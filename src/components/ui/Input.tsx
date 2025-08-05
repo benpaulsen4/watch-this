@@ -1,66 +1,76 @@
-import { TextField, Label, Input as AriaInput, FieldError, Text } from 'react-aria-components'
-import { cn } from '@/lib/utils'
+import { forwardRef } from 'react';
+import { cn } from '@/lib/utils';
+import { cva, type VariantProps } from 'class-variance-authority';
 
-interface InputProps {
-  label?: string
-  placeholder?: string
-  value?: string
-  onChange?: (value: string) => void
-  type?: 'text' | 'email' | 'password' | 'search'
-  isRequired?: boolean
-  isDisabled?: boolean
-  errorMessage?: string
-  description?: string
-  className?: string
+const inputVariants = cva(
+  'flex w-full rounded-lg border bg-transparent px-3 py-2 text-sm transition-all file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-50',
+  {
+    variants: {
+      variant: {
+        default:
+          'border-gray-600 text-gray-100 hover:border-gray-500 focus:border-red-500',
+        error:
+          'border-red-500 text-gray-100 focus:border-red-400 focus-visible:ring-red-400',
+        success:
+          'border-green-500 text-gray-100 focus:border-green-400 focus-visible:ring-green-400',
+      },
+      size: {
+        default: 'h-10',
+        sm: 'h-8 text-xs',
+        lg: 'h-12 text-base',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+export interface InputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'>,
+    VariantProps<typeof inputVariants> {
+  error?: string;
+  label?: string;
+  helperText?: string;
 }
 
-export function Input({
-  label,
-  placeholder,
-  value,
-  onChange,
-  type = 'text',
-  isRequired,
-  isDisabled,
-  errorMessage,
-  description,
-  className,
-}: InputProps) {
-  return (
-    <TextField
-      value={value}
-      onChange={onChange}
-      isRequired={isRequired}
-      isDisabled={isDisabled}
-      isInvalid={!!errorMessage}
-      className={cn('flex flex-col gap-1', className)}
-    >
-      {label && (
-        <Label className="text-sm font-medium text-gray-700">
-          {label}
-          {isRequired && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-      )}
-      <AriaInput
-        type={type}
-        placeholder={placeholder}
-        className={cn(
-          'px-3 py-2 border border-gray-300 rounded-md shadow-sm',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-          'disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed',
-          'invalid:border-red-500 invalid:ring-red-500'
+const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ className, variant, size, error, label, helperText, id, ...props }, ref) => {
+    const inputId = id || `input-${Math.random().toString(36).substring(2)}`;
+    const finalVariant = error ? 'error' : variant;
+
+    return (
+      <div className="space-y-2">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className="text-sm font-medium text-gray-200"
+          >
+            {label}
+          </label>
         )}
-      />
-      {description && (
-        <Text slot="description" className="text-sm text-gray-600">
-          {description}
-        </Text>
-      )}
-      {errorMessage && (
-        <FieldError className="text-sm text-red-600">
-          {errorMessage}
-        </FieldError>
-      )}
-    </TextField>
-  )
-}
+        <input
+          id={inputId}
+          className={cn(inputVariants({ variant: finalVariant, size, className }))}
+          ref={ref}
+          {...props}
+        />
+        {(error || helperText) && (
+          <p
+            className={cn(
+              'text-xs',
+              error ? 'text-red-400' : 'text-gray-500'
+            )}
+          >
+            {error || helperText}
+          </p>
+        )}
+      </div>
+    );
+  }
+);
+
+Input.displayName = 'Input';
+
+export { Input, inputVariants };
