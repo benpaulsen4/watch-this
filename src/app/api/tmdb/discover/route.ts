@@ -1,24 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { tmdbClient } from "@/lib/tmdb/client";
-import { getCurrentUser } from "@/lib/auth/webauthn";
+import {
+  withAuth,
+  handleApiError,
+  validatePagination,
+  AuthenticatedRequest,
+} from "@/lib/auth/api-middleware";
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
-    // Check authentication
-    // TODO get the user and auth status from middleware state
-    const sessionToken = request.cookies.get("session")?.value;
-    const user = await getCurrentUser(sessionToken);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") as "movie" | "tv";
-    const page = parseInt(searchParams.get("page") || "1");
     const genre = searchParams.get("genre");
     const year = searchParams.get("year");
     const sortBy = searchParams.get("sort_by");
@@ -30,11 +22,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (page < 1 || page > 1000) {
-      return NextResponse.json(
-        { error: "Page must be between 1 and 1000" },
-        { status: 400 }
-      );
+    const { page: validatedPage, error: pageError } = validatePagination(
+      searchParams.get("page")
+    );
+    if (pageError) {
+      return pageError;
     }
 
     const params: {
@@ -43,7 +35,7 @@ export async function GET(request: NextRequest) {
       year?: number;
       sortBy?: string;
     } = {
-      page,
+      page: validatedPage,
     };
 
     if (genre) {
@@ -91,18 +83,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(results);
   } catch (error) {
-    console.error("TMDB discover error:", error);
-
-    if (error instanceof Error && error.message.includes("TMDB API error")) {
-      return NextResponse.json(
-        { error: "External service unavailable" },
-        { status: 503 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Failed to discover content" },
-      { status: 500 }
-    );
+    return handleApiError(error, "TMDB discover");
   }
-}
+});

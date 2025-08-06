@@ -1,21 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { tmdbClient } from "@/lib/tmdb/client";
-import { getCurrentUser } from "@/lib/auth/webauthn";
+import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
-    // Check authentication
-    // TODO get the user and auth status from middleware state
-    const sessionToken = request.cookies.get("session")?.value;
-    const user = await getCurrentUser(sessionToken);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const type = searchParams.get("type") as "movie" | "tv";
@@ -73,4 +61,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

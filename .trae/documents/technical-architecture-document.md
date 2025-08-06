@@ -346,3 +346,171 @@ The `user_content_status` table enables sophisticated status tracking that addre
 -- Initial user_content_status records are created when users first interact with content
 ```
 
+## 7. Coding Standards
+
+### 7.1 Component Architecture
+
+**Server Components First**
+- Use Server Components by default for all pages and components
+- Only use Client Components when interactivity is required (forms, event handlers, state management)
+- Create "islands of reactivity" using Client Components within Server Component trees
+- Wrap Client Components with Suspense boundaries for better loading states
+
+```tsx
+// ✅ Good: Server Component with Client Component island
+export default async function ListPage({ params }: { params: { id: string } }) {
+  const list = await getList(params.id); // Server-side data fetching
+  
+  return (
+    <div>
+      <h1>{list.name}</h1>
+      <Suspense fallback={<LoadingSpinner />}>
+        <AddContentForm listId={list.id} /> {/* Client Component */}
+      </Suspense>
+    </div>
+  );
+}
+```
+
+### 7.2 Testing Requirements
+
+**Comprehensive Test Coverage**
+- Write unit tests for every utility function and library
+- Write component tests for all UI components using React Testing Library
+- Write integration tests for API routes and database operations
+- Maintain minimum 80% code coverage
+
+```tsx
+// Example component test structure
+describe('ListCard', () => {
+  it('renders list information correctly', () => {
+    render(<ListCard list={mockList} />);
+    expect(screen.getByText(mockList.name)).toBeInTheDocument();
+  });
+  
+  it('handles collaboration status display', () => {
+    // Test collaborative features
+  });
+});
+```
+
+### 7.3 Layout and Authentication Patterns
+
+**Shared Layouts**
+- Extract common UI elements (headers, navigation, footers) into shared layout components
+- Implement authentication checks at the layout level to avoid repetition
+- Use layout.tsx files for route-level shared layouts
+
+```tsx
+// app/(authenticated)/layout.tsx
+export default async function AuthenticatedLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await getCurrentUser(); // Single auth check for all child routes
+  
+  if (!user) {
+    redirect('/auth');
+  }
+  
+  return (
+    <div className="min-h-screen bg-gray-900">
+      <Header user={user} />
+      <main className="container mx-auto px-4 py-8">
+        {children}
+      </main>
+    </div>
+  );
+}
+```
+
+### 7.4 API Route Authentication
+
+**Middleware-First Authentication**
+- Handle authentication in middleware whenever possible
+- Pass user information from middleware to API routes via headers or request context
+- Avoid re-checking authentication in API routes if middleware has already validated
+
+```tsx
+// middleware.ts
+export async function middleware(request: NextRequest) {
+  const user = await validateAuth(request);
+  
+  if (user) {
+    // Add user info to request headers
+    request.headers.set('x-user-id', user.id);
+    request.headers.set('x-username', user.username);
+  }
+  
+  return NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+}
+
+// API route using middleware auth
+export async function GET(request: Request) {
+  const userId = request.headers.get('x-user-id');
+  
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  // No need to re-validate auth, middleware already did it
+  const lists = await getUserLists(userId);
+  return NextResponse.json(lists);
+}
+```
+
+### 7.5 File Organization
+
+**Consistent Structure**
+- Group related components in feature-based directories
+- Keep test files adjacent to source files with `.test.tsx` or `.spec.tsx` extensions
+- Use barrel exports (index.ts) for clean imports
+- Separate client and server utilities into appropriate directories
+
+```
+src/
+├── app/
+│   ├── (authenticated)/
+│   │   ├── layout.tsx          # Auth layout
+│   │   ├── dashboard/
+│   │   └── lists/
+│   └── (public)/
+│       ├── layout.tsx          # Public layout
+│       └── auth/
+├── components/
+│   ├── ui/                     # Reusable UI components
+│   ├── forms/                  # Form components
+│   └── layouts/                # Layout components
+├── lib/
+│   ├── auth/                   # Authentication utilities
+│   ├── db/                     # Database utilities
+│   └── utils.ts                # General utilities
+└── __tests__/                  # Global test utilities
+```
+
+### 7.6 Performance Guidelines
+
+**Optimization Best Practices**
+- Use dynamic imports for heavy Client Components
+- Implement proper caching strategies for database queries
+- Optimize images with Next.js Image component
+- Use React.memo() for expensive Client Components that don't need frequent re-renders
+
+```tsx
+// Dynamic import for heavy components
+const VideoPlayer = dynamic(() => import('./VideoPlayer'), {
+  loading: () => <VideoPlayerSkeleton />,
+  ssr: false,
+});
+
+// Cached database query
+const getListsWithCache = cache(async (userId: string) => {
+  return await db.select().from(lists).where(eq(lists.ownerId, userId));
+});
+```
+

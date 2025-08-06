@@ -9,7 +9,8 @@ import {
   type RegistrationResponseJSON,
   type AuthenticationResponseJSON,
 } from "@simplewebauthn/server";
-import { db, users, passkeyCredentials, type User } from "../db";
+import { db } from "../db/index";
+import { users, passkeyCredentials, type User } from "../db";
 import { eq } from "drizzle-orm";
 import { SignJWT, jwtVerify } from "jose";
 

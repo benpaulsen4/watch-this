@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentSession } from '@/lib/auth/client';
-import { ArrowLeft, Filter, TrendingUp, Star } from 'lucide-react';
+import { ArrowLeft, Filter, TrendingUp } from 'lucide-react';
 import type { TMDBMovie, TMDBTVShow, TMDBGenre } from '@/lib/tmdb/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { ContentCard } from '@/components/ui/ContentCard';
@@ -14,10 +13,9 @@ import { Button } from '@/components/ui/Button';
 type ContentType = 'all' | 'movie' | 'tv';
 type SortBy = 'popularity.desc' | 'vote_average.desc' | 'release_date.desc' | 'title.asc';
 
-export default function SearchPage() {
+export function SearchClient() {
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<(TMDBMovie | TMDBTVShow)[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -31,22 +29,7 @@ export default function SearchPage() {
   const [discoverContent, setDiscoverContent] = useState<(TMDBMovie | TMDBTVShow)[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const session = await getCurrentSession();
-      if (session?.user) {
-        // User is authenticated, continue
-      } else {
-        router.push('/auth');
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      router.push('/auth');
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
+  const [contentLoading, setContentLoading] = useState(true);
 
   const loadGenres = async () => {
     try {
@@ -98,6 +81,8 @@ export default function SearchPage() {
       }
     } catch (error) {
       console.error('Failed to load discover content:', error);
+    } finally {
+      setContentLoading(false);
     }
   }, [contentType, sortBy, selectedGenre, selectedYear]);
 
@@ -130,11 +115,10 @@ export default function SearchPage() {
   }, [contentType, loadDiscoverContent]);
 
   useEffect(() => {
-    checkAuth();
     loadGenres();
     loadTrendingContent();
     loadDiscoverContent();
-  }, [checkAuth, loadDiscoverContent]);
+  }, [loadDiscoverContent]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -161,14 +145,6 @@ export default function SearchPage() {
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <LoadingSpinner size="xl" variant="primary" text="Loading search..." />
-      </div>
-    );
-  }
 
   const displayContent = searchQuery ? searchResults : discoverContent;
 
@@ -205,9 +181,8 @@ export default function SearchPage() {
           <SearchInput
             value={searchQuery}
             onSearch={handleSearch}
+            placeholder="Search movies and TV shows..."
             loading={searchLoading}
-            placeholder="Search for movies and TV shows..."
-            className="max-w-2xl mx-auto"
           />
         </div>
 
@@ -215,16 +190,10 @@ export default function SearchPage() {
         {showFilters && (
           <Card variant="entertainment" className="mb-8">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Filters</CardTitle>
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear All
-                </Button>
-              </div>
+              <CardTitle>Filters</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Content Type */}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Content Type
@@ -232,7 +201,7 @@ export default function SearchPage() {
                   <select
                     value={contentType}
                     onChange={(e) => setContentType(e.target.value as ContentType)}
-                    className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-gray-100 focus:border-red-500 focus:ring-red-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
                   >
                     <option value="all">All</option>
                     <option value="movie">Movies</option>
@@ -240,7 +209,6 @@ export default function SearchPage() {
                   </select>
                 </div>
 
-                {/* Genre */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Genre
@@ -248,7 +216,7 @@ export default function SearchPage() {
                   <select
                     value={selectedGenre}
                     onChange={(e) => setSelectedGenre(e.target.value)}
-                    className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-gray-100 focus:border-red-500 focus:ring-red-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
                   >
                     <option value="">All Genres</option>
                     {genres.map((genre) => (
@@ -259,7 +227,6 @@ export default function SearchPage() {
                   </select>
                 </div>
 
-                {/* Year */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Year
@@ -267,7 +234,7 @@ export default function SearchPage() {
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value)}
-                    className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-gray-100 focus:border-red-500 focus:ring-red-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
                   >
                     <option value="">All Years</option>
                     {years.map((year) => (
@@ -278,7 +245,6 @@ export default function SearchPage() {
                   </select>
                 </div>
 
-                {/* Sort By */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Sort By
@@ -286,107 +252,76 @@ export default function SearchPage() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortBy)}
-                    className="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-gray-100 focus:border-red-500 focus:ring-red-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
                   >
-                    <option value="popularity.desc">Most Popular</option>
-                    <option value="vote_average.desc">Highest Rated</option>
-                    <option value="release_date.desc">Newest</option>
-                    <option value="title.asc">Title A-Z</option>
+                    <option value="popularity.desc">Popularity</option>
+                    <option value="vote_average.desc">Rating</option>
+                    <option value="release_date.desc">Release Date</option>
+                    <option value="title.asc">Title</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear Filters
+                </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Trending Section (only when not searching) */}
-        {!searchQuery && trendingContent.length > 0 && (
-          <section className="mb-8">
-            <div className="flex items-center gap-2 mb-6">
-              <TrendingUp className="h-5 w-5 text-red-400" />
-              <h2 className="text-xl font-semibold text-gray-100">Trending Today</h2>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-10 gap-4">
-              {trendingContent.map((content) => (
-                <ContentCard
-                  key={`${content.id}-${'title' in content ? 'movie' : 'tv'}`}
-                  content={content}
-                  variant="compact"
-                  onAddToList={() => {
-                    // TODO: Implement add to list functionality
-                    console.log('Add to list:', content);
-                  }}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Results Section */}
+        {/* Results */}
         <section>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-100">
+            <h2 className="text-2xl font-bold text-gray-100">
               {searchQuery ? `Search Results for "${searchQuery}"` : 'Discover Content'}
             </h2>
-            
-            {displayContent.length > 0 && (
-              <p className="text-sm text-gray-400">
-                {displayContent.length} results
-              </p>
-            )}
           </div>
-          
-          {searchLoading ? (
-            <div className="flex justify-center py-12">
-              <LoadingSpinner size="lg" variant="primary" text="Searching..." />
+
+          {(searchLoading || contentLoading) ? (
+            <div className="flex justify-center py-8">
+              <LoadingSpinner size="lg" variant="primary" />
             </div>
           ) : displayContent.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {displayContent.map((content) => (
-                  <ContentCard
-                    key={`${content.id}-${'title' in content ? 'movie' : 'tv'}`}
-                    content={content}
-                    variant="default"
-                    onAddToList={() => {
-                      // TODO: Implement add to list functionality
-                      console.log('Add to list:', content);
-                    }}
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                {displayContent.map((item) => (
+                  <ContentCard key={item.id} content={item} />
                 ))}
               </div>
               
-              {/* Load More Button */}
               {!searchQuery && hasMore && (
                 <div className="flex justify-center mt-8">
-                  <Button
-                    onClick={loadMore}
-                    variant="outline"
-                    className="px-8"
-                  >
+                  <Button onClick={loadMore} variant="outline">
                     Load More
                   </Button>
                 </div>
               )}
             </>
           ) : (
-            <Card variant="entertainment">
-              <CardContent className="text-center py-12">
-                <Star className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-300 mb-2">
-                  {searchQuery ? 'No results found' : 'Start discovering'}
-                </h3>
-                <p className="text-gray-400">
-                  {searchQuery 
-                    ? `No content found for "${searchQuery}". Try different keywords or filters.`
-                    : 'Use the search bar or filters to discover amazing movies and TV shows.'
-                  }
-                </p>
-              </CardContent>
-            </Card>
+            <div className="text-center py-8">
+              <p className="text-gray-400">
+                {searchQuery ? `No results found for "${searchQuery}"` : 'No content available'}
+              </p>
+            </div>
           )}
         </section>
+
+        {/* Trending Sidebar */}
+        {!searchQuery && trendingContent.length > 0 && (
+          <section className="mt-12">
+            <div className="flex items-center gap-2 mb-6">
+              <TrendingUp className="h-5 w-5 text-red-400" />
+              <h3 className="text-xl font-semibold text-gray-100">Trending Today</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+              {trendingContent.map((item) => (
+                <ContentCard key={item.id} content={item} />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );

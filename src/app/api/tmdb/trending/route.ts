@@ -1,21 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { tmdbClient } from "@/lib/tmdb/client";
-import { getCurrentUser } from "@/lib/auth/webauthn";
+import {
+  withAuth,
+  handleApiError,
+  AuthenticatedRequest,
+} from "@/lib/auth/api-middleware";
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
-    // Check authentication
-    // TODO get the user and auth status from middleware state
-    const sessionToken = request.cookies.get("session")?.value;
-    const user = await getCurrentUser(sessionToken);
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const mediaType = searchParams.get("media_type") as
       | "all"
@@ -48,18 +40,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(results);
   } catch (error) {
-    console.error("TMDB trending error:", error);
-
-    if (error instanceof Error && error.message.includes("TMDB API error")) {
-      return NextResponse.json(
-        { error: "External service unavailable" },
-        { status: 503 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Failed to get trending content" },
-      { status: 500 }
-    );
+    return handleApiError(error, "TMDB trending");
   }
-}
+});
