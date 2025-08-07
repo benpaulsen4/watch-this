@@ -1,10 +1,6 @@
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
-const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
+const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
-
-if (!TMDB_API_KEY) {
-  throw new Error('TMDB_API_KEY environment variable is required');
-}
 
 export interface TMDBMovie {
   id: number;
@@ -140,20 +136,27 @@ export interface TMDBTVShowDetails extends TMDBTVShow {
   type: string;
 }
 
-export type ContentType = 'movie' | 'tv';
+export type ContentType = "movie" | "tv";
 
 class TMDBClient {
-  private async request<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    params: Record<string, string> = {}
+  ): Promise<T> {
+    if (!TMDB_API_KEY) {
+      throw new Error("TMDB_API_KEY environment variable is required");
+    }
+
     const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-    url.searchParams.set('api_key', TMDB_API_KEY!);
-    
+    url.searchParams.set("api_key", TMDB_API_KEY!);
+
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.set(key, value);
     });
 
     const response = await fetch(url.toString(), {
       headers: {
-        'Accept': 'application/json',
+        Accept: "application/json",
       },
       next: {
         revalidate: 3600, // Cache for 1 hour
@@ -161,31 +164,42 @@ class TMDBClient {
     });
 
     if (!response.ok) {
-      throw new Error(`TMDB API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `TMDB API error: ${response.status} ${response.statusText}`
+      );
     }
 
     return response.json();
   }
 
   // Search for movies and TV shows
-  async searchMulti(query: string, page: number = 1): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>('/search/multi', {
+  async searchMulti(
+    query: string,
+    page: number = 1
+  ): Promise<TMDBSearchResult> {
+    return this.request<TMDBSearchResult>("/search/multi", {
       query: encodeURIComponent(query),
       page: page.toString(),
     });
   }
 
   // Search for movies only
-  async searchMovies(query: string, page: number = 1): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>('/search/movie', {
+  async searchMovies(
+    query: string,
+    page: number = 1
+  ): Promise<TMDBSearchResult> {
+    return this.request<TMDBSearchResult>("/search/movie", {
       query: encodeURIComponent(query),
       page: page.toString(),
     });
   }
 
   // Search for TV shows only
-  async searchTVShows(query: string, page: number = 1): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>('/search/tv', {
+  async searchTVShows(
+    query: string,
+    page: number = 1
+  ): Promise<TMDBSearchResult> {
+    return this.request<TMDBSearchResult>("/search/tv", {
       query: encodeURIComponent(query),
       page: page.toString(),
     });
@@ -202,44 +216,51 @@ class TMDBClient {
   }
 
   // Get trending content
-  async getTrending(mediaType: 'all' | 'movie' | 'tv' = 'all', timeWindow: 'day' | 'week' = 'week'): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>(`/trending/${mediaType}/${timeWindow}`);
+  async getTrending(
+    mediaType: "all" | "movie" | "tv" = "all",
+    timeWindow: "day" | "week" = "week"
+  ): Promise<TMDBSearchResult> {
+    return this.request<TMDBSearchResult>(
+      `/trending/${mediaType}/${timeWindow}`
+    );
   }
 
   // Get popular movies
   async getPopularMovies(page: number = 1): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>('/movie/popular', {
+    return this.request<TMDBSearchResult>("/movie/popular", {
       page: page.toString(),
     });
   }
 
   // Get popular TV shows
   async getPopularTVShows(page: number = 1): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>('/tv/popular', {
+    return this.request<TMDBSearchResult>("/tv/popular", {
       page: page.toString(),
     });
   }
 
   // Get movie genres
   async getMovieGenres(): Promise<{ genres: TMDBGenre[] }> {
-    return this.request<{ genres: TMDBGenre[] }>('/genre/movie/list');
+    return this.request<{ genres: TMDBGenre[] }>("/genre/movie/list");
   }
 
   // Get TV genres
   async getTVGenres(): Promise<{ genres: TMDBGenre[] }> {
-    return this.request<{ genres: TMDBGenre[] }>('/genre/tv/list');
+    return this.request<{ genres: TMDBGenre[] }>("/genre/tv/list");
   }
 
   // Discover movies with filters
-  async discoverMovies(params: {
-    page?: number;
-    genre?: number;
-    year?: number;
-    sortBy?: string;
-  } = {}): Promise<TMDBSearchResult> {
+  async discoverMovies(
+    params: {
+      page?: number;
+      genre?: number;
+      year?: number;
+      sortBy?: string;
+    } = {}
+  ): Promise<TMDBSearchResult> {
     const queryParams: Record<string, string> = {
       page: (params.page || 1).toString(),
-      sort_by: params.sortBy || 'popularity.desc',
+      sort_by: params.sortBy || "popularity.desc",
     };
 
     if (params.genre) {
@@ -250,19 +271,21 @@ class TMDBClient {
       queryParams.year = params.year.toString();
     }
 
-    return this.request<TMDBSearchResult>('/discover/movie', queryParams);
+    return this.request<TMDBSearchResult>("/discover/movie", queryParams);
   }
 
   // Discover TV shows with filters
-  async discoverTVShows(params: {
-    page?: number;
-    genre?: number;
-    year?: number;
-    sortBy?: string;
-  } = {}): Promise<TMDBSearchResult> {
+  async discoverTVShows(
+    params: {
+      page?: number;
+      genre?: number;
+      year?: number;
+      sortBy?: string;
+    } = {}
+  ): Promise<TMDBSearchResult> {
     const queryParams: Record<string, string> = {
       page: (params.page || 1).toString(),
-      sort_by: params.sortBy || 'popularity.desc',
+      sort_by: params.sortBy || "popularity.desc",
     };
 
     if (params.genre) {
@@ -273,28 +296,36 @@ class TMDBClient {
       queryParams.first_air_date_year = params.year.toString();
     }
 
-    return this.request<TMDBSearchResult>('/discover/tv', queryParams);
+    return this.request<TMDBSearchResult>("/discover/tv", queryParams);
   }
 }
 
 // Utility functions for image URLs
-export function getImageUrl(path: string | null, size: 'w92' | 'w154' | 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w500'): string | null {
+export function getImageUrl(
+  path: string | null,
+  size: "w92" | "w154" | "w185" | "w342" | "w500" | "w780" | "original" = "w500"
+): string | null {
   if (!path) return null;
   return `${TMDB_IMAGE_BASE_URL}/${size}${path}`;
 }
 
-export function getBackdropUrl(path: string | null, size: 'w300' | 'w780' | 'w1280' | 'original' = 'w1280'): string | null {
+export function getBackdropUrl(
+  path: string | null,
+  size: "w300" | "w780" | "w1280" | "original" = "w1280"
+): string | null {
   if (!path) return null;
   return `${TMDB_IMAGE_BASE_URL}/${size}${path}`;
 }
 
 // Helper function to determine if content is a movie or TV show
 export function isMovie(content: TMDBMovie | TMDBTVShow): content is TMDBMovie {
-  return 'title' in content;
+  return "title" in content;
 }
 
-export function isTVShow(content: TMDBMovie | TMDBTVShow): content is TMDBTVShow {
-  return 'name' in content;
+export function isTVShow(
+  content: TMDBMovie | TMDBTVShow
+): content is TMDBTVShow {
+  return "name" in content;
 }
 
 // Helper function to get content title
@@ -309,7 +340,7 @@ export function getContentReleaseDate(content: TMDBMovie | TMDBTVShow): string {
 
 // Helper function to get content type
 export function getContentType(content: TMDBMovie | TMDBTVShow): ContentType {
-  return isMovie(content) ? 'movie' : 'tv';
+  return isMovie(content) ? "movie" : "tv";
 }
 
 // Create and export the TMDB client instance
