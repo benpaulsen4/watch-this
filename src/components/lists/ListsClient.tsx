@@ -10,8 +10,10 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 interface List {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
+  listType: string;
   isPublic: boolean;
+  ownerId: string;
   itemCount: number;
   collaborators: number;
   createdAt: string;
@@ -26,82 +28,104 @@ export default function ListsClient() {
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
   const [newListIsPublic, setNewListIsPublic] = useState(false);
+  const [newListType, setNewListType] = useState('mixed');
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
 
 
   useEffect(() => {
-    // Mock data for demonstration
-    const mockLists: List[] = [
-      {
-        id: '1',
-        name: 'Must Watch Movies',
-        description: 'My collection of must-see films',
-        isPublic: true,
-        createdAt: '2024-01-15T10:00:00Z',
-        updatedAt: '2024-01-20T15:30:00Z',
-        itemCount: 12,
-        collaborators: 3
-      },
-      {
-        id: '2',
-        name: 'TV Series Backlog',
-        description: 'Shows I need to catch up on',
-        isPublic: false,
-        createdAt: '2024-01-10T08:00:00Z',
-        updatedAt: '2024-01-18T12:00:00Z',
-        itemCount: 8,
-        collaborators: 1
-      },
-      {
-        id: '3',
-        name: 'Comedy Specials',
-        description: 'Stand-up and comedy shows',
-        isPublic: true,
-        createdAt: '2024-01-12T14:00:00Z',
-        updatedAt: '2024-01-16T09:30:00Z',
-        itemCount: 5,
-        collaborators: 0
+    const fetchLists = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch('/api/lists', {
+          method: 'GET',
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch lists');
+        }
+        
+        const data = await response.json();
+        setLists(data.lists || []);
+      } catch (err) {
+        console.error('Error fetching lists:', err);
+        setError('Failed to load lists. Please try again.');
+      } finally {
+        setLoading(false);
       }
-    ];
-    setLists(mockLists);
-    setLoading(false);
+    };
+    
+    fetchLists();
   }, []);
 
   const handleCreateList = async () => {
     if (!newListName.trim()) return;
 
     setCreating(true);
+    setError(null);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newList: List = {
-      id: Date.now().toString(),
-      name: newListName,
-      description: newListDescription,
-      isPublic: newListIsPublic,
-      itemCount: 0,
-      collaborators: 1,
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0]
-    };
-
-    setLists(prev => [newList, ...prev]);
-    setNewListName('');
-    setNewListDescription('');
-    setNewListIsPublic(false);
-    setShowCreateForm(false);
-    setCreating(false);
+    try {
+      const response = await fetch('/api/lists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newListName.trim(),
+          description: newListDescription.trim() || null,
+          listType: newListType,
+          isPublic: newListIsPublic,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create list');
+      }
+      
+      const data = await response.json();
+      setLists(prev => [data.list, ...prev]);
+      
+      // Reset form
+      setNewListName('');
+      setNewListDescription('');
+      setNewListIsPublic(false);
+      setNewListType('mixed');
+      setShowCreateForm(false);
+    } catch (err) {
+      console.error('Error creating list:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create list');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleDeleteList = async (listId: string) => {
     if (!confirm('Are you sure you want to delete this list?')) return;
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    setLists(prev => prev.filter(list => list.id !== listId));
+    try {
+      setError(null);
+      
+      const response = await fetch(`/api/lists/${listId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete list');
+      }
+      
+      setLists(prev => prev.filter(list => list.id !== listId));
+    } catch (err) {
+      console.error('Error deleting list:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete list');
+    }
   };
 
   if (loading) {
@@ -134,6 +158,13 @@ export default function ListsClient() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Error Display */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-900/50 border border-red-800 rounded-lg">
+            <p className="text-red-200">{error}</p>
+          </div>
+        )}
+
         {/* Create List Form */}
         {showCreateForm && (
           <Card className="mb-8 bg-gray-900 border-gray-800">
@@ -165,6 +196,22 @@ export default function ListsClient() {
                   rows={3}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
+              </div>
+              
+              <div>
+                <label htmlFor="listType" className="block text-sm font-medium text-gray-300 mb-2">
+                  List Type
+                </label>
+                <select
+                  id="listType"
+                  value={newListType}
+                  onChange={(e) => setNewListType(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="mixed">Mixed (Movies & TV Shows)</option>
+                  <option value="movies">Movies Only</option>
+                  <option value="tv">TV Shows Only</option>
+                </select>
               </div>
               
               <div className="flex items-center gap-2">
@@ -230,9 +277,14 @@ export default function ListsClient() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-gray-100 text-lg mb-1">
-                        {list.name}
-                      </CardTitle>
+                      <div className="flex items-center gap-2 mb-1">
+                        <CardTitle className="text-gray-100 text-lg">
+                          {list.name}
+                        </CardTitle>
+                        <span className="px-2 py-1 text-xs bg-blue-600 text-blue-100 rounded-full capitalize">
+                          {list.listType}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-2 text-sm text-gray-400">
                         {list.isPublic ? (
                           <>

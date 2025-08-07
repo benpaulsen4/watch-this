@@ -1,10 +1,11 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import Image from 'next/image';
 import { cn, formatVoteAverage } from '@/lib/utils';
 import { getContentTitle, getContentReleaseDate, getContentType, getImageUrl } from '@/lib/tmdb/client';
 import { Card } from './Card';
 import { Badge } from './Badge';
-import { Star, Calendar, Play } from 'lucide-react';
+import { ContentDetailsModal } from './ContentDetailsModal';
+import { Star, Play } from 'lucide-react';
 import type { TMDBMovie, TMDBTVShow } from '@/lib/tmdb/client';
 
 export interface ContentCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'content'> {
@@ -14,6 +15,13 @@ export interface ContentCardProps extends Omit<React.HTMLAttributes<HTMLDivEleme
   status?: string;
   onStatusChange?: (status: string) => void;
   onAddToList?: () => void;
+  onContentClick?: (content: TMDBMovie | TMDBTVShow) => void;
+  // List-specific props
+  showRemoveButton?: boolean;
+  onRemove?: () => void;
+  addedDate?: string;
+  showAddedDate?: boolean;
+  currentListId?: string;
 }
 
 const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
@@ -23,9 +31,30 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
     showStatus = false, 
     status, 
     onAddToList,
+    onContentClick,
+    showRemoveButton = false,
+    onRemove,
+    addedDate,
+    showAddedDate = false,
+    currentListId,
     className, 
     ...props 
   }, ref) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    const handleCardClick = () => {
+      if (onContentClick) {
+        onContentClick(content);
+      } else {
+        setIsModalOpen(true);
+      }
+    };
+    
+    const handleAddToList = () => {
+      if (onAddToList) {
+        onAddToList();
+      }
+    };
     const title = getContentTitle(content);
     const releaseDate = getContentReleaseDate(content);
     const contentType = getContentType(content);
@@ -34,14 +63,16 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
 
     if (variant === 'compact') {
       return (
-        <Card
-          ref={ref}
-          variant="entertainment"
-          hover="lift"
-          size="sm"
-          className={cn('group cursor-pointer overflow-hidden', className)}
-          {...props}
-        >
+        <>
+          <Card
+            ref={ref}
+            variant="entertainment"
+            hover="lift"
+            size="sm"
+            className={cn('group cursor-pointer overflow-hidden', className)}
+            onClick={handleCardClick}
+            {...props}
+          >
           <div className="flex gap-3">
             <div className="relative flex-shrink-0">
               {posterUrl ? (
@@ -85,21 +116,53 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
                   {formatVoteAverage(content.vote_average)}
                 </span>
               </div>
+              
+              {/* List-specific features for compact variant */}
+              {(showRemoveButton || showAddedDate) && (
+                <div className="flex justify-between items-center mt-2">
+                  {showAddedDate && addedDate && (
+                    <span className="text-xs text-gray-500">
+                      Added {new Date(addedDate).toLocaleDateString()}
+                    </span>
+                  )}
+                  {showRemoveButton && onRemove && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove();
+                      }}
+                      className="text-red-400 hover:text-red-300 text-xs px-2 py-1 rounded transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        </Card>
+          </Card>
+          
+          <ContentDetailsModal
+            content={content}
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            currentListId={currentListId}
+          />
+        </>
       );
     }
 
     return (
-      <Card
-        ref={ref}
-        variant="entertainment"
-        hover="lift"
-        size="sm"
-        className={cn('group cursor-pointer overflow-hidden', className)}
-        {...props}
-      >
+      <>
+        <Card
+          ref={ref}
+          variant="entertainment"
+          hover="lift"
+          size="sm"
+          className={cn('group cursor-pointer overflow-hidden', className)}
+          onClick={handleCardClick}
+          {...props}
+        >
         <div className="relative">
           {posterUrl ? (
             <Image
@@ -122,11 +185,22 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAddToList();
+                    handleAddToList();
                   }}
                   className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors"
                 >
                   Add to List
+                </button>
+              )}
+              {showRemoveButton && onRemove && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove();
+                  }}
+                  className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Remove
                 </button>
               )}
             </div>
@@ -171,22 +245,28 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
             </p>
           )}
 
-          <div className="flex items-center justify-between mt-3">
-            <div className="flex items-center gap-1 text-gray-400">
-              <Calendar className="h-3 w-3" />
-              <span className="text-xs">
-                {year || 'TBA'}
+          <div className="flex justify-between items-center mt-3">
+            {showAddedDate && addedDate && (
+              <span className="text-xs text-gray-500">
+                Added {new Date(addedDate).toLocaleDateString()}
               </span>
-            </div>
-            
-            {content.vote_count > 0 && (
+            )}
+            {content.vote_count && content.vote_count > 0 && (
               <span className="text-xs text-gray-500">
                 {content.vote_count.toLocaleString()} votes
               </span>
             )}
           </div>
         </div>
-      </Card>
+        </Card>
+        
+        <ContentDetailsModal
+          content={content}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          currentListId={currentListId}
+        />
+      </>
     );
   }
 );
