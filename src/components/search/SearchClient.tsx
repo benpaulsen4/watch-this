@@ -186,7 +186,7 @@ export function SearchClient() {
           />
         </div>
 
-        {/* Filters */}
+        {/* Filters // TODO some don't actually work */}
         {showFilters && (
           <Card variant="entertainment" className="mb-8">
             <CardHeader>

@@ -87,46 +87,6 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
     fetchCurrentUser();
   }, [fetchListDetails, fetchCurrentUser]);
 
-  const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('Are you sure you want to remove this item from the list?')) return;
-    
-    try {
-      console.log('Attempting to delete item:', itemId, 'from list:', listId);
-      
-      const response = await fetch(`/api/lists/${listId}/items`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ listItemId: itemId }),
-      });
-      
-      console.log('Delete response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Delete error response:', errorData);
-        throw new Error(errorData.error || 'Failed to delete item');
-      }
-      
-      const result = await response.json();
-      console.log('Delete success response:', result);
-      
-      // Update local state
-      setList(prev => prev ? {
-        ...prev,
-        items: prev.items.filter(item => item.listItemId !== itemId)
-      } : null);
-      
-      // Show success feedback
-      toast.success('Item removed from list successfully');
-    } catch (err) {
-      console.error('Error deleting item:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete item';
-      toast.error(`Error: ${errorMessage}`);
-    }
-  };
-
   const handleListUpdate = (updatedList: Partial<List>) => {
     setList(prev => prev ? { ...prev, ...updatedList } : null);
     toast.success('List updated successfully');
@@ -232,7 +192,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
         {/* List Description */}
         {list.description && (
           <Card className="mb-8 bg-gray-900 border-gray-800">
-            <CardContent className="pt-6">
+            <CardContent>
               <p className="text-gray-300">{list.description}</p>
             </CardContent>
           </Card>
@@ -267,12 +227,10 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
                  <ContentCard
                    key={listItemId}
                    content={contentData as TMDBMovie | TMDBTVShow}
-                   showRemoveButton={true}
-                   onRemove={() => handleDeleteItem(listItemId)}
                    addedDate={addedAt}
                    showAddedDate={true}
                    currentListId={listId}
-                   currentListName={list.name}
+                   onRemoveFromList={() => fetchListDetails()}
                  />
                );
              })}

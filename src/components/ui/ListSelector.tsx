@@ -1,33 +1,44 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Check, ChevronDown, Plus } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from './Button';
 import type { List } from '@/lib/db/schema';
 
 export interface ListSelectorProps {
   contentType: 'movie' | 'tv';
   contentId: number;
   currentListId?: string;
-  onSelectList: (listId: string) => void;
-  onClose: () => void;
+  onAddToList: (listId: string) => void;
+  onRemoveFromList: (listId: string, itemId: string) => void;
   className?: string;
 }
 
-export function ListSelector({ contentType, contentId, currentListId, onSelectList, onClose, className }: ListSelectorProps) {
+export function ListSelector({ contentType, contentId, currentListId, onAddToList, onRemoveFromList, className }: ListSelectorProps) {
   const [lists, setLists] = useState<List[]>([]);
-  const [listsWithContent, setListsWithContent] = useState<Set<string>>(new Set());
+  const [listsWithContent, setListsWithContent] = useState<Record<string,string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
-    fetchLists();
-    fetchListsWithContent();
+const fetchListsWithContent = useCallback(async () => {
+  console.log("callback running")
+    try {
+      const response = await fetch(`/api/content/${contentId}/lists`);
+      if (response.ok) {
+        const data = await response.json() as { listId: string; itemId: string }[];
+
+        setListsWithContent(data.reduce((acc, list) => {
+          acc[list.listId] = list.itemId;
+          return acc;
+        }, {} as Record<string, string>));
+      }
+    } catch (err) {
+      console.error('Failed to fetch lists with content:', err);
+    }
   }, [contentId]);
 
-  const fetchLists = async () => {
+  useEffect(() => {
+    const fetchLists = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/lists');
@@ -43,18 +54,11 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
     }
   };
 
-  const fetchListsWithContent = async () => {
-    try {
-      const response = await fetch(`/api/content/${contentId}/lists`);
-      if (response.ok) {
-        const data = await response.json();
-        setListsWithContent(new Set(data.listIds || []));
-      }
-    } catch (err) {
-      console.error('Failed to fetch lists with content:', err);
-    }
-  };
+    fetchLists();
+    fetchListsWithContent();
+  }, [contentId, fetchListsWithContent]);
 
+  
   // Filter lists based on content type
   const filteredLists = lists.filter(list => {
     if (list.listType === 'mixed') return true;
@@ -64,8 +68,13 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
   });
 
   const handleSelectList = (listId: string) => {
-    onSelectList(listId);
-    setIsOpen(false);
+    onAddToList(listId);
+    setTimeout(() => fetchListsWithContent(), 300);
+  };
+
+  const handleRemoveFromList = (listId: string, itemId: string) => {
+    onRemoveFromList(listId, itemId);
+    setTimeout(() => fetchListsWithContent(), 300);
   };
 
   if (loading) {
@@ -80,13 +89,6 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
     return (
       <div className={cn('bg-gray-800 rounded-lg p-4', className)}>
         <div className="text-red-400 text-sm mb-2">Error: {error}</div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={fetchLists}
-        >
-          Retry
-        </Button>
       </div>
     );
   }
@@ -97,15 +99,6 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
         <div className="text-gray-300 text-sm mb-2">
           No compatible lists found. Create a {contentType === 'movie' ? 'movie' : 'TV show'} or mixed list first.
         </div>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-        </div>
       </div>
     );
   }
@@ -114,7 +107,7 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
     <div className={cn('bg-gray-800 rounded-lg p-4', className)}>
       <div className="mb-3">
         <h3 className="text-gray-100 font-medium text-sm mb-1">
-          Add to List
+          Manage Lists
         </h3>
         <p className="text-gray-400 text-xs">
           Select a compatible list for this {contentType === 'movie' ? 'movie' : 'TV show'}
@@ -124,19 +117,16 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
       <div className="space-y-2 max-h-48 overflow-y-auto">
         {filteredLists.map((list) => {
           const isCurrentList = currentListId === list.id;
-          const hasContent = listsWithContent.has(list.id);
-          const isDisabled = isCurrentList || hasContent;
+          const hasContent = Object.hasOwn(listsWithContent, list.id);
+          const itemId = listsWithContent[list.id];
           
           return (
             <button
               key={list.id}
-              onClick={() => !isDisabled && handleSelectList(list.id)}
-              disabled={isDisabled}
+              onClick={() => hasContent ? handleRemoveFromList(list.id, itemId) : handleSelectList(list.id)}
+
               className={cn(
-                "w-full text-left p-3 rounded-lg transition-colors group",
-                isDisabled
-                  ? "bg-gray-800 cursor-not-allowed opacity-60"
-                  : "bg-gray-700 hover:bg-gray-600"
+                "w-full text-left p-3 rounded-lg transition-colors group", "bg-gray-700 hover:bg-gray-600"
               )}
             >
               <div className="flex items-center justify-between">
@@ -150,7 +140,7 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
                         Current
                       </span>
                     )}
-                    {hasContent && !isCurrentList && (
+                    {hasContent && (
                       <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">
                         Added
                       </span>
@@ -158,7 +148,7 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
                   </div>
                   <div className="text-gray-400 text-xs mt-1">
                     {list.listType === 'mixed' ? 'Mixed' :
-                     list.listType === 'movie' ? 'Movies' : 'TV Shows'} •
+                     list.listType === 'movie' ? 'Movies' : 'TV Shows'} &nbsp;• &nbsp;
                     {list.isPublic ? 'Public' : 'Private'}
                   </div>
                 </div>
@@ -168,7 +158,7 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
                   ) : (
                     <div className={cn(
                       "transition-opacity",
-                      isDisabled ? "opacity-30" : "opacity-0 group-hover:opacity-100"
+                    "opacity-0 group-hover:opacity-100"
                     )}>
                       <Plus className="h-4 w-4 text-gray-400" />
                     </div>
@@ -178,17 +168,6 @@ export function ListSelector({ contentType, contentId, currentListId, onSelectLi
             </button>
           );
         })}
-      </div>
-      
-      <div className="mt-3 pt-3 border-t border-gray-700">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onClose}
-          className="w-full"
-        >
-          Cancel
-        </Button>
       </div>
     </div>
   );

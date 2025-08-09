@@ -1,15 +1,13 @@
-import { forwardRef, useState } from 'react';
-import { cn, debounce } from '@/lib/utils';
+import { forwardRef, useState, useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
 import { Input } from './Input';
 import { Button } from './Button';
-import { Search, X, Filter } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 export interface SearchInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'size'> {
   onSearch?: (query: string) => void;
   onClear?: () => void;
-  onFilterClick?: () => void;
-  showFilter?: boolean;
   loading?: boolean;
   debounceMs?: number;
 }
@@ -19,40 +17,48 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     className, 
     onSearch, 
     onClear, 
-    onFilterClick,
-    showFilter = false,
     loading = false,
-    debounceMs = 300,
+    debounceMs = 500,
     value: controlledValue,
     defaultValue,
     ...props 
   }, ref) => {
-    const [internalValue, setInternalValue] = useState(defaultValue || '');
-    const value = controlledValue !== undefined ? controlledValue : internalValue;
+    const [internalValue, setInternalValue] = useState(controlledValue ?? defaultValue ?? '');
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Create debounced search function
-    const debouncedSearch = debounce((...args: unknown[]) => {
-      const query = args[0] as string;
-      onSearch?.(query);
-    }, debounceMs) as (query: string) => void;
+    // Clear timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = e.target.value;
+      setInternalValue(newValue);
       
-      if (controlledValue === undefined) {
-        setInternalValue(newValue);
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
       
-      // Call debounced search
-      debouncedSearch(newValue);
+      // Set a new timeout
+      timeoutRef.current = setTimeout(() => {
+        onSearch?.(newValue);
+      }, debounceMs);
     };
 
     const handleClear = () => {
-      if (controlledValue === undefined) {
-        setInternalValue('');
-      }
+      setInternalValue('');
       onClear?.();
       onSearch?.('');
+      
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     };
 
     return (
@@ -64,7 +70,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           {/* Input */}
           <Input
             ref={ref}
-            value={value}
+            value={internalValue}
             onChange={handleChange}
             size="default"
             className="pl-10 pr-10"
@@ -73,7 +79,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           />
           
           {/* Clear button */}
-          {value && (
+          {internalValue && (
             <Button
               type="button"
               variant="ghost"
@@ -92,19 +98,6 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             </div>
           )}
         </div>
-        
-        {/* Filter button */}
-        {showFilter && (
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={onFilterClick}
-            className="flex-shrink-0"
-          >
-            <Filter className="h-4 w-4" />
-          </Button>
-        )}
       </div>
     );
   }

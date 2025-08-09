@@ -2,40 +2,91 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Users, Lock, Globe } from 'lucide-react';
+import { ArrowLeft, Plus, Users, Lock, Globe, Ellipsis } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { getImageUrl } from '@/lib/tmdb/client';
+import { List } from '@/lib/db';
 import Image from 'next/image';
+import { getImageUrl } from '@/lib/tmdb';
 
-interface List {
-  id: string;
-  name: string;
-  description: string | null;
-  listType: string;
-  isPublic: boolean;
-  ownerId: string;
+interface ListResponse extends List{
   itemCount: number;
   collaborators: number;
-  createdAt: string;
-  updatedAt: string;
+  posterPaths: string[];
 }
 
-interface ListItem {
-  id: string;
-  tmdbId: number;
-  contentType: 'movie' | 'tv';
-  title: string;
-  posterPath: string | null;
-  notes: string | null;
-  addedAt: string;
-  sortOrder: number;
-}
+// Poster collage component
+const PosterCollage = ({ posterUrls }: { posterUrls: string[] }) => {
+  if (!posterUrls || posterUrls.length === 0) {
+    return (
+      <div className="w-full h-64 bg-gray-800 rounded-lg flex items-center justify-center mb-4">
+        <div className="text-gray-500 text-sm">No posters</div>
+      </div>
+    );
+  }
+
+  const renderPosterGrid = () => {
+    switch (posterUrls.length) {
+      case 1:
+        return (
+          <div className="w-full h-64 rounded-lg overflow-hidden">
+            <Image 
+              src={posterUrls[0]} 
+              alt="Poster" 
+              className="w-full h-full object-cover"
+              width={300}
+              height={450}
+            />
+          </div>
+        );
+      case 2:
+        return (
+          <div className="grid grid-cols-2 gap-1 h-64 rounded-lg overflow-hidden">
+            {posterUrls.slice(0, 2).map((url, index) => (
+              <Image 
+                key={index}
+                src={url} 
+                alt={`Poster ${index + 1}`} 
+                className="w-full h-full object-cover"
+                width={300}
+              height={450}
+              />
+            ))}
+          </div>
+        );
+      default: // 3 or more
+        return (
+          <div className="grid grid-cols-2 grid-rows-2 gap-1 h-64 rounded-lg overflow-hidden">
+            {posterUrls.slice(0, 4).map((url, index) => (
+              <Image 
+                key={index}
+                src={url} 
+                alt={`Poster ${index + 1}`} 
+                className="w-full h-full object-cover"
+                width={300}
+              height={450}
+              />
+            ))}
+            {posterUrls.length === 3 &&
+            <div className="w-full h-32 bg-gray-800 flex items-center justify-center mb-4">
+        <Ellipsis className='text-gray-500' />
+      </div>}
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="mb-4">
+      {renderPosterGrid()}
+    </div>
+  );
+};
 
 export default function ListsClient() {
   const router = useRouter();
-  const [lists, setLists] = useState<List[]>([]);
+  const [lists, setLists] = useState<ListResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newListName, setNewListName] = useState('');
@@ -44,28 +95,6 @@ export default function ListsClient() {
   const [newListType, setNewListType] = useState('mixed');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [listItems, setListItems] = useState<Record<string, ListItem[]>>({});
-
-
-
-  const fetchListItems = async (listId: string) => {
-    try {
-      const response = await fetch(`/api/lists/${listId}/items`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        return [];
-      }
-      
-      const data = await response.json();
-      return data.items || [];
-    } catch (err) {
-      console.error('Error fetching list items:', err);
-      return [];
-    }
-  };
 
   useEffect(() => {
     const fetchLists = async () => {
@@ -73,10 +102,7 @@ export default function ListsClient() {
         setLoading(true);
         setError(null);
         
-        const response = await fetch('/api/lists', {
-          method: 'GET',
-          credentials: 'include',
-        });
+        const response = await fetch('/api/lists');
         
         if (!response.ok) {
           throw new Error('Failed to fetch lists');
@@ -85,19 +111,7 @@ export default function ListsClient() {
         const data = await response.json();
         const fetchedLists = data.lists || [];
         setLists(fetchedLists);
-        
-        // Fetch items for each list to create collages
-        const itemsPromises = fetchedLists.map(async (list: List) => {
-          const items = await fetchListItems(list.id);
-          return { listId: list.id, items: items.slice(0, 4) }; // Only need first 4 for collage
-        });
-        
-        const allItems = await Promise.all(itemsPromises);
-        const itemsMap: Record<string, ListItem[]> = {};
-        allItems.forEach(({ listId, items }) => {
-          itemsMap[listId] = items;
-        });
-        setListItems(itemsMap);
+
       } catch (err) {
         console.error('Error fetching lists:', err);
         setError('Failed to load lists. Please try again.');
@@ -108,48 +122,6 @@ export default function ListsClient() {
     
     fetchLists();
   }, []);
-
-  const CollagePreview = ({ items }: { items: ListItem[] }) => {
-    const placeholderCount = Math.max(0, 4 - items.length);
-    const placeholders = Array(placeholderCount).fill(null);
-    
-    // Debug logging
-    console.log('CollagePreview items:', items);
-    
-    return (
-      <div className="grid grid-cols-2 gap-1 w-full h-24 mb-4 rounded-lg overflow-hidden bg-gray-800">
-        {items.map((item, index) => {
-          // Debug each item
-          console.log(`Item ${index}:`, item);
-          console.log(`Poster path:`, item.posterPath);
-          
-          return (
-            <div key={item.id} className="relative bg-gray-700 aspect-[2/3]">
-              {item.posterPath ? (
-                <Image
-                  src={getImageUrl(item.posterPath, 'w185') || ''}
-                  alt={item.title}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 50px, 75px"
-                  onError={(e) => console.error('Image load error:', e)}
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-700 flex items-center justify-center">
-                  <span className="text-xs text-gray-500 text-center p-1">{item.title}</span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {placeholders.map((_, index) => (
-          <div key={`placeholder-${index}`} className="bg-gray-700 aspect-[2/3] flex items-center justify-center">
-            <Plus className="h-4 w-4 text-gray-500" />
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   const handleCreateList = async () => {
     if (!newListName.trim()) return;
@@ -191,29 +163,6 @@ export default function ListsClient() {
       setError(err instanceof Error ? err.message : 'Failed to create list');
     } finally {
       setCreating(false);
-    }
-  };
-
-  const handleDeleteList = async (listId: string) => {
-    if (!confirm('Are you sure you want to delete this list?')) return;
-    
-    try {
-      setError(null);
-      
-      const response = await fetch(`/api/lists/${listId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete list');
-      }
-      
-      setLists(prev => prev.filter(list => list.id !== listId));
-    } catch (err) {
-      console.error('Error deleting list:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete list');
     }
   };
 
@@ -362,8 +311,6 @@ export default function ListsClient() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {lists.map((list) => {
-              const items = listItems[list.id] || [];
-              
               return (
                 <Card 
                   key={list.id} 
@@ -395,29 +342,18 @@ export default function ListsClient() {
                           )}
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteList(list.id);
-                        }}
-                        className="text-gray-400 hover:text-red-400 hover:bg-gray-800 active:scale-95"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </CardHeader>
                   
                   <CardContent>
-                    {/* Collage Preview */}
-                    <CollagePreview items={items} />
-                    
                     {list.description && (
                       <p className="text-gray-400 text-sm mb-4 line-clamp-2">
                         {list.description}
                       </p>
                     )}
+                    
+                    {/* Poster Collage */}
+                    <PosterCollage posterUrls={list.posterPaths?.map(path => getImageUrl(path, 'w342')) as string[]} />
                     
                     <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
                       <span>{list.itemCount} items</span>

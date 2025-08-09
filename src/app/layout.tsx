@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -17,10 +17,13 @@ export const metadata: Metadata = {
   description: "Track and discover movies and TV shows with friends. Create lists, share recommendations, and never miss what to watch next.",
   keywords: ["movies", "tv shows", "tracking", "watchlist", "collaboration", "entertainment"],
   authors: [{ name: "WatchThis Team" }],
-  // TODO use new viewport declaration
-  viewport: "width=device-width, initial-scale=1",
-  themeColor: "#ef4444",
 };
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#ef4444",
+}
 
 export default function RootLayout({
   children,

@@ -127,9 +127,9 @@ export default function ListSettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
-        {/* Header */}
+        {/* Header // TODO does not use ARIA modal component */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-white">List Settings</h2>
           <button
@@ -189,7 +189,7 @@ export default function ListSettingsModal({
                 </p>
               </div>
 
-              {/* List Type */}
+              {/* List Type // TODO does not work (nor should it really exist) */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   List Type

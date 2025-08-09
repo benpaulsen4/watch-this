@@ -5,28 +5,25 @@ import Image from 'next/image';
 import { Modal, ModalOverlay, Heading, Button as AriaButton } from 'react-aria-components';
 import { X, Star, Calendar, Clock, Users, Play } from 'lucide-react';
 import { cn, formatVoteAverage } from '@/lib/utils';
-import { getContentTitle, getContentReleaseDate, getContentType, getImageUrl, tmdbClient } from '@/lib/tmdb/client';
+import { getContentTitle, getContentReleaseDate, getContentType, getImageUrl } from '@/lib/tmdb/client';
 import { getGenreNames } from '@/lib/tmdb/genres';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { ListSelector } from './ListSelector';
-import { toast } from 'sonner';
 import type { TMDBMovie, TMDBTVShow, TMDBMovieDetails, TMDBTVShowDetails } from '@/lib/tmdb/client';
 
 export interface ContentDetailsModalProps {
   content: TMDBMovie | TMDBTVShow;
   isOpen: boolean;
   onClose: () => void;
+  onRemove?: () => void,
   currentListId?: string;
-  currentListName?: string;
-  onRemoveFromList?: () => void;
 }
 
-export function ContentDetailsModal({ content, isOpen, onClose, currentListId, currentListName, onRemoveFromList }: ContentDetailsModalProps) {
+export function ContentDetailsModal({ content, isOpen, onClose, onRemove, currentListId }: ContentDetailsModalProps) {
   const [showListSelector, setShowListSelector] = useState(false);
-  const [isAddingToList, setIsAddingToList] = useState(false);
+  const [isManagingList, setIsManagingList] = useState(false);
   const [detailedContent, setDetailedContent] = useState<TMDBMovieDetails | TMDBTVShowDetails | null>(null);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   
   const title = getContentTitle(content);
   const releaseDate = getContentReleaseDate(content);
@@ -43,20 +40,13 @@ export function ContentDetailsModal({ content, isOpen, onClose, currentListId, c
   // Fetch detailed content information when modal opens
   useEffect(() => {
     if (isOpen && !detailedContent) {
-      setIsLoadingDetails(true);
       const fetchDetails = async () => {
         try {
-          if (contentType === 'movie') {
-            const details = await tmdbClient.getMovieDetails(content.id);
-            setDetailedContent(details);
-          } else {
-            const details = await tmdbClient.getTVShowDetails(content.id);
-            setDetailedContent(details);
-          }
+          const details = await fetch(`/api/tmdb/details?type=${contentType}&id=${content.id}`);
+          const data = await details.json();
+          setDetailedContent(data);
         } catch (error) {
           console.error('Error fetching content details:', error);
-        } finally {
-          setIsLoadingDetails(false);
         }
       };
       fetchDetails();
@@ -72,7 +62,7 @@ export function ContentDetailsModal({ content, isOpen, onClose, currentListId, c
 
   const handleAddToList = async (listId: string) => {
     try {
-      setIsAddingToList(true);
+      setIsManagingList(true);
       
       const response = await fetch(`/api/lists/${listId}/items`, {
         method: 'POST',
@@ -92,13 +82,31 @@ export function ContentDetailsModal({ content, isOpen, onClose, currentListId, c
         throw new Error(errorData.error || 'Failed to add content to list');
       }
 
-      toast.success(`Added "${title}" to list successfully!`);
-      setShowListSelector(false);
     } catch (error) {
       console.error('Error adding to list:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to add content to list');
     } finally {
-      setIsAddingToList(false);
+      setIsManagingList(false);
+    }
+  };
+
+  const handleRemoveFromList = async (listId: string, itemId: string) => {
+    try {
+      setIsManagingList(true);
+      
+      const response = await fetch(`/api/lists/${listId}/items/${itemId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove content from list');
+      } else {
+        onRemove?.();
+      }
+    } catch (error) {
+      console.error('Error removing from list:', error);
+    } finally {
+      setIsManagingList(false);
     }
   };
 
@@ -183,7 +191,7 @@ export function ContentDetailsModal({ content, isOpen, onClose, currentListId, c
                       {formatVoteAverage(content.vote_average)}
                     </span>
                     <span className="text-gray-400 text-sm">
-                      ({content.vote_count.toLocaleString()} votes)
+                      ({content.vote_count?.toLocaleString()} votes)
                     </span>
                   </div>
                   
@@ -247,37 +255,20 @@ export function ContentDetailsModal({ content, isOpen, onClose, currentListId, c
                       contentType={contentType}
                       contentId={content.id}
                       currentListId={currentListId}
-                      onSelectList={handleAddToList}
-                      onClose={() => setShowListSelector(false)}
+                      onAddToList={handleAddToList}
+                      onRemoveFromList={handleRemoveFromList}
                     />
                   </div>
                 )}
                 
                 {/* Actions */}
                 <div className="flex gap-3">
-                  {currentListId && currentListName && onRemoveFromList && (
-                    <Button
-                      onClick={onRemoveFromList}
-                      variant="outline"
-                      className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
-                      disabled={isAddingToList}
-                    >
-                      Remove from {currentListName}
-                    </Button>
-                  )}
                   <Button
                     onClick={() => setShowListSelector(!showListSelector)}
                     className="bg-red-600 hover:bg-red-700"
-                    disabled={isAddingToList}
+                    disabled={isManagingList}
                   >
-                    {isAddingToList ? 'Adding...' : showListSelector ? 'Cancel' : 'Add to List'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={onClose}
-                    disabled={isAddingToList}
-                  >
-                    Close
+                    {showListSelector ? 'Finish Managing Lists' : 'Manage Lists'}
                   </Button>
                 </div>
               </div>

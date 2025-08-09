@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { lists, listItems, listCollaborators } from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { eq, or, count } from "drizzle-orm";
+import { eq, or, sql, desc } from "drizzle-orm";
 
 // GET /api/lists - Get all lists for the authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
 
-    // Get lists owned by user or where user is a collaborator
-    const userLists = await db
+    // Get lists with counts in a single optimized query
+    const userListsWithCounts = await db
       .select({
         id: lists.id,
         name: lists.name,
@@ -20,40 +20,53 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         ownerId: lists.ownerId,
         createdAt: lists.createdAt,
         updatedAt: lists.updatedAt,
+        itemCount: sql<number>`(
+          SELECT COUNT(*) 
+          FROM ${listItems} 
+          WHERE ${listItems.listId} = ${lists.id}
+        )`.as("item_count"),
+        collaborators: sql<number>`(
+          SELECT COUNT(*) 
+          FROM ${listCollaborators} 
+          WHERE ${listCollaborators.listId} = ${lists.id}
+        )`.as("collaborator_count"),
       })
       .from(lists)
       .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
       .where(
-        or(
-          eq(lists.ownerId, userId),
-          eq(listCollaborators.userId, userId)
-        )
+        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
       )
-      .groupBy(lists.id);
+      .groupBy(
+        lists.id,
+        lists.name,
+        lists.description,
+        lists.listType,
+        lists.isPublic,
+        lists.ownerId,
+        lists.createdAt,
+        lists.updatedAt
+      );
 
-    // Get item counts and collaborator counts for each list
-    const listsWithCounts = await Promise.all(
-      userLists.map(async (list) => {
-        const [itemCountResult, collaboratorCountResult] = await Promise.all([
-          db
-            .select({ count: count() })
-            .from(listItems)
-            .where(eq(listItems.listId, list.id)),
-          db
-            .select({ count: count() })
-            .from(listCollaborators)
-            .where(eq(listCollaborators.listId, list.id))
-        ]);
+    // Get poster URLs for each list (up to 4 items)
+    const listsWithPosters = await Promise.all(
+      userListsWithCounts.map(async (list) => {
+        const posterItems = await db
+          .select({
+            posterPath: listItems.posterPath,
+          })
+          .from(listItems)
+          .where(eq(listItems.listId, list.id))
+          .orderBy(desc(listItems.addedAt))
+          .limit(4);
 
         return {
           ...list,
-          itemCount: itemCountResult[0]?.count || 0,
-          collaborators: collaboratorCountResult[0]?.count || 0,
+          posterPaths: posterItems.map((i) => i.posterPath),
         };
       })
     );
 
-    return NextResponse.json({ lists: listsWithCounts });
+    return NextResponse.json({ lists: listsWithPosters });
   } catch (error) {
     console.error("Error fetching lists:", error);
     return NextResponse.json(
@@ -68,7 +81,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const body = await request.json();
-    
+
     const { name, description, listType = "mixed", isPublic = false } = body;
 
     if (!name || name.trim().length === 0) {
