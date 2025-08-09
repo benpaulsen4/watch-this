@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Users, Lock, Globe, Edit, Share, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Users, Lock, Globe, Share, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ContentCard } from '@/components/ui/ContentCard';
 import { toast } from 'sonner';
 import type { TMDBMovie, TMDBTVShow } from '@/lib/tmdb/client';
+import { getCurrentSession } from '@/lib/auth/client';
+import CollaborationModal from './CollaborationModal';
+import ListSettingsModal from './ListSettingsModal';
 
 interface ListItem extends TMDBMovie, TMDBTVShow {
   listItemId: string;
@@ -24,6 +27,7 @@ interface List {
   listType: 'movie' | 'tv' | 'mixed';
   isPublic: boolean;
   ownerId: string;
+  ownerUsername?: string;
   createdAt: string;
   updatedAt: string;
   items: ListItem[];
@@ -39,12 +43,20 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
   const [list, setList] = useState<List | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCollaborationModal, setShowCollaborationModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string; username: string } | null>(null);
 
-  useEffect(() => {
-    fetchListDetails();
-  }, [listId]);
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const session = await getCurrentSession();
+      setCurrentUser(session?.user || null);
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  }, []);
 
-  const fetchListDetails = async () => {
+  const fetchListDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -68,7 +80,12 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [listId]);
+
+  useEffect(() => {
+    fetchListDetails();
+    fetchCurrentUser();
+  }, [fetchListDetails, fetchCurrentUser]);
 
   const handleDeleteItem = async (itemId: string) => {
     if (!confirm('Are you sure you want to remove this item from the list?')) return;
@@ -108,6 +125,16 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete item';
       toast.error(`Error: ${errorMessage}`);
     }
+  };
+
+  const handleListUpdate = (updatedList: Partial<List>) => {
+    setList(prev => prev ? { ...prev, ...updatedList } : null);
+    toast.success('List updated successfully');
+  };
+
+  const handleListDelete = () => {
+    toast.success('List deleted successfully');
+    router.push('/lists');
   };
 
   if (loading) {
@@ -176,11 +203,19 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
             </div>
             
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowCollaborationModal(true)}
+              >
                 <Share className="h-4 w-4 mr-2" />
                 Share
               </Button>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowSettingsModal(true)}
+              >
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
               </Button>
@@ -226,7 +261,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {list.items.map((item) => {
               // The item now contains complete TMDB data merged with list-specific data
-              const { listItemId, addedAt, notes, sortOrder, ...contentData } = item;
+              const { listItemId, addedAt, ...contentData } = item;
 
               return (
                  <ContentCard
@@ -237,12 +272,35 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
                    addedDate={addedAt}
                    showAddedDate={true}
                    currentListId={listId}
+                   currentListName={list.name}
                  />
                );
              })}
           </div>
         )}
       </main>
+
+      {/* Collaboration Modal */}
+      <CollaborationModal
+         isOpen={showCollaborationModal}
+         onClose={() => setShowCollaborationModal(false)}
+         listId={listId}
+         listName={list?.name || ''}
+         isOwner={currentUser?.id === list?.ownerId}
+         ownerUsername={list?.ownerUsername}
+       />
+
+      {/* List Settings Modal */}
+      {list && (
+        <ListSettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+          list={list}
+          isOwner={currentUser?.id === list.ownerId}
+          onListUpdate={handleListUpdate}
+          onListDelete={handleListDelete}
+        />
+      )}
     </div>
   );
 }

@@ -17,9 +17,12 @@ export interface ContentDetailsModalProps {
   content: TMDBMovie | TMDBTVShow;
   isOpen: boolean;
   onClose: () => void;
+  currentListId?: string;
+  currentListName?: string;
+  onRemoveFromList?: () => void;
 }
 
-export function ContentDetailsModal({ content, isOpen, onClose }: ContentDetailsModalProps) {
+export function ContentDetailsModal({ content, isOpen, onClose, currentListId, currentListName, onRemoveFromList }: ContentDetailsModalProps) {
   const [showListSelector, setShowListSelector] = useState(false);
   const [isAddingToList, setIsAddingToList] = useState(false);
   const [detailedContent, setDetailedContent] = useState<TMDBMovieDetails | TMDBTVShowDetails | null>(null);
@@ -242,6 +245,8 @@ export function ContentDetailsModal({ content, isOpen, onClose }: ContentDetails
                   <div className="mb-6">
                     <ListSelector
                       contentType={contentType}
+                      contentId={content.id}
+                      currentListId={currentListId}
                       onSelectList={handleAddToList}
                       onClose={() => setShowListSelector(false)}
                     />
@@ -250,6 +255,16 @@ export function ContentDetailsModal({ content, isOpen, onClose }: ContentDetails
                 
                 {/* Actions */}
                 <div className="flex gap-3">
+                  {currentListId && currentListName && onRemoveFromList && (
+                    <Button
+                      onClick={onRemoveFromList}
+                      variant="outline"
+                      className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
+                      disabled={isAddingToList}
+                    >
+                      Remove from {currentListName}
+                    </Button>
+                  )}
                   <Button
                     onClick={() => setShowListSelector(!showListSelector)}
                     className="bg-red-600 hover:bg-red-700"

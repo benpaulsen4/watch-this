@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lists, listItems, listCollaborators } from "@/lib/db/schema";
+import { lists, listItems, listCollaborators, users } from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and, or, count, asc } from "drizzle-orm";
 import { tmdbClient } from "@/lib/tmdb/client";
@@ -30,10 +30,12 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         listType: lists.listType,
         isPublic: lists.isPublic,
         ownerId: lists.ownerId,
+        ownerUsername: users.username,
         createdAt: lists.createdAt,
         updatedAt: lists.updatedAt,
       })
       .from(lists)
+      .innerJoin(users, eq(users.id, lists.ownerId))
       .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
       .where(
         and(

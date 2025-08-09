@@ -22,6 +22,7 @@ export interface ContentCardProps extends Omit<React.HTMLAttributes<HTMLDivEleme
   addedDate?: string;
   showAddedDate?: boolean;
   currentListId?: string;
+  currentListName?: string;
 }
 
 const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
@@ -37,6 +38,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
     addedDate,
     showAddedDate = false,
     currentListId,
+    currentListName,
     className, 
     ...props 
   }, ref) => {
@@ -147,6 +149,8 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             currentListId={currentListId}
+            currentListName={currentListName}
+            onRemoveFromList={onRemove}
           />
         </>
       );
@@ -265,6 +269,8 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           currentListId={currentListId}
+          currentListName={currentListName}
+          onRemoveFromList={onRemove}
         />
       </>
     );

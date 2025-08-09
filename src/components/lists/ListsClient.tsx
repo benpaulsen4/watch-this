@@ -6,6 +6,8 @@ import { ArrowLeft, Plus, Trash2, Users, Lock, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { getImageUrl } from '@/lib/tmdb/client';
+import Image from 'next/image';
 
 interface List {
   id: string;
@@ -20,6 +22,17 @@ interface List {
   updatedAt: string;
 }
 
+interface ListItem {
+  id: string;
+  tmdbId: number;
+  contentType: 'movie' | 'tv';
+  title: string;
+  posterPath: string | null;
+  notes: string | null;
+  addedAt: string;
+  sortOrder: number;
+}
+
 export default function ListsClient() {
   const router = useRouter();
   const [lists, setLists] = useState<List[]>([]);
@@ -31,8 +44,28 @@ export default function ListsClient() {
   const [newListType, setNewListType] = useState('mixed');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listItems, setListItems] = useState<Record<string, ListItem[]>>({});
 
 
+
+  const fetchListItems = async (listId: string) => {
+    try {
+      const response = await fetch(`/api/lists/${listId}/items`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        return [];
+      }
+      
+      const data = await response.json();
+      return data.items || [];
+    } catch (err) {
+      console.error('Error fetching list items:', err);
+      return [];
+    }
+  };
 
   useEffect(() => {
     const fetchLists = async () => {
@@ -50,7 +83,21 @@ export default function ListsClient() {
         }
         
         const data = await response.json();
-        setLists(data.lists || []);
+        const fetchedLists = data.lists || [];
+        setLists(fetchedLists);
+        
+        // Fetch items for each list to create collages
+        const itemsPromises = fetchedLists.map(async (list: List) => {
+          const items = await fetchListItems(list.id);
+          return { listId: list.id, items: items.slice(0, 4) }; // Only need first 4 for collage
+        });
+        
+        const allItems = await Promise.all(itemsPromises);
+        const itemsMap: Record<string, ListItem[]> = {};
+        allItems.forEach(({ listId, items }) => {
+          itemsMap[listId] = items;
+        });
+        setListItems(itemsMap);
       } catch (err) {
         console.error('Error fetching lists:', err);
         setError('Failed to load lists. Please try again.');
@@ -61,6 +108,48 @@ export default function ListsClient() {
     
     fetchLists();
   }, []);
+
+  const CollagePreview = ({ items }: { items: ListItem[] }) => {
+    const placeholderCount = Math.max(0, 4 - items.length);
+    const placeholders = Array(placeholderCount).fill(null);
+    
+    // Debug logging
+    console.log('CollagePreview items:', items);
+    
+    return (
+      <div className="grid grid-cols-2 gap-1 w-full h-24 mb-4 rounded-lg overflow-hidden bg-gray-800">
+        {items.map((item, index) => {
+          // Debug each item
+          console.log(`Item ${index}:`, item);
+          console.log(`Poster path:`, item.posterPath);
+          
+          return (
+            <div key={item.id} className="relative bg-gray-700 aspect-[2/3]">
+              {item.posterPath ? (
+                <Image
+                  src={getImageUrl(item.posterPath, 'w185') || ''}
+                  alt={item.title}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 50px, 75px"
+                  onError={(e) => console.error('Image load error:', e)}
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                  <span className="text-xs text-gray-500 text-center p-1">{item.title}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {placeholders.map((_, index) => (
+          <div key={`placeholder-${index}`} className="bg-gray-700 aspect-[2/3] flex items-center justify-center">
+            <Plus className="h-4 w-4 text-gray-500" />
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const handleCreateList = async () => {
     if (!newListName.trim()) return;
@@ -272,86 +361,79 @@ export default function ListsClient() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {lists.map((list) => (
-              <Card key={list.id} className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CardTitle className="text-gray-100 text-lg">
-                          {list.name}
-                        </CardTitle>
-                        <span className="px-2 py-1 text-xs bg-blue-600 text-blue-100 rounded-full capitalize">
-                          {list.listType}
-                        </span>
+            {lists.map((list) => {
+              const items = listItems[list.id] || [];
+              
+              return (
+                <Card 
+                  key={list.id} 
+                  className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-all cursor-pointer hover:shadow-xl hover:shadow-black/25 group"
+                  onClick={() => router.push(`/lists/${list.id}`)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CardTitle className="text-gray-100 text-lg group-hover:text-white transition-colors">
+                            {list.name}
+                          </CardTitle>
+                          <span className="px-2 py-1 text-xs bg-blue-600 text-blue-100 rounded-full capitalize">
+                            {list.listType}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-400">
+                          {list.isPublic ? (
+                            <>
+                              <Globe className="h-3 w-3" />
+                              Public
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="h-3 w-3" />
+                              Private
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
-                        {list.isPublic ? (
-                          <>
-                            <Globe className="h-3 w-3" />
-                            Public
-                          </>
-                        ) : (
-                          <>
-                            <Lock className="h-3 w-3" />
-                            Private
-                          </>
-                        )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteList(list.id);
+                        }}
+                        className="text-gray-400 hover:text-red-400 hover:bg-gray-800 active:scale-95"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent>
+                    {/* Collage Preview */}
+                    <CollagePreview items={items} />
+                    
+                    {list.description && (
+                      <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                        {list.description}
+                      </p>
+                    )}
+                    
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                      <span>{list.itemCount} items</span>
+                      <div className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        <span>{list.collaborators}</span>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteList(list.id)}
-                      className="text-gray-400 hover:text-red-400"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                
-                <CardContent>
-                  {list.description && (
-                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                      {list.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                    <span>{list.itemCount} items</span>
-                    <div className="flex items-center gap-1">
-                      <Users className="h-3 w-3" />
-                      <span>{list.collaborators}</span>
+                    
+                    <div className="text-xs text-gray-600 mt-3">
+                      Updated {new Date(list.updatedAt).toLocaleDateString()}
                     </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => router.push(`/lists/${list.id}`)}
-                    >
-                      View List
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => {
-                        // TODO: Implement edit functionality
-                        console.log('Edit list:', list.id);
-                      }}
-                    >
-                      Edit
-                    </Button>
-                  </div>
-                  
-                  <div className="text-xs text-gray-600 mt-3">
-                    Updated {new Date(list.updatedAt).toLocaleDateString()}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </main>
