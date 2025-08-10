@@ -10,8 +10,8 @@ The product targets entertainment enthusiasts who want to organize their viewing
 
 ### 2.1 User Roles
 
-| Role | Registration Method | Core Permissions |
-|------|---------------------|------------------|
+| Role | Registration Method             | Core Permissions                                                               |
+| ---- | ------------------------------- | ------------------------------------------------------------------------------ |
 | User | Username + Passkey registration | Can create lists, collaborate on shared lists, search content, manage own data |
 
 ### 2.2 Feature Module
@@ -20,30 +20,32 @@ Our WatchThis app consists of the following main pages:
 
 1. **Authentication page**: passkey registration, passkey sign-in, username setup.
 2. **Home page**: dashboard overview, quick access to lists, recent activity feed.
-3. **My Lists page**: personal list management, "For Me" default list, custom list creation.
+3. **My Lists page**: personal list management, list creation.
 4. **Search page**: TMDB content discovery, advanced filtering, content details.
 5. **List Details page**: list content management, collaboration controls, sharing options.
 6. **Profile page**: user settings, data export/import, account management.
 
 ### 2.3 Page Details
 
-| Page Name | Module Name | Feature description |
-|-----------|-------------|---------------------|
-| Authentication | Passkey Registration | Register with username and create passkey for secure authentication |
-| Authentication | Passkey Sign-in | Sign in using existing passkey across multiple devices |
-| Home | Dashboard | Display overview of all lists, recent activity, and quick navigation |
-| Home | Activity Feed | Show recent additions, friend activities, and list updates |
-| My Lists | Default List Management | Manage "For Me" personal list with movies and TV shows |
-| My Lists | Custom List Creation | Create new lists with type selection (TV only, Movies only, or Mixed) |
-| My Lists | List Overview | View all personal and shared lists with quick access |
-| Search | Content Discovery | Search TMDB database for movies and TV shows with real-time results |
-| Search | Advanced Filtering | Filter content by genre, year, rating, type, and other criteria |
-| Search | Content Details | View detailed information about movies/shows before adding to lists |
-| List Details | Content Management | Add, remove, and organize content within lists |
-| List Details | Collaboration Controls | Invite friends, manage permissions, block/remove collaborators |
-| List Details | Sharing Options | Generate shareable links and manage list visibility |
-| Profile | Data Export/Import | Export lists to CSV/JSON formats and import from external sources |
-| Profile | Account Settings | Manage username, passkey devices, and privacy preferences |
+| Page Name      | Module Name            | Feature description                                                   |
+| -------------- | ---------------------- | --------------------------------------------------------------------- |
+| Authentication | Passkey Registration   | Register with username and create passkey for secure authentication   |
+| Authentication | Passkey Sign-in        | Sign in using existing passkey across multiple devices                |
+| Home           | Dashboard              | Display overview of all lists, recent activity, and quick navigation  |
+| Home           | Activity Feed          | Show recent additions, friend activities, and list updates            |
+| My Lists       | Custom List Creation   | Create new lists with type selection (TV only, Movies only, or Mixed) |
+| My Lists       | List Overview          | View all personal and shared lists with quick access                  |
+| Search         | Content Discovery      | Search TMDB database for movies and TV shows with real-time results   |
+| Search         | Advanced Filtering     | Filter content by genre, year, rating, type, and other criteria       |
+| Search         | Content Details        | View detailed information about movies/shows before adding to lists   |
+| List Details   | Content Management     | Add, remove, and organize content within lists                        |
+| List Details   | Collaboration Controls | Invite friends, manage permissions, block/remove collaborators        |
+| List Details   | Sharing Options        | Generate shareable links and manage list visibility                   |
+| Profile        | Profile Picture Management | Set external profile picture URL with live preview and validation |
+| Profile        | Username Management    | Change username with availability validation and conflict resolution   |
+| Profile        | Passkey Device Viewer  | View all registered passkey devices with names, creation dates, and last used timestamps |
+| Profile        | Data Export/Import     | Export lists to CSV/JSON formats and import from external sources     |
+| Profile        | Account Settings       | Manage privacy preferences and account information                     |
 
 ## 3. Core Process
 
@@ -71,25 +73,18 @@ graph TD
 
 ## 4. User Interface Design
 
-### 4.1 Design Style
+### 4.1 Page Design Overview
 
-- **Primary Colors**: Deep purple (#6366f1), electric blue (#3b82f6), vibrant pink (#ec4899)
-- **Secondary Colors**: Dark gray (#1f2937), charcoal (#111827), accent orange (#f59e0b)
-- **Button Style**: Rounded corners with gradient backgrounds and subtle hover animations
-- **Font**: Inter for body text (14-16px), Poppins for headings (18-32px)
-- **Layout Style**: Card-based design with glassmorphism effects, top navigation with sidebar
-- **Icons**: Lucide React icons with entertainment-themed custom illustrations
-
-### 4.2 Page Design Overview
-
-| Page Name | Module Name | UI Elements |
-|-----------|-------------|-------------|
-| Authentication | Passkey Setup | Centered card with gradient background, biometric icon animations, purple/blue color scheme |
-| Home | Dashboard | Grid layout with colorful cards, activity timeline, floating action buttons |
-| My Lists | List Grid | Masonry layout with vibrant list cards, quick action overlays, type indicators |
-| Search | Content Browser | Search bar with live suggestions, filter chips, movie/TV poster grid with hover effects |
-| List Details | Content Management | Drag-and-drop interface, collaboration avatars, colorful status indicators |
-| Profile | Settings Panel | Toggle switches with custom styling, export buttons with progress indicators |
+| Page Name      | Module Name        | UI Elements                                                                             |
+| -------------- | ------------------ | --------------------------------------------------------------------------------------- |
+| Authentication | Passkey Setup      | Centered card with gradient background, biometric icon animations                       |
+| Home           | Dashboard          | Grid layout with colorful cards, activity timeline, floating action buttons             |
+| My Lists       | List Grid          | Masonry layout with vibrant list cards, quick action overlays, type indicators          |
+| Search         | Content Browser    | Search bar with live suggestions, filter chips, movie/TV poster grid with hover effects |
+| List Details   | Content Management | Collaboration avatars, colorful status indicators                                       |
+| Profile        | Profile Header     | Large circular profile picture with URL input field, username display with edit icon    |
+| Profile        | Settings Panel     | Toggle switches with custom styling, export buttons with progress indicators            |
+| Profile        | Device Management  | Card-based layout showing passkey devices with device icons and status indicators      |
 
 ### 4.3 Responsiveness
 

@@ -51,6 +51,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         id: listCollaborators.id,
         userId: listCollaborators.userId,
         username: users.username,
+        profilePictureUrl: users.profilePictureUrl,
         permissionLevel: listCollaborators.permissionLevel,
         invitedAt: listCollaborators.invitedAt,
         joinedAt: listCollaborators.joinedAt,
@@ -125,7 +126,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
     // Check if the user to be added exists
     const [targetUser] = await db
-      .select({ id: users.id, username: users.username })
+      .select({ id: users.id, username: users.username, profilePictureUrl: users.profilePictureUrl })
       .from(users)
       .where(eq(users.username, username.trim()))
       .limit(1);
@@ -181,6 +182,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       id: newCollaborator.id,
       userId: targetUser.id,
       username: targetUser.username,
+      profilePictureUrl: targetUser.profilePictureUrl,
       permissionLevel: newCollaborator.permissionLevel,
       invitedAt: newCollaborator.invitedAt,
       joinedAt: newCollaborator.joinedAt,

@@ -5,4 +5,5 @@ export { ContentCard } from './ContentCard';
 export { ContentDetailsModal } from './ContentDetailsModal';
 export { Input } from './Input';
 export { LoadingSpinner } from './LoadingSpinner';
+export { ProfileImage } from './ProfileImage';
 export { SearchInput } from './SearchInput';

@@ -15,6 +15,7 @@ import { relations } from "drizzle-orm";
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   username: varchar("username", { length: 50 }).notNull().unique(),
+  profilePictureUrl: varchar("profile_picture_url", { length: 500 }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

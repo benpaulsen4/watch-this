@@ -28,6 +28,7 @@ interface List {
   isPublic: boolean;
   ownerId: string;
   ownerUsername?: string;
+  ownerProfilePictureUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   items: ListItem[];
@@ -246,6 +247,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
          listName={list?.name || ''}
          isOwner={currentUser?.id === list?.ownerId}
          ownerUsername={list?.ownerUsername}
+         ownerProfilePictureUrl={list?.ownerProfilePictureUrl}
        />
 
       {/* List Settings Modal */}

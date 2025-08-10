@@ -8,11 +8,14 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { ContentCard } from '@/components/ui/ContentCard';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
+import {ProfileImage} from '@/components/ui';
+import { getCurrentSession } from '@/lib/auth/client';
 
 export function DashboardClient() {
   const router = useRouter();
   const [trendingContent, setTrendingContent] = useState<(TMDBMovie | TMDBTVShow)[]>([]);
   const [contentLoading, setContentLoading] = useState(true);
+  const [user, setUser] = useState<{ id: string; username: string; profilePictureUrl?: string | null } | null>(null);
 
   const loadTrendingContent = useCallback(async () => {
     try {
@@ -28,9 +31,21 @@ export function DashboardClient() {
     }
   }, []);
 
+  const loadUserSession = useCallback(async () => {
+    try {
+      const session = await getCurrentSession();
+      if (session?.user) {
+        setUser(session.user);
+      }
+    } catch (error) {
+      console.error('Failed to load user session:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadTrendingContent();
-  }, [loadTrendingContent]);
+    loadUserSession();
+  }, [loadTrendingContent, loadUserSession]);
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -51,6 +66,22 @@ export function DashboardClient() {
                 <Search className="h-4 w-4 mr-2" />
                 Discover
               </Button>
+              {user && (
+                <button
+                  onClick={() => router.push('/profile')}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors border border-gray-700 hover:border-gray-600"
+                  title="Profile Settings"
+                >
+                  <ProfileImage
+                    src={user.profilePictureUrl}
+                    username={user.username}
+                    size="sm"
+                  />
+                  <span className="text-gray-300 text-sm font-medium hidden sm:block">
+                    {user.username}
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>

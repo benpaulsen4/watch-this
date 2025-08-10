@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { X, UserPlus, Trash2, Users } from 'lucide-react';
 import { PermissionLevel, type PermissionLevelEnum } from '@/lib/db/schema';
+import { ProfileImage } from '@/components/ui';
 
 interface Collaborator {
   id: string;
   userId: string;
   username: string;
+  profilePictureUrl?: string | null;
   permissionLevel: string;
   invitedAt: string;
   joinedAt: string | null;
@@ -20,6 +22,7 @@ interface CollaborationModalProps {
   listName: string;
   isOwner: boolean;
   ownerUsername?: string;
+  ownerProfilePictureUrl?: string | null;
 }
 
 export default function CollaborationModal({
@@ -29,6 +32,7 @@ export default function CollaborationModal({
   listName,
   isOwner,
   ownerUsername,
+  ownerProfilePictureUrl,
 }: CollaborationModalProps) {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(false);
@@ -258,9 +262,11 @@ export default function CollaborationModal({
                   <h3 className="text-lg font-medium text-white mb-4">List Owner</h3>
                   <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg border border-gray-600">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-white font-medium">
-                        {ownerUsername.charAt(0).toUpperCase()}
-                      </div>
+                      <ProfileImage
+                        username={ownerUsername}
+                        src={ownerProfilePictureUrl}
+                        size="md"
+                      />
                       <div>
                         <p className="text-white font-medium">{ownerUsername}</p>
                         <p className="text-gray-400 text-sm">Owner</p>
@@ -294,9 +300,11 @@ export default function CollaborationModal({
                         className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-medium">
-                            {collaborator.username.charAt(0).toUpperCase()}
-                          </div>
+                          <ProfileImage
+                            username={collaborator.username}
+                            src={collaborator.profilePictureUrl}
+                            size="md"
+                          />
                           <div>
                             <p className="text-white font-medium">{collaborator.username}</p>
                             <p className="text-gray-400 text-sm">

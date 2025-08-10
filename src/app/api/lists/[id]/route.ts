@@ -31,6 +31,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         isPublic: lists.isPublic,
         ownerId: lists.ownerId,
         ownerUsername: users.username,
+        ownerProfilePictureUrl: users.profilePictureUrl,
         createdAt: lists.createdAt,
         updatedAt: lists.updatedAt,
       })

@@ -49,6 +49,10 @@ graph TD
 | /lists/\[id]            | Individual list details with content management and collaboration |
 | /search                 | Content discovery page with TMDB search and filtering             |
 | /profile                | User profile with settings and data export/import                 |
+| /api/auth/session       | Enhanced session endpoint with profile management                 |
+| /api/profile/devices    | Passkey device management and viewing                             |
+| /api/profile/export     | Data export functionality (CSV/JSON)                              |
+| /api/profile/import     | Data import functionality (CSV/JSON)                              |
 | /api/tmdb/search        | Server-side TMDB API proxy for content search                     |
 | /api/tmdb/details/\[id] | Server-side TMDB API proxy for content details                    |
 
@@ -101,6 +105,101 @@ Response:
 | release\_date | string     | Release date                |
 | genres        | array      | Array of genre objects      |
 
+**Enhanced Session Management**
+
+```
+GET /api/auth/session
+```
+
+Response:
+
+| Param Name                 | Param Type | Description                    |
+| -------------------------- | ---------- | ------------------------------ |
+| user                       | object     | User information object        |
+| user.id                    | string     | User ID                        |
+| user.username              | string     | Current username               |
+| user.profile\_picture\_url | string     | Profile picture URL (nullable) |
+| user.created\_at           | string     | Account creation timestamp     |
+
+```
+PUT /api/profile
+```
+
+Request:
+
+| Param Name            | Param Type | isRequired | Description                  |
+| --------------------- | ---------- | ---------- | ---------------------------- |
+| username              | string     | false      | New username                 |
+| profile\_picture\_url | string     | false      | External profile picture URL |
+
+Response:
+
+| Param Name | Param Type | Description         |
+| ---------- | ---------- | ------------------- |
+| success    | boolean    | Operation status    |
+| user       | object     | Updated user object |
+
+**Passkey Device Management**
+
+```
+GET /api/profile/devices
+```
+
+Response:
+
+| Param Name | Param Type | Description                     |
+| ---------- | ---------- | ------------------------------- |
+| devices    | array      | Array of passkey device objects |
+
+Device Object:
+
+| Param Name   | Param Type | Description              |
+| ------------ | ---------- | ------------------------ |
+| id           | string     | Device credential ID     |
+| device\_name | string     | User-defined device name |
+| created\_at  | string     | Device registration date |
+| last\_used   | string     | Last authentication date |
+
+**Data Export**
+
+```
+GET /api/profile/export?format=csv|json
+```
+
+Request:
+
+| Param Name | Param Type | isRequired | Description              |
+| ---------- | ---------- | ---------- | ------------------------ |
+| format     | string     | true       | Export format (csv/json) |
+
+Response:
+
+| Param Name | Param Type | Description                       |
+| ---------- | ---------- | --------------------------------- |
+| data       | string     | Exported data in requested format |
+| filename   | string     | Suggested filename                |
+
+**Data Import**
+
+```
+POST /api/profile/import
+```
+
+Request:
+
+| Param Name | Param Type | isRequired | Description                |
+| ---------- | ---------- | ---------- | -------------------------- |
+| file       | File       | true       | CSV or JSON file to import |
+| format     | string     | true       | File format (csv/json)     |
+
+Response:
+
+| Param Name      | Param Type | Description                    |
+| --------------- | ---------- | ------------------------------ |
+| success         | boolean    | Import operation status        |
+| imported\_count | number     | Number of lists imported       |
+| errors          | array      | Array of import error messages |
+
 ## 5. Server Architecture Diagram
 
 ```mermaid
@@ -148,6 +247,7 @@ erDiagram
     USERS {
         uuid id PK
         string username UK
+        string profile_picture_url
         timestamp created_at
         timestamp updated_at
     }
@@ -216,9 +316,13 @@ erDiagram
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(50) UNIQUE NOT NULL,
+    profile_picture_url VARCHAR(500),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add profile_picture_url column to existing users table (migration)
+ALTER TABLE users ADD COLUMN profile_picture_url VARCHAR(500);
 
 -- Create index
 CREATE INDEX idx_users_username ON users(username);
@@ -336,7 +440,7 @@ The `user_content_status` table enables sophisticated status tracking that addre
 
 2. **Collaborative Status Sharing**: The `share_status_updates` boolean flag allows users to control whether their status changes propagate to collaborators on shared lists. When enabled (default), status updates are visible to all list collaborators.
 
-3. **Status Resolution**: The application joins `list_items` with `user_content_status` to display the current status for each user-content combination, falling back to 'to_watch' if no status record exists.
+3. **Status Resolution**: The application joins `list_items` with `user_content_status` to display the current status for each user-content combination, falling back to 'to\_watch' if no status record exists.
 
 **Initial Data**
 
@@ -351,10 +455,14 @@ The `user_content_status` table enables sophisticated status tracking that addre
 ### 7.1 Component Architecture
 
 **Server Components First**
-- Use Server Components by default for all pages and components
-- Only use Client Components when interactivity is required (forms, event handlers, state management)
-- Create "islands of reactivity" using Client Components within Server Component trees
-- Wrap Client Components with Suspense boundaries for better loading states
+
+* Use Server Components by default for all pages and components
+
+* Only use Client Components when interactivity is required (forms, event handlers, state management)
+
+* Create "islands of reactivity" using Client Components within Server Component trees
+
+* Wrap Client Components with Suspense boundaries for better loading states
 
 ```tsx
 // ✅ Good: Server Component with Client Component island
@@ -375,10 +483,14 @@ export default async function ListPage({ params }: { params: { id: string } }) {
 ### 7.2 Testing Requirements
 
 **Comprehensive Test Coverage**
-- Write unit tests for every utility function and library
-- Write component tests for all UI components using React Testing Library
-- Write integration tests for API routes and database operations
-- Maintain minimum 80% code coverage
+
+* Write unit tests for every utility function and library
+
+* Write component tests for all UI components using React Testing Library
+
+* Write integration tests for API routes and database operations
+
+* Maintain minimum 80% code coverage
 
 ```tsx
 // Example component test structure
@@ -397,9 +509,12 @@ describe('ListCard', () => {
 ### 7.3 Layout and Authentication Patterns
 
 **Shared Layouts**
-- Extract common UI elements (headers, navigation, footers) into shared layout components
-- Implement authentication checks at the layout level to avoid repetition
-- Use layout.tsx files for route-level shared layouts
+
+* Extract common UI elements (headers, navigation, footers) into shared layout components
+
+* Implement authentication checks at the layout level to avoid repetition
+
+* Use layout.tsx files for route-level shared layouts
 
 ```tsx
 // app/(authenticated)/layout.tsx
@@ -428,9 +543,12 @@ export default async function AuthenticatedLayout({
 ### 7.4 API Route Authentication
 
 **Middleware-First Authentication**
-- Handle authentication in middleware whenever possible
-- Pass user information from middleware to API routes via headers or request context
-- Avoid re-checking authentication in API routes if middleware has already validated
+
+* Handle authentication in middleware whenever possible
+
+* Pass user information from middleware to API routes via headers or request context
+
+* Avoid re-checking authentication in API routes if middleware has already validated
 
 ```tsx
 // middleware.ts
@@ -467,10 +585,14 @@ export async function GET(request: Request) {
 ### 7.5 File Organization
 
 **Consistent Structure**
-- Group related components in feature-based directories
-- Keep test files adjacent to source files with `.test.tsx` or `.spec.tsx` extensions
-- Use barrel exports (index.ts) for clean imports
-- Separate client and server utilities into appropriate directories
+
+* Group related components in feature-based directories
+
+* Keep test files adjacent to source files with `.test.tsx` or `.spec.tsx` extensions
+
+* Use barrel exports (index.ts) for clean imports
+
+* Separate client and server utilities into appropriate directories
 
 ```
 src/
@@ -496,10 +618,14 @@ src/
 ### 7.6 Performance Guidelines
 
 **Optimization Best Practices**
-- Use dynamic imports for heavy Client Components
-- Implement proper caching strategies for database queries
-- Optimize images with Next.js Image component
-- Use React.memo() for expensive Client Components that don't need frequent re-renders
+
+* Use dynamic imports for heavy Client Components
+
+* Implement proper caching strategies for database queries
+
+* Optimize images with Next.js Image component
+
+* Use React.memo() for expensive Client Components that don't need frequent re-renders
 
 ```tsx
 // Dynamic import for heavy components
