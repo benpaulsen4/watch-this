@@ -2,23 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   verifyPasskeyAuthentication,
   createSessionToken,
+  verifyChallengeToken,
 } from "@/lib/auth/webauthn";
 import { AuthenticationResponseJSON } from "@simplewebauthn/browser";
 
 interface RequestBody {
   authenticationResponse: unknown;
-  challenge: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: RequestBody = await request.json();
-    const { authenticationResponse, challenge } = body;
+    const { authenticationResponse } = body;
 
     if (
       !authenticationResponse ||
-      !(authenticationResponse as AuthenticationResponseJSON)?.id ||
-      !challenge
+      !(authenticationResponse as AuthenticationResponseJSON)?.id
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -26,11 +25,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify challenge matches the one stored in cookie
+    // Verify challenge
     const storedChallenge = request.cookies.get(
       "authentication-challenge"
     )?.value;
-    if (!storedChallenge || storedChallenge !== challenge) {
+    if (!storedChallenge) {
+      return NextResponse.json(
+        { error: "Invalid or expired challenge" },
+        { status: 400 }
+      );
+    }
+
+    const challengePayload = await verifyChallengeToken(storedChallenge);
+    if (!challengePayload) {
       return NextResponse.json(
         { error: "Invalid or expired challenge" },
         { status: 400 }
@@ -40,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Verify authentication
     const { user, credential } = await verifyPasskeyAuthentication(
       authenticationResponse as AuthenticationResponseJSON,
-      challenge
+      challengePayload.challenge
     );
 
     // Create session token

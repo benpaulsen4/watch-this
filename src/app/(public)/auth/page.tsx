@@ -7,6 +7,7 @@ import { Fingerprint, Smartphone, Shield } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { UAParser } from 'ua-parser-js';
 
 type AuthMode = 'signin' | 'register';
 
@@ -17,7 +18,6 @@ function AuthPageContent() {
   
   const [mode, setMode] = useState<AuthMode>('signin');
   const [username, setUsername] = useState('');
-  const [deviceName, setDeviceName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [passkeySupported, setPasskeySupported] = useState(false);
@@ -50,9 +50,10 @@ function AuthPageContent() {
     setError('');
 
     try {
+      const {browser, os} = UAParser(navigator.userAgent)
       await registerPasskey({ 
         username: username.trim(), 
-        deviceName: deviceName.trim() || undefined 
+        deviceName:  `${browser.name ?? 'Unknown Browser'} on ${os.name ?? 'Unknown OS'} ${os.version}` 
       });
       
       // Redirect to dashboard on success
@@ -71,9 +72,7 @@ function AuthPageContent() {
     setError('');
 
     try {
-      await authenticatePasskey({ 
-        username: username.trim() || undefined 
-      });
+      await authenticatePasskey();
       
       // Redirect to dashboard on success
       router.push(redirectTo);
@@ -145,27 +144,17 @@ function AuthPageContent() {
           
           <CardContent>
             <form onSubmit={mode === 'register' ? handleRegister : handleSignIn} className="space-y-4">
-              {/* Username */}
+              
+              {mode === 'register' && (
               <Input
                 label="Username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter your username"
-                required={mode === 'register'}
+                required={true}
                 error={error && error.includes('username') ? error : undefined}
               />
-
-              {/* Device Name (Register only) TODO Can we get this from user agent? */}
-              {mode === 'register' && (
-                <Input
-                  label="Device Name (Optional)"
-                  type="text"
-                  value={deviceName}
-                  onChange={(e) => setDeviceName(e.target.value)}
-                  placeholder="e.g., My iPhone, Work Laptop"
-                  helperText="Give this device a name for easy identification"
-                />
               )}
 
               {/* Error Message */}
@@ -213,7 +202,7 @@ function AuthPageContent() {
             {/* Mode Toggle */}
             <div className="mt-6 text-center">
               <p className="text-gray-400 text-sm">
-                {mode === 'register' ? 'Already have an account?' : "Don&apos;t have an account?"}
+                {mode === 'register' ? 'Already have an account?' : "Don't have an account?"}
               </p>
               <Button
                 type="button"
@@ -222,7 +211,6 @@ function AuthPageContent() {
                   setMode(mode === 'register' ? 'signin' : 'register');
                   setError('');
                   setUsername('');
-                  setDeviceName('');
                 }}
                 className="mt-1"
               >

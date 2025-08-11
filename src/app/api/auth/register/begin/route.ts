@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generatePasskeyRegistrationOptions } from "@/lib/auth/webauthn";
+import {
+  createChallengeToken,
+  generatePasskeyRegistrationOptions,
+} from "@/lib/auth/webauthn";
 
 interface RequestBody {
   username: string;
@@ -35,20 +38,22 @@ export async function POST(request: NextRequest) {
 
     const options = await generatePasskeyRegistrationOptions(username.trim());
 
-    // Store challenge in session for verification
     const response = NextResponse.json({
       options,
-      challenge: options.challenge,
     });
 
     // Set challenge in httpOnly cookie for security
-    response.cookies.set("registration-challenge", options.challenge, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 5 * 60, // 5 minutes
-      path: "/api/auth/register",
-    });
+    response.cookies.set(
+      "registration-challenge",
+      await createChallengeToken(options.challenge),
+      {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 10 * 60, // 10 minutes
+        path: "/api/auth/register",
+      }
+    );
 
     return response;
   } catch (error) {

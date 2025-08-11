@@ -51,7 +51,6 @@ export async function generatePasskeyRegistrationOptions(username: string) {
       userVerification: "preferred",
       authenticatorAttachment: "platform",
     },
-    supportedAlgorithmIDs: [-7, -257],
   };
 
   return await generateRegistrationOptions(options);
@@ -97,7 +96,7 @@ export async function verifyPasskeyRegistration(
       .insert(passkeyCredentials)
       .values({
         userId: newUser.id,
-        credentialId: Buffer.from(credentialID).toString("base64url"),
+        credentialId: credentialID,
         publicKey: Buffer.from(credentialPublicKey).toString("base64url"),
         counter,
         deviceName: deviceName || "Unknown Device",
@@ -111,31 +110,10 @@ export async function verifyPasskeyRegistration(
 }
 
 // Generate authentication options for existing user
-export async function generatePasskeyAuthenticationOptions(username?: string) {
-  let allowCredentials: {
-    id: string;
-    transports?: ("internal" | "hybrid")[];
-  }[] = [];
-
-  if (username) {
-    // Get user's credentials
-    const userCredentials = await db
-      .select({ credentialId: passkeyCredentials.credentialId })
-      .from(passkeyCredentials)
-      .innerJoin(users, eq(users.id, passkeyCredentials.userId))
-      .where(eq(users.username, username));
-
-    allowCredentials = userCredentials.map((cred) => ({
-      id: cred.credentialId,
-      transports: ["internal", "hybrid"],
-    }));
-  }
-
+export async function generatePasskeyAuthenticationOptions() {
   const options: GenerateAuthenticationOptionsOpts = {
     rpID: RP_ID,
     timeout: 60000,
-    allowCredentials:
-      allowCredentials.length > 0 ? allowCredentials : undefined,
     userVerification: "preferred",
   };
 
@@ -147,11 +125,6 @@ export async function verifyPasskeyAuthentication(
   authenticationResponse: AuthenticationResponseJSON,
   expectedChallenge: string
 ) {
-  const response = authenticationResponse;
-  const credentialId = Buffer.from(response.id, "base64url").toString(
-    "base64url"
-  );
-
   // Get credential and user info
   const credentialData = await db
     .select({
@@ -160,7 +133,7 @@ export async function verifyPasskeyAuthentication(
     })
     .from(passkeyCredentials)
     .innerJoin(users, eq(users.id, passkeyCredentials.userId))
-    .where(eq(passkeyCredentials.credentialId, credentialId))
+    .where(eq(passkeyCredentials.credentialId, authenticationResponse.id))
     .limit(1);
 
   if (credentialData.length === 0) {
@@ -222,6 +195,33 @@ export async function verifySessionToken(
     return {
       userId: payload.userId as string,
       username: payload.username as string,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Create JWT challenge token
+export async function createChallengeToken(challenge: string): Promise<string> {
+  const payload = {
+    challenge,
+  };
+
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("10m")
+    .sign(JWT_SECRET);
+}
+
+// Verify JWT challenge token
+export async function verifyChallengeToken(
+  token: string
+): Promise<{ challenge: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    return {
+      challenge: payload.challenge as string,
     };
   } catch {
     return null;

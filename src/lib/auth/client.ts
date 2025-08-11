@@ -12,10 +12,6 @@ export interface RegistrationOptions {
   deviceName?: string;
 }
 
-export interface AuthenticationOptions {
-  username?: string;
-}
-
 // Register a new passkey
 export async function registerPasskey({
   username,
@@ -34,7 +30,7 @@ export async function registerPasskey({
       throw new Error(error.message || "Failed to get registration options");
     }
 
-    const { options, challenge } = await optionsResponse.json();
+    const { options } = await optionsResponse.json();
 
     // Start registration with the browser
     const registrationResponse = await startRegistration({
@@ -48,7 +44,6 @@ export async function registerPasskey({
       body: JSON.stringify({
         username,
         registrationResponse,
-        challenge,
         deviceName,
       }),
     });
@@ -68,23 +63,17 @@ export async function registerPasskey({
 }
 
 // Authenticate with existing passkey
-export async function authenticatePasskey({
-  username,
-}: AuthenticationOptions = {}) {
+export async function authenticatePasskey() {
   try {
     // Get authentication options from server
-    const optionsResponse = await fetch("/api/auth/authenticate/begin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username }),
-    });
+    const optionsResponse = await fetch("/api/auth/authenticate/begin");
 
     if (!optionsResponse.ok) {
       const error = await optionsResponse.json();
       throw new Error(error.message || "Failed to get authentication options");
     }
 
-    const { options, challenge } = await optionsResponse.json();
+    const { options } = await optionsResponse.json();
 
     // Start authentication with the browser
     const authenticationResponse = await startAuthentication({
@@ -97,7 +86,6 @@ export async function authenticatePasskey({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         authenticationResponse,
-        challenge,
       }),
     });
 

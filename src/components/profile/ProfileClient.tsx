@@ -37,7 +37,7 @@ export function ProfileClient() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/signout', { method: 'POST' });
       router.push('/auth');
     } catch (error) {
       console.error('Logout failed:', error);

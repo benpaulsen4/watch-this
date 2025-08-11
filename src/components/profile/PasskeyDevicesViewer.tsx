@@ -8,7 +8,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface PasskeyDevice {
   id: string;
-  name: string;
+  deviceName: string;
   createdAt: string;
   lastUsed: string | null;
 }
@@ -115,9 +115,9 @@ export function PasskeyDevicesViewer() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {getDeviceIcon(device.name)}
+                    {getDeviceIcon(device.deviceName)}
                     <div>
-                      <h4 className="font-medium text-gray-100">{device.name}</h4>
+                      <h4 className="font-medium text-gray-100">{device.deviceName}</h4>
                       <div className="flex items-center gap-4 text-sm text-gray-400">
                         <span>Added {formatDate(device.createdAt)}</span>
                         <span>•</span>
