@@ -23,15 +23,15 @@ const badgeVariants = cva(
           'border-transparent bg-blue-600 text-white shadow hover:bg-blue-700',
         // Status-specific variants
         watching:
-          'border-transparent bg-green-600/20 text-green-400 border-green-500/30',
+          'border-transparent bg-green-600/80 text-green-100 backdrop-blur-xs',
         completed:
-          'border-transparent bg-blue-600/20 text-blue-400 border-blue-500/30',
+          'border-transparent bg-blue-600/80 text-blue-100 backdrop-blur-xs',
         planning:
-          'border-transparent bg-yellow-600/20 text-yellow-400 border-yellow-500/30',
+          'border-transparent bg-yellow-600/80 text-yellow-100 backdrop-blur-xs',
         paused:
-          'border-transparent bg-orange-600/20 text-orange-400 border-orange-500/30',
+          'border-transparent bg-orange-600/80 text-orange-100 backdrop-blur-xs',
         dropped:
-          'border-transparent bg-red-600/20 text-red-400 border-red-500/30',
+          'border-transparent bg-red-600/80 text-red-100 backdrop-blur-xs',
         // Entertainment variants
         genre:
           'border-purple-500/30 bg-purple-600/20 text-purple-400 hover:bg-purple-600/30',

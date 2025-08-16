@@ -6,6 +6,7 @@ import {
   validatePagination,
   AuthenticatedRequest,
 } from "@/lib/auth/api-middleware";
+import { enrichWithContentStatus } from "@/lib/tmdb/contentUtils";
 
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
@@ -40,6 +41,17 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       default:
         results = await tmdbClient.searchMulti(query.trim(), validatedPage);
         break;
+    }
+
+    // Enrich results with watch status
+    if (results.results && results.results.length > 0) {
+      const enrichedResults = await Promise.all(
+        results.results.map(async (item) => {
+          return await enrichWithContentStatus(item, request.user.id);
+        })
+      );
+
+      results.results = enrichedResults;
     }
 
     return NextResponse.json(results);

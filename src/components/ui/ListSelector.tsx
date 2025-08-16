@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Check, Plus } from 'lucide-react';
+import { Globe, Minus, Plus, RotateCcw, Lock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { List } from '@/lib/db/schema';
+import { LoadingSpinner } from './LoadingSpinner';
+import { Button } from './Button';
+import { Badge } from './Badge';
 
 export interface ListSelectorProps {
   contentType: 'movie' | 'tv';
@@ -14,14 +17,17 @@ export interface ListSelectorProps {
   className?: string;
 }
 
+export interface ListResult extends List {
+  collaborators: number;
+}
+
 export function ListSelector({ contentType, contentId, currentListId, onAddToList, onRemoveFromList, className }: ListSelectorProps) {
-  const [lists, setLists] = useState<List[]>([]);
+  const [lists, setLists] = useState<ListResult[]>([]);
   const [listsWithContent, setListsWithContent] = useState<Record<string,string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
 const fetchListsWithContent = useCallback(async () => {
-  console.log("callback running")
     try {
       const response = await fetch(`/api/content/${contentId}/lists`);
       if (response.ok) {
@@ -37,8 +43,7 @@ const fetchListsWithContent = useCallback(async () => {
     }
   }, [contentId]);
 
-  useEffect(() => {
-    const fetchLists = async () => {
+const fetchLists = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/lists');
@@ -51,12 +56,12 @@ const fetchListsWithContent = useCallback(async () => {
       setError(err instanceof Error ? err.message : 'Failed to fetch lists');
     } finally {
       setLoading(false);
-    }
-  };
+    }}, [])
 
+  useEffect(() => {
     fetchLists();
     fetchListsWithContent();
-  }, [contentId, fetchListsWithContent]);
+  }, [contentId, fetchListsWithContent, fetchLists]);
 
   
   // Filter lists based on content type
@@ -68,27 +73,40 @@ const fetchListsWithContent = useCallback(async () => {
   });
 
   const handleSelectList = (listId: string) => {
+    setListsWithContent((prev) => ({
+          ...prev,
+          [listId]: contentId.toString(),
+        }));
     onAddToList(listId);
-    setTimeout(() => fetchListsWithContent(), 300);
+    setTimeout(() => fetchListsWithContent(), 500);
   };
 
   const handleRemoveFromList = (listId: string, itemId: string) => {
+    setListsWithContent((prev) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { [listId]: _, ...rest } = prev;
+      return rest;
+    });
     onRemoveFromList(listId, itemId);
-    setTimeout(() => fetchListsWithContent(), 300);
+    setTimeout(() => fetchListsWithContent(), 500);
   };
 
   if (loading) {
     return (
-      <div className={cn('bg-gray-800 rounded-lg p-4', className)}>
-        <div className="text-gray-300 text-sm">Loading lists...</div>
+      <div className={cn('flex items-center justify-center p-8', className)}>
+        <LoadingSpinner size="lg" text='Loading lissts...' />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={cn('bg-gray-800 rounded-lg p-4', className)}>
-        <div className="text-red-400 text-sm mb-2">Error: {error}</div>
+      <div className={cn('p-6 text-center', className)}>
+        <p className="text-red-400 mb-4">{error}</p>
+        <Button onClick={fetchLists} variant="outline" size="sm">
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
       </div>
     );
   }
@@ -104,71 +122,82 @@ const fetchListsWithContent = useCallback(async () => {
   }
 
   return (
-    <div className={cn('bg-gray-800 rounded-lg p-4', className)}>
-      <div className="mb-3">
-        <h3 className="text-gray-100 font-medium text-sm mb-1">
-          Manage Lists
-        </h3>
-        <p className="text-gray-400 text-xs">
-          Select a compatible list for this {contentType === 'movie' ? 'movie' : 'TV show'}
-        </p>
-      </div>
+    <div className={cn('space-y-4', className)}>
+      <h3 className="text-lg font-semibold text-gray-100">Manage Lists</h3>
       
-      <div className="space-y-2 max-h-48 overflow-y-auto">
         {filteredLists.map((list) => {
           const isCurrentList = currentListId === list.id;
           const hasContent = Object.hasOwn(listsWithContent, list.id);
           const itemId = listsWithContent[list.id];
           
           return (
-            <button
-              key={list.id}
-              onClick={() => hasContent ? handleRemoveFromList(list.id, itemId) : handleSelectList(list.id)}
-
-              className={cn(
-                "w-full text-left p-3 rounded-lg transition-colors group", "bg-gray-700 hover:bg-gray-600"
-              )}
-            >
+            <div key={list.id} className="bg-gray-800 rounded-lg border border-gray-700">
+            <div className="p-4">
               <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="text-gray-100 font-medium text-sm truncate">
-                      {list.name}
-                    </div>
-                    {isCurrentList && (
-                      <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">
+                <div>
+                  <h4 className="font-medium text-gray-100">
+                    {list.name}
+                  </h4>
+                  <p className="text-sm text-gray-400 flex items-center flex-wrap gap-1">
+                    {list.listType === 'mixed' ? 'Mixed' :
+                     list.listType === 'movie' ? 'Movies' : 'TV Shows'} 
+                     <span>&nbsp;•&nbsp;</span>
+                    {list.isPublic ? (
+                    <>
+                      <Globe className="h-3 w-3" />
+                      <span>Public</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-3 w-3" />
+                      <span>Private</span>
+                    </>
+                  )}
+                  <span>&nbsp;•&nbsp;</span>
+                  <Users className="h-3 w-3" />
+                    <span>{list.collaborators}</span>
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-3">     
+                  {isCurrentList && (
+                      <Badge variant="info">
                         Current
-                      </span>
+                      </Badge>
+
                     )}
                     {hasContent && (
-                      <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">
+                      <Badge variant="success">
                         Added
-                      </span>
+                      </Badge>
+                    )}      
+                  <div className="flex gap-1">
+                    {hasContent ? (
+                      <Button
+                        onClick={() => handleRemoveFromList(list.id, itemId)}
+                        size="sm"
+                        variant="outline"
+                        className="text-sm"
+                      >
+                        <Minus /> &nbsp; Remove
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleSelectList(list.id)}
+                        size="sm"
+                        variant="outline"
+                        className="text-sm"
+                      >
+                        <Plus /> &nbsp; Add
+                      </Button>
                     )}
                   </div>
-                  <div className="text-gray-400 text-xs mt-1">
-                    {list.listType === 'mixed' ? 'Mixed' :
-                     list.listType === 'movie' ? 'Movies' : 'TV Shows'} &nbsp;• &nbsp;
-                    {list.isPublic ? 'Public' : 'Private'}
-                  </div>
-                </div>
-                <div className="ml-2">
-                  {hasContent ? (
-                    <Check className="h-4 w-4 text-green-400" />
-                  ) : (
-                    <div className={cn(
-                      "transition-opacity",
-                    "opacity-0 group-hover:opacity-100"
-                    )}>
-                      <Plus className="h-4 w-4 text-gray-400" />
-                    </div>
-                  )}
                 </div>
               </div>
-            </button>
+            </div>
+          </div>
           );
         })}
-      </div>
     </div>
   );
 }

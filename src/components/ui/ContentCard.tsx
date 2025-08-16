@@ -1,12 +1,14 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useState} from 'react';
 import Image from 'next/image';
 import { cn, formatVoteAverage } from '@/lib/utils';
 import { getContentTitle, getContentReleaseDate, getContentType, getImageUrl } from '@/lib/tmdb/client';
 import { Card } from './Card';
 import { Badge } from './Badge';
+import { StatusBadge } from './StatusBadge';
 import { ContentDetailsModal } from './ContentDetailsModal';
 import { Star, Play } from 'lucide-react';
 import type { TMDBMovie, TMDBTVShow } from '@/lib/tmdb/client';
+import type { ContentTypeEnum } from '@/lib/db/schema';
 
 export interface ContentCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'content'> {
   content: TMDBMovie | TMDBTVShow;
@@ -16,6 +18,8 @@ export interface ContentCardProps extends Omit<React.HTMLAttributes<HTMLDivEleme
   addedDate?: string;
   showAddedDate?: boolean;
   currentListId?: string;
+  // Watch status props
+  showWatchStatus?: boolean;
 }
 
 const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
@@ -25,12 +29,15 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
     addedDate,
     showAddedDate = false,
     currentListId,
+    showWatchStatus = true,
     className, 
     onRemoveFromList,
     ...props 
   }, ref) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
+    const [watchStatus, setWatchStatus] = useState(content.watchStatus);
+
     
     const handleCardClick = () => {
       if (onContentClick) {
@@ -86,6 +93,17 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
               {formatVoteAverage(content.vote_average)}
             </span>
           </div>
+
+          {/* Watch status badge */}
+          {showWatchStatus && watchStatus && (
+            <div className="absolute bottom-2 right-2">
+              <StatusBadge 
+                status={watchStatus} 
+                contentType={contentType as ContentTypeEnum}
+                size="sm"
+              />
+            </div>
+          )}
         </div>
 
         <div className="mt-4">
@@ -123,6 +141,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
           onClose={onClose}
           currentListId={currentListId}
           onRemove={() => setIsRemoving(true)}
+          onShowStatusChanged={(status) => setWatchStatus(status)}
         />
       </>
     );

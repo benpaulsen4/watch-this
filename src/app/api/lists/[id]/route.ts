@@ -4,19 +4,18 @@ import { lists, listItems, listCollaborators, users } from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and, or, count, asc } from "drizzle-orm";
 import { tmdbClient } from "@/lib/tmdb/client";
-
-
+import { enrichWithContentStatus } from "@/lib/tmdb/contentUtils";
 
 // GET /api/lists/[id] - Get a specific list
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const listId = url.pathname.split('/').pop();
-    
+    const listId = url.pathname.split("/").pop();
+
     if (!listId) {
       return NextResponse.json(
-        { error: 'List ID is required' },
+        { error: "List ID is required" },
         { status: 400 }
       );
     }
@@ -76,69 +75,33 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       db
         .select({ count: count() })
         .from(listCollaborators)
-        .where(eq(listCollaborators.listId, listId))
+        .where(eq(listCollaborators.listId, listId)),
     ]);
 
-    // Fetch complete TMDB data for each item
-    const enrichedItems = await Promise.allSettled(
+    const tmdbItems = await Promise.all(
       basicItems.map(async (item) => {
-        try {
-          let tmdbData;
-          if (item.contentType === 'movie') {
-            tmdbData = await tmdbClient.getMovieDetails(item.tmdbId);
-          } else {
-            tmdbData = await tmdbClient.getTVShowDetails(item.tmdbId);
-          }
-
-          // Merge list item data with TMDB data
-          return {
-            ...tmdbData,
-            // Override with list-specific data
-            listItemId: item.id,
-            addedAt: item.addedAt,
-            notes: item.notes,
-            sortOrder: item.sortOrder,
-          };
-        } catch (error: unknown) {
-          console.error(`Failed to fetch TMDB data for item ${item.id}:`, error);
-          // Fallback to basic data if TMDB fetch fails
-          return {
-            id: item.tmdbId,
-            title: item.contentType === 'movie' ? item.title : undefined,
-            name: item.contentType === 'tv' ? item.title : undefined,
-            poster_path: item.posterPath,
-            vote_average: 0,
-            vote_count: 0,
-            overview: item.notes || '',
-            release_date: item.contentType === 'movie' ? '' : undefined,
-            first_air_date: item.contentType === 'tv' ? '' : undefined,
-            genre_ids: [],
-            adult: false,
-            backdrop_path: null,
-            original_language: 'en',
-            original_title: item.contentType === 'movie' ? item.title : undefined,
-            original_name: item.contentType === 'tv' ? item.title : undefined,
-            popularity: 0,
-            video: item.contentType === 'movie' ? false : undefined,
-            origin_country: item.contentType === 'tv' ? [] : undefined,
-            // List-specific data
-            listItemId: item.id,
-            addedAt: item.addedAt,
-            notes: item.notes,
-            sortOrder: item.sortOrder,
-          };
-        }
+        const tmdbData =
+          item.contentType === "movie"
+            ? await tmdbClient.getMovieDetails(item.tmdbId)
+            : await tmdbClient.getTVShowDetails(item.tmdbId);
+        return {
+          ...tmdbData,
+          // Override with list-specific data
+          listItemId: item.id,
+          addedAt: item.addedAt,
+          notes: item.notes,
+          sortOrder: item.sortOrder,
+        };
       })
     );
 
-    // Filter out failed requests and extract successful results
-    const items = enrichedItems
-      .filter(result => result.status === 'fulfilled')
-      .map(result => (result as PromiseFulfilledResult<unknown>).value);
+    const enrichedItems = await Promise.all(
+      tmdbItems.map(async (item) => await enrichWithContentStatus(item, userId))
+    );
 
     const listWithItems = {
       ...listData,
-      items: items || [],
+      items: enrichedItems || [],
       collaborators: collaboratorCountResult[0]?.count || 0,
     };
 
@@ -157,17 +120,17 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const listId = url.pathname.split('/').pop();
-    
+    const listId = url.pathname.split("/").pop();
+
     if (!listId) {
       return NextResponse.json(
-        { error: 'List ID is required' },
+        { error: "List ID is required" },
         { status: 400 }
       );
     }
-    
+
     const body = await request.json();
-    
+
     const { name, description, listType, isPublic } = body;
 
     // Check if user owns this list
@@ -178,10 +141,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       .limit(1);
 
     if (!existingList) {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "List not found" }, { status: 404 });
     }
 
     if (existingList.ownerId !== userId) {
@@ -223,7 +183,8 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     };
 
     if (name !== undefined) updateData.name = name.trim();
-    if (description !== undefined) updateData.description = description?.trim() || null;
+    if (description !== undefined)
+      updateData.description = description?.trim() || null;
     if (listType !== undefined) updateData.listType = listType;
     if (isPublic !== undefined) updateData.isPublic = Boolean(isPublic);
 
@@ -243,7 +204,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       db
         .select({ count: count() })
         .from(listCollaborators)
-        .where(eq(listCollaborators.listId, listId))
+        .where(eq(listCollaborators.listId, listId)),
     ]);
 
     const listWithCounts = {
@@ -267,11 +228,11 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const listId = url.pathname.split('/').pop();
-    
+    const listId = url.pathname.split("/").pop();
+
     if (!listId) {
       return NextResponse.json(
-        { error: 'List ID is required' },
+        { error: "List ID is required" },
         { status: 400 }
       );
     }
@@ -284,10 +245,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       .limit(1);
 
     if (!existingList) {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "List not found" }, { status: 404 });
     }
 
     if (existingList.ownerId !== userId) {

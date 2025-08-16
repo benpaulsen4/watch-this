@@ -1,3 +1,5 @@
+import { WatchStatusEnum } from "../db";
+
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
@@ -17,6 +19,10 @@ export interface TMDBMovie {
   original_title: string;
   popularity: number;
   video: boolean;
+
+  //enriched from proxy API
+  watchStatus?: WatchStatusEnum;
+  statusUpdatedAt?: string;
 }
 
 export interface TMDBTVShow {
@@ -33,11 +39,33 @@ export interface TMDBTVShow {
   original_language: string;
   original_name: string;
   popularity: number;
+
+  //enriched from proxy API
+  watchStatus?: WatchStatusEnum;
+  statusUpdatedAt?: string;
 }
+
+// Search result types with media_type for multi-search
+export interface TMDBMovieSearchResult extends TMDBMovie {
+  media_type: "movie";
+}
+
+export interface TMDBTVShowSearchResult extends TMDBTVShow {
+  media_type: "tv";
+}
+
+export type TMDBSearchItem = TMDBMovieSearchResult | TMDBTVShowSearchResult;
 
 export interface TMDBSearchResult {
   page: number;
   results: (TMDBMovie | TMDBTVShow)[];
+  total_pages: number;
+  total_results: number;
+}
+
+export interface TMDBMultiSearchResult {
+  page: number;
+  results: TMDBSearchItem[];
   total_pages: number;
   total_results: number;
 }
@@ -99,6 +127,18 @@ export interface TMDBTVShowDetails extends TMDBTVShow {
     vote_average: number;
     vote_count: number;
   } | null;
+  next_episode_to_air: {
+    air_date: string;
+    episode_number: number;
+    id: number;
+    name: string;
+    overview: string;
+    production_code: string;
+    season_number: number;
+    still_path: string | null;
+    vote_average: number;
+    vote_count: number;
+  } | null;
   networks: {
     id: number;
     name: string;
@@ -134,6 +174,48 @@ export interface TMDBTVShowDetails extends TMDBTVShow {
   status: string;
   tagline: string;
   type: string;
+}
+
+export interface TMDBEpisode {
+  air_date: string;
+  episode_number: number;
+  id: number;
+  name: string;
+  overview: string;
+  production_code: string;
+  runtime: number;
+  season_number: number;
+  show_id: number;
+  still_path: string | null;
+  vote_average: number;
+  vote_count: number;
+  crew: {
+    id: number;
+    credit_id: string;
+    name: string;
+    department: string;
+    job: string;
+    profile_path: string | null;
+  }[];
+  guest_stars: {
+    id: number;
+    name: string;
+    credit_id: string;
+    character: string;
+    order: number;
+    profile_path: string | null;
+  }[];
+}
+
+export interface TMDBSeason {
+  _id: string;
+  air_date: string;
+  episodes: TMDBEpisode[];
+  name: string;
+  overview: string;
+  id: number;
+  poster_path: string | null;
+  season_number: number;
 }
 
 export type ContentType = "movie" | "tv";
@@ -297,6 +379,25 @@ class TMDBClient {
     }
 
     return this.request<TMDBSearchResult>("/discover/tv", queryParams);
+  }
+
+  // Get TV show season details with episodes
+  async getTVSeasonDetails(
+    tvId: number,
+    seasonNumber: number
+  ): Promise<TMDBSeason> {
+    return this.request<TMDBSeason>(`/tv/${tvId}/season/${seasonNumber}`);
+  }
+
+  // Get specific episode details
+  async getTVEpisodeDetails(
+    tvId: number,
+    seasonNumber: number,
+    episodeNumber: number
+  ): Promise<TMDBEpisode> {
+    return this.request<TMDBEpisode>(
+      `/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}`
+    );
   }
 }
 

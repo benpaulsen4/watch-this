@@ -2,28 +2,31 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Modal, ModalOverlay, Heading, Button as AriaButton } from 'react-aria-components';
+import { Modal, ModalOverlay, Heading, Button as AriaButton, Tabs, TabList, Tab, TabPanel } from 'react-aria-components';
 import { X, Star, Calendar, Clock, Users, Play } from 'lucide-react';
 import { cn, formatVoteAverage } from '@/lib/utils';
 import { getContentTitle, getContentReleaseDate, getContentType, getImageUrl } from '@/lib/tmdb/client';
 import { getGenreNames } from '@/lib/tmdb/genres';
 import { Badge } from './Badge';
-import { Button } from './Button';
 import { ListSelector } from './ListSelector';
+import { StatusSegmentedSelector } from './StatusSegmentedSelector';
+import { EpisodeTracker } from './EpisodeTracker';
 import type { TMDBMovie, TMDBTVShow, TMDBMovieDetails, TMDBTVShowDetails } from '@/lib/tmdb/client';
+import type { WatchStatusEnum, ContentTypeEnum } from '@/lib/db/schema';
 
 export interface ContentDetailsModalProps {
   content: TMDBMovie | TMDBTVShow;
   isOpen: boolean;
   onClose: () => void;
   onRemove?: () => void,
+  onShowStatusChanged?: (status: WatchStatusEnum) => void;
   currentListId?: string;
 }
 
-export function ContentDetailsModal({ content, isOpen, onClose, onRemove, currentListId }: ContentDetailsModalProps) {
-  const [showListSelector, setShowListSelector] = useState(false);
-  const [isManagingList, setIsManagingList] = useState(false);
+export function ContentDetailsModal({ content, isOpen, onClose, onRemove,  onShowStatusChanged, currentListId }: ContentDetailsModalProps) {
   const [detailedContent, setDetailedContent] = useState<TMDBMovieDetails | TMDBTVShowDetails | null>(null);
+  const [watchStatus, setWatchStatus] = useState<WatchStatusEnum | null>(content.watchStatus ?? null);
+  const [selectedTab, setSelectedTab] = useState<string>('overview');
   
   const title = getContentTitle(content);
   const releaseDate = getContentReleaseDate(content);
@@ -52,18 +55,38 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
       fetchDetails();
     }
   }, [isOpen, content.id, contentType, detailedContent]);
+
+  const handleStatusChange = async (newStatus: WatchStatusEnum) => {
+    try {
+      const response = await fetch('/api/status/content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tmdbId: content.id,
+          contentType: contentType,
+          status: newStatus
+        }),
+      });
+      
+      if (response.ok) {
+        setWatchStatus(newStatus);
+        onShowStatusChanged?.(newStatus);
+      }
+    } catch (error) {
+      console.error('Error updating watch status:', error);
+    }
+  };
   
-  // Reset detailed content when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setDetailedContent(null);
+      setSelectedTab('overview');
     }
   }, [isOpen]);
 
   const handleAddToList = async (listId: string) => {
     try {
-      setIsManagingList(true);
-      
       const response = await fetch(`/api/lists/${listId}/items`, {
         method: 'POST',
         headers: {
@@ -84,15 +107,11 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
 
     } catch (error) {
       console.error('Error adding to list:', error);
-    } finally {
-      setIsManagingList(false);
     }
   };
 
   const handleRemoveFromList = async (listId: string, itemId: string) => {
     try {
-      setIsManagingList(true);
-      
       const response = await fetch(`/api/lists/${listId}/items/${itemId}`, {
         method: 'DELETE',
       });
@@ -105,8 +124,6 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
       }
     } catch (error) {
       console.error('Error removing from list:', error);
-    } finally {
-      setIsManagingList(false);
     }
   };
 
@@ -116,7 +133,7 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
       onOpenChange={onClose}
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
     >
-      <Modal className="bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+      <Modal className="bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="relative">
           {/* Backdrop Image */}
           {backdropUrl && (
@@ -141,35 +158,35 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
           
           {/* Content */}
           <div className={cn(
-            "p-6",
+            "p-4 sm:p-6",
             backdropUrl ? "-mt-32 relative z-10" : ""
           )}>
-            <div className="flex gap-6">
+            <div className="flex flex-col lg:flex-row gap-6">
               {/* Poster */}
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 self-center lg:self-start">
                 {posterUrl ? (
                   <Image
                     src={posterUrl}
                     alt={title}
                     width={200}
                     height={300}
-                    className="rounded-lg shadow-lg"
+                    className="rounded-lg shadow-lg w-32 h-48 sm:w-48 sm:h-72 object-cover"
                   />
                 ) : (
-                  <div className="w-48 h-72 bg-gray-700 rounded-lg flex items-center justify-center">
-                    <Play className="h-12 w-12 text-gray-400" />
+                  <div className="w-32 h-48 sm:w-48 sm:h-72 bg-gray-700 rounded-lg flex items-center justify-center">
+                    <Play className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
                   </div>
                 )}
               </div>
               
               {/* Details */}
               <div className="flex-1 min-w-0">
-                <Heading className="text-3xl font-bold text-gray-100 mb-2">
+                <Heading className="text-2xl sm:text-3xl font-bold text-gray-100 mb-2">
                   {title}
                 </Heading>
                 
                 {/* Badges */}
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
                   <Badge variant="year" size="sm">
                     {year || 'TBA'}
                   </Badge>
@@ -184,13 +201,13 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
                 </div>
                 
                 {/* Rating and Stats */}
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-2 sm:gap-4 mb-4 flex-wrap text-sm sm:text-base">
                   <div className="flex items-center gap-1">
                     <Star className="h-4 w-4 text-yellow-400 fill-current" />
                     <span className="text-gray-100 font-medium">
                       {formatVoteAverage(content.vote_average)}
                     </span>
-                    <span className="text-gray-400 text-sm">
+                    <span className="text-gray-400 text-xs sm:text-sm">
                       ({content.vote_count?.toLocaleString()} votes)
                     </span>
                   </div>
@@ -198,7 +215,7 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
                   {releaseDate && (
                     <div className="flex items-center gap-1 text-gray-400">
                       <Calendar className="h-4 w-4" />
-                      <span className="text-sm">
+                      <span className="text-xs sm:text-sm">
                         {new Date(releaseDate).toLocaleDateString()}
                       </span>
                     </div>
@@ -207,7 +224,7 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
                   {runtime && (
                     <div className="flex items-center gap-1 text-gray-400">
                       <Clock className="h-4 w-4" />
-                      <span className="text-sm">
+                      <span className="text-xs sm:text-sm">
                         {runtime} min
                       </span>
                     </div>
@@ -216,7 +233,7 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
                   {seasons && (
                     <div className="flex items-center gap-1 text-gray-400">
                       <Users className="h-4 w-4" />
-                      <span className="text-sm">
+                      <span className="text-xs sm:text-sm">
                         {seasons} season{seasons !== 1 ? 's' : ''}
                         {episodes && ` • ${episodes} episodes`}
                       </span>
@@ -224,53 +241,103 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove, curren
                   )}
                 </div>
                 
-                {/* Overview */}
-                {content.overview && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-100 mb-2">Overview</h3>
-                    <p className="text-gray-300 leading-relaxed">
-                      {content.overview}
-                    </p>
-                  </div>
-                )}
-                
-                {/* Genres */}
-                {content.genre_ids && content.genre_ids.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-100 mb-2">Genres</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {getGenreNames(content.genre_ids, contentType).map((genreName, index) => (
-                        <Badge key={content.genre_ids[index]} variant="genre" size="sm">
-                          {genreName}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* List Selector */}
-                {showListSelector && (
-                  <div className="mb-6">
-                    <ListSelector
-                      contentType={contentType}
-                      contentId={content.id}
-                      currentListId={currentListId}
-                      onAddToList={handleAddToList}
-                      onRemoveFromList={handleRemoveFromList}
+                {/* Watch Status */}
+                <div className="mb-3">
+                  <div className="flex-1 max-w-xs">
+                    <StatusSegmentedSelector
+                      value={watchStatus}
+                      contentType={contentType as ContentTypeEnum}
+                      onValueChange={handleStatusChange}
                     />
                   </div>
-                )}
-                
-                {/* Actions */}
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => setShowListSelector(!showListSelector)}
-                    className="bg-red-600 hover:bg-red-700"
-                    disabled={isManagingList}
-                  >
-                    {showListSelector ? 'Finish Managing Lists' : 'Manage Lists'}
-                  </Button>
                 </div>
+                
+                {/* Tabs */}
+                <Tabs 
+                  selectedKey={selectedTab} 
+                  onSelectionChange={(key) => setSelectedTab(key as string)}
+                  className="mb-6"
+                >
+                  <TabList className="flex border-b border-gray-700 mb-4">
+                    <Tab 
+                      id="overview"
+                      className={({isSelected}) => cn(
+                        "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent",
+                        isSelected ? "text-red-400 border-red-500" : 'hover:text-gray-100 hover:border-gray-500'
+                      )}
+                    >
+                      Overview
+                    </Tab>
+                    {contentType === 'tv' && (
+                      <Tab 
+                        id="episodes"
+                        className={({isSelected}) => cn(
+                        "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent",
+                        isSelected ? "text-red-400 border-red-500" : 'hover:text-gray-100 hover:border-gray-500'
+                      )}
+                      >
+                        Episodes
+                      </Tab>
+                    )}
+                    <Tab 
+                      id="lists"
+                      className={({isSelected}) => cn(
+                        "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent",
+                        isSelected ? "text-red-400 border-red-500" : 'hover:text-gray-100 hover:border-gray-500'
+                      )}
+                    >
+                      Lists
+                    </Tab>
+                  </TabList>
+                  
+                  <TabPanel id="overview" className="focus:outline-none">
+                    {/* Overview */}
+                    {content.overview && (
+                      <div className="mb-6">
+                        <h3 className="text-lg font-semibold text-gray-100 mb-2">Overview</h3>
+                        <p className="text-gray-300 leading-relaxed text-sm sm:text-base">
+                          {content.overview}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Genres */}
+                    {content.genre_ids && content.genre_ids.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="text-lg font-semibold text-gray-100 mb-2">Genres</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {getGenreNames(content.genre_ids, contentType).map((genreName, index) => (
+                            <Badge key={content.genre_ids[index]} variant="genre" size="sm">
+                              {genreName}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </TabPanel>
+                  
+                  {contentType === 'tv' && ( 
+                    <TabPanel id="episodes" className="focus:outline-none">
+                      <EpisodeTracker
+                        tvShowId={content.id}
+                        onShowStatusChanged={(status) => {
+                          setWatchStatus(status);
+                          onShowStatusChanged?.(status);
+                        }}
+                      />
+                    </TabPanel>
+                  )}
+
+                  <TabPanel id="lists" className="focus:outline-none">
+                      <ListSelector
+                          contentType={contentType}
+                          contentId={content.id}
+                          currentListId={currentListId}
+                          onAddToList={handleAddToList}
+                          onRemoveFromList={handleRemoveFromList}
+                        />
+                    </TabPanel>
+                </Tabs>
               </div>
             </div>
           </div>

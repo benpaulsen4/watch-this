@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { User } from 'lucide-react';
 
 export interface ProfileImageProps {
   src?: string | null;
@@ -62,6 +61,7 @@ export function ProfileImage({
           {username.charAt(0).toUpperCase()}
         </div>
       )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt={`${username}'s profile picture`}

@@ -55,6 +55,9 @@ graph TD
 | /api/profile/import     | Data import functionality (CSV/JSON)                              |
 | /api/tmdb/search        | Server-side TMDB API proxy for content search                     |
 | /api/tmdb/details/\[id] | Server-side TMDB API proxy for content details                    |
+| /api/tmdb/episodes/\[id] | Server-side TMDB API proxy for TV show episode data               |
+| /api/status/content     | Content watch status management (GET, PUT, DELETE)                |
+| /api/status/episodes    | Episode watch status tracking (GET, PUT)                          |
 
 ## 4. API Definitions
 
@@ -200,6 +203,87 @@ Response:
 | imported\_count | number     | Number of lists imported       |
 | errors          | array      | Array of import error messages |
 
+**Content Watch Status Management**
+
+```
+GET /api/status/content?tmdb_id={id}&content_type={type}
+```
+
+Request:
+
+| Param Name   | Param Type | isRequired | Description                    |
+| ------------ | ---------- | ---------- | ------------------------------ |
+| tmdb\_id     | number     | true       | TMDB content ID                |
+| content\_type | string     | true       | Content type (movie or tv)     |
+
+Response:
+
+| Param Name | Param Type | Description                           |
+| ---------- | ---------- | ------------------------------------- |
+| status     | string     | Current watch status (nullable)       |
+| updated\_at | string     | Last status update timestamp          |
+| progress   | object     | Episode progress data (TV shows only) |
+
+```
+PUT /api/status/content
+```
+
+Request:
+
+| Param Name   | Param Type | isRequired | Description                                    |
+| ------------ | ---------- | ---------- | ---------------------------------------------- |
+| tmdb\_id     | number     | true       | TMDB content ID                                |
+| content\_type | string     | true       | Content type (movie or tv)                     |
+| status       | string     | true       | New status (planning, watching, completed, etc.) |
+
+Response:
+
+| Param Name | Param Type | Description          |
+| ---------- | ---------- | -------------------- |
+| success    | boolean    | Operation status     |
+| status     | object     | Updated status object |
+
+**Episode Watch Status Tracking**
+
+```
+GET /api/status/episodes?tmdb_id={id}
+```
+
+Request:
+
+| Param Name | Param Type | isRequired | Description     |
+| ---------- | ---------- | ---------- | --------------- |
+| tmdb\_id   | number     | true       | TMDB TV show ID |
+
+Response:
+
+| Param Name      | Param Type | Description                        |
+| --------------- | ---------- | ---------------------------------- |
+| episodes        | array      | Array of episode watch status      |
+| total\_episodes | number     | Total number of episodes           |
+| watched\_count  | number     | Number of episodes marked watched  |
+
+```
+PUT /api/status/episodes
+```
+
+Request:
+
+| Param Name     | Param Type | isRequired | Description                    |
+| -------------- | ---------- | ---------- | ------------------------------ |
+| tmdb\_id       | number     | true       | TMDB TV show ID                |
+| season\_number | number     | true       | Season number                  |
+| episode\_number | number     | true       | Episode number                 |
+| watched        | boolean    | true       | Whether episode is watched     |
+
+Response:
+
+| Param Name    | Param Type | Description                           |
+| ------------- | ---------- | ------------------------------------- |
+| success       | boolean    | Operation status                      |
+| show\_status  | string     | Updated show status (if changed)      |
+| episode\_count | object     | Updated episode count information     |
+
 ## 5. Server Architecture Diagram
 
 ```mermaid
@@ -242,7 +326,9 @@ erDiagram
     LISTS ||--o{ LIST_ITEMS : contains
     USERS ||--o{ PASSKEY_CREDENTIALS : has
     USERS ||--o{ USER_CONTENT_STATUS : tracks
+    USERS ||--o{ EPISODE_WATCH_STATUS : tracks
     LIST_ITEMS ||--o{ USER_CONTENT_STATUS : references
+    USER_CONTENT_STATUS ||--o{ EPISODE_WATCH_STATUS : contains
     
     USERS {
         uuid id PK
@@ -304,6 +390,18 @@ erDiagram
         boolean share_status_updates
         timestamp updated_at
         timestamp created_at
+    }
+    
+    EPISODE_WATCH_STATUS {
+        uuid id PK
+        uuid user_id FK
+        integer tmdb_id
+        integer season_number
+        integer episode_number
+        boolean watched
+        timestamp watched_at
+        timestamp created_at
+        timestamp updated_at
     }
 ```
 
@@ -419,28 +517,56 @@ CREATE TABLE user_content_status (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     tmdb_id INTEGER NOT NULL,
     content_type VARCHAR(10) NOT NULL CHECK (content_type IN ('movie', 'tv')),
-    status VARCHAR(20) DEFAULT 'to_watch' CHECK (status IN ('to_watch', 'watching', 'watched')),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('planning', 'watching', 'paused', 'completed', 'dropped')),
     share_status_updates BOOLEAN DEFAULT true,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id, tmdb_id, content_type)
 );
 
--- Create indexes
+-- Create episode_watch_status table
+CREATE TABLE episode_watch_status (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tmdb_id INTEGER NOT NULL,
+    season_number INTEGER NOT NULL,
+    episode_number INTEGER NOT NULL,
+    watched BOOLEAN DEFAULT false,
+    watched_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, tmdb_id, season_number, episode_number)
+);
+
+-- Create indexes for user_content_status
 CREATE INDEX idx_user_content_status_user_id ON user_content_status(user_id);
 CREATE INDEX idx_user_content_status_tmdb_id ON user_content_status(tmdb_id);
 CREATE INDEX idx_user_content_status_updated_at ON user_content_status(updated_at DESC);
+
+-- Create indexes for episode_watch_status
+CREATE INDEX idx_episode_watch_status_user_id ON episode_watch_status(user_id);
+CREATE INDEX idx_episode_watch_status_tmdb_id ON episode_watch_status(tmdb_id);
+CREATE INDEX idx_episode_watch_status_season_episode ON episode_watch_status(tmdb_id, season_number, episode_number);
+CREATE INDEX idx_episode_watch_status_watched_at ON episode_watch_status(watched_at DESC);
 ```
 
-**Status Management Architecture**
+**Enhanced Status Management Architecture**
 
-The `user_content_status` table enables sophisticated status tracking that addresses cross-list synchronization and collaborative sharing:
+The watch status system uses two complementary tables to provide comprehensive tracking:
 
-1. **Cross-List Status Sync**: When content appears in multiple lists, its status is maintained globally per user through the `user_content_status` table, ensuring consistency across all lists.
+1. **Content-Level Status (`user_content_status`)**: Tracks overall watch status for movies and TV shows with support for Planning, Watching, Paused, Completed, and Dropped statuses. This ensures cross-list synchronization where content status remains consistent across all user lists.
 
-2. **Collaborative Status Sharing**: The `share_status_updates` boolean flag allows users to control whether their status changes propagate to collaborators on shared lists. When enabled (default), status updates are visible to all list collaborators.
+2. **Episode-Level Tracking (`episode_watch_status`)**: Provides granular episode tracking for TV shows, recording which specific episodes have been watched. This enables automatic status updates and progress calculation.
 
-3. **Status Resolution**: The application joins `list_items` with `user_content_status` to display the current status for each user-content combination, falling back to 'to\_watch' if no status record exists.
+3. **Automatic Status Logic**: 
+   - First episode marked watched → Show status becomes "Watching"
+   - All episodes marked watched → Show status becomes "Completed"
+   - New episodes added to completed show → Status reverts to "Watching"
+   - Manual status changes override automatic updates until next episode interaction
+
+4. **Collaborative Status Sharing**: The `share_status_updates` flag controls whether status changes are visible to collaborators on shared lists, maintaining privacy while enabling social features.
+
+5. **Status Resolution**: The application joins `list_items` with `user_content_status` and aggregates `episode_watch_status` data to display comprehensive progress information, with appropriate fallbacks for untracked content.
 
 **Initial Data**
 
@@ -615,7 +741,81 @@ src/
 └── __tests__/                  # Global test utilities
 ```
 
-### 7.6 Performance Guidelines
+### 7.6 Watch Status Implementation Patterns
+
+**Status Management Best Practices**
+
+* Use optimistic updates for status changes with proper error handling and rollback
+* Implement debounced episode tracking to avoid excessive database writes
+* Cache episode data from TMDB API to reduce external API calls
+* Use database transactions for automatic status updates to ensure consistency
+
+```tsx
+// Optimistic status update pattern
+const updateContentStatus = async (tmdbId: number, newStatus: string) => {
+  // Optimistic update
+  setLocalStatus(newStatus);
+  
+  try {
+    await fetch('/api/status/content', {
+      method: 'PUT',
+      body: JSON.stringify({ tmdb_id: tmdbId, status: newStatus })
+    });
+  } catch (error) {
+    // Rollback on error
+    setLocalStatus(previousStatus);
+    showErrorToast('Failed to update status');
+  }
+};
+
+// Debounced episode tracking
+const debouncedEpisodeUpdate = useMemo(
+  () => debounce(async (tmdbId: number, season: number, episode: number, watched: boolean) => {
+    await updateEpisodeStatus(tmdbId, season, episode, watched);
+  }, 500),
+  []
+);
+```
+
+**Database Transaction Pattern for Automatic Updates**
+
+```tsx
+// Server-side automatic status update with transaction
+export async function updateEpisodeWithStatusCheck(userId: string, tmdbId: number, season: number, episode: number, watched: boolean) {
+  return await db.transaction(async (tx) => {
+    // Update episode status
+    await tx.insert(episodeWatchStatus).values({
+      userId,
+      tmdbId,
+      seasonNumber: season,
+      episodeNumber: episode,
+      watched,
+      watchedAt: watched ? new Date() : null
+    }).onConflictDoUpdate({
+      target: [episodeWatchStatus.userId, episodeWatchStatus.tmdbId, episodeWatchStatus.seasonNumber, episodeWatchStatus.episodeNumber],
+      set: { watched, watchedAt: watched ? new Date() : null }
+    });
+    
+    // Check if show status needs automatic update
+    const episodeStats = await getEpisodeStats(tx, userId, tmdbId);
+    const newShowStatus = calculateAutoStatus(episodeStats);
+    
+    if (newShowStatus) {
+      await tx.insert(userContentStatus).values({
+        userId,
+        tmdbId,
+        contentType: 'tv',
+        status: newShowStatus
+      }).onConflictDoUpdate({
+        target: [userContentStatus.userId, userContentStatus.tmdbId],
+        set: { status: newShowStatus, updatedAt: new Date() }
+      });
+    }
+  });
+}
+```
+
+### 7.7 Performance Guidelines
 
 **Optimization Best Practices**
 
@@ -638,5 +838,58 @@ const VideoPlayer = dynamic(() => import('./VideoPlayer'), {
 const getListsWithCache = cache(async (userId: string) => {
   return await db.select().from(lists).where(eq(lists.ownerId, userId));
 });
+```
+
+### 7.8 Watch Status UI Component Guidelines
+
+**Status Badge Implementation**
+
+* Use the existing Badge component with status-specific variants (watching, completed, planning, paused, dropped)
+* Leverage existing Badge component styling and behavior rather than creating new components
+* Ensure consistent status color scheme across the application
+
+**Episode Tracker Component**
+
+* Display episode titles and synopses fetched from TMDB API alongside checkboxes
+* Implement efficient data fetching and caching for episode metadata
+* Use debounced updates for episode status changes to optimize performance
+
+```tsx
+// Example: Using existing Badge component for status display
+import { Badge } from '@/components/ui/Badge';
+
+function ContentCard({ content, userStatus }) {
+  return (
+    <div className="content-card">
+      {userStatus && (
+        <Badge variant={userStatus.status}>
+          {userStatus.status}
+        </Badge>
+      )}
+      {/* Content details */}
+    </div>
+  );
+}
+
+// Example: Episode tracker with TMDB data
+function EpisodeTracker({ tmdbId, episodes, userProgress }) {
+  return (
+    <div className="episode-list">
+      {episodes.map(episode => (
+        <div key={episode.id} className="episode-item">
+          <input 
+            type="checkbox" 
+            checked={userProgress[episode.id]?.watched || false}
+            onChange={(e) => updateEpisodeStatus(episode.id, e.target.checked)}
+          />
+          <div className="episode-info">
+            <h4>{episode.name}</h4>
+            <p className="text-sm text-gray-400">{episode.overview}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 ```
 

@@ -113,8 +113,8 @@ export const userContentStatus = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     tmdbId: integer("tmdb_id").notNull(),
     contentType: varchar("content_type", { length: 10 }).notNull(),
-    status: varchar("status", { length: 20 }).default("to_watch").notNull(),
-    shareStatusUpdates: boolean("share_status_updates").default(true).notNull(),
+    status: varchar("status", { length: 20 }).default("planning").notNull(),
+    nextEpisodeDate: timestamp("next_episode_date", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -125,12 +125,43 @@ export const userContentStatus = pgTable(
   (table) => [unique().on(table.userId, table.tmdbId, table.contentType)]
 );
 
+// Episode watch status table
+export const episodeWatchStatus = pgTable(
+  "episode_watch_status",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tmdbId: integer("tmdb_id").notNull(),
+    seasonNumber: integer("season_number").notNull(),
+    episodeNumber: integer("episode_number").notNull(),
+    watched: boolean("watched").default(false).notNull(),
+    watchedAt: timestamp("watched_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique().on(
+      table.userId,
+      table.tmdbId,
+      table.seasonNumber,
+      table.episodeNumber
+    ),
+  ]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   passkeyCredentials: many(passkeyCredentials),
   ownedLists: many(lists),
   collaborations: many(listCollaborators),
   contentStatuses: many(userContentStatus),
+  episodeStatuses: many(episodeWatchStatus),
 }));
 
 export const passkeyCredentialsRelations = relations(
@@ -183,6 +214,16 @@ export const userContentStatusRelations = relations(
   })
 );
 
+export const episodeWatchStatusRelations = relations(
+  episodeWatchStatus,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [episodeWatchStatus.userId],
+      references: [users.id],
+    }),
+  })
+);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -202,6 +243,9 @@ export type NewListItem = typeof listItems.$inferInsert;
 export type UserContentStatus = typeof userContentStatus.$inferSelect;
 export type NewUserContentStatus = typeof userContentStatus.$inferInsert;
 
+export type EpisodeWatchStatus = typeof episodeWatchStatus.$inferSelect;
+export type NewEpisodeWatchStatus = typeof episodeWatchStatus.$inferInsert;
+
 // Enums for type safety
 export const ListType = {
   MOVIE: "movie",
@@ -215,9 +259,26 @@ export const ContentType = {
 } as const;
 
 export const WatchStatus = {
-  TO_WATCH: "to_watch",
+  PLANNING: "planning",
   WATCHING: "watching",
-  WATCHED: "watched",
+  PAUSED: "paused",
+  COMPLETED: "completed",
+  DROPPED: "dropped",
+} as const;
+
+// Movie-specific statuses
+export const MovieWatchStatus = {
+  PLANNING: "planning",
+  COMPLETED: "completed",
+} as const;
+
+// TV show-specific statuses
+export const TVWatchStatus = {
+  PLANNING: "planning",
+  WATCHING: "watching",
+  PAUSED: "paused",
+  COMPLETED: "completed",
+  DROPPED: "dropped",
 } as const;
 
 export const PermissionLevel = {
@@ -228,5 +289,9 @@ export const PermissionLevel = {
 export type ListTypeEnum = (typeof ListType)[keyof typeof ListType];
 export type ContentTypeEnum = (typeof ContentType)[keyof typeof ContentType];
 export type WatchStatusEnum = (typeof WatchStatus)[keyof typeof WatchStatus];
+export type MovieWatchStatusEnum =
+  (typeof MovieWatchStatus)[keyof typeof MovieWatchStatus];
+export type TVWatchStatusEnum =
+  (typeof TVWatchStatus)[keyof typeof TVWatchStatus];
 export type PermissionLevelEnum =
   (typeof PermissionLevel)[keyof typeof PermissionLevel];
