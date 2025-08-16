@@ -50,7 +50,7 @@ export function DashboardClient() {
   return (
     <div className="min-h-screen bg-gray-950">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
+      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
@@ -59,12 +59,12 @@ export function DashboardClient() {
             
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={() => router.push('/lists')}>
-                <Heart className="h-4 w-4 mr-2" />
-                My Lists
+                <Heart className="h-4 w-4" />
+                <span className='ml-2 hidden sm:block'>My Lists</span>
               </Button>
               <Button variant="outline" size="sm" onClick={() => router.push('/search')}>
-                <Search className="h-4 w-4 mr-2" />
-                Discover
+                <Search className="h-4 w-4" />
+                <span className='ml-2 hidden sm:block'>Discover</span>
               </Button>
               {user && (
                 <button
@@ -77,7 +77,7 @@ export function DashboardClient() {
                     username={user.username}
                     size="sm"
                   />
-                  <span className="text-gray-300 text-sm font-medium hidden sm:block">
+                  <span className="text-gray-100 text-sm font-medium hidden sm:block">
                     {user.username}
                   </span>
                 </button>
@@ -153,7 +153,7 @@ export function DashboardClient() {
               <LoadingSpinner size="lg" variant="primary" />
             </div>
           ) : trendingContent.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
               {trendingContent.map((item) => (
                 <ContentCard key={item.id} content={item} />
               ))}

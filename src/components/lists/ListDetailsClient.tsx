@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Users, Lock, Globe, Share, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Users, Lock, Globe, Share, Settings, FileStack } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -144,20 +144,25 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
                   {list.isPublic ? (
                     <>
                       <Globe className="h-3 w-3" />
-                      Public
+                      <span className='hidden sm:block'>Public</span>
                     </>
                   ) : (
                     <>
                       <Lock className="h-3 w-3" />
-                      Private
+                      <span className='hidden sm:block'>Private</span>
                     </>
                   )}
                   <span>•</span>
-                  <span>{list.items.length} items</span>
+                  <div className="flex items-center gap-1">
+                    <FileStack className="h-3 w-3" />
+                    <span>{list.items.length}</span>
+                    <span className='hidden sm:block'>items</span>
+                  </div>
                   <span>•</span>
                   <div className="flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    <span>{list.collaborators}</span>
+                    <span>{list.collaborators}</span> 
+                    <span className='hidden sm:block'>collaborators</span>
                   </div>
                 </div>
               </div>
@@ -169,20 +174,20 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
                 size="sm"
                 onClick={() => setShowCollaborationModal(true)}
               >
-                <Share className="h-4 w-4 mr-2" />
-                Share
+                <Share className="h-4 w-4" />
+                <span className='ml-2 hidden sm:block'>Share</span>
               </Button>
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => setShowSettingsModal(true)}
               >
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
+                <Settings className="h-4 w-4" />
+                <span className='ml-2 hidden sm:block'>Settings</span>
               </Button>
               <Button onClick={() => router.push('/search')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Content
+                <Plus className="h-5 w-5" />
+                <span className='ml-2 hidden sm:block'>Add Content</span>
               </Button>
             </div>
           </div>
@@ -198,8 +203,6 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
             </CardContent>
           </Card>
         )}
-
-
 
         {/* List Items */}
         {list.items.length === 0 ? (
@@ -219,7 +222,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
             {list.items.map((item) => {
               // The item now contains complete TMDB data merged with list-specific data
               const { listItemId, addedAt, ...contentData } = item;

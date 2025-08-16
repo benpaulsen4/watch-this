@@ -78,7 +78,7 @@ export function StatusSegmentedSelector({
   return (
     <div 
       className={cn(
-        'inline-flex bg-gray-800 border border-gray-600 rounded-lg',
+        'inline-flex flex-wrap bg-gray-800 border border-gray-600 rounded-lg',
         'focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent',
         disabled && 'opacity-50 cursor-not-allowed',
         sizeClasses[size].container,

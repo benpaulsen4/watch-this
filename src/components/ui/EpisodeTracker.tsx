@@ -297,7 +297,7 @@ export function EpisodeTracker({ tvShowId, className, onShowStatusChanged }: Epi
                   </div>
                 </button>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-1 min-w-0 flex-wrap items-center justify-end gap-3">
                   {/* Progress Bar */}
                   <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
                     <div 
@@ -379,7 +379,7 @@ export function EpisodeTracker({ tvShowId, className, onShowStatusChanged }: Epi
                           ) : isWatched ? (
                             <Check className="h-3 w-3" />
                           ) : isInFuture && (
-                            <Clock className="h-3 w-3" />
+                            <Clock className="h-3 w-3 text-white" />
                           )}
                         </button>
 
@@ -389,6 +389,7 @@ export function EpisodeTracker({ tvShowId, className, onShowStatusChanged }: Epi
                             <span className="font-medium text-gray-100">
                               {episode.episode_number}. {episode.name}
                             </span>
+                            <div className="flex flex-1 min-w-0 flex-wrap items-center justify-end gap-2">
                             {episode.air_date && (
                               <div className="flex items-center gap-1 text-gray-400 text-xs">
                                 <Calendar className="h-3 w-3" />
@@ -407,9 +408,10 @@ export function EpisodeTracker({ tvShowId, className, onShowStatusChanged }: Epi
                                 <span>{watchDate.toLocaleDateString()}</span>
                               </div>
                             )}
+                            </div>
                           </div>
                           {episode.overview && (
-                            <p className="text-sm text-gray-400 line-clamp-2">
+                            <p className="text-sm text-gray-400 line-clamp-3">
                               {episode.overview}
                             </p>
                           )}

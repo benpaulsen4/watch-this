@@ -159,7 +159,7 @@ const fetchLists = useCallback(async () => {
                   </p>
                 </div>
                 
-                <div className="flex items-center gap-3">     
+                <div className="flex items-center gap-3 flex-wrap justify-end">     
                   {isCurrentList && (
                       <Badge variant="info">
                         Current

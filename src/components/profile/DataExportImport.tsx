@@ -141,7 +141,7 @@ export function DataExportImport() {
               <p className="text-sm text-gray-400 mb-4">
                 Download all your lists and items in JSON or CSV format for backup or migration.
               </p>
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-col sm:flex-row">
                 <Button
                   onClick={() => handleExport('json')}
                   disabled={exportLoading}

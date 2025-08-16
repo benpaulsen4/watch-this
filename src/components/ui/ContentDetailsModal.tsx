@@ -243,13 +243,11 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove,  onSho
                 
                 {/* Watch Status */}
                 <div className="mb-3">
-                  <div className="flex-1 max-w-xs">
                     <StatusSegmentedSelector
                       value={watchStatus}
                       contentType={contentType as ContentTypeEnum}
                       onValueChange={handleStatusChange}
                     />
-                  </div>
                 </div>
                 
                 {/* Tabs */}

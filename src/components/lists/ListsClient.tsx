@@ -188,7 +188,7 @@ export default function ListsClient() {
             </div>
             
             <Button onClick={() => setShowCreateForm(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-5 w-5 mr-2" />
               Create List
             </Button>
           </div>
@@ -324,6 +324,7 @@ export default function ListsClient() {
                           <CardTitle className="text-gray-100 text-lg group-hover:text-white transition-colors">
                             {list.name}
                           </CardTitle>
+                          {/* TODO use badge component */}
                           <span className="px-2 py-1 text-xs bg-blue-600 text-blue-100 rounded-full capitalize">
                             {list.listType}
                           </span>

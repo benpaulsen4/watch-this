@@ -224,14 +224,15 @@ export default function CollaborationModal({
                   <UserPlus className="w-5 h-5" />
                   Add Collaborator
                 </h3>
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-col sm:flex-row">
+                  {/* TODO use input component */}
                   <input
                     type="text"
                     placeholder="Enter username"
                     value={newUsername}
                     onChange={(e) => setNewUsername(e.target.value)}
                     className="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onKeyPress={(e) => e.key === 'Enter' && addCollaborator()}
+                    onKeyDown={(e) => e.key === 'Enter' && addCollaborator()}
                   />
                   <select
                     value={newPermissionLevel}
@@ -241,6 +242,7 @@ export default function CollaborationModal({
                     <option value={PermissionLevel.COLLABORATOR}>Collaborator</option>
                     <option value={PermissionLevel.VIEWER}>Viewer</option>
                   </select>
+                  {/* TODO Use button component */}
                   <button
                     onClick={addCollaborator}
                     disabled={addingCollaborator || !newUsername.trim()}
