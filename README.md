@@ -87,3 +87,19 @@ npm run test:ui
 # Run tests once (CI mode)
 npm run test:run
 ```
+
+## 🛣️ Roadmap
+
+- [ ] TV show scheduling
+- [ ] Watch status sync option for shared lists
+- [ ] Activity feed to see you and your friends recent activity on lists and watch status
+- [ ] Quick complete action from content card
+- [ ] Improved import and export for watch status
+- [ ] Multi-device passkey management
+- [ ] JustWatch integration with per-user streaming service configuration
+- [ ] \*arr stack integration for when content is not on any configured streaming services
+- [ ] Component refactoring and tech debt squashing
+- [ ] Recommendations of some kind
+- [ ] Sorting and filtering inside lists
+- [ ] Cast tab for content details
+- [ ] Statistics page in user profile

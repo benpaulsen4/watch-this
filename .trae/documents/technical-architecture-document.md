@@ -10,16 +10,16 @@ graph TD
     B --> E[Drizzle ORM Client]
     E --> F[PostgreSQL Database]
     D --> G[TMDB External API]
-    
+
     subgraph "Frontend Layer"
         B
         C
     end
-    
+
     subgraph "Data Layer"
         F
     end
-    
+
     subgraph "External Services"
         G
     end
@@ -27,37 +27,37 @@ graph TD
 
 ## 2. Technology Description
 
-* Frontend: Next.js\@15 + React\@19 + TypeScript + Tailwind CSS\@4 + React ARIA Components
+- Frontend: Next.js\@15 + React\@19 + TypeScript + Tailwind CSS\@4 + React ARIA Components
 
-* Database: PostgreSQL with Drizzle ORM
+- Database: PostgreSQL with Drizzle ORM
 
-* Authentication: WebAuthn/Passkeys (no backend auth service)
+- Authentication: WebAuthn/Passkeys (no backend auth service)
 
-* External APIs: TMDB API v3
+- External APIs: TMDB API v3
 
-* Testing: Vitest + React Testing Library
+- Testing: Vitest + React Testing Library
 
-* Deployment: Vercel OR Docker
+- Deployment: Vercel OR Docker
 
 ## 3. Route Definitions
 
-| Route                   | Purpose                                                           |
-| ----------------------- | ----------------------------------------------------------------- |
-| /                       | Home dashboard with lists overview and activity feed              |
-| /auth                   | Authentication page for passkey registration and sign-in          |
-| /lists                  | My Lists page showing all personal and shared lists               |
-| /lists/\[id]            | Individual list details with content management and collaboration |
-| /search                 | Content discovery page with TMDB search and filtering             |
-| /profile                | User profile with settings and data export/import                 |
-| /api/auth/session       | Enhanced session endpoint with profile management                 |
-| /api/profile/devices    | Passkey device management and viewing                             |
-| /api/profile/export     | Data export functionality (CSV/JSON)                              |
-| /api/profile/import     | Data import functionality (CSV/JSON)                              |
-| /api/tmdb/search        | Server-side TMDB API proxy for content search                     |
-| /api/tmdb/details/\[id] | Server-side TMDB API proxy for content details                    |
+| Route                    | Purpose                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| /                        | Home dashboard with lists overview and activity feed              |
+| /auth                    | Authentication page for passkey registration and sign-in          |
+| /lists                   | My Lists page showing all personal and shared lists               |
+| /lists/\[id]             | Individual list details with content management and collaboration |
+| /search                  | Content discovery page with TMDB search and filtering             |
+| /profile                 | User profile with settings and data export/import                 |
+| /api/auth/session        | Enhanced session endpoint with profile management                 |
+| /api/profile/devices     | Passkey device management and viewing                             |
+| /api/profile/export      | Data export functionality (CSV/JSON)                              |
+| /api/profile/import      | Data import functionality (CSV/JSON)                              |
+| /api/tmdb/search         | Server-side TMDB API proxy for content search                     |
+| /api/tmdb/details/\[id]  | Server-side TMDB API proxy for content details                    |
 | /api/tmdb/episodes/\[id] | Server-side TMDB API proxy for TV show episode data               |
-| /api/status/content     | Content watch status management (GET, PUT, DELETE)                |
-| /api/status/episodes    | Episode watch status tracking (GET, PUT)                          |
+| /api/status/content      | Content watch status management (GET, PUT, DELETE)                |
+| /api/status/episodes     | Episode watch status tracking (GET, PUT)                          |
 
 ## 4. API Definitions
 
@@ -79,11 +79,11 @@ Request:
 
 Response:
 
-| Param Name     | Param Type | Description                     |
-| -------------- | ---------- | ------------------------------- |
-| results        | array      | Array of movie/TV show objects  |
-| total\_pages   | number     | Total number of pages available |
-| total\_results | number     | Total number of results         |
+| Param Name    | Param Type | Description                     |
+| ------------- | ---------- | ------------------------------- |
+| results       | array      | Array of movie/TV show objects  |
+| total_pages   | number     | Total number of pages available |
+| total_results | number     | Total number of results         |
 
 **Content Details**
 
@@ -99,14 +99,14 @@ Request:
 
 Response:
 
-| Param Name    | Param Type | Description                 |
-| ------------- | ---------- | --------------------------- |
-| id            | number     | TMDB content ID             |
-| title         | string     | Movie title or TV show name |
-| overview      | string     | Content description         |
-| poster\_path  | string     | Poster image path           |
-| release\_date | string     | Release date                |
-| genres        | array      | Array of genre objects      |
+| Param Name   | Param Type | Description                 |
+| ------------ | ---------- | --------------------------- |
+| id           | number     | TMDB content ID             |
+| title        | string     | Movie title or TV show name |
+| overview     | string     | Content description         |
+| poster_path  | string     | Poster image path           |
+| release_date | string     | Release date                |
+| genres       | array      | Array of genre objects      |
 
 **Enhanced Session Management**
 
@@ -116,13 +116,13 @@ GET /api/auth/session
 
 Response:
 
-| Param Name                 | Param Type | Description                    |
-| -------------------------- | ---------- | ------------------------------ |
-| user                       | object     | User information object        |
-| user.id                    | string     | User ID                        |
-| user.username              | string     | Current username               |
-| user.profile\_picture\_url | string     | Profile picture URL (nullable) |
-| user.created\_at           | string     | Account creation timestamp     |
+| Param Name               | Param Type | Description                    |
+| ------------------------ | ---------- | ------------------------------ |
+| user                     | object     | User information object        |
+| user.id                  | string     | User ID                        |
+| user.username            | string     | Current username               |
+| user.profile_picture_url | string     | Profile picture URL (nullable) |
+| user.created_at          | string     | Account creation timestamp     |
 
 ```
 PUT /api/profile
@@ -130,10 +130,10 @@ PUT /api/profile
 
 Request:
 
-| Param Name            | Param Type | isRequired | Description                  |
-| --------------------- | ---------- | ---------- | ---------------------------- |
-| username              | string     | false      | New username                 |
-| profile\_picture\_url | string     | false      | External profile picture URL |
+| Param Name          | Param Type | isRequired | Description                  |
+| ------------------- | ---------- | ---------- | ---------------------------- |
+| username            | string     | false      | New username                 |
+| profile_picture_url | string     | false      | External profile picture URL |
 
 Response:
 
@@ -156,12 +156,12 @@ Response:
 
 Device Object:
 
-| Param Name   | Param Type | Description              |
-| ------------ | ---------- | ------------------------ |
-| id           | string     | Device credential ID     |
-| device\_name | string     | User-defined device name |
-| created\_at  | string     | Device registration date |
-| last\_used   | string     | Last authentication date |
+| Param Name  | Param Type | Description              |
+| ----------- | ---------- | ------------------------ |
+| id          | string     | Device credential ID     |
+| device_name | string     | User-defined device name |
+| created_at  | string     | Device registration date |
+| last_used   | string     | Last authentication date |
 
 **Data Export**
 
@@ -197,11 +197,11 @@ Request:
 
 Response:
 
-| Param Name      | Param Type | Description                    |
-| --------------- | ---------- | ------------------------------ |
-| success         | boolean    | Import operation status        |
-| imported\_count | number     | Number of lists imported       |
-| errors          | array      | Array of import error messages |
+| Param Name     | Param Type | Description                    |
+| -------------- | ---------- | ------------------------------ |
+| success        | boolean    | Import operation status        |
+| imported_count | number     | Number of lists imported       |
+| errors         | array      | Array of import error messages |
 
 **Content Watch Status Management**
 
@@ -211,17 +211,17 @@ GET /api/status/content?tmdb_id={id}&content_type={type}
 
 Request:
 
-| Param Name   | Param Type | isRequired | Description                    |
-| ------------ | ---------- | ---------- | ------------------------------ |
-| tmdb\_id     | number     | true       | TMDB content ID                |
-| content\_type | string     | true       | Content type (movie or tv)     |
+| Param Name   | Param Type | isRequired | Description                |
+| ------------ | ---------- | ---------- | -------------------------- |
+| tmdb_id      | number     | true       | TMDB content ID            |
+| content_type | string     | true       | Content type (movie or tv) |
 
 Response:
 
 | Param Name | Param Type | Description                           |
 | ---------- | ---------- | ------------------------------------- |
 | status     | string     | Current watch status (nullable)       |
-| updated\_at | string     | Last status update timestamp          |
+| updated_at | string     | Last status update timestamp          |
 | progress   | object     | Episode progress data (TV shows only) |
 
 ```
@@ -230,17 +230,17 @@ PUT /api/status/content
 
 Request:
 
-| Param Name   | Param Type | isRequired | Description                                    |
-| ------------ | ---------- | ---------- | ---------------------------------------------- |
-| tmdb\_id     | number     | true       | TMDB content ID                                |
-| content\_type | string     | true       | Content type (movie or tv)                     |
+| Param Name   | Param Type | isRequired | Description                                      |
+| ------------ | ---------- | ---------- | ------------------------------------------------ |
+| tmdb_id      | number     | true       | TMDB content ID                                  |
+| content_type | string     | true       | Content type (movie or tv)                       |
 | status       | string     | true       | New status (planning, watching, completed, etc.) |
 
 Response:
 
-| Param Name | Param Type | Description          |
-| ---------- | ---------- | -------------------- |
-| success    | boolean    | Operation status     |
+| Param Name | Param Type | Description           |
+| ---------- | ---------- | --------------------- |
+| success    | boolean    | Operation status      |
 | status     | object     | Updated status object |
 
 **Episode Watch Status Tracking**
@@ -253,15 +253,15 @@ Request:
 
 | Param Name | Param Type | isRequired | Description     |
 | ---------- | ---------- | ---------- | --------------- |
-| tmdb\_id   | number     | true       | TMDB TV show ID |
+| tmdb_id    | number     | true       | TMDB TV show ID |
 
 Response:
 
-| Param Name      | Param Type | Description                        |
-| --------------- | ---------- | ---------------------------------- |
-| episodes        | array      | Array of episode watch status      |
-| total\_episodes | number     | Total number of episodes           |
-| watched\_count  | number     | Number of episodes marked watched  |
+| Param Name     | Param Type | Description                       |
+| -------------- | ---------- | --------------------------------- |
+| episodes       | array      | Array of episode watch status     |
+| total_episodes | number     | Total number of episodes          |
+| watched_count  | number     | Number of episodes marked watched |
 
 ```
 PUT /api/status/episodes
@@ -269,20 +269,20 @@ PUT /api/status/episodes
 
 Request:
 
-| Param Name     | Param Type | isRequired | Description                    |
-| -------------- | ---------- | ---------- | ------------------------------ |
-| tmdb\_id       | number     | true       | TMDB TV show ID                |
-| season\_number | number     | true       | Season number                  |
-| episode\_number | number     | true       | Episode number                 |
-| watched        | boolean    | true       | Whether episode is watched     |
+| Param Name     | Param Type | isRequired | Description                |
+| -------------- | ---------- | ---------- | -------------------------- |
+| tmdb_id        | number     | true       | TMDB TV show ID            |
+| season_number  | number     | true       | Season number              |
+| episode_number | number     | true       | Episode number             |
+| watched        | boolean    | true       | Whether episode is watched |
 
 Response:
 
-| Param Name    | Param Type | Description                           |
-| ------------- | ---------- | ------------------------------------- |
-| success       | boolean    | Operation status                      |
-| show\_status  | string     | Updated show status (if changed)      |
-| episode\_count | object     | Updated episode count information     |
+| Param Name    | Param Type | Description                       |
+| ------------- | ---------- | --------------------------------- |
+| success       | boolean    | Operation status                  |
+| show_status   | string     | Updated show status (if changed)  |
+| episode_count | object     | Updated episode count information |
 
 ## 5. Server Architecture Diagram
 
@@ -296,18 +296,18 @@ graph TD
     D --> G[Drizzle Client]
     E --> G
     G --> H[(PostgreSQL)]
-    
+
     subgraph "Frontend Layer"
         B
         D
         E
     end
-    
+
     subgraph "API Layer"
         C
         F
     end
-    
+
     subgraph "Data Layer"
         G
         H
@@ -329,7 +329,7 @@ erDiagram
     USERS ||--o{ EPISODE_WATCH_STATUS : tracks
     LIST_ITEMS ||--o{ USER_CONTENT_STATUS : references
     USER_CONTENT_STATUS ||--o{ EPISODE_WATCH_STATUS : contains
-    
+
     USERS {
         uuid id PK
         string username UK
@@ -337,7 +337,7 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
-    
+
     PASSKEY_CREDENTIALS {
         uuid id PK
         uuid user_id FK
@@ -348,7 +348,7 @@ erDiagram
         timestamp created_at
         timestamp last_used
     }
-    
+
     LISTS {
         uuid id PK
         uuid owner_id FK
@@ -359,7 +359,7 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
-    
+
     LIST_COLLABORATORS {
         uuid id PK
         uuid list_id FK
@@ -368,7 +368,7 @@ erDiagram
         timestamp invited_at
         timestamp joined_at
     }
-    
+
     LIST_ITEMS {
         uuid id PK
         uuid list_id FK
@@ -380,7 +380,7 @@ erDiagram
         timestamp added_at
         integer sort_order
     }
-    
+
     USER_CONTENT_STATUS {
         uuid id PK
         uuid user_id FK
@@ -391,7 +391,7 @@ erDiagram
         timestamp updated_at
         timestamp created_at
     }
-    
+
     EPISODE_WATCH_STATUS {
         uuid id PK
         uuid user_id FK
@@ -518,7 +518,7 @@ CREATE TABLE user_content_status (
     tmdb_id INTEGER NOT NULL,
     content_type VARCHAR(10) NOT NULL CHECK (content_type IN ('movie', 'tv')),
     status VARCHAR(20) NOT NULL CHECK (status IN ('planning', 'watching', 'paused', 'completed', 'dropped')),
-    share_status_updates BOOLEAN DEFAULT true,
+    next_episode_date TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id, tmdb_id, content_type)
@@ -558,7 +558,8 @@ The watch status system uses two complementary tables to provide comprehensive t
 
 2. **Episode-Level Tracking (`episode_watch_status`)**: Provides granular episode tracking for TV shows, recording which specific episodes have been watched. This enables automatic status updates and progress calculation.
 
-3. **Automatic Status Logic**: 
+3. **Automatic Status Logic**:
+
    - First episode marked watched → Show status becomes "Watching"
    - All episodes marked watched → Show status becomes "Completed"
    - New episodes added to completed show → Status reverts to "Watching"
@@ -582,19 +583,19 @@ The watch status system uses two complementary tables to provide comprehensive t
 
 **Server Components First**
 
-* Use Server Components by default for all pages and components
+- Use Server Components by default for all pages and components
 
-* Only use Client Components when interactivity is required (forms, event handlers, state management)
+- Only use Client Components when interactivity is required (forms, event handlers, state management)
 
-* Create "islands of reactivity" using Client Components within Server Component trees
+- Create "islands of reactivity" using Client Components within Server Component trees
 
-* Wrap Client Components with Suspense boundaries for better loading states
+- Wrap Client Components with Suspense boundaries for better loading states
 
 ```tsx
 // ✅ Good: Server Component with Client Component island
 export default async function ListPage({ params }: { params: { id: string } }) {
   const list = await getList(params.id); // Server-side data fetching
-  
+
   return (
     <div>
       <h1>{list.name}</h1>
@@ -610,23 +611,23 @@ export default async function ListPage({ params }: { params: { id: string } }) {
 
 **Comprehensive Test Coverage**
 
-* Write unit tests for every utility function and library
+- Write unit tests for every utility function and library
 
-* Write component tests for all UI components using React Testing Library
+- Write component tests for all UI components using React Testing Library
 
-* Write integration tests for API routes and database operations
+- Write integration tests for API routes and database operations
 
-* Maintain minimum 80% code coverage
+- Maintain minimum 80% code coverage
 
 ```tsx
 // Example component test structure
-describe('ListCard', () => {
-  it('renders list information correctly', () => {
+describe("ListCard", () => {
+  it("renders list information correctly", () => {
     render(<ListCard list={mockList} />);
     expect(screen.getByText(mockList.name)).toBeInTheDocument();
   });
-  
-  it('handles collaboration status display', () => {
+
+  it("handles collaboration status display", () => {
     // Test collaborative features
   });
 });
@@ -636,11 +637,11 @@ describe('ListCard', () => {
 
 **Shared Layouts**
 
-* Extract common UI elements (headers, navigation, footers) into shared layout components
+- Extract common UI elements (headers, navigation, footers) into shared layout components
 
-* Implement authentication checks at the layout level to avoid repetition
+- Implement authentication checks at the layout level to avoid repetition
 
-* Use layout.tsx files for route-level shared layouts
+- Use layout.tsx files for route-level shared layouts
 
 ```tsx
 // app/(authenticated)/layout.tsx
@@ -650,17 +651,15 @@ export default async function AuthenticatedLayout({
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser(); // Single auth check for all child routes
-  
+
   if (!user) {
-    redirect('/auth');
+    redirect("/auth");
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-900">
       <Header user={user} />
-      <main className="container mx-auto px-4 py-8">
-        {children}
-      </main>
+      <main className="container mx-auto px-4 py-8">{children}</main>
     </div>
   );
 }
@@ -670,23 +669,23 @@ export default async function AuthenticatedLayout({
 
 **Middleware-First Authentication**
 
-* Handle authentication in middleware whenever possible
+- Handle authentication in middleware whenever possible
 
-* Pass user information from middleware to API routes via headers or request context
+- Pass user information from middleware to API routes via headers or request context
 
-* Avoid re-checking authentication in API routes if middleware has already validated
+- Avoid re-checking authentication in API routes if middleware has already validated
 
 ```tsx
 // middleware.ts
 export async function middleware(request: NextRequest) {
   const user = await validateAuth(request);
-  
+
   if (user) {
     // Add user info to request headers
-    request.headers.set('x-user-id', user.id);
-    request.headers.set('x-username', user.username);
+    request.headers.set("x-user-id", user.id);
+    request.headers.set("x-username", user.username);
   }
-  
+
   return NextResponse.next({
     request: {
       headers: request.headers,
@@ -696,12 +695,12 @@ export async function middleware(request: NextRequest) {
 
 // API route using middleware auth
 export async function GET(request: Request) {
-  const userId = request.headers.get('x-user-id');
-  
+  const userId = request.headers.get("x-user-id");
+
   if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  
+
   // No need to re-validate auth, middleware already did it
   const lists = await getUserLists(userId);
   return NextResponse.json(lists);
@@ -712,13 +711,13 @@ export async function GET(request: Request) {
 
 **Consistent Structure**
 
-* Group related components in feature-based directories
+- Group related components in feature-based directories
 
-* Keep test files adjacent to source files with `.test.tsx` or `.spec.tsx` extensions
+- Keep test files adjacent to source files with `.test.tsx` or `.spec.tsx` extensions
 
-* Use barrel exports (index.ts) for clean imports
+- Use barrel exports (index.ts) for clean imports
 
-* Separate client and server utilities into appropriate directories
+- Separate client and server utilities into appropriate directories
 
 ```
 src/
@@ -745,34 +744,43 @@ src/
 
 **Status Management Best Practices**
 
-* Use optimistic updates for status changes with proper error handling and rollback
-* Implement debounced episode tracking to avoid excessive database writes
-* Cache episode data from TMDB API to reduce external API calls
-* Use database transactions for automatic status updates to ensure consistency
+- Use optimistic updates for status changes with proper error handling and rollback
+- Implement debounced episode tracking to avoid excessive database writes
+- Cache episode data from TMDB API to reduce external API calls
+- Use database transactions for automatic status updates to ensure consistency
 
 ```tsx
 // Optimistic status update pattern
 const updateContentStatus = async (tmdbId: number, newStatus: string) => {
   // Optimistic update
   setLocalStatus(newStatus);
-  
+
   try {
-    await fetch('/api/status/content', {
-      method: 'PUT',
-      body: JSON.stringify({ tmdb_id: tmdbId, status: newStatus })
+    await fetch("/api/status/content", {
+      method: "PUT",
+      body: JSON.stringify({ tmdb_id: tmdbId, status: newStatus }),
     });
   } catch (error) {
     // Rollback on error
     setLocalStatus(previousStatus);
-    showErrorToast('Failed to update status');
+    showErrorToast("Failed to update status");
   }
 };
 
 // Debounced episode tracking
 const debouncedEpisodeUpdate = useMemo(
-  () => debounce(async (tmdbId: number, season: number, episode: number, watched: boolean) => {
-    await updateEpisodeStatus(tmdbId, season, episode, watched);
-  }, 500),
+  () =>
+    debounce(
+      async (
+        tmdbId: number,
+        season: number,
+        episode: number,
+        watched: boolean
+      ) => {
+        await updateEpisodeStatus(tmdbId, season, episode, watched);
+      },
+      500
+    ),
   []
 );
 ```
@@ -781,35 +789,52 @@ const debouncedEpisodeUpdate = useMemo(
 
 ```tsx
 // Server-side automatic status update with transaction
-export async function updateEpisodeWithStatusCheck(userId: string, tmdbId: number, season: number, episode: number, watched: boolean) {
+export async function updateEpisodeWithStatusCheck(
+  userId: string,
+  tmdbId: number,
+  season: number,
+  episode: number,
+  watched: boolean
+) {
   return await db.transaction(async (tx) => {
     // Update episode status
-    await tx.insert(episodeWatchStatus).values({
-      userId,
-      tmdbId,
-      seasonNumber: season,
-      episodeNumber: episode,
-      watched,
-      watchedAt: watched ? new Date() : null
-    }).onConflictDoUpdate({
-      target: [episodeWatchStatus.userId, episodeWatchStatus.tmdbId, episodeWatchStatus.seasonNumber, episodeWatchStatus.episodeNumber],
-      set: { watched, watchedAt: watched ? new Date() : null }
-    });
-    
+    await tx
+      .insert(episodeWatchStatus)
+      .values({
+        userId,
+        tmdbId,
+        seasonNumber: season,
+        episodeNumber: episode,
+        watched,
+        watchedAt: watched ? new Date() : null,
+      })
+      .onConflictDoUpdate({
+        target: [
+          episodeWatchStatus.userId,
+          episodeWatchStatus.tmdbId,
+          episodeWatchStatus.seasonNumber,
+          episodeWatchStatus.episodeNumber,
+        ],
+        set: { watched, watchedAt: watched ? new Date() : null },
+      });
+
     // Check if show status needs automatic update
     const episodeStats = await getEpisodeStats(tx, userId, tmdbId);
     const newShowStatus = calculateAutoStatus(episodeStats);
-    
+
     if (newShowStatus) {
-      await tx.insert(userContentStatus).values({
-        userId,
-        tmdbId,
-        contentType: 'tv',
-        status: newShowStatus
-      }).onConflictDoUpdate({
-        target: [userContentStatus.userId, userContentStatus.tmdbId],
-        set: { status: newShowStatus, updatedAt: new Date() }
-      });
+      await tx
+        .insert(userContentStatus)
+        .values({
+          userId,
+          tmdbId,
+          contentType: "tv",
+          status: newShowStatus,
+        })
+        .onConflictDoUpdate({
+          target: [userContentStatus.userId, userContentStatus.tmdbId],
+          set: { status: newShowStatus, updatedAt: new Date() },
+        });
     }
   });
 }
@@ -819,17 +844,17 @@ export async function updateEpisodeWithStatusCheck(userId: string, tmdbId: numbe
 
 **Optimization Best Practices**
 
-* Use dynamic imports for heavy Client Components
+- Use dynamic imports for heavy Client Components
 
-* Implement proper caching strategies for database queries
+- Implement proper caching strategies for database queries
 
-* Optimize images with Next.js Image component
+- Optimize images with Next.js Image component
 
-* Use React.memo() for expensive Client Components that don't need frequent re-renders
+- Use React.memo() for expensive Client Components that don't need frequent re-renders
 
 ```tsx
 // Dynamic import for heavy components
-const VideoPlayer = dynamic(() => import('./VideoPlayer'), {
+const VideoPlayer = dynamic(() => import("./VideoPlayer"), {
   loading: () => <VideoPlayerSkeleton />,
   ssr: false,
 });
@@ -844,27 +869,25 @@ const getListsWithCache = cache(async (userId: string) => {
 
 **Status Badge Implementation**
 
-* Use the existing Badge component with status-specific variants (watching, completed, planning, paused, dropped)
-* Leverage existing Badge component styling and behavior rather than creating new components
-* Ensure consistent status color scheme across the application
+- Use the existing Badge component with status-specific variants (watching, completed, planning, paused, dropped)
+- Leverage existing Badge component styling and behavior rather than creating new components
+- Ensure consistent status color scheme across the application
 
 **Episode Tracker Component**
 
-* Display episode titles and synopses fetched from TMDB API alongside checkboxes
-* Implement efficient data fetching and caching for episode metadata
-* Use debounced updates for episode status changes to optimize performance
+- Display episode titles and synopses fetched from TMDB API alongside checkboxes
+- Implement efficient data fetching and caching for episode metadata
+- Use debounced updates for episode status changes to optimize performance
 
 ```tsx
 // Example: Using existing Badge component for status display
-import { Badge } from '@/components/ui/Badge';
+import { Badge } from "@/components/ui/Badge";
 
 function ContentCard({ content, userStatus }) {
   return (
     <div className="content-card">
       {userStatus && (
-        <Badge variant={userStatus.status}>
-          {userStatus.status}
-        </Badge>
+        <Badge variant={userStatus.status}>{userStatus.status}</Badge>
       )}
       {/* Content details */}
     </div>
@@ -875,10 +898,10 @@ function ContentCard({ content, userStatus }) {
 function EpisodeTracker({ tmdbId, episodes, userProgress }) {
   return (
     <div className="episode-list">
-      {episodes.map(episode => (
+      {episodes.map((episode) => (
         <div key={episode.id} className="episode-item">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             checked={userProgress[episode.id]?.watched || false}
             onChange={(e) => updateEpisodeStatus(episode.id, e.target.checked)}
           />
@@ -892,4 +915,3 @@ function EpisodeTracker({ tmdbId, episodes, userProgress }) {
   );
 }
 ```
-

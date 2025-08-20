@@ -255,6 +255,7 @@ class TMDBClient {
   }
 
   // Search for movies and TV shows
+  // TODO filter out people from this endpoint
   async searchMulti(
     query: string,
     page: number = 1
@@ -298,6 +299,8 @@ class TMDBClient {
   }
 
   // Get trending content
+  // TODO filter out people from this endpoint
+
   async getTrending(
     mediaType: "all" | "movie" | "tv" = "all",
     timeWindow: "day" | "week" = "week"
