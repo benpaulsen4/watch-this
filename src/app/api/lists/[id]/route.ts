@@ -28,6 +28,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         description: lists.description,
         listType: lists.listType,
         isPublic: lists.isPublic,
+        syncWatchStatus: lists.syncWatchStatus,
         ownerId: lists.ownerId,
         ownerUsername: users.username,
         ownerProfilePictureUrl: users.profilePictureUrl,
@@ -131,7 +132,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
 
     const body = await request.json();
 
-    const { name, description, listType, isPublic } = body;
+    const { name, description, listType, isPublic, syncWatchStatus } = body;
 
     // Check if user owns this list
     const [existingList] = await db
@@ -187,6 +188,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       updateData.description = description?.trim() || null;
     if (listType !== undefined) updateData.listType = listType;
     if (isPublic !== undefined) updateData.isPublic = Boolean(isPublic);
+    if (syncWatchStatus !== undefined) updateData.syncWatchStatus = Boolean(syncWatchStatus);
 
     // Update the list
     const [updatedList] = await db

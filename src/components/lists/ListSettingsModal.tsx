@@ -10,6 +10,7 @@ interface List {
   description: string | null;
   listType: 'movie' | 'tv' | 'mixed';
   isPublic: boolean;
+  syncWatchStatus: boolean;
   ownerId: string;
   ownerUsername?: string;
   createdAt: string;
@@ -38,6 +39,7 @@ export default function ListSettingsModal({
     description: list.description || "",
     type: list.listType,
     isPublic: list.isPublic,
+    syncWatchStatus: list.syncWatchStatus,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -80,6 +82,7 @@ export default function ListSettingsModal({
           description: formData.description.trim() || null,
           type: formData.type,
           isPublic: formData.isPublic,
+          syncWatchStatus: formData.syncWatchStatus,
         }),
       });
 
@@ -222,6 +225,25 @@ export default function ListSettingsModal({
                 </label>
                 <p className="text-xs text-gray-400 mt-1 ml-7">
                   Public lists can be discovered and viewed by other users
+                </p>
+              </div>
+
+              {/* Sync Watch Status */}
+              <div>
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.syncWatchStatus}
+                    onChange={(e) => handleInputChange("syncWatchStatus", e.target.checked)}
+                    disabled={!isOwner || isLoading}
+                    className="w-4 h-4 text-green-600 bg-gray-800 border-gray-600 rounded focus:ring-green-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <span className="text-sm font-medium text-gray-300">
+                    Sync watch status with collaborators
+                  </span>
+                </label>
+                <p className="text-xs text-gray-400 mt-1 ml-7">
+                  When enabled, watch status updates will be synchronized across all collaborators
                 </p>
               </div>
 

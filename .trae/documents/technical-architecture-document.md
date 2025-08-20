@@ -27,37 +27,37 @@ graph TD
 
 ## 2. Technology Description
 
-- Frontend: Next.js\@15 + React\@19 + TypeScript + Tailwind CSS\@4 + React ARIA Components
+* Frontend: Next.js\@15 + React\@19 + TypeScript + Tailwind CSS\@4 + React ARIA Components
 
-- Database: PostgreSQL with Drizzle ORM
+* Database: PostgreSQL with Drizzle ORM
 
-- Authentication: WebAuthn/Passkeys (no backend auth service)
+* Authentication: WebAuthn/Passkeys (no backend auth service)
 
-- External APIs: TMDB API v3
+* External APIs: TMDB API v3
 
-- Testing: Vitest + React Testing Library
+* Testing: Vitest + React Testing Library
 
-- Deployment: Vercel OR Docker
+* Deployment: Vercel OR Docker
 
 ## 3. Route Definitions
 
-| Route                    | Purpose                                                           |
-| ------------------------ | ----------------------------------------------------------------- |
-| /                        | Home dashboard with lists overview and activity feed              |
-| /auth                    | Authentication page for passkey registration and sign-in          |
-| /lists                   | My Lists page showing all personal and shared lists               |
-| /lists/\[id]             | Individual list details with content management and collaboration |
-| /search                  | Content discovery page with TMDB search and filtering             |
-| /profile                 | User profile with settings and data export/import                 |
-| /api/auth/session        | Enhanced session endpoint with profile management                 |
-| /api/profile/devices     | Passkey device management and viewing                             |
-| /api/profile/export      | Data export functionality (CSV/JSON)                              |
-| /api/profile/import      | Data import functionality (CSV/JSON)                              |
-| /api/tmdb/search         | Server-side TMDB API proxy for content search                     |
-| /api/tmdb/details/\[id]  | Server-side TMDB API proxy for content details                    |
-| /api/tmdb/episodes/\[id] | Server-side TMDB API proxy for TV show episode data               |
-| /api/status/content      | Content watch status management (GET, PUT, DELETE)                |
-| /api/status/episodes     | Episode watch status tracking (GET, PUT)                          |
+| Route                    | Purpose                                                              |
+| ------------------------ | -------------------------------------------------------------------- |
+| /                        | Home dashboard with lists overview and activity feed                 |
+| /auth                    | Authentication page for passkey registration and sign-in             |
+| /lists                   | My Lists page showing all personal and shared lists                  |
+| /lists/\[id]             | Individual list details with content management and collaboration    |
+| /search                  | Content discovery page with TMDB search and filtering                |
+| /profile                 | User profile with settings and data export/import                    |
+| /api/auth/session        | Enhanced session endpoint with profile management                    |
+| /api/profile/devices     | Passkey device management and viewing                                |
+| /api/profile/export      | Data export functionality (CSV/JSON)                                 |
+| /api/profile/import      | Data import functionality (CSV/JSON)                                 |
+| /api/tmdb/search         | Server-side TMDB API proxy for content search                        |
+| /api/tmdb/details/\[id]  | Server-side TMDB API proxy for content details                       |
+| /api/tmdb/episodes/\[id] | Server-side TMDB API proxy for TV show episode data                  |
+| /api/status/content      | Content watch status management with sync support (GET, PUT, DELETE) |
+| /api/status/episodes     | Episode watch status tracking with sync support (GET, PUT)           |
 
 ## 4. API Definitions
 
@@ -79,11 +79,11 @@ Request:
 
 Response:
 
-| Param Name    | Param Type | Description                     |
-| ------------- | ---------- | ------------------------------- |
-| results       | array      | Array of movie/TV show objects  |
-| total_pages   | number     | Total number of pages available |
-| total_results | number     | Total number of results         |
+| Param Name     | Param Type | Description                     |
+| -------------- | ---------- | ------------------------------- |
+| results        | array      | Array of movie/TV show objects  |
+| total\_pages   | number     | Total number of pages available |
+| total\_results | number     | Total number of results         |
 
 **Content Details**
 
@@ -99,14 +99,14 @@ Request:
 
 Response:
 
-| Param Name   | Param Type | Description                 |
-| ------------ | ---------- | --------------------------- |
-| id           | number     | TMDB content ID             |
-| title        | string     | Movie title or TV show name |
-| overview     | string     | Content description         |
-| poster_path  | string     | Poster image path           |
-| release_date | string     | Release date                |
-| genres       | array      | Array of genre objects      |
+| Param Name    | Param Type | Description                 |
+| ------------- | ---------- | --------------------------- |
+| id            | number     | TMDB content ID             |
+| title         | string     | Movie title or TV show name |
+| overview      | string     | Content description         |
+| poster\_path  | string     | Poster image path           |
+| release\_date | string     | Release date                |
+| genres        | array      | Array of genre objects      |
 
 **Enhanced Session Management**
 
@@ -116,13 +116,13 @@ GET /api/auth/session
 
 Response:
 
-| Param Name               | Param Type | Description                    |
-| ------------------------ | ---------- | ------------------------------ |
-| user                     | object     | User information object        |
-| user.id                  | string     | User ID                        |
-| user.username            | string     | Current username               |
-| user.profile_picture_url | string     | Profile picture URL (nullable) |
-| user.created_at          | string     | Account creation timestamp     |
+| Param Name                 | Param Type | Description                    |
+| -------------------------- | ---------- | ------------------------------ |
+| user                       | object     | User information object        |
+| user.id                    | string     | User ID                        |
+| user.username              | string     | Current username               |
+| user.profile\_picture\_url | string     | Profile picture URL (nullable) |
+| user.created\_at           | string     | Account creation timestamp     |
 
 ```
 PUT /api/profile
@@ -130,10 +130,10 @@ PUT /api/profile
 
 Request:
 
-| Param Name          | Param Type | isRequired | Description                  |
-| ------------------- | ---------- | ---------- | ---------------------------- |
-| username            | string     | false      | New username                 |
-| profile_picture_url | string     | false      | External profile picture URL |
+| Param Name            | Param Type | isRequired | Description                  |
+| --------------------- | ---------- | ---------- | ---------------------------- |
+| username              | string     | false      | New username                 |
+| profile\_picture\_url | string     | false      | External profile picture URL |
 
 Response:
 
@@ -156,12 +156,12 @@ Response:
 
 Device Object:
 
-| Param Name  | Param Type | Description              |
-| ----------- | ---------- | ------------------------ |
-| id          | string     | Device credential ID     |
-| device_name | string     | User-defined device name |
-| created_at  | string     | Device registration date |
-| last_used   | string     | Last authentication date |
+| Param Name   | Param Type | Description              |
+| ------------ | ---------- | ------------------------ |
+| id           | string     | Device credential ID     |
+| device\_name | string     | User-defined device name |
+| created\_at  | string     | Device registration date |
+| last\_used   | string     | Last authentication date |
 
 **Data Export**
 
@@ -197,11 +197,11 @@ Request:
 
 Response:
 
-| Param Name     | Param Type | Description                    |
-| -------------- | ---------- | ------------------------------ |
-| success        | boolean    | Import operation status        |
-| imported_count | number     | Number of lists imported       |
-| errors         | array      | Array of import error messages |
+| Param Name      | Param Type | Description                    |
+| --------------- | ---------- | ------------------------------ |
+| success         | boolean    | Import operation status        |
+| imported\_count | number     | Number of lists imported       |
+| errors          | array      | Array of import error messages |
 
 **Content Watch Status Management**
 
@@ -211,18 +211,18 @@ GET /api/status/content?tmdb_id={id}&content_type={type}
 
 Request:
 
-| Param Name   | Param Type | isRequired | Description                |
-| ------------ | ---------- | ---------- | -------------------------- |
-| tmdb_id      | number     | true       | TMDB content ID            |
-| content_type | string     | true       | Content type (movie or tv) |
+| Param Name    | Param Type | isRequired | Description                |
+| ------------- | ---------- | ---------- | -------------------------- |
+| tmdb\_id      | number     | true       | TMDB content ID            |
+| content\_type | string     | true       | Content type (movie or tv) |
 
 Response:
 
-| Param Name | Param Type | Description                           |
-| ---------- | ---------- | ------------------------------------- |
-| status     | string     | Current watch status (nullable)       |
-| updated_at | string     | Last status update timestamp          |
-| progress   | object     | Episode progress data (TV shows only) |
+| Param Name  | Param Type | Description                           |
+| ----------- | ---------- | ------------------------------------- |
+| status      | string     | Current watch status (nullable)       |
+| updated\_at | string     | Last status update timestamp          |
+| progress    | object     | Episode progress data (TV shows only) |
 
 ```
 PUT /api/status/content
@@ -230,18 +230,20 @@ PUT /api/status/content
 
 Request:
 
-| Param Name   | Param Type | isRequired | Description                                      |
-| ------------ | ---------- | ---------- | ------------------------------------------------ |
-| tmdb_id      | number     | true       | TMDB content ID                                  |
-| content_type | string     | true       | Content type (movie or tv)                       |
-| status       | string     | true       | New status (planning, watching, completed, etc.) |
+| Param Name    | Param Type | isRequired | Description                                      |
+| ------------- | ---------- | ---------- | ------------------------------------------------ |
+| tmdb\_id      | number     | true       | TMDB content ID                                  |
+| content\_type | string     | true       | Content type (movie or tv)                       |
+| status        | string     | true       | New status (planning, watching, completed, etc.) |
 
 Response:
 
-| Param Name | Param Type | Description           |
-| ---------- | ---------- | --------------------- |
-| success    | boolean    | Operation status      |
-| status     | object     | Updated status object |
+| Param Name      | Param Type | Description                                    |
+| --------------- | ---------- | ---------------------------------------------- |
+| success         | boolean    | Operation status                               |
+| status          | object     | Updated status object                          |
+| synced\_to      | array      | List of collaborator IDs who received the sync |
+| affected\_lists | array      | List IDs where sync was applied                |
 
 **Episode Watch Status Tracking**
 
@@ -253,15 +255,15 @@ Request:
 
 | Param Name | Param Type | isRequired | Description     |
 | ---------- | ---------- | ---------- | --------------- |
-| tmdb_id    | number     | true       | TMDB TV show ID |
+| tmdb\_id   | number     | true       | TMDB TV show ID |
 
 Response:
 
-| Param Name     | Param Type | Description                       |
-| -------------- | ---------- | --------------------------------- |
-| episodes       | array      | Array of episode watch status     |
-| total_episodes | number     | Total number of episodes          |
-| watched_count  | number     | Number of episodes marked watched |
+| Param Name      | Param Type | Description                       |
+| --------------- | ---------- | --------------------------------- |
+| episodes        | array      | Array of episode watch status     |
+| total\_episodes | number     | Total number of episodes          |
+| watched\_count  | number     | Number of episodes marked watched |
 
 ```
 PUT /api/status/episodes
@@ -269,20 +271,55 @@ PUT /api/status/episodes
 
 Request:
 
-| Param Name     | Param Type | isRequired | Description                |
-| -------------- | ---------- | ---------- | -------------------------- |
-| tmdb_id        | number     | true       | TMDB TV show ID            |
-| season_number  | number     | true       | Season number              |
-| episode_number | number     | true       | Episode number             |
-| watched        | boolean    | true       | Whether episode is watched |
+| Param Name      | Param Type | isRequired | Description                |
+| --------------- | ---------- | ---------- | -------------------------- |
+| tmdb\_id        | number     | true       | TMDB TV show ID            |
+| season\_number  | number     | true       | Season number              |
+| episode\_number | number     | true       | Episode number             |
+| watched         | boolean    | true       | Whether episode is watched |
 
 Response:
 
-| Param Name    | Param Type | Description                       |
-| ------------- | ---------- | --------------------------------- |
-| success       | boolean    | Operation status                  |
-| show_status   | string     | Updated show status (if changed)  |
-| episode_count | object     | Updated episode count information |
+| Param Name      | Param Type | Description                                    |
+| --------------- | ---------- | ---------------------------------------------- |
+| success         | boolean    | Operation status                               |
+| show\_status    | string     | Updated show status (if changed)               |
+| episode\_count  | object     | Updated episode count information              |
+| synced\_to      | array      | List of collaborator IDs who received the sync |
+| affected\_lists | array      | List IDs where sync was applied                |
+
+**List Management (Enhanced for Sync Settings)**
+
+The existing list API endpoints in `/api/lists/[id]/route.ts` will be enhanced to handle sync settings:
+
+```
+GET /api/lists/[id]
+```
+
+Response includes:
+
+| Param Name           | Param Type | Description                           |
+| -------------------- | ---------- | ------------------------------------- |
+| sync\_watch\_status  | boolean    | Whether sync is enabled for this list |
+| ...other list fields | various    | Standard list properties              |
+
+```
+PUT /api/lists/[id]
+```
+
+Request can include:
+
+| Param Name           | Param Type | isRequired | Description                     |
+| -------------------- | ---------- | ---------- | ------------------------------- |
+| sync\_watch\_status  | boolean    | false      | Enable or disable sync feature  |
+| ...other list fields | various    | false      | Other list properties to update |
+
+Response:
+
+| Param Name | Param Type | Description                                  |
+| ---------- | ---------- | -------------------------------------------- |
+| success    | boolean    | Operation status                             |
+| list       | object     | Updated list object with sync\_watch\_status |
 
 ## 5. Server Architecture Diagram
 
@@ -356,6 +393,7 @@ erDiagram
         string description
         string list_type
         boolean is_public
+        boolean sync_watch_status
         timestamp created_at
         timestamp updated_at
     }
@@ -457,6 +495,7 @@ CREATE TABLE lists (
     description TEXT,
     list_type VARCHAR(20) DEFAULT 'mixed' CHECK (list_type IN ('movie', 'tv', 'mixed')),
     is_public BOOLEAN DEFAULT false,
+    sync_watch_status BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -560,14 +599,29 @@ The watch status system uses two complementary tables to provide comprehensive t
 
 3. **Automatic Status Logic**:
 
-   - First episode marked watched → Show status becomes "Watching"
-   - All episodes marked watched → Show status becomes "Completed"
-   - New episodes added to completed show → Status reverts to "Watching"
-   - Manual status changes override automatic updates until next episode interaction
+   * First episode marked watched → Show status becomes "Watching"
 
-4. **Collaborative Status Sharing**: The `share_status_updates` flag controls whether status changes are visible to collaborators on shared lists, maintaining privacy while enabling social features.
+   * All episodes marked watched → Show status becomes "Completed"
 
-5. **Status Resolution**: The application joins `list_items` with `user_content_status` and aggregates `episode_watch_status` data to display comprehensive progress information, with appropriate fallbacks for untracked content.
+   * New episodes added to completed show → Status reverts to "Watching"
+
+   * Manual status changes override automatic updates until next episode interaction
+
+4. **Watch Together Sync Logic**: When a user updates content or episode status, the system:
+
+   * Checks if the content exists in any lists with `sync_watch_status = true`
+
+   * Identifies all collaborators in those sync-enabled lists
+
+   * Applies the same status update to all collaborators' `user_content_status` and `episode_watch_status` records
+
+   * Maintains audit trail of sync operations for transparency
+
+   * Handles conflict resolution using "last update wins" strategy
+
+5. **Collaborative Status Sharing**: The `share_status_updates` flag controls whether status changes are visible to collaborators on shared lists, maintaining privacy while enabling social features.
+
+6. **Status Resolution**: The application joins `list_items` with `user_content_status` and aggregates `episode_watch_status` data to display comprehensive progress information, with appropriate fallbacks for untracked content.
 
 **Initial Data**
 
@@ -583,13 +637,13 @@ The watch status system uses two complementary tables to provide comprehensive t
 
 **Server Components First**
 
-- Use Server Components by default for all pages and components
+* Use Server Components by default for all pages and components
 
-- Only use Client Components when interactivity is required (forms, event handlers, state management)
+* Only use Client Components when interactivity is required (forms, event handlers, state management)
 
-- Create "islands of reactivity" using Client Components within Server Component trees
+* Create "islands of reactivity" using Client Components within Server Component trees
 
-- Wrap Client Components with Suspense boundaries for better loading states
+* Wrap Client Components with Suspense boundaries for better loading states
 
 ```tsx
 // ✅ Good: Server Component with Client Component island
@@ -611,13 +665,13 @@ export default async function ListPage({ params }: { params: { id: string } }) {
 
 **Comprehensive Test Coverage**
 
-- Write unit tests for every utility function and library
+* Write unit tests for every utility function and library
 
-- Write component tests for all UI components using React Testing Library
+* Write component tests for all UI components using React Testing Library
 
-- Write integration tests for API routes and database operations
+* Write integration tests for API routes and database operations
 
-- Maintain minimum 80% code coverage
+* Maintain minimum 80% code coverage
 
 ```tsx
 // Example component test structure
@@ -637,11 +691,11 @@ describe("ListCard", () => {
 
 **Shared Layouts**
 
-- Extract common UI elements (headers, navigation, footers) into shared layout components
+* Extract common UI elements (headers, navigation, footers) into shared layout components
 
-- Implement authentication checks at the layout level to avoid repetition
+* Implement authentication checks at the layout level to avoid repetition
 
-- Use layout.tsx files for route-level shared layouts
+* Use layout.tsx files for route-level shared layouts
 
 ```tsx
 // app/(authenticated)/layout.tsx
@@ -669,11 +723,11 @@ export default async function AuthenticatedLayout({
 
 **Middleware-First Authentication**
 
-- Handle authentication in middleware whenever possible
+* Handle authentication in middleware whenever possible
 
-- Pass user information from middleware to API routes via headers or request context
+* Pass user information from middleware to API routes via headers or request context
 
-- Avoid re-checking authentication in API routes if middleware has already validated
+* Avoid re-checking authentication in API routes if middleware has already validated
 
 ```tsx
 // middleware.ts
@@ -711,13 +765,13 @@ export async function GET(request: Request) {
 
 **Consistent Structure**
 
-- Group related components in feature-based directories
+* Group related components in feature-based directories
 
-- Keep test files adjacent to source files with `.test.tsx` or `.spec.tsx` extensions
+* Keep test files adjacent to source files with `.test.tsx` or `.spec.tsx` extensions
 
-- Use barrel exports (index.ts) for clean imports
+* Use barrel exports (index.ts) for clean imports
 
-- Separate client and server utilities into appropriate directories
+* Separate client and server utilities into appropriate directories
 
 ```
 src/
@@ -744,10 +798,13 @@ src/
 
 **Status Management Best Practices**
 
-- Use optimistic updates for status changes with proper error handling and rollback
-- Implement debounced episode tracking to avoid excessive database writes
-- Cache episode data from TMDB API to reduce external API calls
-- Use database transactions for automatic status updates to ensure consistency
+* Use optimistic updates for status changes with proper error handling and rollback
+
+* Implement debounced episode tracking to avoid excessive database writes
+
+* Cache episode data from TMDB API to reduce external API calls
+
+* Use database transactions for automatic status updates to ensure consistency
 
 ```tsx
 // Optimistic status update pattern
@@ -844,13 +901,13 @@ export async function updateEpisodeWithStatusCheck(
 
 **Optimization Best Practices**
 
-- Use dynamic imports for heavy Client Components
+* Use dynamic imports for heavy Client Components
 
-- Implement proper caching strategies for database queries
+* Implement proper caching strategies for database queries
 
-- Optimize images with Next.js Image component
+* Optimize images with Next.js Image component
 
-- Use React.memo() for expensive Client Components that don't need frequent re-renders
+* Use React.memo() for expensive Client Components that don't need frequent re-renders
 
 ```tsx
 // Dynamic import for heavy components
@@ -869,15 +926,19 @@ const getListsWithCache = cache(async (userId: string) => {
 
 **Status Badge Implementation**
 
-- Use the existing Badge component with status-specific variants (watching, completed, planning, paused, dropped)
-- Leverage existing Badge component styling and behavior rather than creating new components
-- Ensure consistent status color scheme across the application
+* Use the existing Badge component with status-specific variants (watching, completed, planning, paused, dropped)
+
+* Leverage existing Badge component styling and behavior rather than creating new components
+
+* Ensure consistent status color scheme across the application
 
 **Episode Tracker Component**
 
-- Display episode titles and synopses fetched from TMDB API alongside checkboxes
-- Implement efficient data fetching and caching for episode metadata
-- Use debounced updates for episode status changes to optimize performance
+* Display episode titles and synopses fetched from TMDB API alongside checkboxes
+
+* Implement efficient data fetching and caching for episode metadata
+
+* Use debounced updates for episode status changes to optimize performance
 
 ```tsx
 // Example: Using existing Badge component for status display
@@ -915,3 +976,4 @@ function EpisodeTracker({ tmdbId, episodes, userProgress }) {
   );
 }
 ```
+

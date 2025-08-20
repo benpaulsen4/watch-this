@@ -17,6 +17,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         description: lists.description,
         listType: lists.listType,
         isPublic: lists.isPublic,
+        syncWatchStatus: lists.syncWatchStatus,
         ownerId: lists.ownerId,
         createdAt: lists.createdAt,
         updatedAt: lists.updatedAt,
@@ -82,7 +83,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     const userId = request.user.id;
     const body = await request.json();
 
-    const { name, description, listType = "mixed", isPublic = false } = body;
+    const { name, description, listType = "mixed", isPublic = false, syncWatchStatus = false } = body;
 
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
@@ -115,6 +116,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         description: description?.trim() || null,
         listType,
         isPublic: Boolean(isPublic),
+        syncWatchStatus: Boolean(syncWatchStatus),
       })
       .returning();
 

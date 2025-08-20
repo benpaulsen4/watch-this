@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Users, Lock, Globe, Share, Settings, FileStack } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Users, Lock, Globe, Share, Settings, FileStack, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -26,6 +26,7 @@ interface List {
   description: string | null;
   listType: 'movie' | 'tv' | 'mixed';
   isPublic: boolean;
+  syncWatchStatus: boolean;
   ownerId: string;
   ownerUsername?: string;
   ownerProfilePictureUrl?: string | null;
@@ -150,6 +151,15 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
                     <>
                       <Lock className="h-3 w-3" />
                       <span className='hidden sm:block'>Private</span>
+                    </>
+                  )}
+                  {list.syncWatchStatus && (
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3" />
+                        <span className='hidden sm:block'>Sync</span>
+                      </div>
                     </>
                   )}
                   <span>•</span>

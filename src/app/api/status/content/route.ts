@@ -1,8 +1,110 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { userContentStatus, ContentType, ContentTypeEnum, MovieWatchStatus, MovieWatchStatusEnum, TVWatchStatus, TVWatchStatusEnum } from "@/lib/db/schema";
-import { withAuth, AuthenticatedRequest, handleApiError } from "@/lib/auth/api-middleware";
-import { eq, and } from "drizzle-orm";
+import {
+  userContentStatus,
+  ContentType,
+  ContentTypeEnum,
+  MovieWatchStatus,
+  MovieWatchStatusEnum,
+  TVWatchStatus,
+  TVWatchStatusEnum,
+  lists,
+  listCollaborators,
+  listItems,
+} from "@/lib/db/schema";
+import {
+  withAuth,
+  AuthenticatedRequest,
+  handleApiError,
+} from "@/lib/auth/api-middleware";
+import { eq, and, or } from "drizzle-orm";
+
+// Helper function to sync status updates to collaborators
+export async function syncStatusToCollaborators(
+  userId: string,
+  tmdbId: number,
+  contentType: string,
+  status: string
+) {
+  try {
+    // Find all lists that contain this content and have sync enabled
+    const syncEnabledLists = await db
+      .select({
+        listId: lists.id,
+        ownerId: lists.ownerId,
+      })
+      .from(lists)
+      .innerJoin(listItems, eq(listItems.listId, lists.id))
+      .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
+      .where(
+        and(
+          eq(lists.syncWatchStatus, true),
+          eq(listItems.tmdbId, tmdbId),
+          eq(listItems.contentType, contentType),
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
+        )
+      );
+
+    // For each sync-enabled list, update status for all collaborators
+    for (const list of syncEnabledLists) {
+      // Get all collaborators (including owner) for this list
+      const collaborators = await db
+        .select({ userId: listCollaborators.userId })
+        .from(listCollaborators)
+        .where(eq(listCollaborators.listId, list.listId));
+
+      // Add the owner to the collaborators list
+      const allUsers = [
+        ...collaborators.map((c) => c.userId),
+        list.ownerId,
+      ].filter((id) => id !== userId); // Exclude the user who made the update
+
+      // Update status for each collaborator
+      for (const collaboratorId of allUsers) {
+        // Check if collaborator already has a status for this content
+        const existingStatus = await db
+          .select()
+          .from(userContentStatus)
+          .where(
+            and(
+              eq(userContentStatus.userId, collaboratorId),
+              eq(userContentStatus.tmdbId, tmdbId),
+              eq(userContentStatus.contentType, contentType)
+            )
+          )
+          .limit(1);
+
+        if (existingStatus.length > 0) {
+          // Update existing status
+          await db
+            .update(userContentStatus)
+            .set({
+              status,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(userContentStatus.userId, collaboratorId),
+                eq(userContentStatus.tmdbId, tmdbId),
+                eq(userContentStatus.contentType, contentType)
+              )
+            );
+        } else {
+          // Create new status
+          await db.insert(userContentStatus).values({
+            userId: collaboratorId,
+            tmdbId,
+            contentType,
+            status,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error syncing status to collaborators:", error);
+    // Don't throw error to avoid breaking the main status update
+  }
+}
 
 // GET /api/status/content - Get content watch status for authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
@@ -38,8 +140,8 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       )
       .limit(1);
 
-    return NextResponse.json({ 
-      status: status[0] || null 
+    return NextResponse.json({
+      status: status[0] || null,
     });
   } catch (error) {
     return handleApiError(error, "Get content status");
@@ -50,13 +152,12 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 export const POST = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       tmdbId: number;
       contentType: string;
       status: string;
-      shareStatusUpdates?: boolean;
     };
-    const { tmdbId, contentType, status, shareStatusUpdates = true } = body;
+    const { tmdbId, contentType, status } = body;
 
     // Validation
     if (!tmdbId || !contentType || !status) {
@@ -75,7 +176,11 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
     // Validate status based on content type
     if (contentType === ContentType.MOVIE) {
-      if (!Object.values(MovieWatchStatus).includes(status as MovieWatchStatusEnum)) {
+      if (
+        !Object.values(MovieWatchStatus).includes(
+          status as MovieWatchStatusEnum
+        )
+      ) {
         return NextResponse.json(
           { error: "Invalid movie status. Must be 'planning' or 'completed'" },
           { status: 400 }
@@ -84,7 +189,10 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     } else if (contentType === ContentType.TV) {
       if (!Object.values(TVWatchStatus).includes(status as TVWatchStatusEnum)) {
         return NextResponse.json(
-          { error: "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'" },
+          {
+            error:
+              "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'",
+          },
           { status: 400 }
         );
       }
@@ -110,7 +218,6 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         .update(userContentStatus)
         .set({
           status,
-          shareStatusUpdates,
           updatedAt: new Date(),
         })
         .where(
@@ -130,10 +237,12 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
           tmdbId,
           contentType,
           status,
-          shareStatusUpdates,
         })
         .returning();
     }
+
+    // Sync status to collaborators if applicable
+    await syncStatusToCollaborators(userId, tmdbId, contentType, status);
 
     return NextResponse.json({ status: result }, { status: 201 });
   } catch (error) {
@@ -145,13 +254,12 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 export const PUT = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       tmdbId: number;
       contentType: string;
       status?: string;
-      shareStatusUpdates?: boolean;
     };
-    const { tmdbId, contentType, status, shareStatusUpdates } = body;
+    const { tmdbId, contentType, status } = body;
 
     // Validation
     if (!tmdbId || !contentType) {
@@ -171,16 +279,27 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     // Validate status if provided
     if (status) {
       if (contentType === ContentType.MOVIE) {
-        if (!Object.values(MovieWatchStatus).includes(status as MovieWatchStatusEnum)) {
+        if (
+          !Object.values(MovieWatchStatus).includes(
+            status as MovieWatchStatusEnum
+          )
+        ) {
           return NextResponse.json(
-            { error: "Invalid movie status. Must be 'planning' or 'completed'" },
+            {
+              error: "Invalid movie status. Must be 'planning' or 'completed'",
+            },
             { status: 400 }
           );
         }
       } else if (contentType === ContentType.TV) {
-        if (!Object.values(TVWatchStatus).includes(status as TVWatchStatusEnum)) {
+        if (
+          !Object.values(TVWatchStatus).includes(status as TVWatchStatusEnum)
+        ) {
           return NextResponse.json(
-            { error: "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'" },
+            {
+              error:
+                "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'",
+            },
             { status: 400 }
           );
         }
@@ -211,13 +330,11 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     const updateData: {
       updatedAt: Date;
       status?: string;
-      shareStatusUpdates?: boolean;
     } = {
       updatedAt: new Date(),
     };
-    
+
     if (status !== undefined) updateData.status = status;
-    if (shareStatusUpdates !== undefined) updateData.shareStatusUpdates = shareStatusUpdates;
 
     const [result] = await db
       .update(userContentStatus)
@@ -230,6 +347,11 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
         )
       )
       .returning();
+
+    // Sync status to collaborators if applicable
+    if (status !== undefined) {
+      await syncStatusToCollaborators(userId, tmdbId, contentType, status);
+    }
 
     return NextResponse.json({ status: result });
   } catch (error) {
@@ -289,7 +411,9 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
         )
       );
 
-    return NextResponse.json({ message: "Content status removed successfully" });
+    return NextResponse.json({
+      message: "Content status removed successfully",
+    });
   } catch (error) {
     return handleApiError(error, "Delete content status");
   }

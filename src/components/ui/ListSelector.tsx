@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Globe, Minus, Plus, RotateCcw, Lock, Users } from 'lucide-react';
+import { Globe, Minus, Plus, RotateCcw, Lock, Users, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { List } from '@/lib/db/schema';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -151,6 +151,15 @@ const fetchLists = useCallback(async () => {
                     <>
                       <Lock className="h-3 w-3" />
                       <span>Private</span>
+                    </>
+                  )}
+                  {list.syncWatchStatus && (
+                    <>
+                      <span>&nbsp;•&nbsp;</span>
+                      <div className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Sync</span>
+                      </div>
                     </>
                   )}
                   <span>&nbsp;•&nbsp;</span>

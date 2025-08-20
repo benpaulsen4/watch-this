@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Users, Lock, Globe, Ellipsis } from 'lucide-react';
+import { ArrowLeft, Plus, Users, Lock, Globe, Ellipsis, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -329,17 +329,25 @@ export default function ListsClient() {
                             {list.listType}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                          {list.isPublic ? (
-                            <>
-                              <Globe className="h-3 w-3" />
-                              Public
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="h-3 w-3" />
-                              Private
-                            </>
+                        <div className="flex items-center gap-3 text-sm text-gray-400">
+                          <div className="flex items-center gap-1">
+                            {list.isPublic ? (
+                              <>
+                                <Globe className="h-3 w-3" />
+                                Public
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="h-3 w-3" />
+                                Private
+                              </>
+                            )}
+                          </div>
+                          {list.syncWatchStatus && (
+                            <div className="flex items-center gap-1">
+                              <RefreshCw className="h-3 w-3" />
+                              <span className="text-xs">Sync</span>
+                            </div>
                           )}
                         </div>
                       </div>

@@ -1,19 +1,115 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
-  ContentType,
   episodeWatchStatus,
   userContentStatus,
-  WatchStatus,
+  lists,
+  listCollaborators,
+  listItems,
+  ContentType,
   WatchStatusEnum,
+  WatchStatus,
 } from "@/lib/db/schema";
 import {
   withAuth,
   AuthenticatedRequest,
   handleApiError,
 } from "@/lib/auth/api-middleware";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { tmdbClient } from "@/lib";
+import { syncStatusToCollaborators } from "../content/route";
+
+// Helper function to sync episode status to collaborators
+async function syncEpisodeStatusToCollaborators(
+  userId: string,
+  tmdbId: number,
+  seasonNumber: number,
+  episodeNumber: number,
+  watched: boolean
+) {
+  try {
+    // Find all lists that contain this TV show and have sync enabled
+    const syncEnabledLists = await db
+      .select({
+        listId: lists.id,
+        ownerId: lists.ownerId,
+      })
+      .from(lists)
+      .innerJoin(listItems, eq(listItems.listId, lists.id))
+      .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
+      .where(
+        and(
+          eq(lists.syncWatchStatus, true),
+          eq(listItems.tmdbId, tmdbId),
+          eq(listItems.contentType, ContentType.TV),
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
+        )
+      );
+
+    // For each sync-enabled list, update episode status for all collaborators
+    for (const list of syncEnabledLists) {
+      // Get all collaborators (including owner) for this list
+      const collaborators = await db
+        .select({ userId: listCollaborators.userId })
+        .from(listCollaborators)
+        .where(eq(listCollaborators.listId, list.listId));
+
+      // Add the owner to the collaborators list
+      const allUsers = [
+        ...collaborators.map((c) => c.userId),
+        list.ownerId,
+      ].filter((id) => id !== userId); // Exclude the user who made the update
+
+      // Update episode status for each collaborator
+      for (const collaboratorId of allUsers) {
+        // Check if collaborator already has episode status
+        const existingEpisodeStatus = await db
+          .select()
+          .from(episodeWatchStatus)
+          .where(
+            and(
+              eq(episodeWatchStatus.userId, collaboratorId),
+              eq(episodeWatchStatus.tmdbId, tmdbId),
+              eq(episodeWatchStatus.seasonNumber, seasonNumber),
+              eq(episodeWatchStatus.episodeNumber, episodeNumber)
+            )
+          )
+          .limit(1);
+
+        if (existingEpisodeStatus.length === 0) {
+          // Create new episode status
+          await db.insert(episodeWatchStatus).values({
+            userId: collaboratorId,
+            tmdbId,
+            seasonNumber,
+            episodeNumber,
+            watched: watched,
+            watchedAt: watched ? new Date() : null,
+          });
+        } else {
+          // Update existing status
+          await db
+            .update(episodeWatchStatus)
+            .set({
+              watched: watched,
+              watchedAt: watched ? new Date() : null,
+            })
+            .where(
+              and(
+                eq(episodeWatchStatus.userId, collaboratorId),
+                eq(episodeWatchStatus.tmdbId, tmdbId),
+                eq(episodeWatchStatus.seasonNumber, seasonNumber),
+                eq(episodeWatchStatus.episodeNumber, episodeNumber)
+              )
+            );
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error syncing episode status to collaborators:", error);
+    // Don't throw error to avoid breaking the main status update
+  }
+}
 
 // GET /api/status/episodes - Get episode watch status for authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
@@ -139,6 +235,15 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         .returning();
     }
 
+    // Sync episode status to collaborators if applicable
+    await syncEpisodeStatusToCollaborators(
+      userId,
+      tmdbId,
+      seasonNumber,
+      episodeNumber,
+      watched
+    );
+
     let newStatus: WatchStatusEnum | null = null;
 
     //Check if show status needs to be updated
@@ -212,6 +317,15 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
           newStatus = WatchStatus.COMPLETED;
         }
+      }
+
+      if (newStatus) {
+        await syncStatusToCollaborators(
+          userId,
+          tmdbId,
+          ContentType.TV,
+          newStatus
+        );
       }
     }
 
@@ -322,6 +436,14 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       }
 
       results.push(result);
+      // Sync episode status to collaborators if applicable
+      await syncEpisodeStatusToCollaborators(
+        userId,
+        tmdbId,
+        seasonNumber,
+        episodeNumber,
+        watched
+      );
     }
 
     let newStatus: WatchStatusEnum | null = null;
@@ -393,6 +515,15 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
             );
           newStatus = WatchStatus.COMPLETED;
         }
+      }
+
+      if (newStatus) {
+        await syncStatusToCollaborators(
+          userId,
+          tmdbId,
+          ContentType.TV,
+          newStatus
+        );
       }
     }
 
