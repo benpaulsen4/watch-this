@@ -8,6 +8,7 @@ import {
   integer,
   bigint,
   unique,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -156,6 +157,24 @@ export const episodeWatchStatus = pgTable(
   ]
 );
 
+// Activity feed table
+export const activityFeed = pgTable("activity_feed", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  activityType: varchar("activity_type", { length: 50 }).notNull(),
+  tmdbId: integer("tmdb_id"),
+  contentType: varchar("content_type", { length: 10 }),
+  listId: uuid("list_id").references(() => lists.id, { onDelete: "cascade" }),
+  metadata: jsonb("metadata"),
+  collaborators: uuid("collaborators").array(),
+  isCollaborative: boolean("is_collaborative").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   passkeyCredentials: many(passkeyCredentials),
@@ -163,6 +182,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   collaborations: many(listCollaborators),
   contentStatuses: many(userContentStatus),
   episodeStatuses: many(episodeWatchStatus),
+  activities: many(activityFeed),
 }));
 
 export const passkeyCredentialsRelations = relations(
@@ -182,6 +202,7 @@ export const listsRelations = relations(lists, ({ one, many }) => ({
   }),
   collaborators: many(listCollaborators),
   items: many(listItems),
+  activities: many(activityFeed),
 }));
 
 export const listCollaboratorsRelations = relations(
@@ -225,6 +246,17 @@ export const episodeWatchStatusRelations = relations(
   })
 );
 
+export const activityFeedRelations = relations(activityFeed, ({ one }) => ({
+  user: one(users, {
+    fields: [activityFeed.userId],
+    references: [users.id],
+  }),
+  list: one(lists, {
+    fields: [activityFeed.listId],
+    references: [lists.id],
+  }),
+}));
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -246,6 +278,9 @@ export type NewUserContentStatus = typeof userContentStatus.$inferInsert;
 
 export type EpisodeWatchStatus = typeof episodeWatchStatus.$inferSelect;
 export type NewEpisodeWatchStatus = typeof episodeWatchStatus.$inferInsert;
+
+export type ActivityFeed = typeof activityFeed.$inferSelect;
+export type NewActivityFeed = typeof activityFeed.$inferInsert;
 
 // Enums for type safety
 export const ListType = {
@@ -287,6 +322,18 @@ export const PermissionLevel = {
   VIEWER: "viewer",
 } as const;
 
+export const ActivityType = {
+  STATUS_CHANGED: "STATUS_CHANGED",
+  EPISODE_PROGRESS: "EPISODE_PROGRESS",
+  LIST_ITEM_ADDED: "LIST_ITEM_ADDED",
+  LIST_ITEM_REMOVED: "LIST_ITEM_REMOVED",
+  LIST_CREATED: "LIST_CREATED",
+  LIST_UPDATED: "LIST_UPDATED",
+  LIST_DELETED: "LIST_DELETED",
+  COLLABORATOR_ADDED: "COLLABORATOR_ADDED",
+  COLLABORATOR_REMOVED: "COLLABORATOR_REMOVED",
+} as const;
+
 export type ListTypeEnum = (typeof ListType)[keyof typeof ListType];
 export type ContentTypeEnum = (typeof ContentType)[keyof typeof ContentType];
 export type WatchStatusEnum = (typeof WatchStatus)[keyof typeof WatchStatus];
@@ -296,3 +343,4 @@ export type TVWatchStatusEnum =
   (typeof TVWatchStatus)[keyof typeof TVWatchStatus];
 export type PermissionLevelEnum =
   (typeof PermissionLevel)[keyof typeof PermissionLevel];
+export type ActivityTypeEnum = (typeof ActivityType)[keyof typeof ActivityType];

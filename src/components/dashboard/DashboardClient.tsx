@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Users, TrendingUp, Heart } from 'lucide-react';
+import { Search, Heart } from 'lucide-react';
 import type { TMDBMovie, TMDBTVShow } from '@/lib/tmdb/client';
-import { Card, CardContent } from '@/components/ui/Card';
 import { ContentCard } from '@/components/ui/ContentCard';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
 import {ProfileImage} from '@/components/ui';
 import { getCurrentSession } from '@/lib/auth/client';
+import { ActivityFeed } from "@/components/activity/ActivityFeed";
 
 export function DashboardClient() {
   const router = useRouter();
@@ -88,51 +88,9 @@ export function DashboardClient() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Actions */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-bold text-gray-100 mb-6">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card 
-              variant="entertainment" 
-              className="cursor-pointer hover:scale-105 transition-transform"
-              onClick={() => router.push('/lists')}
-            >
-              <CardContent className="p-6 text-center">
-                <Plus className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-100 mb-2">Create List</h3>
-                <p className="text-gray-400 text-sm">
-                  Organize your favorite movies and shows
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card 
-              variant="entertainment" 
-              className="cursor-pointer hover:scale-105 transition-transform"
-              onClick={() => router.push('/search')}
-            >
-              <CardContent className="p-6 text-center">
-                <TrendingUp className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-100 mb-2">Discover</h3>
-                <p className="text-gray-400 text-sm">
-                  Find new content based on your preferences
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card 
-              variant="entertainment" 
-              className="cursor-pointer hover:scale-105 transition-transform"
-            >
-              <CardContent className="p-6 text-center">
-                <Users className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-100 mb-2">Collaborate</h3>
-                <p className="text-gray-400 text-sm">
-                  Share lists and recommendations with friends
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Activity Feed */}
+        <section className="mb-8">
+          <ActivityFeed currentUsername={user?.username ?? ''} />
         </section>
 
         {/* Trending Content */}

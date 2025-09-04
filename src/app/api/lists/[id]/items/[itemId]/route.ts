@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lists, listItems, listCollaborators } from "@/lib/db/schema";
+import {
+  lists,
+  listItems,
+  listCollaborators,
+  activityFeed,
+  ActivityType,
+} from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and, or } from "drizzle-orm";
 
@@ -9,13 +15,13 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const listId = pathParts[3]; // /api/lists/[id]/items/[itemId]
     const itemId = pathParts[5];
-    
+
     if (!listId || !itemId) {
       return NextResponse.json(
-        { error: 'List ID and Item ID are required' },
+        { error: "List ID and Item ID are required" },
         { status: 400 }
       );
     }
@@ -31,10 +37,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         and(
           eq(lists.id, listId),
-          or(
-            eq(lists.ownerId, userId),
-            eq(listCollaborators.userId, userId)
-          )
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
         )
       )
       .limit(1);
@@ -50,12 +53,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     const [existingItem] = await db
       .select({ id: listItems.id })
       .from(listItems)
-      .where(
-        and(
-          eq(listItems.id, itemId),
-          eq(listItems.listId, listId)
-        )
-      )
+      .where(and(eq(listItems.id, itemId), eq(listItems.listId, listId)))
       .limit(1);
 
     if (!existingItem) {
@@ -73,7 +71,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     }
 
     if (sortOrder !== undefined) {
-      if (typeof sortOrder !== 'number' || sortOrder < 0) {
+      if (typeof sortOrder !== "number" || sortOrder < 0) {
         return NextResponse.json(
           { error: "Sort order must be a non-negative number" },
           { status: 400 }
@@ -104,13 +102,13 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const listId = pathParts[3]; // /api/lists/[id]/items/[itemId]
     const itemId = pathParts[5];
-    
+
     if (!listId || !itemId) {
       return NextResponse.json(
-        { error: 'List ID and Item ID are required' },
+        { error: "List ID and Item ID are required" },
         { status: 400 }
       );
     }
@@ -123,10 +121,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         and(
           eq(lists.id, listId),
-          or(
-            eq(lists.ownerId, userId),
-            eq(listCollaborators.userId, userId)
-          )
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
         )
       )
       .limit(1);
@@ -138,16 +133,17 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    // Check if the item exists in this list
+    // Check if the item exists in this list and get its details for activity
     const [existingItem] = await db
-      .select({ id: listItems.id })
+      .select({
+        id: listItems.id,
+        tmdbId: listItems.tmdbId,
+        contentType: listItems.contentType,
+        title: listItems.title,
+        posterPath: listItems.posterPath,
+      })
       .from(listItems)
-      .where(
-        and(
-          eq(listItems.id, itemId),
-          eq(listItems.listId, listId)
-        )
-      )
+      .where(and(eq(listItems.id, itemId), eq(listItems.listId, listId)))
       .limit(1);
 
     if (!existingItem) {
@@ -158,11 +154,41 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     }
 
     // Delete the item
-    await db
-      .delete(listItems)
-      .where(eq(listItems.id, itemId));
+    await db.delete(listItems).where(eq(listItems.id, itemId));
 
-    return NextResponse.json({ message: "Item removed from list successfully" });
+    // Generate activity for content removal
+    try {
+      // Get list info for activity
+      const [listInfo] = await db
+        .select({ ownerId: lists.ownerId, name: lists.name })
+        .from(lists)
+        .where(eq(lists.id, listId))
+        .limit(1);
+
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.LIST_ITEM_REMOVED,
+        tmdbId: existingItem.tmdbId,
+        contentType: existingItem.contentType,
+        listId,
+        metadata: {
+          title: existingItem.title,
+          listName: listInfo?.name || "Unknown List",
+          posterPath: existingItem.posterPath,
+        },
+        createdAt: new Date(),
+      });
+    } catch (activityError) {
+      console.error(
+        "Failed to create activity for list item removal:",
+        activityError
+      );
+      // Don't fail the main operation if activity creation fails
+    }
+
+    return NextResponse.json({
+      message: "Item removed from list successfully",
+    });
   } catch (error) {
     console.error("Error removing item from list:", error);
     return NextResponse.json(
@@ -177,13 +203,13 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const listId = pathParts[3]; // /api/lists/[id]/items/[itemId]
     const itemId = pathParts[5];
-    
+
     if (!listId || !itemId) {
       return NextResponse.json(
-        { error: 'List ID and Item ID are required' },
+        { error: "List ID and Item ID are required" },
         { status: 400 }
       );
     }
@@ -225,12 +251,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         sortOrder: listItems.sortOrder,
       })
       .from(listItems)
-      .where(
-        and(
-          eq(listItems.id, itemId),
-          eq(listItems.listId, listId)
-        )
-      )
+      .where(and(eq(listItems.id, itemId), eq(listItems.listId, listId)))
       .limit(1);
 
     if (!item) {

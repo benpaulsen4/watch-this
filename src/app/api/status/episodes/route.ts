@@ -9,6 +9,8 @@ import {
   ContentType,
   WatchStatusEnum,
   WatchStatus,
+  activityFeed,
+  ActivityType,
 } from "@/lib/db/schema";
 import {
   withAuth,
@@ -17,7 +19,7 @@ import {
 } from "@/lib/auth/api-middleware";
 import { eq, and, or } from "drizzle-orm";
 import { tmdbClient } from "@/lib";
-import { syncStatusToCollaborators } from "../content/route";
+import { syncStatusToCollaborators } from "@/lib/activity/sync-utils";
 
 // Helper function to sync episode status to collaborators
 async function syncEpisodeStatusToCollaborators(
@@ -45,6 +47,8 @@ async function syncEpisodeStatusToCollaborators(
           or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
         )
       );
+
+    const syncedCollaboratorIds = new Set<string>();
 
     // For each sync-enabled list, update episode status for all collaborators
     for (const list of syncEnabledLists) {
@@ -103,11 +107,15 @@ async function syncEpisodeStatusToCollaborators(
               )
             );
         }
+        syncedCollaboratorIds.add(collaboratorId);
       }
     }
+
+    return Array.from(syncedCollaboratorIds);
   } catch (error) {
     console.error("Error syncing episode status to collaborators:", error);
     // Don't throw error to avoid breaking the main status update
+    return [];
   }
 }
 
@@ -236,13 +244,36 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     }
 
     // Sync episode status to collaborators if applicable
-    await syncEpisodeStatusToCollaborators(
+    const syncedCollaboratorIds = await syncEpisodeStatusToCollaborators(
       userId,
       tmdbId,
       seasonNumber,
       episodeNumber,
       watched
     );
+
+    // Create activity entry for episode progress
+    try {
+      const showDetails = await tmdbClient.getTVShowDetails(tmdbId);
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.EPISODE_PROGRESS,
+        tmdbId,
+        contentType: ContentType.TV,
+        metadata: {
+          seasonNumber,
+          episodeNumber,
+          watched,
+          title: showDetails.name,
+          posterPath: showDetails.poster_path,
+        },
+        collaborators: syncedCollaboratorIds,
+        isCollaborative: syncedCollaboratorIds.length > 0,
+      });
+    } catch (activityError) {
+      console.error("Error creating episode activity entry:", activityError);
+      // Don't fail the main operation if activity creation fails
+    }
 
     let newStatus: WatchStatusEnum | null = null;
 
@@ -437,13 +468,36 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
 
       results.push(result);
       // Sync episode status to collaborators if applicable
-      await syncEpisodeStatusToCollaborators(
+      const syncedCollaboratorIds = await syncEpisodeStatusToCollaborators(
         userId,
         tmdbId,
         seasonNumber,
         episodeNumber,
         watched
       );
+
+      // Create activity entry for episode progress
+      try {
+        const showDetails = await tmdbClient.getTVShowDetails(tmdbId);
+        await db.insert(activityFeed).values({
+          userId,
+          activityType: ActivityType.EPISODE_PROGRESS,
+          tmdbId,
+          contentType: ContentType.TV,
+          metadata: {
+            seasonNumber,
+            episodeNumber,
+            watched,
+            title: showDetails.name,
+            posterPath: showDetails.poster_path,
+          },
+          collaborators: syncedCollaboratorIds,
+          isCollaborative: syncedCollaboratorIds.length > 0,
+        });
+      } catch (activityError) {
+        console.error("Error creating episode activity entry:", activityError);
+        // Don't fail the main operation if activity creation fails
+      }
     }
 
     let newStatus: WatchStatusEnum | null = null;

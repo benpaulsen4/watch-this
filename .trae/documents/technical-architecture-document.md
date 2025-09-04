@@ -58,6 +58,9 @@ graph TD
 | /api/tmdb/episodes/\[id] | Server-side TMDB API proxy for TV show episode data                  |
 | /api/status/content      | Content watch status management with sync support (GET, PUT, DELETE) |
 | /api/status/episodes     | Episode watch status tracking with sync support (GET, PUT)           |
+| /activity                | Activity timeline page with infinite scroll and filtering            |
+| /api/activity            | Activity feed management (GET, POST)                                 |
+| /api/activity/timeline   | Infinite scroll activity timeline with filtering (GET)               |
 
 ## 4. API Definitions
 
@@ -288,6 +291,44 @@ Response:
 | synced\_to      | array      | List of collaborator IDs who received the sync |
 | affected\_lists | array      | List IDs where sync was applied                |
 
+**Activity Feed Management**
+
+```
+GET /api/activity?type={type}&date_from={date}&date_to={date}&limit={limit}&offset={offset}
+```
+
+Request:
+
+| Param Name | Param Type | isRequired | Description                             |
+| ---------- | ---------- | ---------- | --------------------------------------- |
+| type       | string     | false      | Filter by activity type                 |
+| date\_from | string     | false      | Start date filter (ISO string)          |
+| date\_to   | string     | false      | End date filter (ISO string)            |
+| limit      | number     | false      | Number of activities to return (max 50) |
+| offset     | number     | false      | Offset for pagination                   |
+
+Response:
+
+| Param Name   | Param Type | Description                           |
+| ------------ | ---------- | ------------------------------------- |
+| activities   | array      | Array of activity objects             |
+| total\_count | number     | Total number of activities            |
+| has\_more    | boolean    | Whether more activities are available |
+
+Activity Object:
+
+| Param Name    | Param Type | Description                                                                        |
+| ------------- | ---------- | ---------------------------------------------------------------------------------- |
+| id            | string     | Activity ID                                                                        |
+| type          | string     | Activity type (status\_change, episode\_progress, list\_content, list\_management) |
+| user\_id      | string     | Primary user who performed the action                                              |
+| content\_id   | number     | TMDB content ID (if applicable)                                                    |
+| content\_type | string     | Content type (movie/tv, if applicable)                                             |
+| list\_id      | string     | List ID (if applicable)                                                            |
+| metadata      | object     | Activity-specific metadata                                                         |
+| collaborators | array      | Array of affected collaborator user IDs                                            |
+| created\_at   | string     | Activity timestamp                                                                 |
+
 **List Management (Enhanced for Sync Settings)**
 
 The existing list API endpoints in `/api/lists/[id]/route.ts` will be enhanced to handle sync settings:
@@ -364,8 +405,12 @@ erDiagram
     USERS ||--o{ PASSKEY_CREDENTIALS : has
     USERS ||--o{ USER_CONTENT_STATUS : tracks
     USERS ||--o{ EPISODE_WATCH_STATUS : tracks
+    USERS ||--o{ ACTIVITY_FEED : generates
     LIST_ITEMS ||--o{ USER_CONTENT_STATUS : references
     USER_CONTENT_STATUS ||--o{ EPISODE_WATCH_STATUS : contains
+    LISTS ||--o{ ACTIVITY_FEED : references
+    USER_CONTENT_STATUS ||--o{ ACTIVITY_FEED : triggers
+    EPISODE_WATCH_STATUS ||--o{ ACTIVITY_FEED : triggers
 
     USERS {
         uuid id PK
@@ -440,6 +485,19 @@ erDiagram
         timestamp watched_at
         timestamp created_at
         timestamp updated_at
+    }
+
+    ACTIVITY_FEED {
+        uuid id PK
+        uuid user_id FK
+        string activity_type
+        integer tmdb_id
+        string content_type
+        uuid list_id FK
+        json metadata
+        json collaborators
+        boolean is_collaborative
+        timestamp created_at
     }
 ```
 
@@ -589,6 +647,32 @@ CREATE INDEX idx_episode_watch_status_season_episode ON episode_watch_status(tmd
 CREATE INDEX idx_episode_watch_status_watched_at ON episode_watch_status(watched_at DESC);
 ```
 
+**Activity Feed Table**
+
+```sql
+-- Create activity_feed table
+CREATE TABLE activity_feed (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    activity_type VARCHAR(50) NOT NULL CHECK (activity_type IN ('status_change', 'episode_progress', 'list_content', 'list_management')),
+    tmdb_id INTEGER,
+    content_type VARCHAR(10) CHECK (content_type IN ('movie', 'tv')),
+    list_id UUID REFERENCES lists(id) ON DELETE CASCADE,
+    metadata JSONB DEFAULT '{}',
+    collaborators UUID[],
+    is_collaborative BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for activity_feed
+CREATE INDEX idx_activity_feed_user_id ON activity_feed(user_id);
+CREATE INDEX idx_activity_feed_created_at ON activity_feed(created_at DESC);
+CREATE INDEX idx_activity_feed_activity_type ON activity_feed(activity_type);
+CREATE INDEX idx_activity_feed_list_id ON activity_feed(list_id);
+CREATE INDEX idx_activity_feed_collaborative ON activity_feed(is_collaborative, created_at DESC);
+CREATE INDEX idx_activity_feed_tmdb_content ON activity_feed(tmdb_id, content_type);
+```
+
 **Enhanced Status Management Architecture**
 
 The watch status system uses two complementary tables to provide comprehensive tracking:
@@ -622,6 +706,34 @@ The watch status system uses two complementary tables to provide comprehensive t
 5. **Collaborative Status Sharing**: The `share_status_updates` flag controls whether status changes are visible to collaborators on shared lists, maintaining privacy while enabling social features.
 
 6. **Status Resolution**: The application joins `list_items` with `user_content_status` and aggregates `episode_watch_status` data to display comprehensive progress information, with appropriate fallbacks for untracked content.
+
+7. **Activity Feed Generation**: The system automatically creates activity feed entries when:
+
+   * Content watch status changes (status\_change activity type)
+
+   * TV show episodes are marked as watched (episode\_progress activity type)
+
+   * Content is added/removed from lists (list\_content activity type)
+
+   * Lists are created/updated or collaborators are modified (list\_management activity type)
+
+8. **Collaborative Activity Visibility**: Activity entries are visible to:
+
+   * The user who performed the action (always visible)
+
+   * Collaborators of shared lists when the activity involves content in those lists
+
+   * Additional collaborators when sync is enabled and multiple users are affected
+
+9. **Activity Metadata Structure**: Each activity entry contains:
+
+   * `status_change`: `{"old_status": "planning", "new_status": "watching"}`
+
+   * `episode_progress`: `{"season": 1, "episode": 5, "episode_title": "Episode Title"}`
+
+   * `list_content`: `{"action": "added", "content_title": "Movie Title"}`
+
+   * `list_management`: `{"action": "created", "list_name": "My List", "collaborators_added": ["user1", "user2"]}`
 
 **Initial Data**
 
@@ -922,7 +1034,135 @@ const getListsWithCache = cache(async (userId: string) => {
 });
 ```
 
-### 7.8 Watch Status UI Component Guidelines
+### 7.8 Activity Feed Implementation Patterns
+
+**Activity Generation Best Practices**
+
+* Generate activity entries asynchronously to avoid blocking user interactions
+
+* Use database transactions to ensure activity entries are created atomically with the triggering action
+
+* Implement activity deduplication to prevent spam from rapid successive actions
+
+* Cache collaborator lists for shared lists to optimize activity visibility calculations
+
+```tsx
+// Activity generation pattern with transaction
+export async function updateContentStatusWithActivity(
+  userId: string,
+  tmdbId: number,
+  contentType: string,
+  newStatus: string
+) {
+  return await db.transaction(async (tx) => {
+    // Get old status for activity metadata
+    const oldStatus = await getCurrentStatus(tx, userId, tmdbId, contentType);
+    
+    // Update content status
+    await tx.insert(userContentStatus).values({
+      userId,
+      tmdbId,
+      contentType,
+      status: newStatus,
+    }).onConflictDoUpdate({
+      target: [userContentStatus.userId, userContentStatus.tmdbId],
+      set: { status: newStatus, updatedAt: new Date() },
+    });
+    
+    // Generate activity entry
+    await createActivityEntry(tx, {
+      userId,
+      activityType: 'status_change',
+      tmdbId,
+      contentType,
+      metadata: { old_status: oldStatus, new_status: newStatus },
+    });
+    
+    // Handle collaborative activities for shared lists
+    await handleCollaborativeActivity(tx, userId, tmdbId, contentType);
+  });
+}
+```
+
+**Activity Feed UI Patterns**
+
+* Use virtualized scrolling for infinite scroll performance with large activity lists
+
+* Implement optimistic updates for activity interactions (likes, comments if added later)
+
+* Group related activities (e.g., multiple episode watches) to reduce feed noise
+
+* Use skeleton loading states while fetching activity data
+
+```tsx
+// Activity feed component with infinite scroll
+function ActivityFeed() {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['activity-feed'],
+    queryFn: ({ pageParam = 0 }) => fetchActivities({ offset: pageParam }),
+    getNextPageParam: (lastPage) => 
+      lastPage.has_more ? lastPage.activities.length : undefined,
+  });
+  
+  return (
+    <div className="activity-feed">
+      {data?.pages.map((page) =>
+        page.activities.map((activity) => (
+          <ActivityEntry key={activity.id} activity={activity} />
+        ))
+      )}
+      {hasNextPage && (
+        <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+          {isFetchingNextPage ? 'Loading...' : 'Load More'}
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+**Collaborative Activity Display**
+
+* Show up to 2 additional user avatars for sync activities
+
+* Use avatar clustering with overflow indicators for multiple collaborators
+
+* Implement real-time updates for collaborative activities using WebSockets or polling
+
+```tsx
+// Collaborative activity indicator component
+function CollaborativeIndicator({ activity }) {
+  const { user, collaborators } = activity;
+  const displayCollaborators = collaborators.slice(0, 2);
+  const overflowCount = Math.max(0, collaborators.length - 2);
+  
+  return (
+    <div className="flex items-center space-x-1">
+      <UserAvatar user={user} size="md" />
+      {activity.is_collaborative && (
+        <>
+          <span className="text-xs text-gray-400">with</span>
+          {displayCollaborators.map((collaborator) => (
+            <UserAvatar key={collaborator.id} user={collaborator} size="sm" />
+          ))}
+          {overflowCount > 0 && (
+            <div className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center text-xs">
+              +{overflowCount}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+### 7.9 Watch Status UI Component Guidelines
 
 **Status Badge Implementation**
 

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lists, listCollaborators, users } from "@/lib/db/schema";
+import {
+  lists,
+  listCollaborators,
+  users,
+  activityFeed,
+  ActivityType,
+} from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and } from "drizzle-orm";
 import { PermissionLevel } from "@/lib/db/schema";
@@ -10,12 +16,12 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const listId = pathParts[pathParts.length - 2]; // Get list ID from path
-    
+
     if (!listId) {
       return NextResponse.json(
-        { error: 'List ID is required' },
+        { error: "List ID is required" },
         { status: 400 }
       );
     }
@@ -75,16 +81,16 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const listId = pathParts[pathParts.length - 2]; // Get list ID from path
-    
+
     if (!listId) {
       return NextResponse.json(
-        { error: 'List ID is required' },
+        { error: "List ID is required" },
         { status: 400 }
       );
     }
-    
+
     const body = await request.json();
     const { username, permissionLevel = PermissionLevel.COLLABORATOR } = body;
 
@@ -111,10 +117,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       .limit(1);
 
     if (!existingList) {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "List not found" }, { status: 404 });
     }
 
     if (existingList.ownerId !== userId) {
@@ -126,16 +129,17 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
     // Check if the user to be added exists
     const [targetUser] = await db
-      .select({ id: users.id, username: users.username, profilePictureUrl: users.profilePictureUrl })
+      .select({
+        id: users.id,
+        username: users.username,
+        profilePictureUrl: users.profilePictureUrl,
+      })
       .from(users)
       .where(eq(users.username, username.trim()))
       .limit(1);
 
     if (!targetUser) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // Check if user is trying to add themselves
@@ -177,6 +181,28 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       })
       .returning();
 
+    // Generate activity for collaborator addition
+    try {
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.COLLABORATOR_ADDED,
+        listId,
+        metadata: {
+          listName: existingList.name,
+          collaboratorUsername: targetUser.username,
+          collaboratorUserId: targetUser.id,
+          permissionLevel,
+        },
+        createdAt: new Date(),
+      });
+    } catch (activityError) {
+      console.error(
+        "Failed to create activity for collaborator addition:",
+        activityError
+      );
+      // Don't fail the main operation if activity creation fails
+    }
+
     // Return the collaborator with user info
     const collaboratorWithUser = {
       id: newCollaborator.id,
@@ -188,9 +214,9 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       joinedAt: newCollaborator.joinedAt,
     };
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       collaborator: collaboratorWithUser,
-      message: `${targetUser.username} has been added as a ${permissionLevel} to ${existingList.name}`
+      message: `${targetUser.username} has been added as a ${permissionLevel} to ${existingList.name}`,
     });
   } catch (error) {
     console.error("Error adding collaborator:", error);

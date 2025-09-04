@@ -1,0 +1,153 @@
+import { NextResponse } from "next/server";
+import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
+import { db } from "@/lib/db";
+import { activityFeed, users, lists, listCollaborators } from "@/lib/db/schema";
+import { eq, desc, and, or, inArray, lt } from "drizzle-orm";
+
+// GET /api/activity - Get paginated activity timeline
+export const GET = withAuth(async (request: AuthenticatedRequest) => {
+  try {
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const cursor = searchParams.get("cursor"); // ISO timestamp for cursor-based pagination
+    const type = searchParams.get("type"); // Optional filter by activity type
+
+    // Build the query conditions
+    let whereConditions;
+
+    if (cursor && type) {
+      whereConditions = and(
+        eq(activityFeed.userId, request.user.id),
+        lt(activityFeed.createdAt, new Date(cursor)),
+        eq(activityFeed.activityType, type)
+      );
+    } else if (cursor) {
+      whereConditions = and(
+        eq(activityFeed.userId, request.user.id),
+        lt(activityFeed.createdAt, new Date(cursor))
+      );
+    } else if (type) {
+      whereConditions = and(
+        eq(activityFeed.userId, request.user.id),
+        eq(activityFeed.activityType, type)
+      );
+    } else {
+      whereConditions = eq(activityFeed.userId, request.user.id);
+    }
+
+    // Get user's collaborative lists to include collaborative activities
+    const userCollaborativeLists = await db
+      .select({ listId: lists.id })
+      .from(lists)
+      .leftJoin(listCollaborators, eq(lists.id, listCollaborators.listId))
+      .where(
+        or(
+          eq(lists.ownerId, request.user.id),
+          eq(listCollaborators.userId, request.user.id)
+        )
+      );
+
+    const collaborativeListIds = userCollaborativeLists.map((l) => l.listId);
+
+    // Include activities from collaborative lists
+    if (collaborativeListIds.length > 0) {
+      let collaborativeConditions = and(
+        inArray(activityFeed.listId, collaborativeListIds),
+        eq(activityFeed.isCollaborative, true)
+      );
+
+      if (cursor) {
+        collaborativeConditions = and(
+          collaborativeConditions,
+          lt(activityFeed.createdAt, new Date(cursor))
+        );
+      }
+
+      if (type) {
+        collaborativeConditions = and(
+          collaborativeConditions,
+          eq(activityFeed.activityType, type)
+        );
+      }
+
+      whereConditions = or(whereConditions, collaborativeConditions);
+    }
+
+    const activities = await db
+      .select({
+        id: activityFeed.id,
+        userId: activityFeed.userId,
+        activityType: activityFeed.activityType,
+        tmdbId: activityFeed.tmdbId,
+        contentType: activityFeed.contentType,
+        listId: activityFeed.listId,
+        metadata: activityFeed.metadata,
+        collaborators: activityFeed.collaborators,
+        isCollaborative: activityFeed.isCollaborative,
+        createdAt: activityFeed.createdAt,
+        username: users.username,
+        userProfilePicture: users.profilePictureUrl,
+      })
+      .from(activityFeed)
+      .leftJoin(users, eq(activityFeed.userId, users.id))
+      .where(whereConditions)
+      .orderBy(desc(activityFeed.createdAt))
+      .limit(limit + 1); // Fetch one extra to determine if there are more
+
+    const hasMore = activities.length > limit;
+    const resultActivities = hasMore ? activities.slice(0, limit) : activities;
+
+    const allCollaborators = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        profilePictureUrl: users.profilePictureUrl,
+      })
+      .from(users)
+      .where(
+        inArray(
+          users.id,
+          resultActivities.flatMap((activity) => activity.collaborators ?? [])
+        )
+      );
+
+    const nextCursor =
+      hasMore && resultActivities.length > 0
+        ? resultActivities[resultActivities.length - 1].createdAt.toISOString()
+        : null;
+
+    return NextResponse.json({
+      activities: resultActivities.map((activity) => ({
+        id: activity.id,
+        activityType: activity.activityType,
+        user: {
+          id: activity.userId,
+          username: activity.username,
+          profilePictureUrl: activity.userProfilePicture,
+        },
+        metadata: activity.metadata,
+        createdAt: activity.createdAt,
+        contentType: activity.contentType,
+        tmdbId: activity.tmdbId,
+        listId: activity.listId,
+        isCollaborative: activity.isCollaborative,
+        collaborators: activity.collaborators?.map((collaboratorId) => ({
+          id: collaboratorId,
+          username: allCollaborators.find((c) => c.id === collaboratorId)
+            ?.username,
+          profilePictureUrl: allCollaborators.find(
+            (c) => c.id === collaboratorId
+          )?.profilePictureUrl,
+        })),
+      })),
+      hasMore,
+      nextCursor,
+    });
+  } catch (error) {
+    console.error("Error fetching activity timeline:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch activity timeline" },
+      { status: 500 }
+    );
+  }
+});

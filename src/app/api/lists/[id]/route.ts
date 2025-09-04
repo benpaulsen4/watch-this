@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lists, listItems, listCollaborators, users } from "@/lib/db/schema";
+import {
+  lists,
+  listItems,
+  listCollaborators,
+  users,
+  activityFeed,
+  ActivityType,
+} from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and, or, count, asc } from "drizzle-orm";
 import { tmdbClient } from "@/lib/tmdb/client";
@@ -188,7 +195,8 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       updateData.description = description?.trim() || null;
     if (listType !== undefined) updateData.listType = listType;
     if (isPublic !== undefined) updateData.isPublic = Boolean(isPublic);
-    if (syncWatchStatus !== undefined) updateData.syncWatchStatus = Boolean(syncWatchStatus);
+    if (syncWatchStatus !== undefined)
+      updateData.syncWatchStatus = Boolean(syncWatchStatus);
 
     // Update the list
     const [updatedList] = await db
@@ -214,6 +222,27 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       itemCount: itemCountResult[0]?.count || 0,
       collaborators: collaboratorCountResult[0]?.count || 0,
     };
+
+    // Generate activity for list update
+    try {
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.LIST_UPDATED,
+        listId,
+        metadata: {
+          listName: updatedList.name,
+          listType: updatedList.listType,
+          isPublic: updatedList.isPublic,
+        },
+        createdAt: new Date(),
+      });
+    } catch (activityError) {
+      console.error(
+        "Failed to create activity for list update:",
+        activityError
+      );
+      // Don't fail the main operation if activity creation fails
+    }
 
     return NextResponse.json({ list: listWithCounts });
   } catch (error) {
@@ -257,8 +286,34 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
+    // Get list info and collaborators before deletion for activity
+    const [listInfo] = await db
+      .select({ name: lists.name, listType: lists.listType })
+      .from(lists)
+      .where(eq(lists.id, listId))
+      .limit(1);
+
     // Delete the list (cascade will handle related records)
     await db.delete(lists).where(eq(lists.id, listId));
+
+    // Generate activity for list deletion
+    try {
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.LIST_DELETED,
+        metadata: {
+          listName: listInfo?.name || "Unknown List",
+          listType: listInfo?.listType || "mixed",
+        },
+        createdAt: new Date(),
+      });
+    } catch (activityError) {
+      console.error(
+        "Failed to create activity for list deletion:",
+        activityError
+      );
+      // Don't fail the main operation if activity creation fails
+    }
 
     return NextResponse.json({ message: "List deleted successfully" });
   } catch (error) {

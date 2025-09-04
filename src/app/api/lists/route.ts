@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lists, listItems, listCollaborators } from "@/lib/db/schema";
+import {
+  lists,
+  listItems,
+  listCollaborators,
+  activityFeed,
+  ActivityType,
+} from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, or, sql, desc } from "drizzle-orm";
 
@@ -83,7 +89,13 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     const userId = request.user.id;
     const body = await request.json();
 
-    const { name, description, listType = "mixed", isPublic = false, syncWatchStatus = false } = body;
+    const {
+      name,
+      description,
+      listType = "mixed",
+      isPublic = false,
+      syncWatchStatus = false,
+    } = body;
 
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
@@ -119,6 +131,27 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         syncWatchStatus: Boolean(syncWatchStatus),
       })
       .returning();
+
+    // Generate activity for list creation
+    try {
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.LIST_CREATED,
+        listId: newList.id,
+        metadata: {
+          listName: newList.name,
+          listType: newList.listType,
+          isPublic: newList.isPublic,
+        },
+        createdAt: new Date(),
+      });
+    } catch (activityError) {
+      console.error(
+        "Failed to create activity for list creation:",
+        activityError
+      );
+      // Don't fail the main operation if activity creation fails
+    }
 
     // Return the new list with counts
     const listWithCounts = {

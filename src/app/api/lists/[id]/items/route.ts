@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lists, listItems, listCollaborators } from "@/lib/db/schema";
+import {
+  lists,
+  listItems,
+  listCollaborators,
+  activityFeed,
+  ActivityType,
+} from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and, max, or } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
@@ -101,6 +107,36 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         addedAt: new Date(),
       })
       .returning();
+
+    // Generate activity for content addition
+    try {
+      // Check if this is a collaborative list
+      const [listInfo] = await db
+        .select({ ownerId: lists.ownerId, name: lists.name })
+        .from(lists)
+        .where(eq(lists.id, listId))
+        .limit(1);
+
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.LIST_ITEM_ADDED,
+        tmdbId: Number(tmdbId),
+        contentType,
+        listId,
+        metadata: {
+          title: title,
+          listName: listInfo?.name || "Unknown List",
+          posterPath: posterPath || null,
+        },
+        createdAt: new Date(),
+      });
+    } catch (activityError) {
+      console.error(
+        "Failed to create activity for list item addition:",
+        activityError
+      );
+      // Don't fail the main operation if activity creation fails
+    }
 
     return NextResponse.json({ item: newItem }, { status: 201 });
   } catch (error) {

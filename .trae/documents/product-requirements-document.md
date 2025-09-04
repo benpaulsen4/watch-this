@@ -19,11 +19,12 @@ The product targets entertainment enthusiasts who want to organize their viewing
 Our WatchThis app consists of the following main pages:
 
 1. **Authentication page**: passkey registration, passkey sign-in, username setup.
-2. **Home page**: dashboard overview, quick access to lists, recent activity feed.
-3. **My Lists page**: personal list management, list creation.
-4. **Search page**: TMDB content discovery, advanced filtering, content details.
-5. **List Details page**: list content management, collaboration controls, sharing options.
-6. **Profile page**: user settings, data export/import, account management.
+2. **Home page**: dashboard overview, quick access to lists, activity feed (replacing quick actions).
+3. **Activity page**: comprehensive activity timeline with infinite scroll and filtering.
+4. **My Lists page**: personal list management, list creation.
+5. **Search page**: TMDB content discovery, advanced filtering, content details.
+6. **List Details page**: list content management, collaboration controls, sharing options.
+7. **Profile page**: user settings, data export/import, account management.
 
 ### 2.3 Page Details
 
@@ -32,7 +33,8 @@ Our WatchThis app consists of the following main pages:
 | Authentication | Passkey Registration       | Register with username and create passkey for secure authentication                                |
 | Authentication | Passkey Sign-in            | Sign in using existing passkey across multiple devices                                             |
 | Home           | Dashboard                  | Display overview of all lists, recent activity, and quick navigation                               |
-| Home           | Activity Feed              | Show recent additions, friend activities, and list updates                                         |
+| Home           | Activity Feed              | Display up to 10 recent activity entries replacing quick actions section entirely                  |
+| Activity       | Activity Timeline          | Infinite scroll view of all activity entries with detailed information and timestamps              |
 | My Lists       | Custom List Creation       | Create new lists with type selection and watch status sync option (TV only, Movies only, or Mixed) |
 | My Lists       | List Overview              | View all personal and shared lists with quick access and sync indicators                           |
 | Search         | Content Discovery          | Search TMDB database for movies and TV shows with real-time results                                |
@@ -50,6 +52,8 @@ Our WatchThis app consists of the following main pages:
 | Profile        | Passkey Device Viewer      | View all registered passkey devices with names, creation dates, and last used timestamps           |
 | Profile        | Data Export/Import         | Export lists to CSV/JSON formats and import from external sources                                  |
 | Profile        | Account Settings           | Manage privacy preferences and account information                                                 |
+| Activity       | Activity Entry Display     | Show activity type, user info, content details, and sync indicators for collaborative actions      |
+| Activity       | Activity Filtering         | Filter activity by type, date range, and collaboration status                                      |
 
 ## 3. Watch Status Tracking System
 
@@ -171,7 +175,97 @@ Our WatchThis app consists of the following main pages:
 
 * Option to leave sync-enabled lists if user prefers individual tracking
 
-## 5. Core Process
+## 5. Activity Tracking System
+
+### 5.1 Activity Types and Generation
+
+**Watch Status Changes:**
+
+* Changing watch status of any content (Planning, Watching, Paused, Completed, Dropped) generates an activity entry
+
+* Activity includes content title, poster, old status, new status, and timestamp
+
+* If content exists in shared lists, activity is visible to all list collaborators
+
+* For sync-enabled lists, activity shows up to 2 additional usernames and profile pictures of other collaborators whose status was also updated
+
+**Episode Progress Tracking:**
+
+* Marking TV show episodes as watched/unwatched generates activity entries
+
+* Activity includes show title, season/episode information, and progress update
+
+* Same visibility rules as watch status changes apply
+
+* Sync-enabled lists show collaborative progress updates with multiple user indicators
+
+**List Content Management:**
+
+* Adding content to any list generates an activity entry with content details
+
+* Removing content from any list generates an activity entry
+
+* If list is shared with collaborators, these activities are visible to all list members
+
+* Activities include list name, content title, and action performed
+
+**List Management Activities:**
+
+* Creating new lists generates activity entries visible to the creator
+
+* Updating list details (name, description, settings) generates activity entries
+
+* Adding collaborators to lists generates activity entries visible to all list members
+
+* Removing collaborators generates activity entries visible to remaining list members
+
+* All list management activities include list name and specific action details
+
+### 5.2 Activity Feed Display
+
+**Dashboard Integration:**
+
+* Activity feed completely replaces the existing "Quick actions" section on the home page
+
+* Displays up to 10 most recent activity entries in chronological order (newest first)
+
+* Each entry shows user avatar, username, action description, content/list information, and relative timestamp
+
+* "View more" button provides access to comprehensive activity timeline
+
+**Activity Timeline Page:**
+
+* Dedicated page accessible via "View more" button from dashboard
+
+* Infinite scroll implementation loading activities in batches
+
+* Comprehensive view of all user and collaborative activities
+
+* Advanced filtering options by activity type, date range, and collaboration status
+
+### 5.3 Collaborative Activity Features
+
+**Visibility Rules:**
+
+* Personal activities (own actions) are always visible to the user
+
+* Shared list activities are visible to all list collaborators
+
+* Private list activities remain private to the list owner
+
+* Activity visibility respects list sharing permissions
+
+**Sync Indicators:**
+
+* When sync is enabled and multiple users are affected by an action, activity entries show collaborative indicators
+
+* Display primary actor (the user who performed the action) prominently
+
+* Show up to 2 additional affected users with smaller avatars and usernames
+
+* Clear visual distinction between individual and collaborative activities
+
+## 6. Core Process
 
 **User Registration and Authentication Flow:**
 New users register by choosing a username and creating a passkey through their device's biometric or security key. Once registered, users can sign in on any device using their passkey without passwords.
@@ -188,22 +282,27 @@ Users can enable "Sync watch status with collaborators" when creating or editing
 **Watch Status Tracking Flow:**
 Users can set and update watch status for any content (movies or TV shows). For movies, available statuses are Planning and Completed. For TV shows, statuses include Planning, Watching, Paused, Completed, and Dropped. TV shows support episode-level tracking where marking episodes as watched automatically updates the show status to Watching, and completing all episodes sets status to Completed.
 
+**Activity Tracking Flow:**
+All user actions (watch status changes, episode progress, list management, content additions/removals) automatically generate activity entries. These activities are displayed on the home dashboard (up to 10 entries) and in the comprehensive activity timeline. Collaborative activities are shared with list collaborators based on list sharing settings, with sync-enabled lists showing multiple user indicators when actions affect multiple users simultaneously.
+
 ```mermaid
 graph TD
     A[Authentication Page] --> B[Home Dashboard]
     B --> C[My Lists]
     B --> D[Search Content]
+    B --> J[Activity Timeline]
     C --> E[List Details]
     D --> F[Content Details]
     F --> E
     E --> G[Collaboration Management]
     B --> H[Profile Settings]
     H --> I[Data Export/Import]
+    J --> K[Activity Filtering]
 ```
 
-## 6. User Interface Design
+## 7. User Interface Design
 
-### 6.1 Design Style
+### 7.1 Design Style
 
 **Watch Status Color Scheme:**
 
@@ -217,6 +316,16 @@ graph TD
 
 * Dropped: Red (#EF4444) with light red background
 
+**Activity Feed Color Scheme:**
+
+* Watch status activities: Use corresponding status colors for action indicators
+
+* Episode progress: Purple (#8B5CF6) for episode-related activities
+
+* List management: Teal (#14B8A6) for list creation, updates, and collaboration
+
+* Content management: Indigo (#6366F1) for adding/removing content
+
 **Badge Design:**
 
 * Rounded corners with subtle border and semi-transparent background
@@ -227,12 +336,15 @@ graph TD
 
 * Responsive sizing for different screen sizes
 
-### 6.2 Page Design Overview
+### 7.2 Page Design Overview
 
 | Page Name      | Module Name           | UI Elements                                                                                           |
 | -------------- | --------------------- | ----------------------------------------------------------------------------------------------------- |
 | Authentication | Passkey Setup         | Centered card with gradient background, biometric icon animations                                     |
-| Home           | Dashboard             | Grid layout with colorful cards, activity timeline, floating action buttons                           |
+| Home           | Dashboard             | Grid layout with colorful cards, activity feed replacing quick actions, floating action buttons       |
+| Home           | Activity Feed         | Linear timeline with user avatars, action descriptions, content thumbnails, and relative timestamps   |
+| Activity       | Activity Timeline     | Infinite scroll layout with detailed activity cards, filtering controls, and search functionality     |
+| Activity       | Activity Cards        | User avatar clusters for sync activities, content thumbnails, action type indicators, timestamps      |
 | My Lists       | List Grid             | Masonry layout with vibrant list cards, quick action overlays, type indicators, sync status icons     |
 | My Lists       | List Creation Form    | Toggle switch for "Sync watch status with collaborators" with clear labeling and description          |
 | Search         | Content Browser       | Search bar with live suggestions, filter chips, movie/TV poster grid with hover effects               |
@@ -243,7 +355,7 @@ graph TD
 | Profile        | Settings Panel        | Toggle switches with custom styling, export buttons with progress indicators                          |
 | Profile        | Device Management     | Card-based layout showing passkey devices with device icons and status indicators                     |
 
-### 6.3 Watch Status UI Components
+### 7.3 Watch Status UI Components
 
 | Component Name     | UI Elements                                                          | Description                                                                                                              |
 | ------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -252,6 +364,17 @@ graph TD
 | Episode Tracker    | Checkbox list with episode titles, synopses, and season/episode info | Shows episode progress for TV shows including episode titles and synopses fetched from TMDB API                          |
 | Progress Indicator | Circular or linear progress bar                                      | Visual representation of completion percentage                                                                           |
 
-### 6.4 Responsiveness
+### 7.4 Activity Feed UI Components
+
+| Component Name          | UI Elements                                                   | Description                                                                                            |
+| ----------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Activity Entry          | User avatar, action description, content thumbnail, timestamp | Individual activity item showing user action with relevant content and timing information              |
+| Collaborative Indicator | Primary user avatar with up to 2 smaller secondary avatars    | Shows when sync actions affect multiple users, with clear visual hierarchy                             |
+| Activity Type Badge     | Colored icon badge indicating activity type                   | Visual indicator for different activity types (status change, episode progress, list management, etc.) |
+| Content Thumbnail       | Small poster image with content title overlay                 | Compact content representation within activity entries                                                 |
+| Activity Filter         | Dropdown and toggle controls for filtering                    | Allows filtering by activity type, date range, and collaboration status                                |
+| Load More Button        | Infinite scroll trigger with loading animation                | Seamless loading of additional activity entries in the timeline view                                   |
+
+### 7.5 Responsiveness
 
 The application is mobile-first with adaptive design for tablet and desktop. Touch interactions are optimized for mobile devices with gesture support for list management and content browsing. The interface scales seamlessly across screen sizes while maintaining the vibrant, entertainment-focused aesthetic.

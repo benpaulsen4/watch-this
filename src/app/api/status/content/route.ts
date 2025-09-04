@@ -8,103 +8,17 @@ import {
   MovieWatchStatusEnum,
   TVWatchStatus,
   TVWatchStatusEnum,
-  lists,
-  listCollaborators,
-  listItems,
+  activityFeed,
+  ActivityType,
 } from "@/lib/db/schema";
 import {
   withAuth,
   AuthenticatedRequest,
   handleApiError,
 } from "@/lib/auth/api-middleware";
-import { eq, and, or } from "drizzle-orm";
-
-// Helper function to sync status updates to collaborators
-export async function syncStatusToCollaborators(
-  userId: string,
-  tmdbId: number,
-  contentType: string,
-  status: string
-) {
-  try {
-    // Find all lists that contain this content and have sync enabled
-    const syncEnabledLists = await db
-      .select({
-        listId: lists.id,
-        ownerId: lists.ownerId,
-      })
-      .from(lists)
-      .innerJoin(listItems, eq(listItems.listId, lists.id))
-      .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
-      .where(
-        and(
-          eq(lists.syncWatchStatus, true),
-          eq(listItems.tmdbId, tmdbId),
-          eq(listItems.contentType, contentType),
-          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-        )
-      );
-
-    // For each sync-enabled list, update status for all collaborators
-    for (const list of syncEnabledLists) {
-      // Get all collaborators (including owner) for this list
-      const collaborators = await db
-        .select({ userId: listCollaborators.userId })
-        .from(listCollaborators)
-        .where(eq(listCollaborators.listId, list.listId));
-
-      // Add the owner to the collaborators list
-      const allUsers = [
-        ...collaborators.map((c) => c.userId),
-        list.ownerId,
-      ].filter((id) => id !== userId); // Exclude the user who made the update
-
-      // Update status for each collaborator
-      for (const collaboratorId of allUsers) {
-        // Check if collaborator already has a status for this content
-        const existingStatus = await db
-          .select()
-          .from(userContentStatus)
-          .where(
-            and(
-              eq(userContentStatus.userId, collaboratorId),
-              eq(userContentStatus.tmdbId, tmdbId),
-              eq(userContentStatus.contentType, contentType)
-            )
-          )
-          .limit(1);
-
-        if (existingStatus.length > 0) {
-          // Update existing status
-          await db
-            .update(userContentStatus)
-            .set({
-              status,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(userContentStatus.userId, collaboratorId),
-                eq(userContentStatus.tmdbId, tmdbId),
-                eq(userContentStatus.contentType, contentType)
-              )
-            );
-        } else {
-          // Create new status
-          await db.insert(userContentStatus).values({
-            userId: collaboratorId,
-            tmdbId,
-            contentType,
-            status,
-          });
-        }
-      }
-    }
-  } catch (error) {
-    console.error("Error syncing status to collaborators:", error);
-    // Don't throw error to avoid breaking the main status update
-  }
-}
+import { eq, and } from "drizzle-orm";
+import { syncStatusToCollaborators } from "@/lib/activity/sync-utils";
+import { tmdbClient, TMDBMovie, TMDBTVShow } from "@/lib";
 
 // GET /api/status/content - Get content watch status for authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
@@ -242,7 +156,40 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     }
 
     // Sync status to collaborators if applicable
-    await syncStatusToCollaborators(userId, tmdbId, contentType, status);
+    const syncedCollaboratorIds = await syncStatusToCollaborators(
+      userId,
+      tmdbId,
+      contentType,
+      status
+    );
+
+    // Create activity entry
+    try {
+      // Get content details from TMDB
+      const contentDetails =
+        contentType === ContentType.MOVIE
+          ? await tmdbClient.getMovieDetails(tmdbId)
+          : await tmdbClient.getTVShowDetails(tmdbId);
+
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.STATUS_CHANGED,
+        tmdbId,
+        contentType,
+        metadata: {
+          status,
+          title:
+            (contentDetails as TMDBMovie)?.title ??
+            (contentDetails as TMDBTVShow)?.name,
+          posterPath: contentDetails.poster_path,
+        },
+        collaborators: syncedCollaboratorIds,
+        isCollaborative: syncedCollaboratorIds.length > 0,
+      });
+    } catch (activityError) {
+      console.error("Error creating activity entry:", activityError);
+      // Don't fail the main operation if activity creation fails
+    }
 
     return NextResponse.json({ status: result }, { status: 201 });
   } catch (error) {
@@ -350,7 +297,40 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
 
     // Sync status to collaborators if applicable
     if (status !== undefined) {
-      await syncStatusToCollaborators(userId, tmdbId, contentType, status);
+      const syncedCollaboratorIds = await syncStatusToCollaborators(
+        userId,
+        tmdbId,
+        contentType,
+        status
+      );
+
+      // Create activity entry
+      try {
+        // Get content details from TMDB
+        const contentDetails =
+          contentType === ContentType.MOVIE
+            ? await tmdbClient.getMovieDetails(tmdbId)
+            : await tmdbClient.getTVShowDetails(tmdbId);
+
+        await db.insert(activityFeed).values({
+          userId,
+          activityType: ActivityType.STATUS_CHANGED,
+          tmdbId,
+          contentType,
+          metadata: {
+            status,
+            title:
+              (contentDetails as TMDBMovie)?.title ??
+              (contentDetails as TMDBTVShow)?.name,
+            posterPath: contentDetails.poster_path,
+          },
+          collaborators: syncedCollaboratorIds,
+          isCollaborative: syncedCollaboratorIds.length > 0,
+        });
+      } catch (activityError) {
+        console.error("Error creating activity entry:", activityError);
+        // Don't fail the main operation if activity creation fails
+      }
     }
 
     return NextResponse.json({ status: result });

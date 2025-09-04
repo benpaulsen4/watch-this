@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { lists, listCollaborators, users } from "@/lib/db/schema";
+import {
+  lists,
+  listCollaborators,
+  users,
+  activityFeed,
+  ActivityType,
+} from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and } from "drizzle-orm";
 import { PermissionLevel } from "@/lib/db/schema";
@@ -10,22 +16,25 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const listId = pathParts[pathParts.length - 3]; // Get list ID from path
     const collaboratorUserId = pathParts[pathParts.length - 1]; // Get collaborator user ID from path
-    
+
     if (!listId || !collaboratorUserId) {
       return NextResponse.json(
-        { error: 'List ID and collaborator user ID are required' },
+        { error: "List ID and collaborator user ID are required" },
         { status: 400 }
       );
     }
-    
+
     const body = await request.json();
     const { permissionLevel } = body;
 
     // Validate input
-    if (!permissionLevel || !Object.values(PermissionLevel).includes(permissionLevel)) {
+    if (
+      !permissionLevel ||
+      !Object.values(PermissionLevel).includes(permissionLevel)
+    ) {
       return NextResponse.json(
         { error: "Valid permission level is required" },
         { status: 400 }
@@ -40,10 +49,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       .limit(1);
 
     if (!existingList) {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "List not found" }, { status: 404 });
     }
 
     if (existingList.ownerId !== userId) {
@@ -93,15 +99,15 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     const collaboratorWithUser = {
       id: updatedCollaborator.id,
       userId: updatedCollaborator.userId,
-      username: userInfo?.username || 'Unknown',
+      username: userInfo?.username || "Unknown",
       permissionLevel: updatedCollaborator.permissionLevel,
       invitedAt: updatedCollaborator.invitedAt,
       joinedAt: updatedCollaborator.joinedAt,
     };
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       collaborator: collaboratorWithUser,
-      message: `Permission level updated to ${permissionLevel}`
+      message: `Permission level updated to ${permissionLevel}`,
     });
   } catch (error) {
     console.error("Error updating collaborator:", error);
@@ -117,13 +123,13 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
     const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
+    const pathParts = url.pathname.split("/");
     const listId = pathParts[pathParts.length - 3]; // Get list ID from path
     const collaboratorUserId = pathParts[pathParts.length - 1]; // Get collaborator user ID from path
-    
+
     if (!listId || !collaboratorUserId) {
       return NextResponse.json(
-        { error: 'List ID and collaborator user ID are required' },
+        { error: "List ID and collaborator user ID are required" },
         { status: 400 }
       );
     }
@@ -136,10 +142,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       .limit(1);
 
     if (!existingList) {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "List not found" }, { status: 404 });
     }
 
     if (existingList.ownerId !== userId) {
@@ -183,8 +186,31 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       .delete(listCollaborators)
       .where(eq(listCollaborators.id, existingCollaborator.id));
 
-    return NextResponse.json({ 
-      message: `${userInfo?.username || 'User'} has been removed from ${existingList.name}`
+    // Generate activity for collaborator removal
+    try {
+      await db.insert(activityFeed).values({
+        userId,
+        activityType: ActivityType.COLLABORATOR_REMOVED,
+        listId,
+        metadata: {
+          listName: existingList.name,
+          collaboratorUsername: userInfo?.username || "Unknown User",
+          collaboratorUserId,
+        },
+        createdAt: new Date(),
+      });
+    } catch (activityError) {
+      console.error(
+        "Failed to create activity for collaborator removal:",
+        activityError
+      );
+      // Don't fail the main operation if activity creation fails
+    }
+
+    return NextResponse.json({
+      message: `${userInfo?.username || "User"} has been removed from ${
+        existingList.name
+      }`,
     });
   } catch (error) {
     console.error("Error removing collaborator:", error);
