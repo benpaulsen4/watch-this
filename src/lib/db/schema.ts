@@ -322,6 +322,7 @@ export const PermissionLevel = {
   VIEWER: "viewer",
 } as const;
 
+// TODO use lower case for consistency
 export const ActivityType = {
   STATUS_CHANGED: "STATUS_CHANGED",
   EPISODE_PROGRESS: "EPISODE_PROGRESS",

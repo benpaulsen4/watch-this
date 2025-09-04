@@ -58,11 +58,11 @@ export function SearchClient() {
   const loadDiscoverContent = useCallback(async (pageNum = 1, append = false) => {
     try {
       const params = new URLSearchParams({
-        type: contentType === 'all' ? 'movie' : contentType,
         page: pageNum.toString(),
         sort_by: sortBy
       });
       
+      if (contentType !== 'all') params.append('type', contentType);
       if (selectedGenre) params.append('with_genres', selectedGenre);
       if (selectedYear) params.append('year', selectedYear);
 
@@ -99,8 +99,9 @@ export function SearchClient() {
     try {
       const params = new URLSearchParams({
         q: query,
-        type: contentType
+        type: contentType,
       });
+      if (selectedYear && contentType !== 'all') params.append('year', selectedYear);
       
       const response = await fetch(`/api/tmdb/search?${params}`);
       if (response.ok) {
@@ -112,7 +113,7 @@ export function SearchClient() {
     } finally {
       setSearchLoading(false);
     }
-  }, [contentType, loadDiscoverContent]);
+  }, [contentType, loadDiscoverContent, selectedYear]);
 
   useEffect(() => {
     loadGenres();
@@ -186,7 +187,7 @@ export function SearchClient() {
           />
         </div>
 
-        {/* Filters // TODO some don't actually work */}
+        {/* Filters */}
         {showFilters && (
           <Card variant="entertainment" className="mb-8">
             <CardHeader>
@@ -198,6 +199,7 @@ export function SearchClient() {
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Content Type
                   </label>
+                  {/* TODO use select component */}
                   <select
                     value={contentType}
                     onChange={(e) => setContentType(e.target.value as ContentType)}
@@ -217,6 +219,7 @@ export function SearchClient() {
                     value={selectedGenre}
                     onChange={(e) => setSelectedGenre(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
+                    disabled={!!searchQuery}
                   >
                     <option value="">All Genres</option>
                     {genres.map((genre) => (
@@ -235,6 +238,7 @@ export function SearchClient() {
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
+                    disabled={!!searchQuery && contentType === 'all'}
                   >
                     <option value="">All Years</option>
                     {years.map((year) => (
@@ -253,6 +257,7 @@ export function SearchClient() {
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortBy)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
+                    disabled={!!searchQuery}
                   >
                     <option value="popularity.desc">Popularity</option>
                     <option value="vote_average.desc">Rating</option>

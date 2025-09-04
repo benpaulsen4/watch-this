@@ -126,11 +126,9 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
                 Added {new Date(addedDate).toLocaleDateString()}
               </span>
             )}
-            {content.vote_count && content.vote_count > 0 && (
               <span className="text-xs text-gray-500">
-                {content.vote_count.toLocaleString()} votes
+                {(content.vote_count ?? 0).toLocaleString()} votes
               </span>
-            )}
           </div>
         </div>
         </Card>

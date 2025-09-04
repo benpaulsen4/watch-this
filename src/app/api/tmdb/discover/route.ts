@@ -16,7 +16,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     const year = searchParams.get("year");
     const sortBy = searchParams.get("sort_by");
 
-    if (!type || !["movie", "tv"].includes(type)) {
+    if (type && !["movie", "tv"].includes(type)) {
       return NextResponse.json(
         { error: 'Type must be either "movie" or "tv"' },
         { status: 400 }
@@ -78,8 +78,25 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     if (type === "movie") {
       results = await tmdbClient.discoverMovies(params);
-    } else {
+    } else if (type === "tv") {
       results = await tmdbClient.discoverTVShows(params);
+    } else {
+      const promises = await Promise.all([
+        tmdbClient.discoverMovies(params),
+        tmdbClient.discoverTVShows(params),
+      ]);
+      results = {
+        page: validatedPage,
+        results: promises.flatMap((item) => item.results),
+        total_pages: promises.reduce(
+          (acc, item) => Math.max(acc, item.total_pages),
+          0
+        ),
+        total_results: promises.reduce(
+          (acc, item) => acc + item.total_results,
+          0
+        ),
+      };
     }
 
     // Enrich results with watch status

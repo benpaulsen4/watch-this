@@ -12,13 +12,33 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q");
-    const type = searchParams.get("type") as "multi" | "movie" | "tv" | null;
+    const type = searchParams.get("type") as "all" | "movie" | "tv" | null;
+    const year = searchParams.get("year");
 
     if (!query || query.trim().length === 0) {
       return NextResponse.json(
         { error: "Search query is required" },
         { status: 400 }
       );
+    }
+    if (year) {
+      const yearNum = parseInt(year);
+      if (!type || type === "all") {
+        return NextResponse.json(
+          { error: "Year cannot be used with multi search" },
+          { status: 400 }
+        );
+      }
+      if (
+        isNaN(yearNum) ||
+        yearNum < 1900 ||
+        yearNum > new Date().getFullYear() + 5
+      ) {
+        return NextResponse.json(
+          { error: "Year must be between 1900 and next 5 years" },
+          { status: 400 }
+        );
+      }
     }
 
     const { page: validatedPage, error: pageError } = validatePagination(
@@ -32,12 +52,20 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     switch (type) {
       case "movie":
-        results = await tmdbClient.searchMovies(query.trim(), validatedPage);
+        results = await tmdbClient.searchMovies(
+          query.trim(),
+          validatedPage,
+          year ? parseInt(year) : undefined
+        );
         break;
       case "tv":
-        results = await tmdbClient.searchTVShows(query.trim(), validatedPage);
+        results = await tmdbClient.searchTVShows(
+          query.trim(),
+          validatedPage,
+          year ? parseInt(year) : undefined
+        );
         break;
-      case "multi":
+      case "all":
       default:
         results = await tmdbClient.searchMulti(query.trim(), validatedPage);
         break;

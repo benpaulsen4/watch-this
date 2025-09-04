@@ -223,7 +223,8 @@ export type ContentType = "movie" | "tv";
 class TMDBClient {
   private async request<T>(
     endpoint: string,
-    params: Record<string, string> = {}
+    params: Record<string, string> = {},
+    postProcessor?: (data: T) => T
   ): Promise<T> {
     if (!TMDB_API_KEY) {
       throw new Error("TMDB_API_KEY environment variable is required");
@@ -251,41 +252,59 @@ class TMDBClient {
       );
     }
 
-    return response.json();
+    const data = await response.json();
+    if (postProcessor) {
+      return postProcessor(data);
+    }
+    return data;
   }
 
   // Search for movies and TV shows
-  // TODO filter out people from this endpoint
   async searchMulti(
     query: string,
     page: number = 1
-  ): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>("/search/multi", {
-      query: encodeURIComponent(query),
-      page: page.toString(),
-    });
+  ): Promise<TMDBMultiSearchResult> {
+    return this.request<TMDBMultiSearchResult>(
+      "/search/multi",
+      {
+        query: encodeURIComponent(query),
+        page: page.toString(),
+      },
+      (data) => ({
+        ...data,
+        results: data.results.filter(
+          (item) => (item.media_type as string) !== "person"
+        ),
+      })
+    );
   }
 
   // Search for movies only
   async searchMovies(
     query: string,
-    page: number = 1
+    page: number = 1,
+    year?: number
   ): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>("/search/movie", {
+    const queryParams: Record<string, string> = {
       query: encodeURIComponent(query),
       page: page.toString(),
-    });
+    };
+    if (year) queryParams.year = year.toString();
+    return this.request<TMDBSearchResult>("/search/movie", queryParams);
   }
 
   // Search for TV shows only
   async searchTVShows(
     query: string,
-    page: number = 1
+    page: number = 1,
+    year?: number
   ): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>("/search/tv", {
+    const queryParams: Record<string, string> = {
       query: encodeURIComponent(query),
       page: page.toString(),
-    });
+    };
+    if (year) queryParams.year = year.toString();
+    return this.request<TMDBSearchResult>("/search/tv", queryParams);
   }
 
   // Get movie details
@@ -299,14 +318,19 @@ class TMDBClient {
   }
 
   // Get trending content
-  // TODO filter out people from this endpoint
-
   async getTrending(
     mediaType: "all" | "movie" | "tv" = "all",
     timeWindow: "day" | "week" = "week"
-  ): Promise<TMDBSearchResult> {
-    return this.request<TMDBSearchResult>(
-      `/trending/${mediaType}/${timeWindow}`
+  ): Promise<TMDBMultiSearchResult> {
+    return this.request<TMDBMultiSearchResult>(
+      `/trending/${mediaType}/${timeWindow}`,
+      {},
+      (data) => ({
+        ...data,
+        results: data.results.filter(
+          (item) => (item.media_type as string) !== "person"
+        ),
+      })
     );
   }
 
