@@ -33,6 +33,21 @@ export function ActivityEntry({ activity, currentUsername }: ActivityEntryProps)
         return `added ${metadata.collaboratorUsername || 'someone'} as ${metadata.permissionLevel || 'collaborator'} to "${metadata.listName || 'a list'}"`;
       case ActivityType.COLLABORATOR_REMOVED:
         return `removed ${metadata.collaboratorUsername || 'someone'} from "${metadata.listName || 'a list'}"`;
+      case ActivityType.PROFILE_IMPORT:
+        const lists = metadata.lists ? parseInt(metadata.lists) : 0;
+        const contentStatus = metadata.contentStatus ? parseInt(metadata.contentStatus) : 0;
+        const episodeStatus = metadata.episodeStatus ? parseInt(metadata.episodeStatus) : 0;
+        const errors = metadata.errors ? parseInt(metadata.errors) : 0;
+        
+        const parts = [];
+        if (lists > 0) parts.push(`${lists} list${lists === 1 ? '' : 's'}`);
+        if (contentStatus > 0) parts.push(`${contentStatus} content status${contentStatus === 1 ? '' : 'es'}`);
+        if (episodeStatus > 0) parts.push(`${episodeStatus} episode status${episodeStatus === 1 ? '' : 'es'}`);
+        
+        let result = `imported ${parts.join(', ')}`;
+        if (errors > 0) result += ` (${errors} error${errors === 1 ? '' : 's'})`;
+        
+        return result || 'imported profile data';
       default:
         return "performed an action";
     }

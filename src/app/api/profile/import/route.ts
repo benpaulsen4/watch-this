@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { db } from "@/lib/db";
-import { lists, listItems } from "@/lib/db/schema";
+import { lists, listItems, userContentStatus, episodeWatchStatus, activityFeed, ActivityType } from "@/lib/db/schema";
 
-// POST /api/profile/import - Import user's lists data from CSV or JSON
+// POST /api/profile/import - Import user's lists data from JSON only
 export const POST = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
@@ -15,201 +15,242 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       return NextResponse.json({ error: "File is required" }, { status: 400 });
     }
 
-    if (!format || !["csv", "json"].includes(format)) {
+    if (!format || format !== "json") {
       return NextResponse.json(
-        { error: "Format parameter is required and must be 'csv' or 'json'" },
+        { error: "Only JSON format is supported for imports" },
         { status: 400 }
       );
     }
 
     const fileContent = await file.text();
-    let importedCount = 0;
+    let importedListsCount = 0;
+    let importedContentStatusCount = 0;
+    let importedEpisodeStatusCount = 0;
     const errors: string[] = [];
 
     try {
-      if (format === "json") {
-        const data = JSON.parse(fileContent);
+      const data = JSON.parse(fileContent);
 
-        if (!data.lists || !Array.isArray(data.lists)) {
-          return NextResponse.json(
-            { error: "Invalid JSON format: 'lists' array is required" },
-            { status: 400 }
+      if (!data.lists || !Array.isArray(data.lists)) {
+        return NextResponse.json(
+          { error: "Invalid JSON format: 'lists' array is required" },
+          { status: 400 }
+        );
+      }
+
+      // Process each list
+      for (const listData of data.lists) {
+        try {
+          // Validate required fields
+          if (!listData.name || typeof listData.name !== "string") {
+            errors.push(
+              `Skipped list: name is required and must be a string`
+            );
+            continue;
+          }
+
+          // Create the list
+          const [newList] = await db
+            .insert(lists)
+            .values({
+              ownerId: userId,
+              name: listData.name,
+              description: listData.description || null,
+              listType: listData.type || "mixed",
+              isPublic: listData.isPublic || false,
+            })
+            .returning();
+
+          // Process list items if they exist
+          if (listData.items && Array.isArray(listData.items)) {
+            for (const itemData of listData.items) {
+              try {
+                if (
+                  !itemData.title ||
+                  !itemData.tmdbId ||
+                  !itemData.contentType
+                ) {
+                  errors.push(
+                    `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`
+                  );
+                  continue;
+                }
+
+                await db.insert(listItems).values({
+                  listId: newList.id,
+                  tmdbId: itemData.tmdbId,
+                  contentType: itemData.contentType,
+                  title: itemData.title,
+                  posterPath: itemData.posterPath || null,
+                  notes: itemData.notes || null,
+                  sortOrder: itemData.sortOrder || 0,
+                });
+              } catch (itemError) {
+                errors.push(
+                  `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`
+                );
+              }
+            }
+          }
+
+          importedListsCount++;
+        } catch (listError) {
+          errors.push(
+            `Failed to import list '${listData.name}': ${listError}`
           );
         }
+      }
 
-        // Process each list
-        for (const listData of data.lists) {
+      // Process content status if it exists
+      if (data.contentStatus && Array.isArray(data.contentStatus)) {
+        for (const statusData of data.contentStatus) {
           try {
-            // Validate required fields
-            if (!listData.name || typeof listData.name !== "string") {
+            if (!statusData.tmdbId || !statusData.contentType || !statusData.status) {
               errors.push(
-                `Skipped list: name is required and must be a string`
+                `Skipped content status: tmdbId, contentType, and status are required`
               );
               continue;
             }
 
-            // Create the list
-            const [newList] = await db
-              .insert(lists)
-              .values({
-                ownerId: userId,
-                name: listData.name,
-                description: listData.description || null,
-                listType: listData.type || "mixed",
-                isPublic: listData.isPublic || false,
-              })
-              .returning();
-
-            // Process list items if they exist
-            if (listData.items && Array.isArray(listData.items)) {
-              for (const itemData of listData.items) {
-                try {
-                  if (
-                    !itemData.title ||
-                    !itemData.tmdbId ||
-                    !itemData.contentType
-                  ) {
-                    errors.push(
-                      `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`
-                    );
-                    continue;
-                  }
-
-                  await db.insert(listItems).values({
-                    listId: newList.id,
-                    tmdbId: itemData.tmdbId,
-                    contentType: itemData.contentType,
-                    title: itemData.title,
-                    posterPath: itemData.posterPath || null,
-                    notes: itemData.notes || null,
-                    sortOrder: itemData.sortOrder || 0,
-                  });
-                } catch (itemError) {
-                  errors.push(
-                    `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`
-                  );
-                }
-              }
-            }
-
-            importedCount++;
-          } catch (listError) {
-            errors.push(
-              `Failed to import list '${listData.name}': ${listError}`
-            );
-          }
-        }
-      } else if (format === "csv") {
-        const lines = fileContent.split("\n").filter((line) => line.trim());
-
-        if (lines.length < 2) {
-          return NextResponse.json(
-            {
-              error:
-                "CSV file must contain at least a header row and one data row",
-            },
-            { status: 400 }
-          );
-        }
-
-        const headers = lines[0]
-          .split(",")
-          .map((h) => h.trim().replace(/^"|"$/g, ""));
-        const expectedHeaders = [
-          "List Name",
-          "List Description",
-          "List Type",
-          "List Is Public",
-          "List Created At",
-          "Item Title",
-          "Item TMDB ID",
-          "Item Content Type",
-          "Item Poster Path",
-          "Item Notes",
-          "Item Added At",
-          "Item Sort Order",
-        ];
-
-        // Validate headers
-        const missingHeaders = expectedHeaders.filter(
-          (h) => !headers.includes(h)
-        );
-        if (missingHeaders.length > 0) {
-          return NextResponse.json(
-            {
-              error: `Missing required CSV headers: ${missingHeaders.join(
-                ", "
-              )}`,
-            },
-            { status: 400 }
-          );
-        }
-
-        const processedLists = new Map<string, string>(); // listName -> listId
-
-        // Process each data row
-        for (let i = 1; i < lines.length; i++) {
-          try {
-            const values = lines[i]
-              .split(",")
-              .map((v) => v.trim().replace(/^"|"$/g, ""));
-            const row: Record<string, string> = {};
-
-            headers.forEach((header, index) => {
-              row[header] = values[index] || "";
-            });
-
-            const listName = row["List Name"];
-            if (!listName) {
-              errors.push(`Row ${i + 1}: List Name is required`);
+            // Validate status value
+            const validStatuses = ['planning', 'watching', 'completed', 'paused', 'dropped'];
+            if (!validStatuses.includes(statusData.status)) {
+              errors.push(
+                `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid status '${statusData.status}'`
+              );
               continue;
             }
 
-            let listId = processedLists.get(listName);
-
-            // Create list if it doesn't exist
-            if (!listId) {
-              const [newList] = await db
-                .insert(lists)
-                .values({
-                  ownerId: userId,
-                  name: listName,
-                  description: row["List Description"] || null,
-                  listType: row["List Type"] || "mixed",
-                  isPublic: row["List Is Public"]?.toLowerCase() === "true",
-                })
-                .returning();
-
-              listId = newList.id;
-              processedLists.set(listName, listId);
-              importedCount++;
+            // Validate content type
+            const validContentTypes = ['movie', 'tv'];
+            if (!validContentTypes.includes(statusData.contentType)) {
+              errors.push(
+                `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid content type '${statusData.contentType}'`
+              );
+              continue;
             }
 
-            // Add item if item data exists
-            const itemTitle = row["Item Title"];
-            const tmdbId = row["Item TMDB ID"];
-            const contentType = row["Item Content Type"];
-
-            if (itemTitle && tmdbId && contentType) {
-              await db.insert(listItems).values({
-                listId: listId,
-                tmdbId: parseInt(tmdbId),
-                contentType: contentType,
-                title: itemTitle,
-                posterPath: row["Item Poster Path"] || null,
-                notes: row["Item Notes"] || null,
-                sortOrder: parseInt(row["Item Sort Order"]) || 0,
+            try {
+              await db.insert(userContentStatus).values({
+                userId: userId,
+                tmdbId: statusData.tmdbId,
+                contentType: statusData.contentType,
+                status: statusData.status,
+                nextEpisodeDate: statusData.nextEpisodeDate ? new Date(statusData.nextEpisodeDate) : null,
+              }).onConflictDoUpdate({
+                target: [userContentStatus.userId, userContentStatus.tmdbId, userContentStatus.contentType],
+                set: {
+                  status: statusData.status,
+                  nextEpisodeDate: statusData.nextEpisodeDate ? new Date(statusData.nextEpisodeDate) : null,
+                  updatedAt: new Date(),
+                },
               });
+            } catch (error) {
+              console.error('Failed to insert content status:', error);
+              errors.push(
+                `Failed to import content status for TMDB ID ${statusData.tmdbId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+              );
+              continue;
             }
-          } catch (rowError) {
-            errors.push(`Row ${i + 1}: ${rowError}`);
+
+            importedContentStatusCount++;
+          } catch (statusError) {
+            errors.push(
+              `Failed to import content status for TMDB ID ${statusData.tmdbId}: ${statusError}`
+            );
           }
+        }
+      }
+
+      // Process episode watch status if it exists
+      if (data.episodeWatchStatus && Array.isArray(data.episodeWatchStatus)) {
+        for (const episodeData of data.episodeWatchStatus) {
+          try {
+            if (!episodeData.tmdbId || episodeData.seasonNumber === undefined || episodeData.episodeNumber === undefined) {
+              errors.push(
+                `Skipped episode status: tmdbId, seasonNumber, and episodeNumber are required`
+              );
+              continue;
+            }
+
+            // Validate season and episode numbers are valid integers
+            const seasonNum = parseInt(episodeData.seasonNumber);
+            const episodeNum = parseInt(episodeData.episodeNumber);
+            
+            if (isNaN(seasonNum) || seasonNum < 0) {
+              errors.push(
+                `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid season number '${episodeData.seasonNumber}'`
+              );
+              continue;
+            }
+            
+            if (isNaN(episodeNum) || episodeNum < 1) {
+              errors.push(
+                `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid episode number '${episodeData.episodeNumber}'`
+              );
+              continue;
+            }
+
+            try {
+              await db.insert(episodeWatchStatus).values({
+                userId: userId,
+                tmdbId: episodeData.tmdbId,
+                seasonNumber: seasonNum,
+                episodeNumber: episodeNum,
+                watched: episodeData.watched ?? false,
+                watchedAt: episodeData.watchedAt ? new Date(episodeData.watchedAt) : null,
+              }).onConflictDoUpdate({
+                target: [episodeWatchStatus.userId, episodeWatchStatus.tmdbId, episodeWatchStatus.seasonNumber, episodeWatchStatus.episodeNumber],
+                set: {
+                  watched: episodeData.watched ?? false,
+                  watchedAt: episodeData.watchedAt ? new Date(episodeData.watchedAt) : null,
+                  updatedAt: new Date(),
+                },
+              });
+            } catch (error) {
+              console.error('Failed to insert episode status:', error);
+              errors.push(
+                `Failed to import episode status for TMDB ID ${episodeData.tmdbId} S${seasonNum}E${episodeNum}: ${error instanceof Error ? error.message : 'Unknown error'}`
+              );
+              continue;
+            }
+
+            importedEpisodeStatusCount++;
+          } catch (episodeError) {
+            errors.push(
+              `Failed to import episode status for TMDB ID ${episodeData.tmdbId} S${episodeData.seasonNumber}E${episodeData.episodeNumber}: ${episodeError}`
+            );
+          }
+        }
+      }
+
+      // Create activity feed entry for successful import
+      const totalImported = importedListsCount + importedContentStatusCount + importedEpisodeStatusCount;
+      if (totalImported > 0) {
+        try {
+          await db.insert(activityFeed).values({
+            userId: userId,
+            activityType: ActivityType.PROFILE_IMPORT,
+            metadata: {
+              lists: importedListsCount,
+              contentStatus: importedContentStatusCount,
+              episodeStatus: importedEpisodeStatusCount,
+              errors: errors.length,
+            },
+          });
+        } catch (activityError) {
+          // Don't fail the import if activity creation fails
+          console.error("Failed to create activity entry:", activityError);
         }
       }
 
       return NextResponse.json({
         success: true,
-        imported_count: importedCount,
+        imported: {
+          lists: importedListsCount,
+          contentStatus: importedContentStatusCount,
+          episodeStatus: importedEpisodeStatusCount,
+        },
         errors: errors,
       });
     } catch (parseError) {

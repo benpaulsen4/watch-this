@@ -333,6 +333,7 @@ export const ActivityType = {
   LIST_DELETED: "LIST_DELETED",
   COLLABORATOR_ADDED: "COLLABORATOR_ADDED",
   COLLABORATOR_REMOVED: "COLLABORATOR_REMOVED",
+  PROFILE_IMPORT: "PROFILE_IMPORT",
 } as const;
 
 export type ListTypeEnum = (typeof ListType)[keyof typeof ListType];

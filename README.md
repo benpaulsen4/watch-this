@@ -94,7 +94,7 @@ npm run test:run
 - [x] Watch status sync option for shared lists
 - [x] Activity feed to see you and your friends recent activity on lists and watch status
 - [ ] Quick complete action from content card
-- [ ] Improved import and export for watch status
+- [x] Improved import and export for watch status
 - [ ] Multi-device passkey management
 - [ ] JustWatch integration with per-user streaming service configuration
 - [ ] \*arr stack integration for when content is not on any configured streaming services

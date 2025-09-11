@@ -11,7 +11,11 @@ type ImportStatus = 'idle' | 'uploading' | 'success' | 'error';
 
 interface ImportResult {
   success: boolean;
-  imported_count: number;
+  imported: {
+    lists: number;
+    contentStatus: number;
+    episodeStatus: number;
+  };
   errors: string[];
 }
 
@@ -20,7 +24,7 @@ export function DataExportImport() {
   const [importStatus, setImportStatus] = useState<ImportStatus>('idle');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [importFormat, setImportFormat] = useState<ExportFormat>('json');
+  // Import is now JSON-only, no format selection needed
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = async (format: ExportFormat) => {
@@ -36,16 +40,26 @@ export function DataExportImport() {
 
       // Parse the JSON response to get data and filename
       const responseData = await response.json();
-      const { data, filename } = responseData;
+      const { data, filename, isZip } = responseData;
       
       if (!data || !filename) {
         throw new Error('Invalid response format from server');
       }
 
-      // Create blob from the data portion only
-      const blob = new Blob([data], { 
-        type: format === 'json' ? 'application/json' : 'text/csv' 
-      });
+      let blob: Blob;
+      if (isZip) {
+        // For ZIP files, data is base64 encoded
+        const binaryString = atob(data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        blob = new Blob([bytes], { type: 'application/zip' });
+      } else {
+        // For JSON files, data is the actual content
+        blob = new Blob([data], { type: 'application/json' });
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -65,15 +79,16 @@ export function DataExportImport() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validate that it's a JSON file
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      if (extension !== 'json') {
+        alert('Only JSON files are supported for import.');
+        return;
+      }
+      
       setSelectedFile(file);
       setImportResult(null);
       setImportStatus('idle');
-      
-      // Auto-detect format based on file extension
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      if (extension === 'csv' || extension === 'json') {
-        setImportFormat(extension);
-      }
     }
   };
 
@@ -86,7 +101,7 @@ export function DataExportImport() {
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('format', importFormat);
+      formData.append('format', 'json'); // Always JSON now
 
       const response = await fetch('/api/profile/import', {
         method: 'POST',
@@ -109,7 +124,11 @@ export function DataExportImport() {
       console.error('Import failed:', error);
       setImportResult({
         success: false,
-        imported_count: 0,
+        imported: {
+          lists: 0,
+          contentStatus: 0,
+          episodeStatus: 0,
+        },
         errors: [error instanceof Error ? error.message : 'Failed to import data']
       });
       setImportStatus('error');
@@ -139,7 +158,7 @@ export function DataExportImport() {
             <div className="flex-1">
               <h4 className="text-lg font-medium text-gray-100 mb-2">Export Data</h4>
               <p className="text-sm text-gray-400 mb-4">
-                Download all your lists and items in JSON or CSV format for backup or migration.
+                Download all your data in JSON format or as a ZIP file containing CSV files for backup or migration.
               </p>
               <div className="flex gap-3 flex-col sm:flex-row">
                 <Button
@@ -159,7 +178,7 @@ export function DataExportImport() {
                   size="sm"
                 >
                   <FileText className="h-4 w-4 mr-2" />
-                  Export as CSV
+                  Export as ZIP (CSV files)
                 </Button>
               </div>
             </div>
@@ -177,7 +196,7 @@ export function DataExportImport() {
             <div className="flex-1">
               <h4 className="text-lg font-medium text-gray-100 mb-2">Import Data</h4>
               <p className="text-sm text-gray-400 mb-4">
-                Upload a previously exported file to restore your lists and items.
+                Upload a previously exported JSON file to restore your lists, content status, and episode watch history.
               </p>
               
               <div className="space-y-4">
@@ -185,7 +204,7 @@ export function DataExportImport() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".json,.csv"
+                    accept=".json"
                     onChange={handleFileSelect}
                     className="hidden"
                     id="import-file"
@@ -206,34 +225,6 @@ export function DataExportImport() {
 
                 {selectedFile && (
                   <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        File Format
-                      </label>
-                      <div className="flex gap-3">
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            value="json"
-                            checked={importFormat === 'json'}
-                            onChange={(e) => setImportFormat(e.target.value as ExportFormat)}
-                            className="mr-2"
-                          />
-                          <span className="text-sm text-gray-300">JSON</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            value="csv"
-                            checked={importFormat === 'csv'}
-                            onChange={(e) => setImportFormat(e.target.value as ExportFormat)}
-                            className="mr-2"
-                          />
-                          <span className="text-sm text-gray-300">CSV</span>
-                        </label>
-                      </div>
-                    </div>
-
                     <Button
                       onClick={handleImport}
                       disabled={importStatus === 'uploading'}
@@ -273,9 +264,14 @@ export function DataExportImport() {
                   </h4>
                   
                   {importResult.success && (
-                    <p className="text-sm text-gray-300 mb-2">
-                      Successfully imported {importResult.imported_count} list(s).
-                    </p>
+                    <div className="text-sm text-gray-300 mb-2 space-y-1">
+                      <p>Successfully imported:</p>
+                      <ul className="ml-4 space-y-1">
+                        <li>• {importResult.imported.lists} list(s)</li>
+                        <li>• {importResult.imported.contentStatus} content status entries</li>
+                        <li>• {importResult.imported.episodeStatus} episode watch entries</li>
+                      </ul>
+                    </div>
                   )}
                   
                   {importResult.errors.length > 0 && (
@@ -312,10 +308,11 @@ export function DataExportImport() {
           <div>
             <h4 className="font-medium text-yellow-400 mb-1">Important Notes</h4>
             <ul className="text-sm text-gray-300 space-y-1">
-              <li>• Importing data will add to your existing lists, not replace them</li>
+              <li>• Importing data will add to your existing data, not replace it</li>
               <li>• Duplicate items may be created if you import the same data multiple times</li>
               <li>• Large files may take some time to process</li>
-              <li>• Only JSON and CSV files exported from WatchThis are supported</li>
+              <li>• Only JSON files exported from WatchThis are supported for import</li>
+              <li>• CSV exports are provided as ZIP files containing separate CSV files for different data types</li>
             </ul>
           </div>
         </div>

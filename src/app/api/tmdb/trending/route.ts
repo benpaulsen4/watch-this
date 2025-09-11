@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { tmdbClient } from "@/lib/tmdb/client";
+import { tmdbClient, TMDBSearchItem } from "@/lib/tmdb/client";
 import {
   withAuth,
   handleApiError,
@@ -47,7 +47,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         })
       );
 
-      results.results = enrichedResults;
+      results.results = enrichedResults as TMDBSearchItem[];
     }
 
     return NextResponse.json(results);
