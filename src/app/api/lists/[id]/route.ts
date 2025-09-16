@@ -73,13 +73,11 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           contentType: listItems.contentType,
           title: listItems.title,
           posterPath: listItems.posterPath,
-          notes: listItems.notes,
-          addedAt: listItems.addedAt,
-          sortOrder: listItems.sortOrder,
+          createdAt: listItems.createdAt,
         })
         .from(listItems)
         .where(eq(listItems.listId, listId))
-        .orderBy(asc(listItems.sortOrder), asc(listItems.addedAt)),
+        .orderBy(asc(listItems.createdAt)),
       db
         .select({ count: count() })
         .from(listCollaborators)
@@ -96,9 +94,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           ...tmdbData,
           // Override with list-specific data
           listItemId: item.id,
-          addedAt: item.addedAt,
-          notes: item.notes,
-          sortOrder: item.sortOrder,
+          createdAt: item.createdAt,
         };
       })
     );

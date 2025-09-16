@@ -11,8 +11,7 @@ interface Collaborator {
   username: string;
   profilePictureUrl?: string | null;
   permissionLevel: string;
-  invitedAt: string;
-  joinedAt: string | null;
+  createdAt: string;
 }
 
 interface CollaborationModalProps {

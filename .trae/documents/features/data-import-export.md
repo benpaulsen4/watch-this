@@ -9,6 +9,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 ### User Stories
 
 **As a user, I want to:**
+
 - Export all my lists, items, content status, and episode progress to backup my data
 - Import previously exported JSON data to restore my complete profile
 - Export data in CSV format for external analysis and data transfer
@@ -19,6 +20,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 ### Functional Requirements
 
 #### Export Functionality
+
 - **FR-1**: Users can export all their lists and associated items
 - **FR-2**: Users can export all content watch status for movies and TV shows
 - **FR-3**: Users can export all episode watch progress for TV shows
@@ -32,6 +34,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 - **FR-11**: Export includes episode watch status metadata (season, episode, watched status, timestamps)
 
 #### Import Functionality
+
 - **FR-12**: Users can import JSON files exported from WatchThis
 - **FR-13**: Import validates file format and structure before processing
 - **FR-14**: Import provides detailed feedback on success/failure status with counts
@@ -56,14 +59,16 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 #### Backend API Endpoints
 
 **Export Endpoint**: `GET /api/profile/export`
+
 - **File**: `src/app/api/profile/export/route.ts`
 - **Authentication**: Protected with `withAuth` middleware
 - **Parameters**: `format` query parameter ("json" | "csv")
-- **Response**: 
+- **Response**:
   - JSON format: JSON object containing complete user data and suggested filename
   - CSV format: ZIP file containing separate CSV files for each data table
 
 **Import Endpoint**: `POST /api/profile/import`
+
 - **File**: `src/app/api/profile/import/route.ts`
 - **Authentication**: Protected with `withAuth` middleware
 - **Input**: FormData with JSON file only
@@ -72,6 +77,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 #### Frontend Component
 
 **DataExportImport Component**: `src/components/profile/DataExportImport.tsx`
+
 - **Type**: Client component with React state management
 - **Features**: File upload (JSON only), CSV/JSON export options, progress indication, detailed result display
 - **UI Framework**: Tailwind CSS with custom Card and Button components
@@ -85,7 +91,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 1. **User Initiation**: User clicks export button (JSON or CSV)
 2. **API Request**: Frontend calls `/api/profile/export?format={format}`
 3. **Authentication**: Middleware validates user session
-4. **Data Retrieval**: 
+4. **Data Retrieval**:
    - Query user's lists with LEFT JOIN to list items
    - Query user's content status for all movies and TV shows
    - Query user's episode watch status for all TV shows
@@ -118,6 +124,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 #### Tables Involved
 
 **Lists Table** (`lists`):
+
 - `id`: Primary key
 - `ownerId`: Foreign key to user
 - `name`: List name (required)
@@ -127,17 +134,17 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 - `createdAt`: Timestamp
 
 **List Items Table** (`listItems`):
+
 - `id`: Primary key
 - `listId`: Foreign key to lists
 - `tmdbId`: TMDB identifier
 - `contentType`: Content type ("movie" | "tv")
 - `title`: Display title
 - `posterPath`: Image URL
-- `notes`: User notes
-- `addedAt`: Timestamp
-- `sortOrder`: Display order
+- `createdAt`: Timestamp
 
 **User Content Status Table** (`userContentStatus`):
+
 - `id`: Primary key
 - `userId`: Foreign key to user
 - `tmdbId`: TMDB identifier
@@ -148,6 +155,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 - `createdAt`: Creation timestamp
 
 **Episode Watch Status Table** (`episodeWatchStatus`):
+
 - `id`: Primary key
 - `userId`: Foreign key to user
 - `tmdbId`: TMDB identifier for TV show
@@ -159,6 +167,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 - `updatedAt`: Last update timestamp
 
 **Activity Feed Table** (`activityFeed`):
+
 - `id`: Primary key
 - `userId`: Foreign key to user
 - `activityType`: Type of activity
@@ -195,9 +204,7 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
           "contentType": "movie",
           "title": "Example Movie",
           "posterPath": "/poster.jpg",
-          "notes": "Recommended by friend",
-          "addedAt": "2024-01-02T00:00:00.000Z",
-          "sortOrder": 1
+          "createdAt": "2024-01-02T00:00:00.000Z"
         }
       ]
     }
@@ -252,18 +259,21 @@ The Data Import/Export feature allows WatchThis users to backup, migrate, and re
 The CSV export creates a ZIP file containing separate CSV files for each data table:
 
 **lists.csv**:
+
 ```csv
 ID,Owner ID,Name,Description,List Type,Is Public,Created At
 "list-uuid","user-uuid","My Watchlist","Movies to watch","movie","false","2024-01-01T00:00:00.000Z"
 ```
 
 **list_items.csv**:
+
 ```csv
 ID,List ID,TMDB ID,Content Type,Title,Poster Path,Notes,Added At,Sort Order
 "item-uuid","list-uuid","12345","movie","Example Movie","/poster.jpg","Recommended by friend","2024-01-02T00:00:00.000Z","1"
 ```
 
 **content_status.csv**:
+
 ```csv
 ID,User ID,TMDB ID,Content Type,Status,Next Episode Date,Updated At,Created At
 "status-uuid","user-uuid","12345","movie","completed","","2024-01-10T15:30:00.000Z","2024-01-05T12:00:00.000Z"
@@ -271,6 +281,7 @@ ID,User ID,TMDB ID,Content Type,Status,Next Episode Date,Updated At,Created At
 ```
 
 **episode_watch_status.csv**:
+
 ```csv
 ID,User ID,TMDB ID,Season Number,Episode Number,Watched,Watched At,Created At,Updated At
 "episode-uuid","user-uuid","67890","1","1","true","2024-01-08T21:30:00.000Z","2024-01-08T21:30:00.000Z","2024-01-08T21:30:00.000Z"
@@ -288,12 +299,14 @@ ID,User ID,TMDB ID,Season Number,Episode Number,Watched,Watched At,Created At,Up
 ### Error Handling
 
 #### Export Errors
+
 - Invalid format parameter
 - Database query failures for lists, content status, or episode data
 - File generation errors
 - ZIP archive creation failures (CSV format)
 
 #### Import Errors
+
 - Missing or invalid JSON file
 - Malformed JSON data structure
 - Missing required fields in lists, content status, or episode data

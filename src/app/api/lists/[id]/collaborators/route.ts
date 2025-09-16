@@ -59,8 +59,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         username: users.username,
         profilePictureUrl: users.profilePictureUrl,
         permissionLevel: listCollaborators.permissionLevel,
-        invitedAt: listCollaborators.invitedAt,
-        joinedAt: listCollaborators.joinedAt,
+        createdAt: listCollaborators.createdAt,
       })
       .from(listCollaborators)
       .innerJoin(users, eq(users.id, listCollaborators.userId))
@@ -176,8 +175,6 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         listId,
         userId: targetUser.id,
         permissionLevel,
-        invitedAt: new Date(),
-        joinedAt: new Date(), // Auto-join for now, could be invitation-based later
       })
       .returning();
 
@@ -210,8 +207,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       username: targetUser.username,
       profilePictureUrl: targetUser.profilePictureUrl,
       permissionLevel: newCollaborator.permissionLevel,
-      invitedAt: newCollaborator.invitedAt,
-      joinedAt: newCollaborator.joinedAt,
+      createdAt: newCollaborator.createdAt,
     };
 
     return NextResponse.json({

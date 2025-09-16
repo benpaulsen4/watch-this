@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ContentCard } from '@/components/ui/ContentCard';
-import { toast } from 'sonner';
 import type { TMDBMovie, TMDBTVShow } from '@/lib/tmdb/client';
 import { getCurrentSession } from '@/lib/auth/client';
 import CollaborationModal from './CollaborationModal';
@@ -15,9 +14,7 @@ import ListSettingsModal from './ListSettingsModal';
 
 interface ListItem extends TMDBMovie, TMDBTVShow {
   listItemId: string;
-  addedAt: string;
-  notes: string | null;
-  sortOrder: number;
+  createdAt: string;
 }
 
 interface List {
@@ -91,11 +88,9 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
 
   const handleListUpdate = (updatedList: Partial<List>) => {
     setList(prev => prev ? { ...prev, ...updatedList } : null);
-    toast.success('List updated successfully');
   };
 
   const handleListDelete = () => {
-    toast.success('List deleted successfully');
     router.push('/lists');
   };
 
@@ -235,13 +230,13 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
             {list.items.map((item) => {
               // The item now contains complete TMDB data merged with list-specific data
-              const { listItemId, addedAt, ...contentData } = item;
+              const { listItemId, createdAt, ...contentData } = item;
 
               return (
                  <ContentCard
                    key={listItemId}
                    content={contentData as TMDBMovie | TMDBTVShow}
-                   addedDate={addedAt}
+                   addedDate={createdAt}
                    showAddedDate={true}
                    currentListId={listId}
                    onRemoveFromList={() => fetchListDetails()}

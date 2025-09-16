@@ -101,8 +101,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       userId: updatedCollaborator.userId,
       username: userInfo?.username || "Unknown",
       permissionLevel: updatedCollaborator.permissionLevel,
-      invitedAt: updatedCollaborator.invitedAt,
-      joinedAt: updatedCollaborator.joinedAt,
+      createdAt: updatedCollaborator.createdAt,
     };
 
     return NextResponse.json({

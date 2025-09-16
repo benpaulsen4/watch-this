@@ -8,7 +8,7 @@ import {
   ActivityType,
 } from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { eq, and, max, or } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 // POST /api/lists/[id]/items - Add item to list
@@ -26,7 +26,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     }
 
     const body = await request.json();
-    const { tmdbId, contentType, title, posterPath, notes } = body;
+    const { tmdbId, contentType, title, posterPath } = body;
 
     // Validate required fields
     if (!tmdbId || !contentType || !title) {
@@ -84,14 +84,6 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    // Get the next sort order
-    const [maxSortResult] = await db
-      .select({ maxSort: max(listItems.sortOrder) })
-      .from(listItems)
-      .where(eq(listItems.listId, listId));
-
-    const nextSortOrder = (maxSortResult?.maxSort || 0) + 1;
-
     // Create the new list item
     const [newItem] = await db
       .insert(listItems)
@@ -102,9 +94,6 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         contentType,
         title: title.trim(),
         posterPath: posterPath || null,
-        notes: notes?.trim() || null,
-        sortOrder: nextSortOrder,
-        addedAt: new Date(),
       })
       .returning();
 

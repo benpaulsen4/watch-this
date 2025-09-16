@@ -63,7 +63,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           })
           .from(listItems)
           .where(eq(listItems.listId, list.id))
-          .orderBy(desc(listItems.addedAt))
+          .orderBy(desc(listItems.createdAt))
           .limit(4);
 
         return {

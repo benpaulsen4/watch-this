@@ -76,10 +76,9 @@ export const listCollaborators = pgTable(
     permissionLevel: varchar("permission_level", { length: 20 })
       .default("collaborator")
       .notNull(),
-    invitedAt: timestamp("invited_at", { withTimezone: true })
+    createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    joinedAt: timestamp("joined_at", { withTimezone: true }),
   },
   (table) => [unique().on(table.listId, table.userId)]
 );
@@ -96,11 +95,9 @@ export const listItems = pgTable(
     contentType: varchar("content_type", { length: 10 }).notNull(),
     title: varchar("title", { length: 255 }).notNull(),
     posterPath: varchar("poster_path", { length: 255 }),
-    notes: text("notes"),
-    addedAt: timestamp("added_at", { withTimezone: true })
+    createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    sortOrder: integer("sort_order").default(0).notNull(),
   },
   (table) => [unique().on(table.listId, table.tmdbId, table.contentType)]
 );
@@ -322,18 +319,17 @@ export const PermissionLevel = {
   VIEWER: "viewer",
 } as const;
 
-// TODO use lower case for consistency
 export const ActivityType = {
-  STATUS_CHANGED: "STATUS_CHANGED",
-  EPISODE_PROGRESS: "EPISODE_PROGRESS",
-  LIST_ITEM_ADDED: "LIST_ITEM_ADDED",
-  LIST_ITEM_REMOVED: "LIST_ITEM_REMOVED",
-  LIST_CREATED: "LIST_CREATED",
-  LIST_UPDATED: "LIST_UPDATED",
-  LIST_DELETED: "LIST_DELETED",
-  COLLABORATOR_ADDED: "COLLABORATOR_ADDED",
-  COLLABORATOR_REMOVED: "COLLABORATOR_REMOVED",
-  PROFILE_IMPORT: "PROFILE_IMPORT",
+  STATUS_CHANGED: "status_changed",
+  EPISODE_PROGRESS: "episode_progress",
+  LIST_ITEM_ADDED: "list_item_added",
+  LIST_ITEM_REMOVED: "list_item_removed",
+  LIST_CREATED: "list_created",
+  LIST_UPDATED: "list_updated",
+  LIST_DELETED: "list_deleted",
+  COLLABORATOR_ADDED: "collaborator_added",
+  COLLABORATOR_REMOVED: "collaborator_removed",
+  PROFILE_IMPORT: "profile_import",
 } as const;
 
 export type ListTypeEnum = (typeof ListType)[keyof typeof ListType];

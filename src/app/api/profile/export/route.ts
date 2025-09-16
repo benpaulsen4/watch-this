@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { db } from "@/lib/db";
-import { lists, listItems, userContentStatus, episodeWatchStatus } from "@/lib/db/schema";
+import {
+  lists,
+  listItems,
+  userContentStatus,
+  episodeWatchStatus,
+} from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import JSZip from "jszip";
 
@@ -33,117 +38,117 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         contentType: listItems.contentType,
         title: listItems.title,
         posterPath: listItems.posterPath,
-        notes: listItems.notes,
-        addedAt: listItems.addedAt,
-        sortOrder: listItems.sortOrder,
+        createdAt: listItems.createdAt,
       })
       .from(lists)
       .leftJoin(listItems, eq(lists.id, listItems.listId))
       .where(eq(lists.ownerId, userId))
-      .orderBy(asc(lists.createdAt), asc(listItems.sortOrder));
+      .orderBy(asc(lists.createdAt));
 
     // Get user's content status with error handling
-      let contentStatuses: Array<{
-        tmdbId: number;
-        contentType: string;
-        status: string;
-        nextEpisodeDate: Date | null;
-        updatedAt: Date | null;
-        createdAt: Date | null;
-      }> = [];
-     try {
-       contentStatuses = await db
-         .select({
-           tmdbId: userContentStatus.tmdbId,
-           contentType: userContentStatus.contentType,
-           status: userContentStatus.status,
-           nextEpisodeDate: userContentStatus.nextEpisodeDate,
-           updatedAt: userContentStatus.updatedAt,
-           createdAt: userContentStatus.createdAt,
-         })
-         .from(userContentStatus)
-         .where(eq(userContentStatus.userId, userId));
+    let contentStatuses: Array<{
+      tmdbId: number;
+      contentType: string;
+      status: string;
+      nextEpisodeDate: Date | null;
+      updatedAt: Date | null;
+      createdAt: Date | null;
+    }> = [];
+    try {
+      contentStatuses = await db
+        .select({
+          tmdbId: userContentStatus.tmdbId,
+          contentType: userContentStatus.contentType,
+          status: userContentStatus.status,
+          nextEpisodeDate: userContentStatus.nextEpisodeDate,
+          updatedAt: userContentStatus.updatedAt,
+          createdAt: userContentStatus.createdAt,
+        })
+        .from(userContentStatus)
+        .where(eq(userContentStatus.userId, userId));
     } catch (error) {
-      console.error('Failed to fetch content status:', error);
+      console.error("Failed to fetch content status:", error);
       // Continue with empty array - don't fail the entire export
     }
 
     // Get user's episode watch status with error handling
-      let episodeStatuses: Array<{
-        tmdbId: number;
-        seasonNumber: number;
-        episodeNumber: number;
-        watched: boolean;
-        watchedAt: Date | null;
-        createdAt: Date | null;
-        updatedAt: Date | null;
-      }> = [];
-     try {
-       episodeStatuses = await db
-         .select({
-           tmdbId: episodeWatchStatus.tmdbId,
-           seasonNumber: episodeWatchStatus.seasonNumber,
-           episodeNumber: episodeWatchStatus.episodeNumber,
-           watched: episodeWatchStatus.watched,
-           watchedAt: episodeWatchStatus.watchedAt,
-           createdAt: episodeWatchStatus.createdAt,
-           updatedAt: episodeWatchStatus.updatedAt,
-         })
-         .from(episodeWatchStatus)
-         .where(eq(episodeWatchStatus.userId, userId));
+    let episodeStatuses: Array<{
+      tmdbId: number;
+      seasonNumber: number;
+      episodeNumber: number;
+      watched: boolean;
+      watchedAt: Date | null;
+      createdAt: Date | null;
+      updatedAt: Date | null;
+    }> = [];
+    try {
+      episodeStatuses = await db
+        .select({
+          tmdbId: episodeWatchStatus.tmdbId,
+          seasonNumber: episodeWatchStatus.seasonNumber,
+          episodeNumber: episodeWatchStatus.episodeNumber,
+          watched: episodeWatchStatus.watched,
+          watchedAt: episodeWatchStatus.watchedAt,
+          createdAt: episodeWatchStatus.createdAt,
+          updatedAt: episodeWatchStatus.updatedAt,
+        })
+        .from(episodeWatchStatus)
+        .where(eq(episodeWatchStatus.userId, userId));
     } catch (error) {
-      console.error('Failed to fetch episode status:', error);
+      console.error("Failed to fetch episode status:", error);
       // Continue with empty array - don't fail the entire export
     }
 
     // Group data by lists
-    const listsData = userLists.reduce((acc, row) => {
-      const listId = row.listId;
+    const listsData = userLists.reduce(
+      (acc, row) => {
+        const listId = row.listId;
 
-      if (!acc[listId]) {
-        acc[listId] = {
-          id: row.listId,
-          name: row.listName,
-          description: row.listDescription,
-          type: row.listType,
-          isPublic: row.isPublic,
-          createdAt: row.listCreatedAt,
-          items: [],
-        };
-      }
+        if (!acc[listId]) {
+          acc[listId] = {
+            id: row.listId,
+            name: row.listName,
+            description: row.listDescription,
+            type: row.listType,
+            isPublic: row.isPublic,
+            createdAt: row.listCreatedAt,
+            items: [],
+          };
+        }
 
-      if (row.itemId && row.contentType && row.title) {
-        acc[listId].items.push({
-          id: row.itemId,
-          tmdbId: row.tmdbId,
-          contentType: row.contentType,
-          title: row.title,
-          posterPath: row.posterPath,
-          notes: row.notes,
-          addedAt: row.addedAt,
-          sortOrder: row.sortOrder,
-        });
-      }
+        if (row.itemId && row.contentType && row.title) {
+          acc[listId].items.push({
+            id: row.itemId,
+            tmdbId: row.tmdbId,
+            contentType: row.contentType,
+            title: row.title,
+            posterPath: row.posterPath,
+            createdAt: row.createdAt,
+          });
+        }
 
-      return acc;
-    }, {} as Record<string, { 
-      id: string;
-      name: string;
-      description: string | null;
-      type: string;
-      isPublic: boolean; 
-      createdAt: Date; 
-      items: { 
-         id: string;
-         tmdbId: number | null;
-         contentType: string;
-         title: string;
-         posterPath: string | null;
-         notes: string | null;
-         addedAt: Date | null;
-         sortOrder: number | null;
-       }[] 
-    }>);
+        return acc;
+      },
+      {} as Record<
+        string,
+        {
+          id: string;
+          name: string;
+          description: string | null;
+          type: string;
+          isPublic: boolean;
+          createdAt: Date;
+          items: {
+            id: string;
+            tmdbId: number | null;
+            contentType: string;
+            title: string;
+            posterPath: string | null;
+            createdAt: Date | null;
+          }[];
+        }
+      >
+    );
 
     const listsArray = Object.values(listsData) as Array<{
       id: string;
@@ -158,9 +163,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         contentType: string;
         title: string;
         posterPath: string | null;
-        notes: string | null;
-        addedAt: Date | null;
-        sortOrder: number | null;
+        createdAt: Date | null;
       }>;
     }>;
     const timestamp = new Date().toISOString().split("T")[0];
@@ -173,7 +176,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           username: request.user.username,
         },
         lists: listsArray,
-        contentStatus: contentStatuses.map(status => ({
+        contentStatus: contentStatuses.map((status) => ({
           tmdbId: status.tmdbId,
           contentType: status.contentType,
           status: status.status,
@@ -181,7 +184,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           updatedAt: status.updatedAt?.toISOString() || null,
           createdAt: status.createdAt?.toISOString() || null,
         })),
-        episodeWatchStatus: episodeStatuses.map(episode => ({
+        episodeWatchStatus: episodeStatuses.map((episode) => ({
           tmdbId: episode.tmdbId,
           seasonNumber: episode.seasonNumber,
           episodeNumber: episode.episodeNumber,
@@ -265,9 +268,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
               item.tmdbId?.toString() || "",
               item.contentType,
               item.posterPath || "",
-              item.notes || "",
-              item.addedAt?.toISOString() || "",
-              item.sortOrder?.toString() || "",
+              item.createdAt?.toISOString() || "",
             ]);
           }
         }
@@ -327,7 +328,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       // Generate ZIP file
       try {
         const zipBuffer = await zip.generateAsync({ type: "arraybuffer" });
-        const zipBase64 = Buffer.from(zipBuffer).toString('base64');
+        const zipBase64 = Buffer.from(zipBuffer).toString("base64");
 
         return NextResponse.json({
           data: zipBase64,
@@ -335,9 +336,9 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           isZip: true,
         });
       } catch (zipError) {
-        console.error('ZIP generation failed:', zipError);
+        console.error("ZIP generation failed:", zipError);
         return NextResponse.json(
-          { error: 'Failed to generate ZIP file' },
+          { error: "Failed to generate ZIP file" },
           { status: 500 }
         );
       }
