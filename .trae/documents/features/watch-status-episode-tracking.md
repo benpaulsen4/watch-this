@@ -7,22 +7,23 @@ The Watch Status & Episode Tracking system allows users to track their viewing p
 ## Product Requirements
 
 ### User Stories
-- **As a viewer**, I want to mark movies as "Planning to Watch", "Watching", "Completed", "Paused", or "Dropped" so I can organize my viewing
+- **As a viewer**, I want to mark movies as "Planning" or "Completed" so I can organize my viewing
+- **As a TV show watcher**, I want to mark shows as "Planning", "Watching", "Paused", "Completed", or "Dropped" and track individual episodes
 - **As a TV show watcher**, I want to track which episodes I've watched so I know where I left off
-- **As a binge watcher**, I want the system to automatically update my show status when I complete all episodes
+- **As a binge watcher**, I want the system to automatically update my show status when I complete all episodes or start watching
 - **As a collaborative viewer**, I want my watch progress to sync with friends on shared lists so we stay coordinated
 - **As a returning user**, I want to see my overall progress and recently watched content
-- **As a data-conscious user**, I want to control whether my watch status is shared with collaborators
+- **As a data-conscious user**, I want my status changes to be reflected in activity feeds for transparency
 
 ### Status Definitions
 
 | Status | Description | Applies To |
 |--------|-------------|------------|
 | **Planning** | Content added to watch later | Movies, TV Shows |
-| **Watching** | Currently in progress | Movies, TV Shows |
-| **Paused** | Temporarily stopped watching | Movies, TV Shows |
+| **Watching** | Currently in progress | TV Shows only |
+| **Paused** | Temporarily stopped watching | TV Shows only |
 | **Completed** | Finished watching entirely | Movies, TV Shows |
-| **Dropped** | Decided not to continue | Movies, TV Shows |
+| **Dropped** | Decided not to continue | TV Shows only |
 
 ### Acceptance Criteria
 
@@ -119,9 +120,8 @@ CREATE TABLE user_content_status (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     tmdb_id INTEGER NOT NULL,
     content_type VARCHAR(10) NOT NULL CHECK (content_type IN ('movie', 'tv')),
-    status VARCHAR(20) NOT NULL CHECK (status IN ('planning', 'watching', 'paused', 'completed', 'dropped')),
-    notes TEXT,
-    share_status_updates BOOLEAN DEFAULT true,
+    status VARCHAR(20) NOT NULL DEFAULT 'planning',
+    next_episode_date TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id, tmdb_id, content_type)
@@ -141,18 +141,18 @@ CREATE TABLE episode_watch_status (
     UNIQUE(user_id, tmdb_id, season_number, episode_number)
 );
 
--- TMDB episode data cache
-CREATE TABLE tmdb_episode_cache (
+-- Activity feed for tracking status changes
+CREATE TABLE activity_feed (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tmdb_id INTEGER NOT NULL,
-    season_number INTEGER NOT NULL,
-    episode_number INTEGER NOT NULL,
-    name VARCHAR(255),
-    overview TEXT,
-    air_date DATE,
-    still_path VARCHAR(255),
-    cached_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(tmdb_id, season_number, episode_number)
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    activity_type VARCHAR(50) NOT NULL,
+    tmdb_id INTEGER,
+    content_type VARCHAR(10),
+    list_id UUID REFERENCES lists(id) ON DELETE CASCADE,
+    metadata JSONB,
+    collaborators UUID[],
+    is_collaborative BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Performance indexes
@@ -165,234 +165,403 @@ CREATE INDEX idx_episode_watch_status_tmdb_id ON episode_watch_status(tmdb_id);
 CREATE INDEX idx_episode_watch_status_season_episode ON episode_watch_status(tmdb_id, season_number, episode_number);
 CREATE INDEX idx_episode_watch_status_watched_at ON episode_watch_status(watched_at DESC);
 
-CREATE INDEX idx_tmdb_episode_cache_show ON tmdb_episode_cache(tmdb_id, season_number);
-CREATE INDEX idx_tmdb_episode_cache_cached_at ON tmdb_episode_cache(cached_at);
+CREATE INDEX idx_activity_feed_user_id ON activity_feed(user_id);
+CREATE INDEX idx_activity_feed_created_at ON activity_feed(created_at DESC);
 ```
 
 ### API Endpoints
 
 #### Content Status Management
 ```typescript
-// GET /api/status/content?tmdb_id={id}&content_type={type}
+// GET /api/status/content?tmdbId={id}&contentType={type}
 interface ContentStatusResponse {
-  status?: string;
-  notes?: string;
-  updated_at: string;
-  share_status_updates: boolean;
+  status: {
+    id: string;
+    userId: string;
+    tmdbId: number;
+    contentType: string;
+    status: string;
+    nextEpisodeDate?: string;
+    updatedAt: string;
+    createdAt: string;
+  } | null;
+}
+
+// POST /api/status/content
+interface CreateContentStatusRequest {
+  tmdbId: number;
+  contentType: 'movie' | 'tv';
+  status: 'planning' | 'watching' | 'paused' | 'completed' | 'dropped';
+}
+
+interface CreateContentStatusResponse {
+  status: {
+    id: string;
+    userId: string;
+    tmdbId: number;
+    contentType: string;
+    status: string;
+    nextEpisodeDate?: string;
+    updatedAt: string;
+    createdAt: string;
+  };
 }
 
 // PUT /api/status/content
 interface UpdateContentStatusRequest {
-  tmdb_id: number;
-  content_type: 'movie' | 'tv';
-  status: 'planning' | 'watching' | 'paused' | 'completed' | 'dropped';
-  notes?: string;
-  share_status_updates?: boolean;
+  tmdbId: number;
+  contentType: 'movie' | 'tv';
+  status?: string;
 }
 
-interface UpdateContentStatusResponse {
-  success: boolean;
-  status: ContentStatusResponse;
-  synced_to: string[]; // User IDs who received sync
-  affected_lists: string[]; // List IDs where sync was applied
-}
-
-// DELETE /api/status/content
-interface DeleteContentStatusRequest {
-  tmdb_id: number;
-  content_type: 'movie' | 'tv';
-}
+// DELETE /api/status/content?tmdbId={id}&contentType={type}
 ```
 
 #### Episode Tracking
 ```typescript
-// GET /api/status/episodes?tmdb_id={id}
+// GET /api/status/episodes?tmdbId={id}&seasonNumber={season}&episodeNumber={episode}
 interface EpisodeStatusResponse {
   episodes: Array<{
-    season_number: number;
-    episode_number: number;
+    id: string;
+    userId: string;
+    tmdbId: number;
+    seasonNumber: number;
+    episodeNumber: number;
     watched: boolean;
-    watched_at?: string;
-    episode_info?: {
-      name: string;
-      overview: string;
-      air_date: string;
-      still_path?: string;
-    };
+    watchedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
   }>;
-  total_episodes: number;
-  watched_count: number;
-  progress_percentage: number;
 }
 
-// PUT /api/status/episodes
+// POST /api/status/episodes
 interface UpdateEpisodeStatusRequest {
-  tmdb_id: number;
-  season_number: number;
-  episode_number: number;
-  watched: boolean;
+  tmdbId: number;
+  seasonNumber: number;
+  episodeNumber: number;
+  watched?: boolean; // defaults to true
 }
 
 interface UpdateEpisodeStatusResponse {
-  success: boolean;
-  show_status?: string; // Updated show status if changed
-  episode_count: {
-    total: number;
-    watched: number;
-    percentage: number;
+  episode: {
+    id: string;
+    userId: string;
+    tmdbId: number;
+    seasonNumber: number;
+    episodeNumber: number;
+    watched: boolean;
+    watchedAt: string | null;
   };
-  synced_to: string[];
-  affected_lists: string[];
+  newStatus?: string; // Updated show status if changed
 }
 
-// POST /api/status/episodes/bulk
-interface BulkUpdateEpisodesRequest {
-  tmdb_id: number;
+// PUT /api/status/episodes/batch
+interface BatchUpdateEpisodesRequest {
+  tmdbId: number;
   episodes: Array<{
-    season_number: number;
-    episode_number: number;
+    seasonNumber: number;
+    episodeNumber: number;
     watched: boolean;
   }>;
 }
+
+interface BatchUpdateEpisodesResponse {
+  episodes: Array<EpisodeWatchStatus>;
+  newStatus?: string; // Updated show status if changed
+}
+
+// DELETE /api/status/episodes?tmdbId={id}&seasonNumber={season}&episodeNumber={episode}
 ```
 
 ### Frontend Components
 
-#### Status Dropdown Component
+#### StatusSegmentedSelector Component
 ```typescript
-// components/status/StatusDropdown.tsx
+// components/ui/StatusSegmentedSelector.tsx
 'use client';
-import { Badge } from '@/components/ui/Badge';
-import { DropdownMenu } from '@/components/ui/DropdownMenu';
+import { cn } from '@/lib/utils';
+import { getAvailableStatuses, getStatusConfig } from './StatusBadge';
+import { WatchStatusEnum, ContentTypeEnum } from '@/lib/db/schema';
 
-interface StatusDropdownProps {
-  tmdbId: number;
-  contentType: 'movie' | 'tv';
-  currentStatus?: string;
-  onStatusChange?: (status: string) => void;
+interface StatusSegmentedSelectorProps {
+  value: WatchStatusEnum | null;
+  contentType: ContentTypeEnum;
+  onValueChange: (status: WatchStatusEnum) => void;
+  disabled?: boolean;
+  className?: string;
+  size?: 'default' | 'sm' | 'lg';
 }
 
-export function StatusDropdown({ tmdbId, contentType, currentStatus, onStatusChange }: StatusDropdownProps) {
-  const [status, setStatus] = useState(currentStatus);
-  const [isLoading, setIsLoading] = useState(false);
+export function StatusSegmentedSelector({
+  value,
+  contentType,
+  onValueChange,
+  disabled = false,
+  className,
+  size = 'default'
+}: StatusSegmentedSelectorProps) {
+  const availableStatuses = getAvailableStatuses(contentType);
   
-  const updateStatus = async (newStatus: string) => {
-    setIsLoading(true);
-    setStatus(newStatus); // Optimistic update
-    
-    try {
-      const response = await fetch('/api/status/content', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tmdb_id: tmdbId,
-          content_type: contentType,
-          status: newStatus,
-        }),
-      });
-      
-      if (!response.ok) throw new Error('Failed to update status');
-      
-      const result = await response.json();
-      onStatusChange?.(newStatus);
-      
-      // Show sync notification if applicable
-      if (result.synced_to.length > 0) {
-        toast.success(`Status synced with ${result.synced_to.length} collaborators`);
-      }
-    } catch (error) {
-      setStatus(currentStatus); // Rollback on error
-      toast.error('Failed to update status');
-    } finally {
-      setIsLoading(false);
+  const statusColors = {
+    planning: 'bg-yellow-400',
+    watching: 'bg-green-400',
+    paused: 'bg-orange-400',
+    completed: 'bg-blue-400',
+    dropped: 'bg-red-400'
+  } as const;
+  
+  const handleStatusChange = (status: WatchStatusEnum) => {
+    if (!disabled) {
+      onValueChange(status);
     }
   };
-  
+
   return (
-    <DropdownMenu>
-      <DropdownMenu.Trigger asChild>
-        <button disabled={isLoading}>
-          {status ? (
-            <Badge variant={status}>{status}</Badge>
-          ) : (
-            <Badge variant="outline">Set Status</Badge>
-          )}
-        </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content>
-        {STATUS_OPTIONS.map((option) => (
-          <DropdownMenu.Item
-            key={option.value}
-            onClick={() => updateStatus(option.value)}
+    <div 
+      className={cn(
+        'inline-flex flex-wrap bg-gray-800 border border-gray-600 rounded-lg',
+        'focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent',
+        disabled && 'opacity-50 cursor-not-allowed',
+        className
+      )}
+      role="radiogroup"
+    >
+      {availableStatuses.map((status) => {
+        const config = getStatusConfig(status);
+        const isSelected = value === status;
+        
+        return (
+          <button
+            key={status}
+            type="button"
+            onClick={() => handleStatusChange(status)}
+            disabled={disabled}
+            className={cn(
+              'relative flex items-center justify-center gap-1.5',
+              'rounded-md transition-all duration-200',
+              'focus:outline-none focus:ring-2 focus:ring-red-500',
+              isSelected
+                ? 'bg-red-600 text-white shadow-sm'
+                : 'text-gray-300 hover:text-white hover:bg-gray-700'
+            )}
+            role="radio"
+            aria-checked={isSelected}
           >
-            <Badge variant={option.value} size="sm" />
-            {option.label}
-          </DropdownMenu.Item>
-        ))}
-      </DropdownMenu.Content>
-    </DropdownMenu>
+            <span 
+              className={cn(
+                'w-2 h-2 rounded-full flex-shrink-0',
+                isSelected ? 'bg-white' : statusColors[status]
+              )}
+            />
+            <span className="font-medium truncate">
+              {config?.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 ```
 
-#### Episode Tracker Component
+#### EpisodeTracker Component
 ```typescript
-// components/status/EpisodeTracker.tsx
+// components/ui/EpisodeTracker.tsx
 'use client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Checkbox } from '@/components/ui/Checkbox';
-import { Progress } from '@/components/ui/Progress';
+import { useState, useEffect, useCallback } from 'react';
+import { Check, ChevronDown, ChevronRight, Calendar, Clock, Eye } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from './Button';
+import { LoadingSpinner } from './LoadingSpinner';
+import { WatchStatusEnum } from '@/lib';
 
 interface EpisodeTrackerProps {
-  tmdbId: number;
-  showTitle: string;
+  tvShowId: number;
+  className?: string;
+  onShowStatusChanged?: (status: WatchStatusEnum) => void;
 }
 
-export function EpisodeTracker({ tmdbId, showTitle }: EpisodeTrackerProps) {
-  const queryClient = useQueryClient();
-  
-  const { data: episodeData, isLoading } = useQuery({
-    queryKey: ['episodes', tmdbId],
-    queryFn: () => fetchEpisodeStatus(tmdbId),
-  });
-  
-  const updateEpisodeMutation = useMutation({
-    mutationFn: ({ season, episode, watched }: { season: number; episode: number; watched: boolean }) =>
-      updateEpisodeStatus(tmdbId, season, episode, watched),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['episodes', tmdbId] });
-    },
-  });
-  
-  const handleEpisodeToggle = useMemo(
-    () => debounce((season: number, episode: number, watched: boolean) => {
-      updateEpisodeMutation.mutate({ season, episode, watched });
-    }, 300),
-    [updateEpisodeMutation]
-  );
-  
-  if (isLoading) return <EpisodeTrackerSkeleton />;
-  
+export function EpisodeTracker({ tvShowId, className, onShowStatusChanged }: EpisodeTrackerProps) {
+  const [seasons, setSeasons] = useState<SeasonData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingEpisodes, setUpdatingEpisodes] = useState<Set<string>>(new Set());
+
+  // Fetch TV show details and episode statuses
+  const fetchTVShowData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get TV show details
+      const tvDetailsResponse = await fetch(`/api/tmdb/details?type=tv&id=${tvShowId}`);
+      const tvDetails = await tvDetailsResponse.json();
+
+      // Get watch statuses for all episodes
+      const statusResponse = await fetch(`/api/status/episodes?tmdbId=${tvShowId}`);
+      const { episodes: watchStatuses } = await statusResponse.json();
+
+      // Fetch season details for each season
+      const seasonPromises = [];
+      for (let seasonNum = 1; seasonNum <= tvDetails.number_of_seasons; seasonNum++) {
+        seasonPromises.push(
+          fetch(`/api/tmdb/episodes/${tvShowId}?season=${seasonNum}`)
+            .then(res => res.json())
+            .then(data => ({ seasonNumber: seasonNum, ...data }))
+        );
+      }
+
+      const seasonResults = await Promise.all(seasonPromises);
+      
+      const seasonsData = seasonResults
+        .filter(result => result.season)
+        .map(result => ({
+          season: result.season,
+          watchStatuses: watchStatuses.filter(
+            status => status.seasonNumber === result.seasonNumber
+          ),
+          isExpanded: false
+        }));
+
+      setSeasons(seasonsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tvShowId]);
+
+  // Toggle episode watch status
+  const toggleEpisodeWatched = async (seasonNumber: number, episodeNumber: number, currentlyWatched: boolean) => {
+    const episodeKey = `${seasonNumber}-${episodeNumber}`;
+    setUpdatingEpisodes(prev => new Set(prev).add(episodeKey));
+
+    try {
+      const response = await fetch('/api/status/episodes', {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tmdbId: tvShowId,
+          seasonNumber,
+          episodeNumber,
+          watched: !currentlyWatched
+        }),
+      });
+
+      const { newStatus } = await response.json();
+      if (newStatus) {
+        onShowStatusChanged?.(newStatus);
+      }
+
+      // Update local state optimistically
+      setSeasons(prevSeasons => 
+        prevSeasons.map(seasonData => {
+          if (seasonData.season.season_number === seasonNumber) {
+            // Update watch statuses for this season
+            const updatedStatuses = currentlyWatched
+              ? seasonData.watchStatuses.filter(
+                  status => !(status.seasonNumber === seasonNumber && status.episodeNumber === episodeNumber)
+                )
+              : [
+                  ...seasonData.watchStatuses.filter(
+                    status => !(status.seasonNumber === seasonNumber && status.episodeNumber === episodeNumber)
+                  ),
+                  {
+                    id: `temp-${Date.now()}`,
+                    userId: 'current-user',
+                    tmdbId: tvShowId,
+                    seasonNumber,
+                    episodeNumber,
+                    watched: true,
+                    watchedAt: new Date().toISOString()
+                  }
+                ];
+            
+            return { ...seasonData, watchStatuses: updatedStatuses };
+          }
+          return seasonData;
+        })
+      );
+    } catch (err) {
+      console.error('Error updating episode status:', err);
+    } finally {
+      setUpdatingEpisodes(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(episodeKey);
+        return newSet;
+      });
+    }
+  };
+
+  // Toggle season expansion and batch operations
+  const toggleSeasonExpanded = (seasonNumber: number) => {
+    setSeasons(prevSeasons => 
+      prevSeasons.map(seasonData => 
+        seasonData.season.season_number === seasonNumber
+          ? { ...seasonData, isExpanded: !seasonData.isExpanded }
+          : seasonData
+      )
+    );
+  };
+
+  const toggleSeasonWatched = async (seasonNumber: number, markAsWatched: boolean) => {
+    const seasonData = seasons.find(s => s.season.season_number === seasonNumber);
+    if (!seasonData) return;
+
+    try {
+      const episodes = seasonData.season.episodes
+        .filter(ep => new Date(ep.air_date) < new Date())
+        .map(ep => ({
+          seasonNumber,
+          episodeNumber: ep.episode_number,
+          watched: markAsWatched
+        }));
+
+      await fetch('/api/status/episodes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tmdbId: tvShowId, episodes }),
+      });
+
+      await fetchTVShowData(); // Refresh data
+    } catch (err) {
+      console.error('Error updating season status:', err);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className={cn('flex items-center justify-center p-8', className)}>
+        <LoadingSpinner size="lg" text='Loading episodes...' />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={cn('p-6 text-center', className)}>
+        <p className="text-red-400 mb-4">{error}</p>
+        <Button onClick={fetchTVShowData} variant="outline" size="sm">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Episode Progress</h3>
-        <div className="text-sm text-gray-400">
-          {episodeData.watched_count} / {episodeData.total_episodes} episodes
-        </div>
-      </div>
-      
-      <Progress value={episodeData.progress_percentage} className="w-full" />
-      
-      <div className="space-y-4">
-        {groupEpisodesBySeason(episodeData.episodes).map((season) => (
-          <SeasonGroup
-            key={season.number}
-            season={season}
-            onEpisodeToggle={handleEpisodeToggle}
-          />
-        ))}
-      </div>
+    <div className={cn('space-y-4', className)}>
+      <h3 className="text-lg font-semibold text-gray-100">Episode Progress</h3>
+      {/* Season list with expandable episodes */}
+      {seasons.map((seasonData) => (
+        <SeasonComponent 
+          key={seasonData.season.season_number}
+          seasonData={seasonData}
+          onToggleExpanded={toggleSeasonExpanded}
+          onToggleEpisode={toggleEpisodeWatched}
+          onToggleSeasonWatched={toggleSeasonWatched}
+          updatingEpisodes={updatingEpisodes}
+        />
+      ))}
     </div>
   );
 }
@@ -400,175 +569,246 @@ export function EpisodeTracker({ tmdbId, showTitle }: EpisodeTrackerProps) {
 
 ### Backend Services
 
-#### Status Service
+#### API Route Implementation
+The backend uses Next.js API routes with middleware for authentication and error handling:
+
 ```typescript
-// lib/services/status-service.ts
-export class StatusService {
-  async updateContentStatus(
-    userId: string,
-    tmdbId: number,
-    contentType: 'movie' | 'tv',
-    status: string,
-    options: {
-      notes?: string;
-      shareStatusUpdates?: boolean;
-    } = {}
-  ) {
-    return await db.transaction(async (tx) => {
-      // Get old status for activity tracking
-      const oldStatus = await this.getCurrentStatus(tx, userId, tmdbId, contentType);
-      
-      // Update or insert status
-      const [updatedStatus] = await tx
-        .insert(userContentStatus)
-        .values({
-          userId,
-          tmdbId,
-          contentType,
-          status,
-          notes: options.notes,
-          shareStatusUpdates: options.shareStatusUpdates ?? true,
-        })
-        .onConflictDoUpdate({
-          target: [userContentStatus.userId, userContentStatus.tmdbId, userContentStatus.contentType],
-          set: {
-            status,
-            notes: options.notes,
-            shareStatusUpdates: options.shareStatusUpdates,
-            updatedAt: new Date(),
-          },
-        })
-        .returning();
-      
-      // Handle collaborative sync
-      const syncResults = await this.handleCollaborativeSync(
-        tx,
-        userId,
-        tmdbId,
-        contentType,
-        status,
-        options
-      );
-      
-      // Create activity entry
-      await this.createStatusActivity(tx, {
-        userId,
-        tmdbId,
-        contentType,
-        oldStatus: oldStatus?.status,
-        newStatus: status,
-        collaborators: syncResults.syncedUsers,
-      });
-      
-      return {
-        status: updatedStatus,
-        syncedTo: syncResults.syncedUsers,
-        affectedLists: syncResults.affectedLists,
-      };
-    });
-  }
-  
-  async updateEpisodeStatus(
-    userId: string,
-    tmdbId: number,
-    seasonNumber: number,
-    episodeNumber: number,
-    watched: boolean
-  ) {
-    return await db.transaction(async (tx) => {
-      // Update episode status
-      await tx
-        .insert(episodeWatchStatus)
-        .values({
-          userId,
-          tmdbId,
-          seasonNumber,
-          episodeNumber,
-          watched,
-          watchedAt: watched ? new Date() : null,
-        })
-        .onConflictDoUpdate({
-          target: [
-            episodeWatchStatus.userId,
-            episodeWatchStatus.tmdbId,
-            episodeWatchStatus.seasonNumber,
-            episodeWatchStatus.episodeNumber,
-          ],
-          set: {
-            watched,
-            watchedAt: watched ? new Date() : null,
-            updatedAt: new Date(),
-          },
-        });
-      
-      // Check if show status needs automatic update
-      const episodeStats = await this.getEpisodeStats(tx, userId, tmdbId);
-      const newShowStatus = this.calculateAutoStatus(episodeStats);
-      
-      let statusUpdate = null;
-      if (newShowStatus) {
-        statusUpdate = await this.updateContentStatus(
-          userId,
-          tmdbId,
-          'tv',
-          newShowStatus,
-          { shareStatusUpdates: true }
+// app/api/status/content/route.ts
+import { withAuth, AuthenticatedRequest, handleApiError } from '@/lib/auth/api-middleware';
+import { syncStatusToCollaborators } from '@/lib/activity/sync-utils';
+
+export const POST = withAuth(async (request: AuthenticatedRequest) => {
+  try {
+    const userId = request.user.id;
+    const { tmdbId, contentType, status } = await request.json();
+
+    // Validation for content type and status
+    if (contentType === ContentType.MOVIE) {
+      if (!Object.values(MovieWatchStatus).includes(status)) {
+        return NextResponse.json(
+          { error: "Invalid movie status. Must be 'planning' or 'completed'" },
+          { status: 400 }
         );
       }
-      
-      return {
-        episodeStats,
-        statusUpdate,
-      };
+    } else if (contentType === ContentType.TV) {
+      if (!Object.values(TVWatchStatus).includes(status)) {
+        return NextResponse.json(
+          { error: "Invalid TV status" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Update or create status
+    const [result] = await db
+      .insert(userContentStatus)
+      .values({ userId, tmdbId, contentType, status })
+      .onConflictDoUpdate({
+        target: [userContentStatus.userId, userContentStatus.tmdbId, userContentStatus.contentType],
+        set: { status, updatedAt: new Date() }
+      })
+      .returning();
+
+    // Sync to collaborators and create activity
+    const syncedCollaboratorIds = await syncStatusToCollaborators(userId, tmdbId, contentType, status);
+    
+    await db.insert(activityFeed).values({
+      userId,
+      activityType: ActivityType.STATUS_CHANGED,
+      tmdbId,
+      contentType,
+      metadata: { status, title: contentDetails.title || contentDetails.name },
+      collaborators: syncedCollaboratorIds,
+      isCollaborative: syncedCollaboratorIds.length > 0,
     });
+
+    return NextResponse.json({ status: result }, { status: 201 });
+  } catch (error) {
+    return handleApiError(error, "Create/update content status");
   }
-  
-  private calculateAutoStatus(stats: EpisodeStats): string | null {
-    if (stats.watchedCount === 0) return null;
-    if (stats.watchedCount === 1 && stats.totalCount > 1) return 'watching';
-    if (stats.watchedCount === stats.totalCount) return 'completed';
-    if (stats.watchedCount > 0 && stats.watchedCount < stats.totalCount) return 'watching';
-    return null;
+});
+```
+
+#### Episode Status Management
+```typescript
+// app/api/status/episodes/route.ts
+export const POST = withAuth(async (request: AuthenticatedRequest) => {
+  try {
+    const userId = request.user.id;
+    const { tmdbId, seasonNumber, episodeNumber, watched = true } = await request.json();
+
+    // Update episode status
+    const [result] = await db
+      .insert(episodeWatchStatus)
+      .values({
+        userId, tmdbId, seasonNumber, episodeNumber, watched,
+        watchedAt: watched ? new Date() : null,
+      })
+      .onConflictDoUpdate({
+        target: [episodeWatchStatus.userId, episodeWatchStatus.tmdbId, 
+                episodeWatchStatus.seasonNumber, episodeWatchStatus.episodeNumber],
+        set: { watched, watchedAt: watched ? new Date() : null, updatedAt: new Date() }
+      })
+      .returning();
+
+    // Sync episode status to collaborators
+    const syncedCollaboratorIds = await syncEpisodeStatusToCollaborators(
+      userId, tmdbId, seasonNumber, episodeNumber, watched
+    );
+
+    // Auto-update show status based on episode progress
+    let newStatus: WatchStatusEnum | null = null;
+    if (watched) {
+      const contentStatus = await db.select().from(userContentStatus)
+        .where(and(
+          eq(userContentStatus.userId, userId),
+          eq(userContentStatus.tmdbId, tmdbId),
+          eq(userContentStatus.contentType, ContentType.TV)
+        )).limit(1);
+
+      if (contentStatus.length === 0) {
+        await db.insert(userContentStatus).values({
+          userId, tmdbId, contentType: ContentType.TV, status: WatchStatus.WATCHING,
+        });
+        newStatus = WatchStatus.WATCHING;
+      } else if (contentStatus[0].status !== WatchStatus.WATCHING) {
+        // Check if this is the last episode to mark as completed
+        const showDetails = await tmdbClient.getTVShowDetails(tmdbId);
+        if (showDetails.last_episode_to_air &&
+            showDetails.last_episode_to_air.season_number === seasonNumber &&
+            showDetails.last_episode_to_air.episode_number === episodeNumber) {
+          newStatus = WatchStatus.COMPLETED;
+        } else {
+          newStatus = WatchStatus.WATCHING;
+        }
+        
+        await db.update(userContentStatus)
+          .set({ status: newStatus, updatedAt: new Date() })
+          .where(and(
+            eq(userContentStatus.userId, userId),
+            eq(userContentStatus.tmdbId, tmdbId),
+            eq(userContentStatus.contentType, ContentType.TV)
+          ));
+      }
+    }
+
+    return NextResponse.json({ episode: result, newStatus }, { status: 201 });
+  } catch (error) {
+    return handleApiError(error, "Update episode status");
   }
+});
+```
+
+#### Collaborative Sync Utilities
+```typescript
+// lib/activity/sync-utils.ts
+export async function syncStatusToCollaborators(
+  userId: string,
+  tmdbId: number,
+  contentType: string,
+  status: string
+): Promise<string[]> {
+  // Find all lists that contain this content and have sync enabled
+  const syncEnabledLists = await db
+    .select({ listId: lists.id, ownerId: lists.ownerId })
+    .from(lists)
+    .innerJoin(listItems, eq(listItems.listId, lists.id))
+    .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
+    .where(and(
+      eq(lists.syncWatchStatus, true),
+      eq(listItems.tmdbId, tmdbId),
+      eq(listItems.contentType, contentType),
+      or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
+    ));
+
+  const syncedCollaboratorIds: string[] = [];
+
+  for (const list of syncEnabledLists) {
+    const collaborators = await db
+      .select({ userId: listCollaborators.userId })
+      .from(listCollaborators)
+      .where(eq(listCollaborators.listId, list.listId));
+
+    const allUsers = [...collaborators.map(c => c.userId), list.ownerId]
+      .filter(id => id !== userId);
+
+    for (const collaboratorId of allUsers) {
+      await db.insert(userContentStatus)
+        .values({ userId: collaboratorId, tmdbId, contentType, status })
+        .onConflictDoUpdate({
+          target: [userContentStatus.userId, userContentStatus.tmdbId, userContentStatus.contentType],
+          set: { status, updatedAt: new Date() }
+        });
+      
+      syncedCollaboratorIds.push(collaboratorId);
+    }
+  }
+
+  return Array.from(new Set(syncedCollaboratorIds));
 }
 ```
 
 ### Performance Optimizations
 
-1. **Optimistic Updates**: UI updates immediately, with rollback on error
-2. **Debounced Episode Updates**: Prevent excessive API calls during rapid clicking
-3. **TMDB Caching**: Cache episode metadata to reduce external API calls
-4. **Database Indexing**: Optimized indexes for common query patterns
-5. **Batch Operations**: Support bulk episode updates for efficiency
+1. **Optimistic Updates**: UI updates immediately in EpisodeTracker, with rollback on error
+2. **Loading States**: Individual episode loading indicators prevent UI blocking
+3. **Database Indexing**: Optimized indexes for user queries and episode lookups
+4. **Batch Operations**: Support bulk episode updates via PUT endpoint for season operations
+5. **Efficient Queries**: Use of Drizzle ORM with proper joins and filtering
+6. **Activity Feed Optimization**: Async activity creation doesn't block main operations
 
 ### Error Handling
 
+The implementation uses centralized error handling through the API middleware:
+
 ```typescript
-// lib/errors/status-errors.ts
-export class StatusError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public statusCode: number = 400
-  ) {
-    super(message);
+// lib/auth/api-middleware.ts
+export function handleApiError(error: unknown, operation: string) {
+  console.error(`Error in ${operation}:`, error);
+  
+  if (error instanceof Error) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
+  
+  return NextResponse.json(
+    { error: 'An unexpected error occurred' },
+    { status: 500 }
+  );
 }
 
-export const StatusErrorCodes = {
-  INVALID_STATUS: 'invalid_status',
-  CONTENT_NOT_FOUND: 'content_not_found',
-  SYNC_FAILED: 'sync_failed',
-  EPISODE_NOT_FOUND: 'episode_not_found',
-} as const;
+// Usage in API routes
+export const POST = withAuth(async (request: AuthenticatedRequest) => {
+  try {
+    // API logic
+  } catch (error) {
+    return handleApiError(error, "Update episode status");
+  }
+});
 ```
+
+### Key Implementation Features
+
+1. **Content Type Validation**: Different status options for movies vs TV shows
+2. **Automatic Status Updates**: TV show status automatically updates based on episode progress
+3. **Collaborative Sync**: Status changes sync across shared lists with `syncWatchStatus` enabled
+4. **Activity Tracking**: All status changes create activity feed entries for transparency
+5. **Future Episode Handling**: Episodes not yet aired are disabled in the UI
+6. **Season Management**: Expandable seasons with batch mark/unmark functionality
+7. **Real-time Updates**: Episode status changes immediately reflect in the UI
+8. **Next Episode Detection**: System tracks next episode air dates for completed shows
 
 ### Testing Strategy
 
-1. **Unit Tests**: Test status calculation logic and sync algorithms
-2. **Integration Tests**: Test API endpoints with database operations
-3. **Component Tests**: Test UI components with mocked API responses
-4. **E2E Tests**: Test complete user flows including collaborative sync
+The current implementation would benefit from:
+
+1. **API Route Tests**: Test authentication, validation, and database operations
+2. **Component Tests**: Test StatusSegmentedSelector and EpisodeTracker interactions
+3. **Sync Logic Tests**: Test collaborative synchronization across lists
+4. **Status Calculation Tests**: Test automatic status updates based on episode progress
+5. **Error Handling Tests**: Test API error responses and UI error states
 
 ---
 
