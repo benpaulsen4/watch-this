@@ -810,6 +810,228 @@ The current implementation would benefit from:
 4. **Status Calculation Tests**: Test automatic status updates based on episode progress
 5. **Error Handling Tests**: Test API error responses and UI error states
 
+## Quick Complete Action
+
+### Overview
+
+The Quick Complete action provides a streamlined way for users to progress their content watch status without opening detailed modals. This feature addresses the friction of having to navigate through ContentDetailsModal and EpisodeTracker components for simple status updates.
+
+### User Story
+
+**As a user**, I want to quickly mark content as watched with a simple double-click/tap action, so that I can efficiently update my progress without interrupting my browsing flow.
+
+### Feature Requirements
+
+#### Trigger Action
+- **Double-click/Double-tap**: Users can double-click (desktop) or double-tap (mobile) anywhere on a ContentCard component
+- **Universal Availability**: This action works on ContentCard components throughout the entire application
+
+#### Visual Feedback
+- **Tick Animation**: When triggered, a checkmark animation appears on the content card to provide immediate visual confirmation
+- **Animation Duration**: The tick animation should be brief but noticeable (approximately 300-500ms)
+- **Non-blocking**: The animation doesn't prevent further user interactions
+
+#### Smart Status Logic
+
+##### For Movies
+- **Direct Completion**: Updates the movie status to "watched" using the existing `/api/status/content` endpoint
+- **Status Transition**: Regardless of current status (planning, etc.), movies are marked as "completed"
+
+##### For TV Shows
+- **Next Episode Logic**: Calls a new `/api/status/episodes/next` endpoint to mark the next available episode as watched
+- **Episode Discovery**: The system identifies the most recently watched episode and attempts to mark the subsequent episode as watched
+- **Air Date Validation**: Only episodes that have already aired can be marked as watched
+- **Error Handling**: If no next episode is available or the next episode hasn't aired, returns a bad request error
+
+#### Show Status Auto-Update
+- **First Episode**: If this is the user's first episode for a TV show, the show status is set to "watching"
+- **Series Completion**: If the marked episode is the final aired episode, the show status is updated to "completed"
+- **Status Consistency**: Maintains consistency with existing episode tracking logic
+
+### API Specification
+
+#### New Endpoint: `/api/status/episodes/next`
+
+```typescript
+// POST /api/status/episodes/next
+interface MarkNextEpisodeRequest {
+  tmdbId: number;
+}
+
+interface MarkNextEpisodeResponse {
+  episode: {
+    id: string;
+    userId: string;
+    tmdbId: number;
+    seasonNumber: number;
+    episodeNumber: number;
+    watched: boolean;
+    watchedAt: string;
+  };
+  newStatus?: WatchStatusEnum; // Updated show status if changed
+  error?: string; // Error message if no next episode available
+}
+
+// Error Responses
+// 400 Bad Request: No next episode available or next episode hasn't aired
+// 404 Not Found: TV show not found
+// 401 Unauthorized: User not authenticated
+```
+
+#### Endpoint Logic
+1. **Authentication**: Verify user is authenticated
+2. **Show Validation**: Confirm the TMDB ID corresponds to a valid TV show
+3. **Episode Discovery**: 
+   - Query user's episode watch history for the show
+   - Identify the most recently watched episode
+   - Determine the next episode in sequence (considering season boundaries)
+4. **Air Date Check**: Verify the next episode has aired using TMDB data
+5. **Status Update**: Mark the episode as watched and update show status if needed
+6. **Collaboration Sync**: Sync the episode status to collaborators if applicable
+
+### Frontend Implementation
+
+#### ContentCard Component Updates
+
+```typescript
+// components/ui/ContentCard.tsx - New functionality
+interface ContentCardProps {
+  // ... existing props
+  onQuickComplete?: (success: boolean) => void;
+}
+
+const ContentCard = ({ content, onQuickComplete, ...props }: ContentCardProps) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+  
+  const handleDoubleClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Trigger tick animation
+    setIsAnimating(true);
+    
+    try {
+      if (content.media_type === 'movie') {
+        await updateMovieStatus(content.id);
+      } else if (content.media_type === 'tv') {
+        await markNextEpisode(content.id);
+      }
+      
+      onQuickComplete?.(true);
+    } catch (error) {
+      console.error('Quick complete failed:', error);
+      onQuickComplete?.(false);
+    } finally {
+      // Reset animation after delay
+      setTimeout(() => setIsAnimating(false), 500);
+    }
+  };
+  
+  return (
+    <div 
+      className="relative"
+      onDoubleClick={handleDoubleClick}
+    >
+      {/* Existing card content */}
+      
+      {/* Quick complete animation overlay */}
+      {isAnimating && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+          <CheckIcon className="w-12 h-12 text-green-400 animate-bounce" />
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+#### API Client Functions
+
+```typescript
+// lib/api/quick-complete.ts
+export async function updateMovieStatus(tmdbId: number): Promise<void> {
+  const response = await fetch('/api/status/content', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tmdbId,
+      contentType: 'movie',
+      status: 'completed'
+    }),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to update movie status');
+  }
+}
+
+export async function markNextEpisode(tmdbId: number): Promise<void> {
+  const response = await fetch('/api/status/episodes/next', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tmdbId }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to mark next episode');
+  }
+}
+```
+
+### User Experience Flow
+
+1. **Discovery**: User sees content they want to mark as watched
+2. **Action**: User double-clicks/taps the content card
+3. **Feedback**: Tick animation immediately appears on the card
+4. **Processing**: System determines appropriate action (movie completion vs next episode)
+5. **Validation**: For TV shows, system checks if next episode is available and aired
+6. **Update**: Status is updated in database and synced to collaborators
+7. **Completion**: Animation completes and user can continue browsing
+
+### Error Handling
+
+#### User-Facing Errors
+- **No Next Episode**: "You're all caught up! No new episodes available."
+- **Episode Not Aired**: "Next episode hasn't aired yet. Check back on [air date]."
+- **Network Error**: "Unable to update status. Please try again."
+
+#### Technical Error Handling
+- **API Failures**: Graceful degradation with user notification
+- **Animation Cleanup**: Ensure animation state resets even on errors
+- **Optimistic Updates**: Consider implementing optimistic UI updates with rollback
+
+### Performance Considerations
+
+1. **Debouncing**: Prevent multiple rapid double-clicks from triggering multiple API calls
+2. **Animation Performance**: Use CSS transforms for smooth animations
+3. **API Efficiency**: Batch episode lookups where possible
+4. **Caching**: Cache TMDB episode data to reduce external API calls
+
+### Accessibility
+
+1. **Keyboard Support**: Provide keyboard equivalent (e.g., Enter key when focused)
+2. **Screen Reader**: Announce status changes to screen readers
+3. **Visual Indicators**: Ensure sufficient color contrast for the tick animation
+4. **Focus Management**: Maintain focus state after quick complete action
+
+### Testing Strategy
+
+#### Unit Tests
+- Test double-click event handling
+- Test API client functions with various response scenarios
+- Test animation state management
+
+#### Integration Tests
+- Test end-to-end quick complete flow for movies
+- Test end-to-end quick complete flow for TV shows
+- Test error scenarios (no next episode, network failures)
+
+#### User Acceptance Tests
+- Verify tick animation appears and disappears correctly
+- Confirm status updates reflect in other parts of the application
+- Test collaborative sync functionality
+
 ---
 
 *This feature document should be updated as the watch status system evolves and new tracking requirements are identified.*

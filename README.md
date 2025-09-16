@@ -93,7 +93,7 @@ npm run test:run
 - [ ] TV show scheduling
 - [x] Watch status sync option for shared lists
 - [x] Activity feed to see you and your friends recent activity on lists and watch status
-- [ ] Quick complete action from content card
+- [x] Quick complete action from content card
 - [x] Improved import and export for watch status
 - [ ] Multi-device passkey management
 - [ ] JustWatch integration with per-user streaming service configuration
