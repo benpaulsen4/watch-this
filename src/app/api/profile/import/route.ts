@@ -38,67 +38,66 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     try {
       const data = JSON.parse(fileContent);
 
-      if (!data.lists || !Array.isArray(data.lists)) {
-        return NextResponse.json(
-          { error: "Invalid JSON format: 'lists' array is required" },
-          { status: 400 }
-        );
-      }
+      if (data.lists && Array.isArray(data.lists)) {
+        // Process each list
+        for (const listData of data.lists) {
+          try {
+            // Validate required fields
+            if (!listData.name || typeof listData.name !== "string") {
+              errors.push(
+                `Skipped list: name is required and must be a string`
+              );
+              continue;
+            }
 
-      // Process each list
-      for (const listData of data.lists) {
-        try {
-          // Validate required fields
-          if (!listData.name || typeof listData.name !== "string") {
-            errors.push(`Skipped list: name is required and must be a string`);
-            continue;
-          }
+            // Create the list
+            const [newList] = await db
+              .insert(lists)
+              .values({
+                ownerId: userId,
+                name: listData.name,
+                description: listData.description || null,
+                listType: listData.type || "mixed",
+                isPublic: listData.isPublic || false,
+              })
+              .returning();
 
-          // Create the list
-          const [newList] = await db
-            .insert(lists)
-            .values({
-              ownerId: userId,
-              name: listData.name,
-              description: listData.description || null,
-              listType: listData.type || "mixed",
-              isPublic: listData.isPublic || false,
-            })
-            .returning();
+            // Process list items if they exist
+            if (listData.items && Array.isArray(listData.items)) {
+              for (const itemData of listData.items) {
+                try {
+                  if (
+                    !itemData.title ||
+                    !itemData.tmdbId ||
+                    !itemData.contentType
+                  ) {
+                    errors.push(
+                      `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`
+                    );
+                    continue;
+                  }
 
-          // Process list items if they exist
-          if (listData.items && Array.isArray(listData.items)) {
-            for (const itemData of listData.items) {
-              try {
-                if (
-                  !itemData.title ||
-                  !itemData.tmdbId ||
-                  !itemData.contentType
-                ) {
+                  await db.insert(listItems).values({
+                    listId: newList.id,
+                    tmdbId: itemData.tmdbId,
+                    contentType: itemData.contentType,
+                    title: itemData.title,
+                    posterPath: itemData.posterPath || null,
+                  });
+                } catch (itemError) {
                   errors.push(
-                    `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`
+                    `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`
                   );
-                  continue;
                 }
-
-                await db.insert(listItems).values({
-                  listId: newList.id,
-                  tmdbId: itemData.tmdbId,
-                  contentType: itemData.contentType,
-                  title: itemData.title,
-                  posterPath: itemData.posterPath || null,
-                });
-              } catch (itemError) {
-                errors.push(
-                  `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`
-                );
               }
             }
-          }
 
-          importedListsCount++;
-        } catch (listError) {
-          errors.push(`Failed to import list '${listData.name}': ${listError}`);
+            importedListsCount++;
+          } catch (listError) {
+            errors.push(
+              `Failed to import list '${listData.name}': ${listError}`
+            );
+          }
         }
       }
 
