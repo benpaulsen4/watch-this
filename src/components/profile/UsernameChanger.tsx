@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Edit3, Check, X, AlertCircle, User } from 'lucide-react';
+import { Edit3, Check, X, AlertCircle, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import type { User as UserType } from '@/lib/auth/types';
+import { User } from '@/lib/auth';
 
 interface UsernameChangerProps {
-  user: UserType;
-  onUserUpdate: (user: UserType) => void;
+  user: User;
+  onUserUpdate: (user: User) => void;
 }
 
 export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
@@ -103,7 +103,7 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
         {/* Username Icon */}
         <div className="flex-shrink-0">
           <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-gray-700 flex items-center justify-center">
-            <User className="h-6 w-6 text-gray-400" />
+            <UserIcon className="h-6 w-6 text-gray-400" />
           </div>
         </div>
 

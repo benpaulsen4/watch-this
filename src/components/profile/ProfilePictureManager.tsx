@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Camera, Check, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import type { User } from '@/lib/auth/types';
+import { User } from '@/lib/auth/client';
 
 interface ProfilePictureManagerProps {
   user: User;

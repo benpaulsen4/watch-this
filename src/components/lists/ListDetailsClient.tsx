@@ -8,9 +8,9 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ContentCard } from '@/components/ui/ContentCard';
 import type { TMDBMovie, TMDBTVShow } from '@/lib/tmdb/client';
-import { getCurrentSession } from '@/lib/auth/client';
 import CollaborationModal from './CollaborationModal';
 import ListSettingsModal from './ListSettingsModal';
+import { useUser } from '@/lib/auth/context';
 
 interface ListItem extends TMDBMovie, TMDBTVShow {
   listItemId: string;
@@ -39,21 +39,12 @@ interface ListDetailsClientProps {
 
 export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
   const router = useRouter();
+  const user = useUser();
   const [list, setList] = useState<List | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCollaborationModal, setShowCollaborationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState<{ id: string; username: string } | null>(null);
-
-  const fetchCurrentUser = useCallback(async () => {
-    try {
-      const session = await getCurrentSession();
-      setCurrentUser(session?.user || null);
-    } catch (error) {
-      console.error('Error fetching current user:', error);
-    }
-  }, []);
 
   const fetchListDetails = useCallback(async () => {
     try {
@@ -83,8 +74,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
 
   useEffect(() => {
     fetchListDetails();
-    fetchCurrentUser();
-  }, [fetchListDetails, fetchCurrentUser]);
+  }, [fetchListDetails]);
 
   const handleListUpdate = (updatedList: Partial<List>) => {
     setList(prev => prev ? { ...prev, ...updatedList } : null);
@@ -253,7 +243,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
          onClose={() => setShowCollaborationModal(false)}
          listId={listId}
          listName={list?.name || ''}
-         isOwner={currentUser?.id === list?.ownerId}
+         isOwner={user?.id === list?.ownerId}
          ownerUsername={list?.ownerUsername}
          ownerProfilePictureUrl={list?.ownerProfilePictureUrl}
        />
@@ -264,7 +254,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
           isOpen={showSettingsModal}
           onClose={() => setShowSettingsModal(false)}
           list={list}
-          isOwner={currentUser?.id === list.ownerId}
+          isOwner={user?.id === list.ownerId}
           onListUpdate={handleListUpdate}
           onListDelete={handleListDelete}
         />

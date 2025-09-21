@@ -118,7 +118,7 @@ export async function signOut() {
 }
 
 // Get current user session
-export async function getCurrentSession() {
+export async function getCurrentSession(): Promise<{ user: User } | null> {
   try {
     const response = await fetch("/api/auth/session");
     if (!response.ok) return null;
@@ -148,3 +148,10 @@ export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
     return false;
   }
 }
+
+export type User = {
+  id: string;
+  username: string;
+  profilePictureUrl: string;
+  createdAt: string;
+};

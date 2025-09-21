@@ -1,39 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Settings, Shield, LogOut, ArrowLeft } from 'lucide-react';
+import { User as UserIcon, Settings, Shield, LogOut, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ProfilePictureManager } from './ProfilePictureManager';
 import { UsernameChanger } from './UsernameChanger';
 import { PasskeyDevicesViewer } from './PasskeyDevicesViewer';
 import { DataExportImport } from './DataExportImport';
-import { getCurrentSession } from '@/lib/auth/client';
-import type { User as UserType } from '@/lib/auth/types';
+import { useAuth } from '@/lib/auth/context';
 
 export function ProfileClient() {
   const router = useRouter();
-  const [user, setUser] = useState<UserType | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, refreshSession } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'data'>('profile');
-
-  const loadUserData = useCallback(async () => {
-    try {
-      const session = await getCurrentSession();
-      if (session?.user) {
-        setUser(session.user);
-      } else {
-        router.push('/auth');
-      }
-    } catch (error) {
-      console.error('Failed to load user data:', error);
-      router.push('/auth');
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
 
   const handleLogout = async () => {
     try {
@@ -44,25 +25,9 @@ export function ProfileClient() {
     }
   };
 
-  const handleUserUpdate = (updatedUser: UserType) => {
-    setUser(updatedUser);
-  };
+  const handleUserUpdate = async () => await refreshSession();
 
-  useEffect(() => {
-    loadUserData();
-  }, [loadUserData]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <LoadingSpinner size="xl" variant="primary" text="Loading profile..." />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
+if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -105,7 +70,7 @@ export function ProfileClient() {
                         : 'text-gray-300 hover:bg-gray-800 hover:text-gray-100'
                     }`}
                   >
-                    <User className="h-4 w-4" />
+                    <UserIcon className="h-4 w-4" />
                     Profile
                   </button>
                   <button

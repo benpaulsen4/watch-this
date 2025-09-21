@@ -8,14 +8,14 @@ import { ContentCard } from '@/components/ui/ContentCard';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
 import {ProfileImage} from '@/components/ui';
-import { getCurrentSession } from '@/lib/auth/client';
 import { ActivityFeed } from "@/components/activity/ActivityFeed";
+import { useUser } from '@/lib/auth/context';
 
 export function DashboardClient() {
   const router = useRouter();
+  const user = useUser();
   const [trendingContent, setTrendingContent] = useState<(TMDBMovie | TMDBTVShow)[]>([]);
   const [contentLoading, setContentLoading] = useState(true);
-  const [user, setUser] = useState<{ id: string; username: string; profilePictureUrl?: string | null } | null>(null);
 
   const loadTrendingContent = useCallback(async () => {
     try {
@@ -31,21 +31,9 @@ export function DashboardClient() {
     }
   }, []);
 
-  const loadUserSession = useCallback(async () => {
-    try {
-      const session = await getCurrentSession();
-      if (session?.user) {
-        setUser(session.user);
-      }
-    } catch (error) {
-      console.error('Failed to load user session:', error);
-    }
-  }, []);
-
   useEffect(() => {
     loadTrendingContent();
-    loadUserSession();
-  }, [loadTrendingContent, loadUserSession]);
+  }, [loadTrendingContent]);
 
   return (
     <div className="min-h-screen bg-gray-950">

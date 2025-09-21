@@ -1,30 +1,23 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentSession } from '@/lib/auth/client';
+import { useAuth } from '@/lib/auth/context';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export default function Home() {
   const router = useRouter();
+  const { user, loading } = useAuth();
 
-  const checkAuthAndRedirect = useCallback(async () => {
-    try {
-      const session = await getCurrentSession();
-      if (session?.user) {
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
         router.push('/dashboard');
       } else {
         router.push('/auth');
       }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      router.push('/auth');
     }
-  }, [router]);
-
-  useEffect(() => {
-    checkAuthAndRedirect();
-  }, [checkAuthAndRedirect]);
+  }, [user, loading, router]);
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">

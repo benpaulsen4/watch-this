@@ -8,13 +8,15 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { UAParser } from 'ua-parser-js';
+import { useAuth } from '@/lib/auth/context';
 
 type AuthMode = 'signin' | 'register';
 
 function AuthPageContent() {
   const router = useRouter();
+  const {refreshSession} = useAuth();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/dashboard';
+  const redirectTo = decodeURIComponent(searchParams.get('redirect') || '/dashboard');
   
   const [mode, setMode] = useState<AuthMode>('signin');
   const [username, setUsername] = useState('');
@@ -55,6 +57,7 @@ function AuthPageContent() {
         username: username.trim(), 
         deviceName:  `${browser.name ?? 'Unknown Browser'} on ${os.name ?? 'Unknown OS'} ${os.version}` 
       });
+      await refreshSession();
       
       // Redirect to dashboard on success
       router.push(redirectTo);
@@ -73,6 +76,7 @@ function AuthPageContent() {
 
     try {
       await authenticatePasskey();
+      await refreshSession();
       
       // Redirect to dashboard on success
       router.push(redirectTo);

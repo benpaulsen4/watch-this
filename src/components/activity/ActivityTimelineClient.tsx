@@ -7,6 +7,7 @@ import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { LoadingSpinner } from "../ui";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/lib/auth/context";
 
 interface UserStub {
   id: string;
@@ -35,6 +36,7 @@ export interface ActivityResponse {
 
 export function ActivityTimelineClient() {
   const router = useRouter();
+  const user = useUser();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -144,7 +146,7 @@ export function ActivityTimelineClient() {
             <ActivityEntry 
               key={activity.id} 
               activity={activity} 
-              currentUsername=""
+              currentUsername={user?.username || ''}
             />
           ))}
           

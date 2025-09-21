@@ -1,37 +1,21 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { getCurrentSession } from '@/lib/auth/client';
+import { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/lib/auth/context';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export default function Layout({children}: {children: React.ReactNode}) {
-
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const session = await getCurrentSession();
-      if (session?.user) {
-        setAuthenticated(true);
-      } else {
-        router.push('/auth');
-        return;
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      router.push('/auth');
-      return;
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
+  const pathname = usePathname();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    if (!loading && !user) {
+      const redirectUrl = encodeURIComponent(pathname);
+      router.push(`/auth?redirect=${redirectUrl}`);
+    }
+  }, [user, loading, router, pathname]);
 
   if (loading) {
     return (
@@ -41,7 +25,7 @@ export default function Layout({children}: {children: React.ReactNode}) {
     );
   }
 
-  if (!authenticated) {
+  if (!user) {
     return null; // Router will redirect
   }
 
