@@ -258,16 +258,11 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
             </Badge>
           </div>
 
-          <div className="flex justify-between items-center mt-3">
             {showAddedDate && addedDate && (
               <span className="text-xs text-gray-500">
                 Added {new Date(addedDate).toLocaleDateString()}
               </span>
             )}
-              <span className="text-xs text-gray-500">
-                {(content.vote_count ?? 0).toLocaleString()} votes
-              </span>
-          </div>
         </div>
         </Card>
         

@@ -67,7 +67,7 @@ const fetchLists = useCallback(async () => {
   // Filter lists based on content type
   const filteredLists = lists.filter(list => {
     if (list.listType === 'mixed') return true;
-    if (contentType === 'movie' && list.listType === 'movie') return true;
+    if (contentType === 'movie' && list.listType === 'movies') return true;
     if (contentType === 'tv' && list.listType === 'tv') return true;
     return false;
   });
@@ -138,9 +138,9 @@ const fetchLists = useCallback(async () => {
                   <h4 className="font-medium text-gray-100">
                     {list.name}
                   </h4>
-                  <p className="text-sm text-gray-400 flex items-center flex-wrap gap-1">
+                  <div className="text-sm text-gray-400 flex items-center flex-wrap gap-1">
                     {list.listType === 'mixed' ? 'Mixed' :
-                     list.listType === 'movie' ? 'Movies' : 'TV Shows'} 
+                     list.listType === 'movies' ? 'Movies' : 'TV Shows'} 
                      <span>&nbsp;•&nbsp;</span>
                     {list.isPublic ? (
                     <>
@@ -162,10 +162,14 @@ const fetchLists = useCallback(async () => {
                       </div>
                     </>
                   )}
-                  <span>&nbsp;•&nbsp;</span>
-                  <Users className="h-3 w-3" />
-                    <span>{list.collaborators}</span>
-                  </p>
+                  {list.collaborators > 0 && (
+                    <>
+                      <span>&nbsp;•&nbsp;</span>
+                      <Users className="h-3 w-3" />
+                      <span>{list.collaborators}</span>
+                    </>
+                  )}
+                </div>
                 </div>
                 
                 <div className="flex items-center gap-3 flex-wrap justify-end">     

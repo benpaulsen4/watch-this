@@ -80,6 +80,7 @@ export function StatusSegmentedSelector({
       className={cn(
         'inline-flex flex-wrap bg-gray-800 border border-gray-600 rounded-lg',
         'focus-within:ring-2 focus-within:ring-red-500 focus-within:border-transparent',
+        'justify-center sm:justify-start',
         disabled && 'opacity-50 cursor-not-allowed',
         sizeClasses[size].container,
         className

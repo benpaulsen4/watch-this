@@ -103,3 +103,5 @@ npm run test:run
 - [ ] Sorting and filtering inside lists
 - [ ] Cast tab for content details
 - [ ] Statistics page in user profile
+- [ ] List quick access and refreshed list cards
+- [ ] Splash page

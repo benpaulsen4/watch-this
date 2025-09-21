@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { List } from '@/lib/db';
 import Image from 'next/image';
 import { getImageUrl } from '@/lib/tmdb';
+import { Badge } from '../ui';
 
 interface ListResponse extends List{
   itemCount: number;
@@ -324,10 +325,7 @@ export default function ListsClient() {
                           <CardTitle className="text-gray-100 text-lg group-hover:text-white transition-colors">
                             {list.name}
                           </CardTitle>
-                          {/* TODO use badge component */}
-                          <span className="px-2 py-1 text-xs bg-blue-600 text-blue-100 rounded-full capitalize">
-                            {list.listType}
-                          </span>
+                          <Badge variant="genre">{list.listType === 'mixed' ? 'Mixed' : list.listType === 'movies' ? 'Movies' : 'TV Shows'}</Badge>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-gray-400">
                           <div className="flex items-center gap-1">

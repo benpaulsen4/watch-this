@@ -386,10 +386,10 @@ export function EpisodeTracker({ tvShowId, className, onShowStatusChanged }: Epi
                         {/* Episode Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-gray-100">
+                            <span className="flex-2 md:flex-3 font-medium text-gray-100">
                               {episode.episode_number}. {episode.name}
                             </span>
-                            <div className="flex flex-1 min-w-0 flex-wrap items-center justify-end gap-2">
+                            <div className="flex flex-1 md:flex-2 flex-wrap items-center justify-end gap-2">
                             {episode.air_date && (
                               <div className="flex items-center gap-1 text-gray-400 text-xs">
                                 <Calendar className="h-3 w-3" />

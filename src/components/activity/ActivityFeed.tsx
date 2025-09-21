@@ -23,7 +23,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
     const fetchActivities = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/activity?limit=10");
+        const response = await fetch("/api/activity?limit=5");
         if (!response.ok) {
           throw new Error("Failed to fetch activities");
         }

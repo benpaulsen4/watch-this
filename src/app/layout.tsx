@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
   title: "WatchThis - Collaborative Movie & TV Tracking",
   description: "Track and discover movies and TV shows with friends. Create lists, share recommendations, and never miss what to watch next.",
   keywords: ["movies", "tv shows", "tracking", "watchlist", "collaboration", "entertainment"],
-  authors: [{ name: "WatchThis Team" }],
+  authors: [{ name: "Ben Paulsen", url: "https://benpaulsen.tech" }],
 };
 
 export const viewport: Viewport = {
@@ -37,6 +38,7 @@ export default function RootLayout({
       >
         {children}
       </body>
+      <Analytics />
     </html>
   );
 }

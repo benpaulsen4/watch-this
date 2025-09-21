@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Heart } from 'lucide-react';
+import { Search, List } from 'lucide-react';
 import type { TMDBMovie, TMDBTVShow } from '@/lib/tmdb/client';
 import { ContentCard } from '@/components/ui/ContentCard';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -59,7 +59,7 @@ export function DashboardClient() {
             
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={() => router.push('/lists')}>
-                <Heart className="h-4 w-4" />
+                <List className="h-4 w-4" />
                 <span className='ml-2 hidden sm:block'>My Lists</span>
               </Button>
               <Button variant="outline" size="sm" onClick={() => router.push('/search')}>

@@ -37,7 +37,7 @@ export default function ListSettingsModal({
   const [formData, setFormData] = useState({
     name: list.name,
     description: list.description || "",
-    type: list.listType,
+    listType: list.listType,
     isPublic: list.isPublic,
     syncWatchStatus: list.syncWatchStatus,
   });
@@ -80,7 +80,7 @@ export default function ListSettingsModal({
         body: JSON.stringify({
           name: formData.name.trim(),
           description: formData.description.trim() || null,
-          type: formData.type,
+          listType: formData.listType,
           isPublic: formData.isPublic,
           syncWatchStatus: formData.syncWatchStatus,
         }),
@@ -192,19 +192,19 @@ export default function ListSettingsModal({
                 </p>
               </div>
 
-              {/* List Type // TODO does not work (nor should it really exist) */}
+              {/* List Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   List Type
                 </label>
                 <select
-                  value={formData.type}
-                  onChange={(e) => handleInputChange("type", e.target.value)}
+                  value={formData.listType}
+                  onChange={(e) => handleInputChange("listType", e.target.value)}
                   disabled={!isOwner || isLoading}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="mixed">Mixed (Movies & TV Shows)</option>
-                  <option value="movie">Movies Only</option>
+                  <option value="movies">Movies Only</option>
                   <option value="tv">TV Shows Only</option>
                 </select>
               </div>

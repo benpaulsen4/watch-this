@@ -3,10 +3,9 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Modal, ModalOverlay, Heading, Button as AriaButton, Tabs, TabList, Tab, TabPanel } from 'react-aria-components';
-import { X, Star, Calendar, Clock, Users, Play } from 'lucide-react';
+import { X, Star, Calendar, Clock, Play, Tv } from 'lucide-react';
 import { cn, formatVoteAverage } from '@/lib/utils';
 import { getContentTitle, getContentReleaseDate, getContentType, getImageUrl } from '@/lib/tmdb/client';
-import { getGenreNames } from '@/lib/tmdb/genres';
 import { Badge } from './Badge';
 import { ListSelector } from './ListSelector';
 import { StatusSegmentedSelector } from './StatusSegmentedSelector';
@@ -232,7 +231,7 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove,  onSho
                   
                   {seasons && (
                     <div className="flex items-center gap-1 text-gray-400">
-                      <Users className="h-4 w-4" />
+                      <Tv className="h-4 w-4" />
                       <span className="text-xs sm:text-sm">
                         {seasons} season{seasons !== 1 ? 's' : ''}
                         {episodes && ` • ${episodes} episodes`}
@@ -300,13 +299,13 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove,  onSho
                     )}
                     
                     {/* Genres */}
-                    {content.genre_ids && content.genre_ids.length > 0 && (
+                    {detailedContent?.genres && detailedContent.genres.length > 0 && (
                       <div className="mb-6">
                         <h3 className="text-lg font-semibold text-gray-100 mb-2">Genres</h3>
                         <div className="flex flex-wrap gap-2">
-                          {getGenreNames(content.genre_ids, contentType).map((genreName, index) => (
-                            <Badge key={content.genre_ids[index]} variant="genre" size="sm">
-                              {genreName}
+                          {detailedContent.genres.map((genre) => (
+                            <Badge key={genre.id} variant="genre" size="sm">
+                              {genre.name}
                             </Badge>
                           ))}
                         </div>

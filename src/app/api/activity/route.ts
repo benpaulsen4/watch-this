@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { db } from "@/lib/db";
 import { activityFeed, users, lists, listCollaborators } from "@/lib/db/schema";
-import { eq, desc, and, or, inArray, lt } from "drizzle-orm";
+import { eq, desc, and, or, inArray, lt, arrayContains } from "drizzle-orm";
 
 // GET /api/activity - Get paginated activity timeline
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
@@ -17,22 +17,34 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     if (cursor && type) {
       whereConditions = and(
-        eq(activityFeed.userId, request.user.id),
+        or(
+          eq(activityFeed.userId, request.user.id),
+          arrayContains(activityFeed.collaborators, [request.user.id])
+        ),
         lt(activityFeed.createdAt, new Date(cursor)),
         eq(activityFeed.activityType, type)
       );
     } else if (cursor) {
       whereConditions = and(
-        eq(activityFeed.userId, request.user.id),
+        or(
+          eq(activityFeed.userId, request.user.id),
+          arrayContains(activityFeed.collaborators, [request.user.id])
+        ),
         lt(activityFeed.createdAt, new Date(cursor))
       );
     } else if (type) {
       whereConditions = and(
-        eq(activityFeed.userId, request.user.id),
+        or(
+          eq(activityFeed.userId, request.user.id),
+          arrayContains(activityFeed.collaborators, [request.user.id])
+        ),
         eq(activityFeed.activityType, type)
       );
     } else {
-      whereConditions = eq(activityFeed.userId, request.user.id);
+      whereConditions = or(
+        eq(activityFeed.userId, request.user.id),
+        arrayContains(activityFeed.collaborators, [request.user.id])
+      );
     }
 
     // Get user's collaborative lists to include collaborative activities
