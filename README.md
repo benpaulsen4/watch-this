@@ -90,7 +90,7 @@ npm run test:run
 
 ## 🛣️ Roadmap
 
-- [ ] TV show scheduling
+- [x] TV show scheduling
 - [x] Watch status sync option for shared lists
 - [x] Activity feed to see you and your friends recent activity on lists and watch status
 - [x] Quick complete action from content card

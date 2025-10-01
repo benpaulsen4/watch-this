@@ -10,6 +10,7 @@ import {
   TVWatchStatusEnum,
   activityFeed,
   ActivityType,
+  showSchedules,
 } from "@/lib/db/schema";
 import {
   withAuth,
@@ -19,6 +20,36 @@ import {
 import { eq, and } from "drizzle-orm";
 import { syncStatusToCollaborators } from "@/lib/activity/sync-utils";
 import { tmdbClient, TMDBMovie, TMDBTVShow } from "@/lib";
+
+// Helper function to remove schedules when a show is completed or dropped
+async function removeSchedulesForCompletedOrDroppedShow(
+  userId: string,
+  tmdbId: number,
+  contentType: string,
+  status: string
+) {
+  // Only remove schedules for TV shows that are completed or dropped
+  if (contentType === ContentType.TV && (status === "completed" || status === "dropped")) {
+    try {
+      const deletedSchedules = await db
+        .delete(showSchedules)
+        .where(
+          and(
+            eq(showSchedules.userId, userId),
+            eq(showSchedules.tmdbId, tmdbId)
+          )
+        )
+        .returning();
+      
+      if (deletedSchedules.length > 0) {
+        console.log(`Automatically removed ${deletedSchedules.length} schedule(s) for ${status} show ${tmdbId}`);
+      }
+    } catch (error) {
+      console.error("Error removing schedules for completed/dropped show:", error);
+      // Don't fail the main operation if schedule cleanup fails
+    }
+  }
+}
 
 // GET /api/status/content - Get content watch status for authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
@@ -154,6 +185,9 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         })
         .returning();
     }
+
+    // Remove schedules if show is completed or dropped
+    await removeSchedulesForCompletedOrDroppedShow(userId, tmdbId, contentType, status);
 
     // Sync status to collaborators if applicable
     const syncedCollaboratorIds = await syncStatusToCollaborators(
@@ -294,6 +328,11 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
         )
       )
       .returning();
+
+    // Remove schedules if show is completed or dropped
+    if (status !== undefined) {
+      await removeSchedulesForCompletedOrDroppedShow(userId, tmdbId, contentType, status);
+    }
 
     // Sync status to collaborators if applicable
     if (status !== undefined) {

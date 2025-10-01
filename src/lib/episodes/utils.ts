@@ -10,6 +10,7 @@ import {
   WatchStatus,
   ActivityType,
   WatchStatusEnum,
+  showSchedules,
 } from "@/lib/db/schema";
 import { eq, and, or } from "drizzle-orm";
 import { tmdbClient } from "@/lib/tmdb/client";
@@ -297,6 +298,26 @@ export async function updateTVShowStatus(
         );
 
       newStatus = WatchStatus.COMPLETED;
+
+      // Remove schedules when show is completed
+      try {
+        const deletedSchedules = await db
+          .delete(showSchedules)
+          .where(
+            and(
+              eq(showSchedules.userId, userId),
+              eq(showSchedules.tmdbId, tmdbId)
+            )
+          )
+          .returning();
+        
+        if (deletedSchedules.length > 0) {
+          console.log(`Automatically removed ${deletedSchedules.length} schedule(s) for completed show ${tmdbId}`);
+        }
+      } catch (error) {
+        console.error("Error removing schedules for completed show:", error);
+        // Don't fail the main operation if schedule cleanup fails
+      }
     }
   }
 

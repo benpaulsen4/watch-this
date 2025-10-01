@@ -172,6 +172,26 @@ export const activityFeed = pgTable("activity_feed", {
     .notNull(),
 });
 
+// Show schedules table
+export const showSchedules = pgTable(
+  "show_schedules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tmdbId: integer("tmdb_id").notNull(),
+    dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday, 6 = Saturday
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [unique().on(table.userId, table.tmdbId, table.dayOfWeek)]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   passkeyCredentials: many(passkeyCredentials),
@@ -180,6 +200,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   contentStatuses: many(userContentStatus),
   episodeStatuses: many(episodeWatchStatus),
   activities: many(activityFeed),
+  showSchedules: many(showSchedules),
 }));
 
 export const passkeyCredentialsRelations = relations(
@@ -254,6 +275,13 @@ export const activityFeedRelations = relations(activityFeed, ({ one }) => ({
   }),
 }));
 
+export const showSchedulesRelations = relations(showSchedules, ({ one }) => ({
+  user: one(users, {
+    fields: [showSchedules.userId],
+    references: [users.id],
+  }),
+}));
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -278,6 +306,9 @@ export type NewEpisodeWatchStatus = typeof episodeWatchStatus.$inferInsert;
 
 export type ActivityFeed = typeof activityFeed.$inferSelect;
 export type NewActivityFeed = typeof activityFeed.$inferInsert;
+
+export type ShowSchedule = typeof showSchedules.$inferSelect;
+export type NewShowSchedule = typeof showSchedules.$inferInsert;
 
 // Enums for type safety
 export const ListType = {

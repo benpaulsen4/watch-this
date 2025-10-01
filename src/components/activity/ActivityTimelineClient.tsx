@@ -28,8 +28,17 @@ export interface Activity {
   createdAt: string;
 }
 
+export interface UpcomingActivity {
+  tmdbId: number;
+  scheduleId: string;
+  status: string;
+  title: string;
+  posterPath: string;
+}
+
 export interface ActivityResponse {
   activities: Activity[];
+  upcoming?: UpcomingActivity[];
   hasMore: boolean;
   nextCursor?: string;
 }

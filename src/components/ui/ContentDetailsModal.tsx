@@ -10,6 +10,7 @@ import { Badge } from './Badge';
 import { ListSelector } from './ListSelector';
 import { StatusSegmentedSelector } from './StatusSegmentedSelector';
 import { EpisodeTracker } from './EpisodeTracker';
+import { ScheduleManager } from './ScheduleManager';
 import type { TMDBMovie, TMDBTVShow, TMDBMovieDetails, TMDBTVShowDetails } from '@/lib/tmdb/client';
 import type { WatchStatusEnum, ContentTypeEnum } from '@/lib/db/schema';
 
@@ -285,6 +286,17 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove,  onSho
                     >
                       Lists
                     </Tab>
+                    {contentType === 'tv' && !!watchStatus && (
+                      <Tab 
+                        id="schedule"
+                        className={({isSelected}) => cn(
+                        "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent",
+                        isSelected ? "text-red-400 border-red-500" : 'hover:text-gray-100 hover:border-gray-500'
+                      )}
+                      >
+                        Schedule
+                      </Tab>
+                    )}
                   </TabList>
                   
                   <TabPanel id="overview" className="focus:outline-none">
@@ -321,6 +333,15 @@ export function ContentDetailsModal({ content, isOpen, onClose, onRemove,  onSho
                           setWatchStatus(status);
                           onShowStatusChanged?.(status);
                         }}
+                      />
+                    </TabPanel>
+                  )}
+
+                  {contentType === 'tv' && !!watchStatus && (
+                    <TabPanel id="schedule" className="focus:outline-none">
+                      <ScheduleManager
+                        tmdbId={content.id}
+                        watchStatus={watchStatus}
                       />
                     </TabPanel>
                   )}
