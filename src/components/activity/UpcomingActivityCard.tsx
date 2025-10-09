@@ -27,7 +27,7 @@ export function UpcomingActivityCard({ upcoming, onEpisodeWatched }: UpcomingAct
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          tmdbId: upcoming.tmdbId,
+          tmdbId: upcoming.id,
         }),
       });
 
@@ -44,7 +44,7 @@ export function UpcomingActivityCard({ upcoming, onEpisodeWatched }: UpcomingAct
     }
   };
 
-  const posterUrl = getImageUrl(upcoming.posterPath, 'w342');
+  const posterUrl = getImageUrl(upcoming.poster_path, 'w342');
 
   const today = DAYS_OF_WEEK[new Date().getDay()];
 
@@ -56,7 +56,7 @@ export function UpcomingActivityCard({ upcoming, onEpisodeWatched }: UpcomingAct
             {posterUrl ? (
               <Image
                 src={posterUrl}
-                alt={upcoming.title}
+                alt={upcoming.name}
                 width={300}
                 height={450}
                 className="w-24 h-36 sm:w-28 sm:h-40 md:w-32 md:h-48 object-cover rounded-md"
@@ -71,7 +71,7 @@ export function UpcomingActivityCard({ upcoming, onEpisodeWatched }: UpcomingAct
           <div className="flex-1 flex flex-col gap-2">
             <p className="text-gray-400 text-sm md:text-base">It&apos;s {today}! Have you watched this today?</p>
             <h3 className="text-gray-100 font-semibold text-xl truncate mb-4">
-              {upcoming.title}
+              {upcoming.name}
             </h3>
             <div>
               <Button

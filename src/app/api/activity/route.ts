@@ -148,6 +148,9 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     // Get upcoming activities (scheduled shows for today)
     const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
+    console.log(
+      `Getting upcoming activities for day ${today}. Timezone is ${new Date().getTimezoneOffset()}`
+    );
 
     const upcomingActivities = await db
       .select({
@@ -194,14 +197,11 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
         // Get show details from TMDB
         const showDetails = await tmdbClient.getTVShowDetails(activity.tmdbId);
-        const { name, poster_path } = showDetails;
 
         return {
-          tmdbId: activity.tmdbId,
+          ...showDetails,
           scheduleId: activity.scheduleId,
           status: activity.status,
-          title: name,
-          posterPath: poster_path,
         };
       })
     );
@@ -230,15 +230,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           )?.profilePictureUrl,
         })),
       })),
-      upcoming: upcomingWithEpisodes
-        .filter((upcoming) => upcoming !== null)
-        .map((upcoming) => ({
-          tmdbId: upcoming.tmdbId,
-          scheduleId: upcoming.scheduleId,
-          status: upcoming.status,
-          title: upcoming.title,
-          posterPath: upcoming.posterPath,
-        })),
+      upcoming: upcomingWithEpisodes.filter((upcoming) => upcoming !== null),
       hasMore,
       nextCursor,
     });

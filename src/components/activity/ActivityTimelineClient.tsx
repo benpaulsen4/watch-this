@@ -8,6 +8,7 @@ import { LoadingSpinner } from "../ui";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/auth/context";
+import { TMDBTVShow } from "@/lib/tmdb/client";
 
 interface UserStub {
   id: string;
@@ -28,12 +29,9 @@ export interface Activity {
   createdAt: string;
 }
 
-export interface UpcomingActivity {
-  tmdbId: number;
+export interface UpcomingActivity extends TMDBTVShow {
   scheduleId: string;
   status: string;
-  title: string;
-  posterPath: string;
 }
 
 export interface ActivityResponse {

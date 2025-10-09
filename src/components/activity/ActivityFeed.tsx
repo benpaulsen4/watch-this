@@ -111,7 +111,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {upcomingActivities.map((upcoming, index) => (
               <UpcomingActivityCard 
-                key={`${upcoming.tmdbId}-${index}`} 
+                key={`${upcoming.id}-${index}`} 
                 upcoming={upcoming}
                 onEpisodeWatched={fetchActivities}
               />
