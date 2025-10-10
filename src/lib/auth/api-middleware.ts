@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth/webauthn';
+import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/webauthn";
+import { User } from "../db";
 
 export interface AuthenticatedRequest extends NextRequest {
-  user: {
-    id: string;
-    username: string;
-    createdAt: Date;
-  };
+  user: User;
 }
 
 export type AuthenticatedHandler = (
@@ -22,11 +19,11 @@ export function withAuth(handler: AuthenticatedHandler) {
   return async function (request: NextRequest): Promise<NextResponse> {
     try {
       // Check authentication
-      const sessionToken = request.cookies.get('session')?.value;
-      
+      const sessionToken = request.cookies.get("session")?.value;
+
       if (!sessionToken) {
         return NextResponse.json(
-          { error: 'Authentication required' },
+          { error: "Authentication required" },
           { status: 401 }
         );
       }
@@ -36,26 +33,22 @@ export function withAuth(handler: AuthenticatedHandler) {
       if (!user) {
         // Clear invalid session cookie
         const response = NextResponse.json(
-          { error: 'Invalid session' },
+          { error: "Invalid session" },
           { status: 401 }
         );
-        response.cookies.delete('session');
+        response.cookies.delete("session");
         return response;
       }
 
       // Add user to request object
       const authenticatedRequest = request as AuthenticatedRequest;
-      authenticatedRequest.user = {
-        id: user.id,
-        username: user.username,
-        createdAt: user.createdAt,
-      };
+      authenticatedRequest.user = user;
 
       return await handler(authenticatedRequest);
     } catch (error) {
-      console.error('Authentication middleware error:', error);
+      console.error("Authentication middleware error:", error);
       return NextResponse.json(
-        { error: 'Authentication failed' },
+        { error: "Authentication failed" },
         { status: 500 }
       );
     }
@@ -72,25 +65,22 @@ export function handleApiError(error: unknown, context: string): NextResponse {
   console.error(`${context} error:`, error);
 
   if (error instanceof Error) {
-    if (error.message.includes('TMDB API error')) {
+    if (error.message.includes("TMDB API error")) {
       return NextResponse.json(
-        { error: 'External service unavailable' },
+        { error: "External service unavailable" },
         { status: 503 }
       );
     }
-    
-    if (error.message.includes('rate limit')) {
+
+    if (error.message.includes("rate limit")) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.' },
+        { error: "Rate limit exceeded. Please try again later." },
         { status: 429 }
       );
     }
   }
 
-  return NextResponse.json(
-    { error: `${context} failed` },
-    { status: 500 }
-  );
+  return NextResponse.json({ error: `${context} failed` }, { status: 500 });
 }
 
 /**
@@ -103,8 +93,8 @@ export function validatePagination(
   page: string | null,
   maxPage: number = 1000
 ): { page: number; error?: NextResponse } {
-  const pageNum = parseInt(page || '1');
-  
+  const pageNum = parseInt(page || "1");
+
   if (isNaN(pageNum) || pageNum < 1 || pageNum > maxPage) {
     return {
       page: 1,
@@ -114,6 +104,6 @@ export function validatePagination(
       ),
     };
   }
-  
+
   return { page: pageNum };
 }

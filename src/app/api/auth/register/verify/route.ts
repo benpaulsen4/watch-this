@@ -10,12 +10,13 @@ interface RequestBody {
   username: string;
   registrationResponse: unknown;
   deviceName?: string;
+  timezone?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: RequestBody = await request.json();
-    const { username, registrationResponse, deviceName } = body;
+    const { username, registrationResponse, deviceName, timezone } = body;
 
     if (
       !username ||
@@ -48,11 +49,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify registration
+    // Validate timezone if provided
+    let validatedTimezone: string | undefined = undefined;
+    if (timezone !== undefined) {
+      if (typeof timezone !== "string" || timezone.trim().length === 0) {
+        return NextResponse.json(
+          { error: "Timezone must be a non-empty string" },
+          { status: 400 }
+        );
+      }
+      try {
+        // Validate via Intl API
+        new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(
+          new Date()
+        );
+        validatedTimezone = timezone;
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid timezone" },
+          { status: 400 }
+        );
+      }
+    }
+
     const { user, credential } = await verifyPasskeyRegistration(
       username.trim(),
       registrationResponse as RegistrationResponseJSON,
       challengePayload.challenge,
-      deviceName
+      deviceName,
+      validatedTimezone
     );
 
     // Create session token
@@ -63,6 +88,8 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         username: user.username,
+        profilePictureUrl: user.profilePictureUrl,
+        timezone: user.timezone,
         createdAt: user.createdAt,
       },
       credential: {

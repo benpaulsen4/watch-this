@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
         id: user.id,
         username: user.username,
         profilePictureUrl: user.profilePictureUrl,
+        timezone: user.timezone,
         createdAt: user.createdAt,
       },
     });
@@ -62,7 +63,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { username, profilePictureUrl } = body;
+    const { username, profilePictureUrl, timezone } = body;
 
     // Validate input
     if (username !== undefined) {
@@ -111,6 +112,33 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Validate timezone if provided
+    if (timezone !== undefined) {
+      if (typeof timezone !== "string" || timezone.trim().length === 0) {
+        return NextResponse.json(
+          { error: "Timezone must be a non-empty string" },
+          { status: 400 }
+        );
+      }
+      if (timezone.length > 100) {
+        return NextResponse.json(
+          { error: "Timezone must be 100 characters or less" },
+          { status: 400 }
+        );
+      }
+      try {
+        // Validate via Intl API
+        new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(
+          new Date()
+        );
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid timezone" },
+          { status: 400 }
+        );
+      }
+    }
+
     // Check if username is already taken (if username is being updated)
     if (username !== undefined && username !== user.username) {
       const existingUser = await db
@@ -140,6 +168,10 @@ export async function PUT(request: NextRequest) {
       updateData.profilePictureUrl = profilePictureUrl || null;
     }
 
+    if (timezone !== undefined) {
+      updateData.timezone = timezone;
+    }
+
     const [updatedUser] = await db
       .update(users)
       .set(updateData)
@@ -152,6 +184,7 @@ export async function PUT(request: NextRequest) {
         id: updatedUser.id,
         username: updatedUser.username,
         profilePictureUrl: updatedUser.profilePictureUrl,
+        timezone: updatedUser.timezone,
         createdAt: updatedUser.createdAt,
       },
     });

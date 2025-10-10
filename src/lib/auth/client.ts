@@ -18,6 +18,8 @@ export async function registerPasskey({
   deviceName,
 }: RegistrationOptions) {
   try {
+    // Detect browser timezone
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     // Get registration options from server
     const optionsResponse = await fetch("/api/auth/register/begin", {
       method: "POST",
@@ -45,6 +47,7 @@ export async function registerPasskey({
         username,
         registrationResponse,
         deviceName,
+        timezone,
       }),
     });
 
@@ -153,5 +156,6 @@ export type User = {
   id: string;
   username: string;
   profilePictureUrl: string;
+  timezone: string;
   createdAt: string;
 };

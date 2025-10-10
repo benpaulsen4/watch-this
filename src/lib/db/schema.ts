@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   username: varchar("username", { length: 50 }).notNull().unique(),
   profilePictureUrl: varchar("profile_picture_url", { length: 500 }),
+  timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

@@ -146,11 +146,24 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         ? resultActivities[resultActivities.length - 1].createdAt.toISOString()
         : null;
 
-    // Get upcoming activities (scheduled shows for today)
-    const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
-    console.log(
-      `Getting upcoming activities for day ${today}. Timezone is ${new Date().getTimezoneOffset()}`
-    );
+    const userTimezone = request.user.timezone;
+
+    // Determine today's day in user's timezone
+    const dayNameFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: userTimezone,
+      weekday: "short",
+    });
+    const dayName = dayNameFormatter.format(new Date());
+    const dayMap: Record<string, number> = {
+      Sun: 0,
+      Mon: 1,
+      Tue: 2,
+      Wed: 3,
+      Thu: 4,
+      Fri: 5,
+      Sat: 6,
+    };
+    const today = dayMap[dayName] ?? new Date().getDay();
 
     const upcomingActivities = await db
       .select({
@@ -186,7 +199,8 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
               eq(episodeWatchStatus.userId, request.user.id),
               eq(episodeWatchStatus.tmdbId, activity.tmdbId),
               eq(episodeWatchStatus.watched, true),
-              sql`DATE(${episodeWatchStatus.watchedAt}) = CURRENT_DATE`
+              // Compare dates using the user's timezone rather than DB server timezone
+              sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`
             )
           );
 

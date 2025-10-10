@@ -61,7 +61,8 @@ export async function verifyPasskeyRegistration(
   username: string,
   registrationResponse: RegistrationResponseJSON,
   expectedChallenge: string,
-  deviceName?: string
+  deviceName?: string,
+  timezone?: string
 ) {
   const verification: VerifyRegistrationResponseOpts = {
     response: registrationResponse,
@@ -88,6 +89,7 @@ export async function verifyPasskeyRegistration(
       .insert(users)
       .values({
         username,
+        timezone: timezone || "UTC",
       })
       .returning();
 

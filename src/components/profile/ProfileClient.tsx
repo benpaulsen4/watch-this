@@ -10,6 +10,7 @@ import { UsernameChanger } from './UsernameChanger';
 import { PasskeyDevicesViewer } from './PasskeyDevicesViewer';
 import { DataExportImport } from './DataExportImport';
 import { useAuth } from '@/lib/auth/context';
+import { TimezoneSelector } from './TimezoneSelector';
 
 export function ProfileClient() {
   const router = useRouter();
@@ -116,6 +117,10 @@ if (!user) return null;
                     <UsernameChanger 
                       user={user} 
                       onUserUpdate={handleUserUpdate} 
+                    />
+                    <TimezoneSelector 
+                      user={user}
+                      onUserUpdate={handleUserUpdate}
                     />
                   </CardContent>
                 </Card>
