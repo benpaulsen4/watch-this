@@ -1,28 +1,31 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Camera, Check, X, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { User } from '@/lib/auth/client';
+import { useState } from "react";
+import { Camera, Check, X, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { User } from "@/lib/auth/client";
 
 interface ProfilePictureManagerProps {
   user: User;
   onUserUpdate: (user: User) => void;
 }
 
-export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureManagerProps) {
+export function ProfilePictureManager({
+  user,
+  onUserUpdate,
+}: ProfilePictureManagerProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [newUrl, setNewUrl] = useState(user.profilePictureUrl || '');
+  const [newUrl, setNewUrl] = useState(user.profilePictureUrl || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
 
   const validateUrl = (url: string): boolean => {
     if (!url.trim()) return true; // Empty URL is valid (removes profile picture)
-    
+
     try {
       const urlObj = new URL(url);
-      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+      return urlObj.protocol === "http:" || urlObj.protocol === "https:";
     } catch {
       return false;
     }
@@ -30,7 +33,7 @@ export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureMana
 
   const handleSave = async () => {
     if (!validateUrl(newUrl)) {
-      setError('Please enter a valid HTTP or HTTPS URL');
+      setError("Please enter a valid HTTP or HTTPS URL");
       return;
     }
 
@@ -38,10 +41,10 @@ export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureMana
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/session', {
-        method: 'PUT',
+      const response = await fetch("/api/auth/session", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           profilePictureUrl: newUrl.trim() || null,
@@ -50,7 +53,7 @@ export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureMana
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update profile picture');
+        throw new Error(errorData.error || "Failed to update profile picture");
       }
 
       const updatedUser = await response.json();
@@ -58,14 +61,16 @@ export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureMana
       setIsEditing(false);
       setPreviewError(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update profile picture');
+      setError(
+        err instanceof Error ? err.message : "Failed to update profile picture",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    setNewUrl(user.profilePictureUrl || '');
+    setNewUrl(user.profilePictureUrl || "");
     setIsEditing(false);
     setError(null);
     setPreviewError(false);
@@ -106,16 +111,22 @@ export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureMana
         {/* Profile Picture Management */}
         <div className="flex-1 space-y-4">
           <div>
-            <h3 className="text-lg font-medium text-gray-100 mb-2">Profile Picture</h3>
+            <h3 className="text-lg font-medium text-gray-100 mb-2">
+              Profile Picture
+            </h3>
             <p className="text-sm text-gray-400">
-              Add a profile picture using an external URL. Supported formats: JPG, PNG, GIF, WebP.
+              Add a profile picture using an external URL. Supported formats:
+              JPG, PNG, GIF, WebP.
             </p>
           </div>
 
           {isEditing ? (
             <div className="space-y-4">
               <div>
-                <label htmlFor="profile-url" className="block text-sm font-medium text-gray-300 mb-2">
+                <label
+                  htmlFor="profile-url"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
                   Image URL
                 </label>
                 {/* TODO use input component */}
@@ -143,7 +154,9 @@ export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureMana
                       src={newUrl}
                       alt="Preview"
                       className="w-full h-full object-cover"
-                      onError={() => setError('Unable to load image from this URL')}
+                      onError={() =>
+                        setError("Unable to load image from this URL")
+                      }
                       onLoad={() => setError(null)}
                     />
                   </div>
@@ -164,7 +177,7 @@ export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureMana
                   loading={loading}
                   size="sm"
                 >
-                    <Check className="h-4 w-4 mr-2" />
+                  <Check className="h-4 w-4 mr-2" />
                   Save
                 </Button>
                 <Button
@@ -193,7 +206,7 @@ export function ProfilePictureManager({ user, onUserUpdate }: ProfilePictureMana
                 onClick={() => setIsEditing(true)}
               >
                 <Camera className="h-4 w-4 mr-2" />
-                {user.profilePictureUrl ? 'Change Picture' : 'Add Picture'}
+                {user.profilePictureUrl ? "Change Picture" : "Add Picture"}
               </Button>
             </div>
           )}

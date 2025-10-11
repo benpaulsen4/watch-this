@@ -9,10 +9,10 @@ import { db } from "@/lib/db";
 import { episodeWatchStatus } from "@/lib/db/schema";
 import { tmdbClient } from "@/lib/tmdb/client";
 import {
-  syncEpisodeStatusToCollaborators,
   createEpisodeActivityEntry,
+  syncEpisodeStatusToCollaborators,
   updateTVShowStatus,
-} from "@/lib/episodes";
+} from "@/lib/episodes/episodeUtils";
 
 // POST /api/status/episodes/next - Mark the next available episode as watched
 export const POST = withAuth(async (request: AuthenticatedRequest) => {
@@ -25,7 +25,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || typeof tmdbId !== "number") {
       return NextResponse.json(
         { error: "tmdbId is required and must be a number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -36,7 +36,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       if (error instanceof Error && error.message.includes("404")) {
         return NextResponse.json(
           { error: "TV show not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       throw error;
@@ -50,12 +50,12 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(episodeWatchStatus.userId, userId),
           eq(episodeWatchStatus.tmdbId, tmdbId),
-          eq(episodeWatchStatus.watched, true)
-        )
+          eq(episodeWatchStatus.watched, true),
+        ),
       )
       .orderBy(
         desc(episodeWatchStatus.seasonNumber),
-        desc(episodeWatchStatus.episodeNumber)
+        desc(episodeWatchStatus.episodeNumber),
       );
 
     // Determine the next episode to watch
@@ -71,12 +71,12 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       try {
         seasonDetails = await tmdbClient.getTVSeasonDetails(
           tmdbId,
-          lastWatched.seasonNumber
+          lastWatched.seasonNumber,
         );
       } catch {
         return NextResponse.json(
           { error: "Failed to get season details" },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -97,13 +97,13 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       nextEpisodeDetails = await tmdbClient.getTVEpisodeDetails(
         tmdbId,
         nextSeasonNumber,
-        nextEpisodeNumber
+        nextEpisodeNumber,
       );
     } catch (error) {
       if (error instanceof Error && error.message.includes("404")) {
         return NextResponse.json(
           { error: "No next episode available. You're all caught up!" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       throw error;
@@ -119,7 +119,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
           error: `Next episode hasn't aired yet. Check back on ${airDate.toLocaleDateString()}.`,
           nextAirDate: nextEpisodeDetails.air_date,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -132,8 +132,8 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
           eq(episodeWatchStatus.userId, userId),
           eq(episodeWatchStatus.tmdbId, tmdbId),
           eq(episodeWatchStatus.seasonNumber, nextSeasonNumber),
-          eq(episodeWatchStatus.episodeNumber, nextEpisodeNumber)
-        )
+          eq(episodeWatchStatus.episodeNumber, nextEpisodeNumber),
+        ),
       )
       .limit(1);
 
@@ -152,8 +152,8 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             eq(episodeWatchStatus.userId, userId),
             eq(episodeWatchStatus.tmdbId, tmdbId),
             eq(episodeWatchStatus.seasonNumber, nextSeasonNumber),
-            eq(episodeWatchStatus.episodeNumber, nextEpisodeNumber)
-          )
+            eq(episodeWatchStatus.episodeNumber, nextEpisodeNumber),
+          ),
         )
         .returning();
     } else {
@@ -177,7 +177,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       tmdbId,
       nextSeasonNumber,
       nextEpisodeNumber,
-      true
+      true,
     );
 
     // Create activity entry for episode progress
@@ -188,7 +188,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       nextEpisodeNumber,
       true,
       syncedCollaboratorIds,
-      nextEpisodeDetails.name
+      nextEpisodeDetails.name,
     );
 
     // Auto-update show status based on episode progress
@@ -197,7 +197,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       tmdbId,
       nextSeasonNumber,
       nextEpisodeNumber,
-      true
+      true,
     );
 
     return NextResponse.json(
@@ -211,7 +211,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
           airDate: nextEpisodeDetails.air_date,
         },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     return handleApiError(error, "Mark next episode as watched");

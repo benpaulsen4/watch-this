@@ -1,34 +1,34 @@
-import { forwardRef } from 'react';
-import { cn } from '@/lib/utils';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { forwardRef } from "react";
+import { cn } from "@/lib/utils";
+import { cva, type VariantProps } from "class-variance-authority";
 
 const inputVariants = cva(
-  'flex w-full rounded-lg border bg-transparent px-3 py-2 text-sm transition-all file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-50',
+  "flex w-full rounded-lg border bg-transparent px-3 py-2 text-sm transition-all file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          'border-gray-600 text-gray-100 hover:border-gray-500 focus:border-red-500',
+          "border-gray-600 text-gray-100 hover:border-gray-500 focus:border-red-500",
         error:
-          'border-red-500 text-gray-100 focus:border-red-400 focus-visible:ring-red-400',
+          "border-red-500 text-gray-100 focus:border-red-400 focus-visible:ring-red-400",
         success:
-          'border-green-500 text-gray-100 focus:border-green-400 focus-visible:ring-green-400',
+          "border-green-500 text-gray-100 focus:border-green-400 focus-visible:ring-green-400",
       },
       size: {
-        default: 'h-10',
-        sm: 'h-8 text-xs',
-        lg: 'h-12 text-base',
+        default: "h-10",
+        sm: "h-8 text-xs",
+        lg: "h-12 text-base",
       },
     },
     defaultVariants: {
-      variant: 'default',
-      size: 'default',
+      variant: "default",
+      size: "default",
     },
-  }
+  },
 );
 
 export interface InputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'>,
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
     VariantProps<typeof inputVariants> {
   error?: string;
   label?: string;
@@ -36,9 +36,12 @@ export interface InputProps
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, variant, size, error, label, helperText, id, ...props }, ref) => {
+  (
+    { className, variant, size, error, label, helperText, id, ...props },
+    ref,
+  ) => {
     const inputId = id || `input-${Math.random().toString(36).substring(2)}`;
-    const finalVariant = error ? 'error' : variant;
+    const finalVariant = error ? "error" : variant;
 
     return (
       <div className="space-y-2">
@@ -52,25 +55,24 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         <input
           id={inputId}
-          className={cn(inputVariants({ variant: finalVariant, size, className }))}
+          className={cn(
+            inputVariants({ variant: finalVariant, size, className }),
+          )}
           ref={ref}
           {...props}
         />
         {(error || helperText) && (
           <p
-            className={cn(
-              'text-xs',
-              error ? 'text-red-400' : 'text-gray-500'
-            )}
+            className={cn("text-xs", error ? "text-red-400" : "text-gray-500")}
           >
             {error || helperText}
           </p>
         )}
       </div>
     );
-  }
+  },
 );
 
-Input.displayName = 'Input';
+Input.displayName = "Input";
 
 export { Input, inputVariants };

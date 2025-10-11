@@ -20,7 +20,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!format || !["csv", "json"].includes(format)) {
       return NextResponse.json(
         { error: "Format parameter is required and must be 'csv' or 'json'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -147,7 +147,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
             createdAt: Date | null;
           }[];
         }
-      >
+      >,
     );
 
     const listsArray = Object.values(listsData) as Array<{
@@ -218,7 +218,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
                   ? `"${fieldStr.replace(/"/g, '""')}"`
                   : fieldStr;
               })
-              .join(",")
+              .join(","),
           )
           .join("\n");
       };
@@ -339,7 +339,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         console.error("ZIP generation failed:", zipError);
         return NextResponse.json(
           { error: "Failed to generate ZIP file" },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
@@ -350,7 +350,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     return NextResponse.json(
       { error: "Failed to export data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

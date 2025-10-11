@@ -72,7 +72,7 @@ interface WatchThisImport {
  */
 function mapShowStatus(
   seriesGuideStatus: string,
-  hasWatchedEpisodes: boolean
+  hasWatchedEpisodes: boolean,
 ): ContentStatus["status"] {
   switch (seriesGuideStatus.toLowerCase()) {
     case "ended":
@@ -96,7 +96,7 @@ function mapShowStatus(
  * Converts SeriesGuide JSON to WatchThis import format
  */
 function convertSeriesGuideToWatchThis(
-  seriesGuideData: SeriesGuideShow[]
+  seriesGuideData: SeriesGuideShow[],
 ): WatchThisImport {
   const contentStatus: ContentStatus[] = [];
   const episodeWatchStatus: EpisodeWatchStatus[] = [];
@@ -118,7 +118,7 @@ function convertSeriesGuideToWatchThis(
           // Convert first_aired timestamp to ISO string if available
           if (episode.first_aired) {
             episodeStatus.watchedAt = new Date(
-              episode.first_aired
+              episode.first_aired,
             ).toISOString();
           }
 
@@ -156,10 +156,10 @@ function main() {
 
   if (args.length < 1) {
     console.error(
-      "Usage: node seriesguide-converter.js <input-file> [output-file]"
+      "Usage: node seriesguide-converter.js <input-file> [output-file]",
     );
     console.error(
-      "Example: node seriesguide-converter.js seriesguide-snippet.json watchthis-import.json"
+      "Example: node seriesguide-converter.js seriesguide-snippet.json watchthis-import.json",
     );
     process.exit(1);
   }
@@ -178,7 +178,7 @@ function main() {
     // Read and parse SeriesGuide JSON
     console.log(`Reading SeriesGuide data from: ${inputFile}`);
     const seriesGuideData: SeriesGuideShow[] = JSON.parse(
-      fs.readFileSync(inputFile, "utf8")
+      fs.readFileSync(inputFile, "utf8"),
     );
 
     // Convert to WatchThis format
@@ -190,7 +190,7 @@ function main() {
     fs.writeFileSync(
       outputFile,
       JSON.stringify(watchThisData, null, 2),
-      "utf8"
+      "utf8",
     );
 
     // Summary
@@ -199,10 +199,13 @@ function main() {
     console.log(`Watched episodes: ${watchThisData.episodeWatchStatus.length}`);
 
     // Show breakdown by status
-    const statusCounts = watchThisData.contentStatus.reduce((acc, item) => {
-      acc[item.status] = (acc[item.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const statusCounts = watchThisData.contentStatus.reduce(
+      (acc, item) => {
+        acc[item.status] = (acc[item.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     console.log("\nShow status breakdown:");
     Object.entries(statusCounts).forEach(([status, count]) => {

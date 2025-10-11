@@ -1,29 +1,29 @@
-import { forwardRef } from 'react';
-import { cn } from '@/lib/utils';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { forwardRef } from "react";
+import { cn } from "@/lib/utils";
+import { cva, type VariantProps } from "class-variance-authority";
 
 const spinnerVariants = cva(
-  'animate-spin rounded-full border-2 border-solid border-current border-r-transparent',
+  "animate-spin rounded-full border-2 border-solid border-current border-r-transparent",
   {
     variants: {
       size: {
-        sm: 'h-4 w-4',
-        default: 'h-6 w-6',
-        lg: 'h-8 w-8',
-        xl: 'h-12 w-12',
+        sm: "h-4 w-4",
+        default: "h-6 w-6",
+        lg: "h-8 w-8",
+        xl: "h-12 w-12",
       },
       variant: {
-        default: 'text-gray-400',
-        primary: 'text-red-500',
-        white: 'text-white',
-        entertainment: 'text-purple-500',
+        default: "text-gray-400",
+        primary: "text-red-500",
+        white: "text-white",
+        entertainment: "text-purple-500",
       },
     },
     defaultVariants: {
-      size: 'default',
-      variant: 'default',
+      size: "default",
+      variant: "default",
     },
-  }
+  },
 );
 
 export interface LoadingSpinnerProps
@@ -40,14 +40,19 @@ const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
         ref={ref}
         className={cn(spinnerVariants({ size, variant }), className)}
         role="status"
-        aria-label={text || 'Loading'}
+        aria-label={text || "Loading"}
         {...props}
       />
     );
 
     if (text) {
       return (
-        <div className={cn('flex items-center gap-2', centered && 'justify-center')}>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            centered && "justify-center",
+          )}
+        >
           {spinner}
           <span className="text-sm text-gray-400">{text}</span>
         </div>
@@ -55,26 +60,25 @@ const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
     }
 
     if (centered) {
-      return (
-        <div className="flex justify-center">
-          {spinner}
-        </div>
-      );
+      return <div className="flex justify-center">{spinner}</div>;
     }
 
     return spinner;
-  }
+  },
 );
 
-LoadingSpinner.displayName = 'LoadingSpinner';
+LoadingSpinner.displayName = "LoadingSpinner";
 
 // Full page loading component
 export interface PageLoadingProps {
   text?: string;
-  variant?: VariantProps<typeof spinnerVariants>['variant'];
+  variant?: VariantProps<typeof spinnerVariants>["variant"];
 }
 
-export function PageLoading({ text = 'Loading...', variant = 'primary' }: PageLoadingProps) {
+export function PageLoading({
+  text = "Loading...",
+  variant = "primary",
+}: PageLoadingProps) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-950">
       <div className="flex flex-col items-center gap-4">
@@ -88,17 +92,17 @@ export function PageLoading({ text = 'Loading...', variant = 'primary' }: PageLo
 // Section loading component
 export interface SectionLoadingProps {
   text?: string;
-  variant?: VariantProps<typeof spinnerVariants>['variant'];
+  variant?: VariantProps<typeof spinnerVariants>["variant"];
   className?: string;
 }
 
-export function SectionLoading({ 
-  text = 'Loading...', 
-  variant = 'default',
-  className 
+export function SectionLoading({
+  text = "Loading...",
+  variant = "default",
+  className,
 }: SectionLoadingProps) {
   return (
-    <div className={cn('flex items-center justify-center py-12', className)}>
+    <div className={cn("flex items-center justify-center py-12", className)}>
       <LoadingSpinner size="lg" variant={variant} text={text} />
     </div>
   );

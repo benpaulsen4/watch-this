@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/lib/auth/context';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useAuth } from "@/components/providers/AuthProvider";
 
-export default function Layout({children}: {children: React.ReactNode}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading } = useAuth();

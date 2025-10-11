@@ -58,7 +58,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         } catch {
           return { tmdbId: schedule.tmdbId, title: null };
         }
-      })
+      }),
     );
     const titleMap = new Map<number, string | null>();
     titleResults.forEach((r) => titleMap.set(r.tmdbId, r.title));
@@ -91,7 +91,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || typeof tmdbId !== "number") {
       return NextResponse.json(
         { error: "tmdbId is required and must be a number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -104,7 +104,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     ) {
       return NextResponse.json(
         { error: "dayOfWeek is required and must be a number between 0-6" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -116,8 +116,8 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(userContentStatus.userId, request.user.id),
           eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, "tv")
-        )
+          eq(userContentStatus.contentType, "tv"),
+        ),
       )
       .limit(1);
 
@@ -127,7 +127,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
           error:
             "TV show not found in your library. Add it to your library first.",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -138,7 +138,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         {
           error: `Cannot schedule ${status} shows. Only shows that are planning, watching, or paused can be scheduled.`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -150,15 +150,15 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(showSchedules.userId, request.user.id),
           eq(showSchedules.tmdbId, tmdbId),
-          eq(showSchedules.dayOfWeek, dayOfWeek)
-        )
+          eq(showSchedules.dayOfWeek, dayOfWeek),
+        ),
       )
       .limit(1);
 
     if (existingSchedule.length > 0) {
       return NextResponse.json(
         { error: "Show is already scheduled for this day" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -189,20 +189,20 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId) {
       return NextResponse.json(
         { error: "tmdbId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     let whereConditions = and(
       eq(showSchedules.userId, request.user.id),
-      eq(showSchedules.tmdbId, parseInt(tmdbId))
+      eq(showSchedules.tmdbId, parseInt(tmdbId)),
     );
 
     // If dayOfWeek is provided, remove only that specific day
     if (dayOfWeek !== null && dayOfWeek !== undefined) {
       whereConditions = and(
         whereConditions,
-        eq(showSchedules.dayOfWeek, parseInt(dayOfWeek))
+        eq(showSchedules.dayOfWeek, parseInt(dayOfWeek)),
       );
     }
 
@@ -214,7 +214,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (deletedSchedules.length === 0) {
       return NextResponse.json(
         { error: "Schedule not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 

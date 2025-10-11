@@ -37,31 +37,31 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       whereConditions = and(
         or(
           eq(activityFeed.userId, request.user.id),
-          arrayContains(activityFeed.collaborators, [request.user.id])
+          arrayContains(activityFeed.collaborators, [request.user.id]),
         ),
         lt(activityFeed.createdAt, new Date(cursor)),
-        eq(activityFeed.activityType, type)
+        eq(activityFeed.activityType, type),
       );
     } else if (cursor) {
       whereConditions = and(
         or(
           eq(activityFeed.userId, request.user.id),
-          arrayContains(activityFeed.collaborators, [request.user.id])
+          arrayContains(activityFeed.collaborators, [request.user.id]),
         ),
-        lt(activityFeed.createdAt, new Date(cursor))
+        lt(activityFeed.createdAt, new Date(cursor)),
       );
     } else if (type) {
       whereConditions = and(
         or(
           eq(activityFeed.userId, request.user.id),
-          arrayContains(activityFeed.collaborators, [request.user.id])
+          arrayContains(activityFeed.collaborators, [request.user.id]),
         ),
-        eq(activityFeed.activityType, type)
+        eq(activityFeed.activityType, type),
       );
     } else {
       whereConditions = or(
         eq(activityFeed.userId, request.user.id),
-        arrayContains(activityFeed.collaborators, [request.user.id])
+        arrayContains(activityFeed.collaborators, [request.user.id]),
       );
     }
 
@@ -73,8 +73,8 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         or(
           eq(lists.ownerId, request.user.id),
-          eq(listCollaborators.userId, request.user.id)
-        )
+          eq(listCollaborators.userId, request.user.id),
+        ),
       );
 
     const collaborativeListIds = userCollaborativeLists.map((l) => l.listId);
@@ -83,20 +83,20 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (collaborativeListIds.length > 0) {
       let collaborativeConditions = and(
         inArray(activityFeed.listId, collaborativeListIds),
-        eq(activityFeed.isCollaborative, true)
+        eq(activityFeed.isCollaborative, true),
       );
 
       if (cursor) {
         collaborativeConditions = and(
           collaborativeConditions,
-          lt(activityFeed.createdAt, new Date(cursor))
+          lt(activityFeed.createdAt, new Date(cursor)),
         );
       }
 
       if (type) {
         collaborativeConditions = and(
           collaborativeConditions,
-          eq(activityFeed.activityType, type)
+          eq(activityFeed.activityType, type),
         );
       }
 
@@ -137,8 +137,8 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         inArray(
           users.id,
-          resultActivities.flatMap((activity) => activity.collaborators ?? [])
-        )
+          resultActivities.flatMap((activity) => activity.collaborators ?? []),
+        ),
       );
 
     const nextCursor =
@@ -177,14 +177,14 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(showSchedules.userId, userContentStatus.userId),
           eq(showSchedules.tmdbId, userContentStatus.tmdbId),
-          eq(userContentStatus.contentType, "tv")
-        )
+          eq(userContentStatus.contentType, "tv"),
+        ),
       )
       .where(
         and(
           eq(showSchedules.userId, request.user.id),
-          eq(showSchedules.dayOfWeek, today)
-        )
+          eq(showSchedules.dayOfWeek, today),
+        ),
       );
 
     // For each scheduled show, find the next episode to watch
@@ -200,8 +200,8 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
               eq(episodeWatchStatus.tmdbId, activity.tmdbId),
               eq(episodeWatchStatus.watched, true),
               // Compare dates using the user's timezone rather than DB server timezone
-              sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`
-            )
+              sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`,
+            ),
           );
 
         // If episodes were watched today, skip this show
@@ -215,9 +215,9 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         return {
           ...showDetails,
           scheduleId: activity.scheduleId,
-          status: activity.status,
+          watchStatus: activity.status,
         };
-      })
+      }),
     );
 
     return NextResponse.json({
@@ -240,7 +240,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           username: allCollaborators.find((c) => c.id === collaboratorId)
             ?.username,
           profilePictureUrl: allCollaborators.find(
-            (c) => c.id === collaboratorId
+            (c) => c.id === collaboratorId,
           )?.profilePictureUrl,
         })),
       })),
@@ -252,7 +252,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error fetching activity timeline:", error);
     return NextResponse.json(
       { error: "Failed to fetch activity timeline" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

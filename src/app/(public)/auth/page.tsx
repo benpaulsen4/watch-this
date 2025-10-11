@@ -1,27 +1,34 @@
-'use client';
+"use client";
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { registerPasskey, authenticatePasskey, isPasskeySupported, isPlatformAuthenticatorAvailable } from '@/lib/auth/client';
-import { Fingerprint, Smartphone, Shield } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { UAParser } from 'ua-parser-js';
-import { useAuth } from '@/lib/auth/context';
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  registerPasskey,
+  authenticatePasskey,
+  isPasskeySupported,
+  isPlatformAuthenticatorAvailable,
+} from "@/lib/auth/client";
+import { Fingerprint, Smartphone, Shield } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { UAParser } from "ua-parser-js";
+import { useAuth } from "@/components/providers/AuthProvider";
 
-type AuthMode = 'signin' | 'register';
+type AuthMode = "signin" | "register";
 
 function AuthPageContent() {
   const router = useRouter();
-  const {refreshSession} = useAuth();
+  const { refreshSession } = useAuth();
   const searchParams = useSearchParams();
-  const redirectTo = decodeURIComponent(searchParams.get('redirect') || '/dashboard');
-  
-  const [mode, setMode] = useState<AuthMode>('signin');
-  const [username, setUsername] = useState('');
+  const redirectTo = decodeURIComponent(
+    searchParams.get("redirect") || "/dashboard",
+  );
+
+  const [mode, setMode] = useState<AuthMode>("signin");
+  const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [platformAuthAvailable, setPlatformAuthAvailable] = useState(false);
 
@@ -30,39 +37,41 @@ function AuthPageContent() {
     const checkSupport = async () => {
       const supported = isPasskeySupported();
       setPasskeySupported(supported);
-      
+
       if (supported) {
         const available = await isPlatformAuthenticatorAvailable();
         setPlatformAuthAvailable(available);
       }
     };
-    
+
     checkSupport();
   }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!username.trim()) {
-      setError('Username is required');
+      setError("Username is required");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const {browser, os} = UAParser(navigator.userAgent)
-      await registerPasskey({ 
-        username: username.trim(), 
-        deviceName:  `${browser.name ?? 'Unknown Browser'} on ${os.name ?? 'Unknown OS'} ${os.version}` 
+      const { browser, os } = UAParser(navigator.userAgent);
+      await registerPasskey({
+        username: username.trim(),
+        deviceName: `${browser.name ?? "Unknown Browser"} on ${
+          os.name ?? "Unknown OS"
+        } ${os.version}`,
       });
       await refreshSession();
-      
+
       // Redirect to dashboard on success
       router.push(redirectTo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -70,18 +79,18 @@ function AuthPageContent() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       await authenticatePasskey();
       await refreshSession();
-      
+
       // Redirect to dashboard on success
       router.push(redirectTo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setLoading(false);
     }
@@ -99,10 +108,11 @@ function AuthPageContent() {
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-gray-400 mb-4">
-              Your browser doesn&apos;t support passkeys. Please use a modern browser like Chrome, Safari, or Firefox.
+              Your browser doesn&apos;t support passkeys. Please use a modern
+              browser like Chrome, Safari, or Firefox.
             </p>
-            <Button 
-              onClick={() => window.location.reload()} 
+            <Button
+              onClick={() => window.location.reload()}
               variant="outline"
               className="w-full"
             >
@@ -136,33 +146,36 @@ function AuthPageContent() {
               </div>
             </div>
             <CardTitle className="text-center">
-              {mode === 'register' ? 'Create Account' : 'Welcome Back'}
+              {mode === "register" ? "Create Account" : "Welcome Back"}
             </CardTitle>
             <p className="text-center text-gray-400 text-sm">
-              {mode === 'register' 
-                ? 'Sign up with your passkey for secure access'
-                : 'Sign in with your passkey'
-              }
+              {mode === "register"
+                ? "Sign up with your passkey for secure access"
+                : "Sign in with your passkey"}
             </p>
           </CardHeader>
-          
+
           <CardContent>
-            <form onSubmit={mode === 'register' ? handleRegister : handleSignIn} className="space-y-4">
-              
-              {mode === 'register' && (
-              <Input
-                label="Username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
-                required={true}
-                error={error && error.includes('username') ? error : undefined}
-              />
+            <form
+              onSubmit={mode === "register" ? handleRegister : handleSignIn}
+              className="space-y-4"
+            >
+              {mode === "register" && (
+                <Input
+                  label="Username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
+                  required={true}
+                  error={
+                    error && error.includes("username") ? error : undefined
+                  }
+                />
               )}
 
               {/* Error Message */}
-              {error && !error.includes('username') && (
+              {error && !error.includes("username") && (
                 <div className="p-3 rounded-lg bg-red-600/20 border border-red-500/30">
                   <p className="text-red-400 text-sm">{error}</p>
                 </div>
@@ -174,9 +187,12 @@ function AuthPageContent() {
                   <div className="flex items-start gap-2">
                     <Smartphone className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-yellow-400 text-sm font-medium">Limited Passkey Support</p>
+                      <p className="text-yellow-400 text-sm font-medium">
+                        Limited Passkey Support
+                      </p>
                       <p className="text-yellow-300 text-xs mt-1">
-                        Your device may not support platform authenticators. You can still use security keys.
+                        Your device may not support platform authenticators. You
+                        can still use security keys.
                       </p>
                     </div>
                   </div>
@@ -193,11 +209,17 @@ function AuthPageContent() {
                 disabled={loading}
               >
                 {loading ? (
-                  mode === 'register' ? 'Creating Account...' : 'Signing In...'
+                  mode === "register" ? (
+                    "Creating Account..."
+                  ) : (
+                    "Signing In..."
+                  )
                 ) : (
                   <>
                     <Fingerprint className="mr-2 h-4 w-4" />
-                    {mode === 'register' ? 'Create Account with Passkey' : 'Sign In with Passkey'}
+                    {mode === "register"
+                      ? "Create Account with Passkey"
+                      : "Sign In with Passkey"}
                   </>
                 )}
               </Button>
@@ -206,19 +228,21 @@ function AuthPageContent() {
             {/* Mode Toggle */}
             <div className="mt-6 text-center">
               <p className="text-gray-400 text-sm">
-                {mode === 'register' ? 'Already have an account?' : "Don't have an account?"}
+                {mode === "register"
+                  ? "Already have an account?"
+                  : "Don't have an account?"}
               </p>
               <Button
                 type="button"
                 variant="link"
                 onClick={() => {
-                  setMode(mode === 'register' ? 'signin' : 'register');
-                  setError('');
-                  setUsername('');
+                  setMode(mode === "register" ? "signin" : "register");
+                  setError("");
+                  setUsername("");
                 }}
                 className="mt-1"
               >
-                {mode === 'register' ? 'Sign In' : 'Create Account'}
+                {mode === "register" ? "Sign In" : "Create Account"}
               </Button>
             </div>
           </CardContent>
@@ -237,11 +261,13 @@ function AuthPageContent() {
 
 export default function AuthPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+        </div>
+      }
+    >
       <AuthPageContent />
     </Suspense>
   );

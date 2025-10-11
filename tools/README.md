@@ -5,6 +5,7 @@ This tool converts SeriesGuide JSON exports to the WatchThis import format.
 ## Usage
 
 ### Prerequisites
+
 - Node.js installed on your system
 - TypeScript execution environment (tsx will be installed automatically)
 
@@ -23,7 +24,7 @@ npx tsx seriesguide-converter.ts seriesguide-snippet.json my-watchthis-import.js
 
 ### What it does
 
-1. **Content Status Mapping**: 
+1. **Content Status Mapping**:
    - Maps each TV show from SeriesGuide to WatchThis format
    - Determines status based on SeriesGuide status and watched episodes:
      - `ended` shows with watched episodes → `completed`
@@ -39,6 +40,7 @@ npx tsx seriesguide-converter.ts seriesguide-snippet.json my-watchthis-import.js
 ### Output Format
 
 The generated JSON follows the WatchThis import schema with:
+
 - `contentStatus`: Array of shows with their watch status
 - `episodeWatchStatus`: Array of individual watched episodes
 

@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth/context';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 export default function Home() {
   const router = useRouter();
@@ -12,9 +12,9 @@ export default function Home() {
   useEffect(() => {
     if (!loading) {
       if (user) {
-        router.push('/dashboard');
+        router.push("/dashboard");
       } else {
-        router.push('/auth');
+        router.push("/auth");
       }
     }
   }, [user, loading, router]);

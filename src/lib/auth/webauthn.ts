@@ -18,7 +18,7 @@ const RP_NAME = process.env.WEBAUTHN_RP_NAME || "WatchThis";
 const RP_ID = process.env.WEBAUTHN_RP_ID || "localhost";
 const ORIGIN = process.env.WEBAUTHN_ORIGIN || "http://localhost:3000";
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.WEBAUTHN_SECRET || "fallback-secret"
+  process.env.WEBAUTHN_SECRET || "fallback-secret",
 );
 
 export interface AuthSession {
@@ -62,7 +62,7 @@ export async function verifyPasskeyRegistration(
   registrationResponse: RegistrationResponseJSON,
   expectedChallenge: string,
   deviceName?: string,
-  timezone?: string
+  timezone?: string,
 ) {
   const verification: VerifyRegistrationResponseOpts = {
     response: registrationResponse,
@@ -125,7 +125,7 @@ export async function generatePasskeyAuthenticationOptions() {
 // Verify authentication response
 export async function verifyPasskeyAuthentication(
   authenticationResponse: AuthenticationResponseJSON,
-  expectedChallenge: string
+  expectedChallenge: string,
 ) {
   // Get credential and user info
   const credentialData = await db
@@ -190,7 +190,7 @@ export async function createSessionToken(user: User): Promise<string> {
 
 // Verify JWT session token
 export async function verifySessionToken(
-  token: string
+  token: string,
 ): Promise<AuthSession | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
@@ -218,7 +218,7 @@ export async function createChallengeToken(challenge: string): Promise<string> {
 
 // Verify JWT challenge token
 export async function verifyChallengeToken(
-  token: string
+  token: string,
 ): Promise<{ challenge: string } | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
@@ -232,7 +232,7 @@ export async function verifyChallengeToken(
 
 // Get current user from session
 export async function getCurrentUser(
-  sessionToken?: string
+  sessionToken?: string,
 ): Promise<User | null> {
   if (!sessionToken) return null;
 

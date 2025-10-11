@@ -10,9 +10,9 @@ WatchThis is a collaborative movie and TV show tracking application that allows 
 
 ## 2. Core User Roles
 
-| Role | Registration Method | Core Permissions |
-|------|-------------------|------------------|
-| User | Username + Passkey | Create lists, collaborate on shared lists, search content, manage personal data |
+| Role | Registration Method | Core Permissions                                                                |
+| ---- | ------------------- | ------------------------------------------------------------------------------- |
+| User | Username + Passkey  | Create lists, collaborate on shared lists, search content, manage personal data |
 
 ## 3. Application Structure
 
@@ -29,15 +29,19 @@ WatchThis consists of 7 main pages organized around core user workflows:
 ## 4. Core Workflows
 
 ### User Onboarding
+
 New users register by choosing a username and creating a passkey through their device's biometric or security key. Authentication is passwordless across all devices.
 
 ### Content Management
+
 Users search for movies and TV shows through TMDB integration, view detailed information, and add content to their lists. They can create custom lists and manage their default "For Me" list.
 
 ### Collaboration
+
 Users can invite friends to collaborate on custom lists, manage permissions, and control access. Real-time synchronization keeps all collaborators updated.
 
 ### Activity Tracking
+
 All user actions generate activity entries that are displayed on the dashboard and in a comprehensive timeline. Collaborative activities are shared with relevant list members.
 
 ## 5. Design Principles
@@ -58,4 +62,4 @@ All user actions generate activity entries that are displayed on the dashboard a
 
 ---
 
-*For detailed feature specifications, refer to individual feature documents in the `/features/` directory.*
+_For detailed feature specifications, refer to individual feature documents in the `/features/` directory._

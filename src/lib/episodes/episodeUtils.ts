@@ -14,7 +14,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, or } from "drizzle-orm";
 import { tmdbClient } from "@/lib/tmdb/client";
-import { syncStatusToCollaborators } from "@/lib/activity/sync-utils";
+import { syncStatusToCollaborators } from "../activity/activityUtils";
 
 /**
  * Sync episode status to collaborators in shared lists
@@ -24,7 +24,7 @@ export async function syncEpisodeStatusToCollaborators(
   tmdbId: number,
   seasonNumber: number,
   episodeNumber: number,
-  watched: boolean
+  watched: boolean,
 ): Promise<string[]> {
   try {
     // Find all lists that contain this TV show and have sync enabled
@@ -41,8 +41,8 @@ export async function syncEpisodeStatusToCollaborators(
           eq(lists.syncWatchStatus, true),
           eq(listItems.tmdbId, tmdbId),
           eq(listItems.contentType, ContentType.TV),
-          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-        )
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+        ),
       );
 
     const syncedCollaboratorIds = new Set<string>();
@@ -72,8 +72,8 @@ export async function syncEpisodeStatusToCollaborators(
               eq(episodeWatchStatus.userId, collaboratorId),
               eq(episodeWatchStatus.tmdbId, tmdbId),
               eq(episodeWatchStatus.seasonNumber, seasonNumber),
-              eq(episodeWatchStatus.episodeNumber, episodeNumber)
-            )
+              eq(episodeWatchStatus.episodeNumber, episodeNumber),
+            ),
           )
           .limit(1);
 
@@ -101,8 +101,8 @@ export async function syncEpisodeStatusToCollaborators(
                 eq(episodeWatchStatus.userId, collaboratorId),
                 eq(episodeWatchStatus.tmdbId, tmdbId),
                 eq(episodeWatchStatus.seasonNumber, seasonNumber),
-                eq(episodeWatchStatus.episodeNumber, episodeNumber)
-              )
+                eq(episodeWatchStatus.episodeNumber, episodeNumber),
+              ),
             );
         }
         syncedCollaboratorIds.add(collaboratorId);
@@ -125,7 +125,7 @@ export async function updateEpisodeWatchStatus(
   tmdbId: number,
   seasonNumber: number,
   episodeNumber: number,
-  watched: boolean
+  watched: boolean,
 ) {
   // Check if episode status already exists
   const existingStatus = await db
@@ -136,8 +136,8 @@ export async function updateEpisodeWatchStatus(
         eq(episodeWatchStatus.userId, userId),
         eq(episodeWatchStatus.tmdbId, tmdbId),
         eq(episodeWatchStatus.seasonNumber, seasonNumber),
-        eq(episodeWatchStatus.episodeNumber, episodeNumber)
-      )
+        eq(episodeWatchStatus.episodeNumber, episodeNumber),
+      ),
     )
     .limit(1);
 
@@ -156,8 +156,8 @@ export async function updateEpisodeWatchStatus(
           eq(episodeWatchStatus.userId, userId),
           eq(episodeWatchStatus.tmdbId, tmdbId),
           eq(episodeWatchStatus.seasonNumber, seasonNumber),
-          eq(episodeWatchStatus.episodeNumber, episodeNumber)
-        )
+          eq(episodeWatchStatus.episodeNumber, episodeNumber),
+        ),
       )
       .returning();
   } else {
@@ -188,7 +188,7 @@ export async function createEpisodeActivityEntry(
   episodeNumber: number,
   watched: boolean,
   syncedCollaboratorIds: string[],
-  episodeName?: string
+  episodeName?: string,
 ) {
   try {
     const showDetails = await tmdbClient.getTVShowDetails(tmdbId);
@@ -222,7 +222,7 @@ export async function updateTVShowStatus(
   tmdbId: number,
   seasonNumber: number,
   episodeNumber: number,
-  watched: boolean
+  watched: boolean,
 ): Promise<WatchStatusEnum | null> {
   if (!watched) {
     return null;
@@ -235,8 +235,8 @@ export async function updateTVShowStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, ContentType.TV)
-      )
+        eq(userContentStatus.contentType, ContentType.TV),
+      ),
     )
     .limit(1);
 
@@ -263,8 +263,8 @@ export async function updateTVShowStatus(
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, ContentType.TV)
-        )
+          eq(userContentStatus.contentType, ContentType.TV),
+        ),
       );
     newStatus = WatchStatus.WATCHING;
   } else {
@@ -286,15 +286,15 @@ export async function updateTVShowStatus(
           nextEpisodeDate: showDetails.next_episode_to_air
             ? new Date(showDetails.next_episode_to_air.air_date)
             : showDetails.status === "Ended"
-            ? null
-            : inOneMonth,
+              ? null
+              : inOneMonth,
         })
         .where(
           and(
             eq(userContentStatus.userId, userId),
             eq(userContentStatus.tmdbId, tmdbId),
-            eq(userContentStatus.contentType, ContentType.TV)
-          )
+            eq(userContentStatus.contentType, ContentType.TV),
+          ),
         );
 
       newStatus = WatchStatus.COMPLETED;
@@ -306,13 +306,15 @@ export async function updateTVShowStatus(
           .where(
             and(
               eq(showSchedules.userId, userId),
-              eq(showSchedules.tmdbId, tmdbId)
-            )
+              eq(showSchedules.tmdbId, tmdbId),
+            ),
           )
           .returning();
-        
+
         if (deletedSchedules.length > 0) {
-          console.log(`Automatically removed ${deletedSchedules.length} schedule(s) for completed show ${tmdbId}`);
+          console.log(
+            `Automatically removed ${deletedSchedules.length} schedule(s) for completed show ${tmdbId}`,
+          );
         }
       } catch (error) {
         console.error("Error removing schedules for completed show:", error);
@@ -323,12 +325,7 @@ export async function updateTVShowStatus(
 
   // Sync status to collaborators if it changed
   if (newStatus) {
-    await syncStatusToCollaborators(
-      userId,
-      tmdbId,
-      ContentType.TV,
-      newStatus
-    );
+    await syncStatusToCollaborators(userId, tmdbId, ContentType.TV, newStatus);
   }
 
   return newStatus;
@@ -343,7 +340,7 @@ export async function completeEpisodeUpdate(
   seasonNumber: number,
   episodeNumber: number,
   watched: boolean,
-  episodeName?: string
+  episodeName?: string,
 ) {
   // Update episode status
   const episodeResult = await updateEpisodeWatchStatus(
@@ -351,7 +348,7 @@ export async function completeEpisodeUpdate(
     tmdbId,
     seasonNumber,
     episodeNumber,
-    watched
+    watched,
   );
 
   // Sync to collaborators
@@ -360,7 +357,7 @@ export async function completeEpisodeUpdate(
     tmdbId,
     seasonNumber,
     episodeNumber,
-    watched
+    watched,
   );
 
   // Create activity entry
@@ -371,7 +368,7 @@ export async function completeEpisodeUpdate(
     episodeNumber,
     watched,
     syncedCollaboratorIds,
-    episodeName
+    episodeName,
   );
 
   // Update show status
@@ -380,7 +377,7 @@ export async function completeEpisodeUpdate(
     tmdbId,
     seasonNumber,
     episodeNumber,
-    watched
+    watched,
   );
 
   return {
@@ -400,7 +397,7 @@ export async function batchUpdateEpisodes(
     seasonNumber: number;
     episodeNumber: number;
     watched: boolean;
-  }>
+  }>,
 ) {
   const results = [];
   const allSyncedCollaboratorIds = new Set<string>();
@@ -412,11 +409,13 @@ export async function batchUpdateEpisodes(
       tmdbId,
       episode.seasonNumber,
       episode.episodeNumber,
-      episode.watched
+      episode.watched,
     );
-    
+
     results.push(result.episode);
-    result.syncedCollaboratorIds.forEach(id => allSyncedCollaboratorIds.add(id));
+    result.syncedCollaboratorIds.forEach((id) =>
+      allSyncedCollaboratorIds.add(id),
+    );
     finalStatus = result.newStatus;
   }
 

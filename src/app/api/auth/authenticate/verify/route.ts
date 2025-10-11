@@ -21,18 +21,18 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify challenge
     const storedChallenge = request.cookies.get(
-      "authentication-challenge"
+      "authentication-challenge",
     )?.value;
     if (!storedChallenge) {
       return NextResponse.json(
         { error: "Invalid or expired challenge" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -40,14 +40,14 @@ export async function POST(request: NextRequest) {
     if (!challengePayload) {
       return NextResponse.json(
         { error: "Invalid or expired challenge" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify authentication
     const { user, credential } = await verifyPasskeyAuthentication(
       authenticationResponse as AuthenticationResponseJSON,
-      challengePayload.challenge
+      challengePayload.challenge,
     );
 
     // Create session token
@@ -88,21 +88,21 @@ export async function POST(request: NextRequest) {
       if (error.message === "Credential not found") {
         return NextResponse.json(
           { error: "Credential not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
       if (error.message === "Authentication verification failed") {
         return NextResponse.json(
           { error: "Authentication verification failed" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
 
     return NextResponse.json(
       { error: "Authentication failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

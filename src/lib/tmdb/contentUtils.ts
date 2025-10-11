@@ -11,14 +11,14 @@ import { tmdbClient, TMDBMovie, TMDBSearchItem, TMDBTVShow } from "./client";
 
 export async function enrichWithContentStatus(
   content: TMDBMovie | TMDBTVShow | TMDBSearchItem,
-  userId: string
+  userId: string,
 ) {
   const contentType =
     "media_type" in content
       ? content.media_type
       : "title" in content
-      ? "movie"
-      : "tv";
+        ? "movie"
+        : "tv";
   let [statusData] = await db
     .select({
       status: userContentStatus.status,
@@ -30,8 +30,8 @@ export async function enrichWithContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, content.id),
-        eq(userContentStatus.contentType, contentType)
-      )
+        eq(userContentStatus.contentType, contentType),
+      ),
     )
     .limit(1);
 
@@ -60,13 +60,13 @@ export async function enrichWithContentStatus(
             eq(episodeWatchStatus.tmdbId, content.id),
             eq(
               episodeWatchStatus.seasonNumber,
-              showDetails.last_episode_to_air.season_number
+              showDetails.last_episode_to_air.season_number,
             ),
             eq(
               episodeWatchStatus.episodeNumber,
-              showDetails.last_episode_to_air.episode_number
-            )
-          )
+              showDetails.last_episode_to_air.episode_number,
+            ),
+          ),
         )
         .limit(1);
 
@@ -82,8 +82,8 @@ export async function enrichWithContentStatus(
             and(
               eq(userContentStatus.userId, userId),
               eq(userContentStatus.tmdbId, content.id),
-              eq(userContentStatus.contentType, contentType)
-            )
+              eq(userContentStatus.contentType, contentType),
+            ),
           )
           .returning({
             status: userContentStatus.status,

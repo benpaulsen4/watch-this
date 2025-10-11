@@ -1,1 +1,0 @@
-export { SearchClient } from './SearchClient';

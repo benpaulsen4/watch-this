@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 // Format vote average as percentage
 export function formatVoteAverage(
-  voteAverage: number | null | undefined
+  voteAverage: number | null | undefined,
 ): string {
   if (
     voteAverage === null ||

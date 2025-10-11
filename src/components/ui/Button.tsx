@@ -1,45 +1,44 @@
-import { forwardRef } from 'react';
-import { cn } from '@/lib/utils';
-import { Slot } from '@radix-ui/react-slot';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { forwardRef } from "react";
+import { cn } from "@/lib/utils";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 disabled:pointer-events-none disabled:opacity-50',
+  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          'bg-red-600 text-white shadow-lg shadow-red-500/25 hover:bg-red-700 hover:shadow-red-500/40 active:scale-95',
+          "bg-red-600 text-white shadow-lg shadow-red-500/25 hover:bg-red-700 hover:shadow-red-500/40 active:scale-95",
         destructive:
-          'bg-red-600 text-white shadow-lg shadow-red-500/25 hover:bg-red-700 hover:shadow-red-500/40 active:scale-95',
+          "bg-red-600 text-white shadow-lg shadow-red-500/25 hover:bg-red-700 hover:shadow-red-500/40 active:scale-95",
         outline:
-          'border border-gray-600 bg-transparent text-gray-100 shadow-sm hover:bg-gray-800 hover:border-gray-500 active:scale-95',
+          "border border-gray-600 bg-transparent text-gray-100 shadow-sm hover:bg-gray-800 hover:border-gray-500 active:scale-95",
         secondary:
-          'bg-gray-700 text-gray-100 shadow-sm hover:bg-gray-600 active:scale-95',
+          "bg-gray-700 text-gray-100 shadow-sm hover:bg-gray-600 active:scale-95",
         ghost:
-          'text-gray-100 hover:bg-gray-800 hover:text-white active:scale-95',
-        link:
-          'text-red-400 underline-offset-4 hover:underline hover:text-red-300',
+          "text-gray-100 hover:bg-gray-800 hover:text-white active:scale-95",
+        link: "text-red-400 underline-offset-4 hover:underline hover:text-red-300",
         gradient:
-          'bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-lg shadow-red-500/25 hover:from-red-700 hover:to-orange-600 hover:shadow-red-500/40 active:scale-95',
+          "bg-gradient-to-r from-red-600 to-orange-500 text-white shadow-lg shadow-red-500/25 hover:from-red-700 hover:to-orange-600 hover:shadow-red-500/40 active:scale-95",
         entertainment:
-          'bg-gradient-to-r from-purple-600 via-red-500 to-orange-500 text-white shadow-lg shadow-purple-500/25 hover:from-purple-700 hover:via-red-600 hover:to-orange-600 hover:shadow-purple-500/40 active:scale-95',
+          "bg-gradient-to-r from-purple-600 via-red-500 to-orange-500 text-white shadow-lg shadow-purple-500/25 hover:from-purple-700 hover:via-red-600 hover:to-orange-600 hover:shadow-purple-500/40 active:scale-95",
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-8 rounded-md px-3 text-xs',
-        lg: 'h-12 rounded-lg px-8 text-base',
-        xl: 'h-14 rounded-xl px-10 text-lg',
-        icon: 'h-10 w-10',
-        'icon-sm': 'h-8 w-8',
-        'icon-lg': 'h-12 w-12',
+        default: "h-10 px-4 py-2",
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-12 rounded-lg px-8 text-base",
+        xl: "h-14 rounded-xl px-10 text-lg",
+        icon: "h-10 w-10",
+        "icon-sm": "h-8 w-8",
+        "icon-lg": "h-12 w-12",
       },
     },
     defaultVariants: {
-      variant: 'default',
-      size: 'default',
+      variant: "default",
+      size: "default",
     },
-  }
+  },
 );
 
 export interface ButtonProps
@@ -50,9 +49,21 @@ export interface ButtonProps
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, loading = false, children, disabled, ...props }, ref) => {
-    const Comp = asChild ? Slot : 'button';
-    
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      loading = false,
+      children,
+      disabled,
+      ...props
+    },
+    ref,
+  ) => {
+    const Comp = asChild ? Slot : "button";
+
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
@@ -89,9 +100,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
       </Comp>
     );
-  }
+  },
 );
 
-Button.displayName = 'Button';
+Button.displayName = "Button";
 
 export { Button, buttonVariants };

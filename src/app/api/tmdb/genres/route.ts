@@ -14,7 +14,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (type && !["movie", "tv", "all"].includes(type)) {
       return NextResponse.json(
         { error: 'Type must be "movie", "tv", or "all"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -35,7 +35,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       const allGenres = [...movieGenres.genres, ...tvGenres.genres];
       const uniqueGenres = allGenres.filter(
         (genre, index, self) =>
-          index === self.findIndex((g) => g.id === genre.id)
+          index === self.findIndex((g) => g.id === genre.id),
       );
 
       results = {

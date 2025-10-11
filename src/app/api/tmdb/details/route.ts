@@ -11,7 +11,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!id || !type) {
       return NextResponse.json(
         { error: "Content ID and type are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -19,14 +19,14 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (isNaN(contentId) || contentId <= 0) {
       return NextResponse.json(
         { error: "Invalid content ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!["movie", "tv"].includes(type)) {
       return NextResponse.json(
         { error: 'Type must be either "movie" or "tv"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -46,19 +46,19 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       if (error.message.includes("404")) {
         return NextResponse.json(
           { error: "Content not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
       return NextResponse.json(
         { error: "External service unavailable" },
-        { status: 503 }
+        { status: 503 },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to get content details" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

@@ -12,7 +12,7 @@ export async function syncStatusToCollaborators(
   userId: string,
   tmdbId: number,
   contentType: string,
-  status: string
+  status: string,
 ): Promise<string[]> {
   try {
     // Find all lists that contain this content and have sync enabled
@@ -29,8 +29,8 @@ export async function syncStatusToCollaborators(
           eq(lists.syncWatchStatus, true),
           eq(listItems.tmdbId, tmdbId),
           eq(listItems.contentType, contentType),
-          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-        )
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+        ),
       );
 
     const syncedCollaboratorIds = new Set<string>();
@@ -59,8 +59,8 @@ export async function syncStatusToCollaborators(
             and(
               eq(userContentStatus.userId, collaboratorId),
               eq(userContentStatus.tmdbId, tmdbId),
-              eq(userContentStatus.contentType, contentType)
-            )
+              eq(userContentStatus.contentType, contentType),
+            ),
           )
           .limit(1);
 
@@ -76,8 +76,8 @@ export async function syncStatusToCollaborators(
               and(
                 eq(userContentStatus.userId, collaboratorId),
                 eq(userContentStatus.tmdbId, tmdbId),
-                eq(userContentStatus.contentType, contentType)
-              )
+                eq(userContentStatus.contentType, contentType),
+              ),
             );
         } else {
           // Create new status

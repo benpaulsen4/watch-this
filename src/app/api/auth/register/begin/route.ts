@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Username is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
           error:
             "Username must be 3-50 characters and contain only letters, numbers, underscores, and hyphens",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         sameSite: "strict",
         maxAge: 10 * 60, // 10 minutes
         path: "/api/auth/register",
-      }
+      },
     );
 
     return response;
@@ -62,13 +62,13 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.message === "Username already exists") {
       return NextResponse.json(
         { error: "Username already exists" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to generate registration options" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { X, UserPlus, Trash2, Users } from 'lucide-react';
-import { PermissionLevel, type PermissionLevelEnum } from '@/lib/db/schema';
-import { ProfileImage } from '@/components/ui';
+import { useState, useEffect } from "react";
+import { X, UserPlus, Trash2, Users } from "lucide-react";
+import { PermissionLevel, type PermissionLevelEnum } from "@/lib/db/schema";
+import { ProfileImage } from "../ui/ProfileImage";
 
 interface Collaborator {
   id: string;
@@ -37,28 +37,31 @@ export default function CollaborationModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [newUsername, setNewUsername] = useState('');
-  const [newPermissionLevel, setNewPermissionLevel] = useState<PermissionLevelEnum>(PermissionLevel.COLLABORATOR);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPermissionLevel, setNewPermissionLevel] =
+    useState<PermissionLevelEnum>(PermissionLevel.COLLABORATOR);
   const [addingCollaborator, setAddingCollaborator] = useState(false);
 
   // Fetch collaborators when modal opens
   useEffect(() => {
     const fetchCollaborators = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/lists/${listId}/collaborators`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch collaborators');
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/lists/${listId}/collaborators`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch collaborators");
+        }
+        const data = await response.json();
+        setCollaborators(data.collaborators || []);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch collaborators",
+        );
+      } finally {
+        setLoading(false);
       }
-      const data = await response.json();
-      setCollaborators(data.collaborators || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch collaborators');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
     if (isOpen && isOwner) {
       fetchCollaborators();
     }
@@ -66,7 +69,7 @@ export default function CollaborationModal({
 
   const addCollaborator = async () => {
     if (!newUsername.trim()) {
-      setError('Username is required');
+      setError("Username is required");
       return;
     }
 
@@ -76,9 +79,9 @@ export default function CollaborationModal({
 
     try {
       const response = await fetch(`/api/lists/${listId}/collaborators`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username: newUsername.trim(),
@@ -89,22 +92,29 @@ export default function CollaborationModal({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to add collaborator');
+        throw new Error(data.error || "Failed to add collaborator");
       }
 
-      setCollaborators(prev => [...prev, data.collaborator]);
+      setCollaborators((prev) => [...prev, data.collaborator]);
       setSuccess(data.message);
-      setNewUsername('');
+      setNewUsername("");
       setNewPermissionLevel(PermissionLevel.COLLABORATOR);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add collaborator');
+      setError(
+        err instanceof Error ? err.message : "Failed to add collaborator",
+      );
     } finally {
       setAddingCollaborator(false);
     }
   };
 
-  const removeCollaborator = async (collaboratorUserId: string, username: string) => {
-    if (!confirm(`Are you sure you want to remove ${username} from this list?`)) {
+  const removeCollaborator = async (
+    collaboratorUserId: string,
+    username: string,
+  ) => {
+    if (
+      !confirm(`Are you sure you want to remove ${username} from this list?`)
+    ) {
       return;
     }
 
@@ -112,54 +122,69 @@ export default function CollaborationModal({
     setSuccess(null);
 
     try {
-      const response = await fetch(`/api/lists/${listId}/collaborators/${collaboratorUserId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to remove collaborator');
+        throw new Error(data.error || "Failed to remove collaborator");
       }
 
-      setCollaborators(prev => prev.filter(c => c.userId !== collaboratorUserId));
+      setCollaborators((prev) =>
+        prev.filter((c) => c.userId !== collaboratorUserId),
+      );
       setSuccess(data.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove collaborator');
+      setError(
+        err instanceof Error ? err.message : "Failed to remove collaborator",
+      );
     }
   };
 
-  const updatePermission = async (collaboratorUserId: string, newPermission: string) => {
+  const updatePermission = async (
+    collaboratorUserId: string,
+    newPermission: string,
+  ) => {
     setError(null);
     setSuccess(null);
 
     try {
-      const response = await fetch(`/api/lists/${listId}/collaborators/${collaboratorUserId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            permissionLevel: newPermission,
+          }),
         },
-        body: JSON.stringify({
-          permissionLevel: newPermission,
-        }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update permission');
+        throw new Error(data.error || "Failed to update permission");
       }
 
-      setCollaborators(prev => 
-        prev.map(c => 
-          c.userId === collaboratorUserId 
+      setCollaborators((prev) =>
+        prev.map((c) =>
+          c.userId === collaboratorUserId
             ? { ...c, permissionLevel: newPermission }
-            : c
-        )
+            : c,
+        ),
       );
       setSuccess(data.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update permission');
+      setError(
+        err instanceof Error ? err.message : "Failed to update permission",
+      );
     }
   };
 
@@ -178,7 +203,9 @@ export default function CollaborationModal({
           <div className="flex items-center gap-3">
             <Users className="w-6 h-6 text-blue-400" />
             <div>
-              <h2 className="text-xl font-semibold text-white">Manage Collaborators</h2>
+              <h2 className="text-xl font-semibold text-white">
+                Manage Collaborators
+              </h2>
               <p className="text-gray-400 text-sm">{listName}</p>
             </div>
           </div>
@@ -195,7 +222,9 @@ export default function CollaborationModal({
           {!isOwner ? (
             <div className="text-center py-8">
               <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-400">Only the list owner can manage collaborators.</p>
+              <p className="text-gray-400">
+                Only the list owner can manage collaborators.
+              </p>
             </div>
           ) : (
             <>
@@ -203,7 +232,10 @@ export default function CollaborationModal({
               {error && (
                 <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200">
                   {error}
-                  <button onClick={clearMessages} className="float-right text-red-400 hover:text-red-200">
+                  <button
+                    onClick={clearMessages}
+                    className="float-right text-red-400 hover:text-red-200"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -211,7 +243,10 @@ export default function CollaborationModal({
               {success && (
                 <div className="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg text-green-200">
                   {success}
-                  <button onClick={clearMessages} className="float-right text-green-400 hover:text-green-200">
+                  <button
+                    onClick={clearMessages}
+                    className="float-right text-green-400 hover:text-green-200"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -231,14 +266,20 @@ export default function CollaborationModal({
                     value={newUsername}
                     onChange={(e) => setNewUsername(e.target.value)}
                     className="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onKeyDown={(e) => e.key === 'Enter' && addCollaborator()}
+                    onKeyDown={(e) => e.key === "Enter" && addCollaborator()}
                   />
                   <select
                     value={newPermissionLevel}
-                    onChange={(e) => setNewPermissionLevel(e.target.value as PermissionLevelEnum)}
+                    onChange={(e) =>
+                      setNewPermissionLevel(
+                        e.target.value as PermissionLevelEnum,
+                      )
+                    }
                     className="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value={PermissionLevel.COLLABORATOR}>Collaborator</option>
+                    <option value={PermissionLevel.COLLABORATOR}>
+                      Collaborator
+                    </option>
                     <option value={PermissionLevel.VIEWER}>Viewer</option>
                   </select>
                   {/* TODO Use button component */}
@@ -260,7 +301,9 @@ export default function CollaborationModal({
               {/* Owner Display */}
               {ownerUsername && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-medium text-white mb-4">List Owner</h3>
+                  <h3 className="text-lg font-medium text-white mb-4">
+                    List Owner
+                  </h3>
                   <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg border border-gray-600">
                     <div className="flex items-center gap-3">
                       <ProfileImage
@@ -269,7 +312,9 @@ export default function CollaborationModal({
                         size="md"
                       />
                       <div>
-                        <p className="text-white font-medium">{ownerUsername}</p>
+                        <p className="text-white font-medium">
+                          {ownerUsername}
+                        </p>
                         <p className="text-gray-400 text-sm">Owner</p>
                       </div>
                     </div>
@@ -282,16 +327,22 @@ export default function CollaborationModal({
 
               {/* Collaborators List */}
               <div>
-                <h3 className="text-lg font-medium text-white mb-4">Collaborators</h3>
+                <h3 className="text-lg font-medium text-white mb-4">
+                  Collaborators
+                </h3>
                 {loading ? (
                   <div className="text-center py-8">
                     <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-gray-400 mt-2">Loading collaborators...</p>
+                    <p className="text-gray-400 mt-2">
+                      Loading collaborators...
+                    </p>
                   </div>
                 ) : collaborators.length === 0 ? (
                   <div className="text-center py-8">
                     <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                    <p className="text-gray-400">No collaborators yet. Add some to start sharing!</p>
+                    <p className="text-gray-400">
+                      No collaborators yet. Add some to start sharing!
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -307,23 +358,42 @@ export default function CollaborationModal({
                             size="md"
                           />
                           <div>
-                            <p className="text-white font-medium">{collaborator.username}</p>
+                            <p className="text-white font-medium">
+                              {collaborator.username}
+                            </p>
                             <p className="text-gray-400 text-sm">
-                              {collaborator.permissionLevel === PermissionLevel.COLLABORATOR ? 'Can edit' : 'View only'}
+                              {collaborator.permissionLevel ===
+                              PermissionLevel.COLLABORATOR
+                                ? "Can edit"
+                                : "View only"}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <select
                             value={collaborator.permissionLevel}
-                            onChange={(e) => updatePermission(collaborator.userId, e.target.value)}
+                            onChange={(e) =>
+                              updatePermission(
+                                collaborator.userId,
+                                e.target.value,
+                              )
+                            }
                             className="px-3 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
-                            <option value={PermissionLevel.COLLABORATOR}>Collaborator</option>
-                            <option value={PermissionLevel.VIEWER}>Viewer</option>
+                            <option value={PermissionLevel.COLLABORATOR}>
+                              Collaborator
+                            </option>
+                            <option value={PermissionLevel.VIEWER}>
+                              Viewer
+                            </option>
                           </select>
                           <button
-                            onClick={() => removeCollaborator(collaborator.userId, collaborator.username)}
+                            onClick={() =>
+                              removeCollaborator(
+                                collaborator.userId,
+                                collaborator.username,
+                              )
+                            }
                             className="p-2 text-gray-400 hover:text-red-400 transition-colors"
                             title="Remove collaborator"
                           >

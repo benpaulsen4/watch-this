@@ -18,7 +18,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!query || query.trim().length === 0) {
       return NextResponse.json(
         { error: "Search query is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (year) {
@@ -26,7 +26,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       if (!type || type === "all") {
         return NextResponse.json(
           { error: "Year cannot be used with multi search" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (
@@ -36,13 +36,13 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       ) {
         return NextResponse.json(
           { error: "Year must be between 1900 and next 5 years" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
 
     const { page: validatedPage, error: pageError } = validatePagination(
-      searchParams.get("page")
+      searchParams.get("page"),
     );
     if (pageError) {
       return pageError;
@@ -55,14 +55,14 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         results = await tmdbClient.searchMovies(
           query.trim(),
           validatedPage,
-          year ? parseInt(year) : undefined
+          year ? parseInt(year) : undefined,
         );
         break;
       case "tv":
         results = await tmdbClient.searchTVShows(
           query.trim(),
           validatedPage,
-          year ? parseInt(year) : undefined
+          year ? parseInt(year) : undefined,
         );
         break;
       case "all":
@@ -76,7 +76,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       const enrichedResults = await Promise.all(
         results.results.map(async (item) => {
           return await enrichWithContentStatus(item, request.user.id);
-        })
+        }),
       );
 
       results.results = enrichedResults;

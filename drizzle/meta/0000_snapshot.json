@@ -78,12 +78,8 @@
           "name": "activity_feed_user_id_users_id_fk",
           "tableFrom": "activity_feed",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -91,12 +87,8 @@
           "name": "activity_feed_list_id_lists_id_fk",
           "tableFrom": "activity_feed",
           "tableTo": "lists",
-          "columnsFrom": [
-            "list_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["list_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -176,12 +168,8 @@
           "name": "episode_watch_status_user_id_users_id_fk",
           "tableFrom": "episode_watch_status",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -191,12 +179,7 @@
         "episode_watch_status_user_id_tmdb_id_season_number_episode_number_unique": {
           "name": "episode_watch_status_user_id_tmdb_id_season_number_episode_number_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "tmdb_id",
-            "season_number",
-            "episode_number"
-          ]
+          "columns": ["user_id", "tmdb_id", "season_number", "episode_number"]
         }
       },
       "policies": {},
@@ -247,12 +230,8 @@
           "name": "list_collaborators_list_id_lists_id_fk",
           "tableFrom": "list_collaborators",
           "tableTo": "lists",
-          "columnsFrom": [
-            "list_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["list_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -260,12 +239,8 @@
           "name": "list_collaborators_user_id_users_id_fk",
           "tableFrom": "list_collaborators",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -275,10 +250,7 @@
         "list_collaborators_list_id_user_id_unique": {
           "name": "list_collaborators_list_id_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "list_id",
-            "user_id"
-          ]
+          "columns": ["list_id", "user_id"]
         }
       },
       "policies": {},
@@ -340,12 +312,8 @@
           "name": "list_items_list_id_lists_id_fk",
           "tableFrom": "list_items",
           "tableTo": "lists",
-          "columnsFrom": [
-            "list_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["list_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -355,11 +323,7 @@
         "list_items_list_id_tmdb_id_content_type_unique": {
           "name": "list_items_list_id_tmdb_id_content_type_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "list_id",
-            "tmdb_id",
-            "content_type"
-          ]
+          "columns": ["list_id", "tmdb_id", "content_type"]
         }
       },
       "policies": {},
@@ -437,12 +401,8 @@
           "name": "lists_owner_id_users_id_fk",
           "tableFrom": "lists",
           "tableTo": "users",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -516,12 +476,8 @@
           "name": "passkey_credentials_user_id_users_id_fk",
           "tableFrom": "passkey_credentials",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -531,9 +487,7 @@
         "passkey_credentials_credential_id_unique": {
           "name": "passkey_credentials_credential_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "credential_id"
-          ]
+          "columns": ["credential_id"]
         }
       },
       "policies": {},
@@ -603,12 +557,8 @@
           "name": "user_content_status_user_id_users_id_fk",
           "tableFrom": "user_content_status",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -618,11 +568,7 @@
         "user_content_status_user_id_tmdb_id_content_type_unique": {
           "name": "user_content_status_user_id_tmdb_id_content_type_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "user_id",
-            "tmdb_id",
-            "content_type"
-          ]
+          "columns": ["user_id", "tmdb_id", "content_type"]
         }
       },
       "policies": {},
@@ -674,9 +620,7 @@
         "users_username_unique": {
           "name": "users_username_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "username"
-          ]
+          "columns": ["username"]
         }
       },
       "policies": {},

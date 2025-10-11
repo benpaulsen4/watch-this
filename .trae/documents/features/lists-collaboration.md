@@ -7,6 +7,7 @@ The Lists & Collaboration system enables users to create, organize, and share wa
 ## Product Requirements
 
 ### User Stories
+
 - **As a user**, I want to create multiple lists to organize my content by genre, mood, or viewing plans
 - **As a list creator**, I want to invite friends to collaborate on shared lists so we can plan what to watch together
 - **As a collaborator**, I want different permission levels so I can view or edit lists based on the owner's preferences
@@ -18,22 +19,25 @@ The Lists & Collaboration system enables users to create, organize, and share wa
 ### List Types & Features
 
 #### List Categories
+
 - **Personal Lists**: Private lists for individual use
 - **Shared Lists**: Lists with invited collaborators
 - **Public Lists**: Discoverable lists visible to all users
 - **Watch Together Lists**: Shared lists with status synchronization enabled
 
 #### Permission Levels
-| Permission | View List | Add/Remove Content | Edit List Details | Manage Collaborators |
-|------------|-----------|-------------------|-------------------|---------------------|
-| **Owner** | ✅ | ✅ | ✅ | ✅ |
-| **Collaborator** | ✅ | ✅ | ❌ | ❌ |
-| **Viewer** | ✅ | ❌ | ❌ | ❌ |
-| **Public** | ✅ | ❌ | ❌ | ❌ |
+
+| Permission       | View List | Add/Remove Content | Edit List Details | Manage Collaborators |
+| ---------------- | --------- | ------------------ | ----------------- | -------------------- |
+| **Owner**        | ✅        | ✅                 | ✅                | ✅                   |
+| **Collaborator** | ✅        | ✅                 | ❌                | ❌                   |
+| **Viewer**       | ✅        | ❌                 | ❌                | ❌                   |
+| **Public**       | ✅        | ❌                 | ❌                | ❌                   |
 
 ### Acceptance Criteria
 
 #### List Management
+
 - Users can create unlimited lists with custom names and descriptions
 - Lists support mixed content types (movies and TV shows) or type-specific filtering
 - Users can reorder list items with drag-and-drop or manual sorting
@@ -41,6 +45,7 @@ The Lists & Collaboration system enables users to create, organize, and share wa
 - Users can duplicate existing lists as templates
 
 #### Collaboration Features
+
 - List owners can invite collaborators via username or shareable links
 - Collaborators receive notifications for list invitations
 - Permission levels can be changed by list owners
@@ -48,6 +53,7 @@ The Lists & Collaboration system enables users to create, organize, and share wa
 - Activity feed shows collaborative actions for transparency
 
 #### Watch Together Synchronization
+
 - Lists can enable "Watch Together" mode for status sync
 - When enabled, watch status changes sync to all collaborators automatically
 - Users can opt-out of receiving synced status updates per list
@@ -55,6 +61,7 @@ The Lists & Collaboration system enables users to create, organize, and share wa
 - Sync activities are logged for audit trail
 
 #### Content Management
+
 - Users can add content from search results or TMDB links
 - Duplicate content is prevented within the same list
 - Content can be moved between lists
@@ -99,16 +106,16 @@ graph TD
     C --> D[Content Manager]
     C --> E[Collaborator Manager]
     C --> F[Settings Panel]
-    
+
     D --> G[Lists API]
     E --> G
     F --> G
-    
+
     G --> H[Lists Service]
     H --> I[Database]
     H --> J[Notification Service]
     H --> K[Activity Service]
-    
+
     subgraph "Frontend Components"
         A
         B
@@ -117,14 +124,14 @@ graph TD
         E
         F
     end
-    
+
     subgraph "Backend Services"
         G
         H
         J
         K
     end
-    
+
     subgraph "Data Layer"
         I
     end
@@ -206,6 +213,7 @@ CREATE INDEX idx_list_invitations_list_id ON list_invitations(list_id);
 ### API Endpoints
 
 #### List Management
+
 ```typescript
 // GET /api/lists
 interface ListsResponse {
@@ -218,7 +226,7 @@ interface ListsResponse {
 interface CreateListRequest {
   name: string;
   description?: string;
-  list_type?: 'movie' | 'tv' | 'mixed';
+  list_type?: "movie" | "tv" | "mixed";
   is_public?: boolean;
   sync_watch_status?: boolean;
 }
@@ -233,7 +241,7 @@ interface ListDetailsResponse {
   list: List & {
     items: ListItem[];
     collaborators: Collaborator[];
-    user_permission: 'owner' | 'collaborator' | 'viewer';
+    user_permission: "owner" | "collaborator" | "viewer";
     can_edit: boolean;
     can_manage_collaborators: boolean;
   };
@@ -254,11 +262,12 @@ interface DeleteListResponse {
 ```
 
 #### List Content Management
+
 ```typescript
 // POST /api/lists/[id]/items
 interface AddListItemRequest {
   tmdb_id: number;
-  content_type: 'movie' | 'tv';
+  content_type: "movie" | "tv";
   title: string;
   poster_path?: string;
   notes?: string;
@@ -291,12 +300,13 @@ interface ReorderItemsRequest {
 ```
 
 #### Collaboration Management
+
 ```typescript
 // POST /api/lists/[id]/collaborators
 interface AddCollaboratorRequest {
   username?: string;
   user_id?: string;
-  permission_level: 'collaborator' | 'viewer';
+  permission_level: "collaborator" | "viewer";
 }
 
 interface AddCollaboratorResponse {
@@ -307,7 +317,7 @@ interface AddCollaboratorResponse {
 
 // PUT /api/lists/[id]/collaborators/[userId]
 interface UpdateCollaboratorRequest {
-  permission_level: 'collaborator' | 'viewer';
+  permission_level: "collaborator" | "viewer";
 }
 
 // DELETE /api/lists/[id]/collaborators/[userId]
@@ -317,7 +327,7 @@ interface RemoveCollaboratorResponse {
 
 // POST /api/lists/[id]/invitations
 interface CreateInvitationRequest {
-  permission_level: 'collaborator' | 'viewer';
+  permission_level: "collaborator" | "viewer";
   expires_in_hours?: number;
   max_uses?: number;
 }
@@ -340,11 +350,12 @@ interface AcceptInvitationResponse {
 ### Frontend Components
 
 #### Lists Overview Page
+
 ```typescript
 // app/(authenticated)/lists/page.tsx
 export default async function ListsPage() {
   const lists = await getUserLists();
-  
+
   return (
     <div className="min-h-screen bg-gray-950">
       <Header title="My Lists" />
@@ -355,7 +366,7 @@ export default async function ListsPage() {
             <CreateListButton />
           </Suspense>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Suspense fallback={<ListCardsSkeleton />}>
             <ListCards lists={lists} />
@@ -380,7 +391,7 @@ export function ListCard({ list }: { list: List }) {
         </div>
         <ListOptionsMenu list={list} />
       </div>
-      
+
       <div className="flex items-center justify-between text-sm text-gray-400">
         <span>{list.item_count} items</span>
         <div className="flex items-center space-x-2">
@@ -391,7 +402,7 @@ export function ListCard({ list }: { list: List }) {
           )}
         </div>
       </div>
-      
+
       <Link
         href={`/lists/${list.id}`}
         className="mt-4 block w-full text-center py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
@@ -404,11 +415,12 @@ export function ListCard({ list }: { list: List }) {
 ```
 
 #### List Details Page
+
 ```typescript
 // app/(authenticated)/lists/[id]/page.tsx
 export default async function ListDetailsPage({ params }: { params: { id: string } }) {
   const listDetails = await getListDetails(params.id);
-  
+
   return (
     <div className="min-h-screen bg-gray-950">
       <Header title={listDetails.list.name} />
@@ -430,7 +442,7 @@ export default async function ListDetailsPage({ params }: { params: { id: string
               <ListSettingsButton list={listDetails.list} canEdit={listDetails.can_edit} />
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-4 text-sm text-gray-400">
             <span>{listDetails.list.items.length} items</span>
             {listDetails.list.collaborators.length > 0 && (
@@ -441,7 +453,7 @@ export default async function ListDetailsPage({ params }: { params: { id: string
             )}
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3">
             <Suspense fallback={<ListItemsSkeleton />}>
@@ -452,7 +464,7 @@ export default async function ListDetailsPage({ params }: { params: { id: string
               />
             </Suspense>
           </div>
-          
+
           <div className="lg:col-span-1">
             <Suspense fallback={<CollaboratorsSkeleton />}>
               <CollaboratorsPanel
@@ -470,6 +482,7 @@ export default async function ListDetailsPage({ params }: { params: { id: string
 ```
 
 #### Collaboration Components
+
 ```typescript
 // components/lists/CollaboratorsPanel.tsx
 'use client';
@@ -483,7 +496,7 @@ export function CollaboratorsPanel({
   listId: string;
 }) {
   const [showInviteModal, setShowInviteModal] = useState(false);
-  
+
   return (
     <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
       <div className="flex items-center justify-between mb-4">
@@ -497,7 +510,7 @@ export function CollaboratorsPanel({
           </Button>
         )}
       </div>
-      
+
       <div className="space-y-3">
         {collaborators.map((collaborator) => (
           <div key={collaborator.user_id} className="flex items-center justify-between">
@@ -508,7 +521,7 @@ export function CollaboratorsPanel({
                 <p className="text-gray-400 text-xs">{collaborator.permission_level}</p>
               </div>
             </div>
-            
+
             {canManage && (
               <CollaboratorOptionsMenu
                 collaborator={collaborator}
@@ -518,7 +531,7 @@ export function CollaboratorsPanel({
           </div>
         ))}
       </div>
-      
+
       {showInviteModal && (
         <InviteCollaboratorModal
           listId={listId}
@@ -533,6 +546,7 @@ export function CollaboratorsPanel({
 ### Backend Services
 
 #### Lists Service
+
 ```typescript
 // lib/services/lists-service.ts
 export class ListsService {
@@ -541,10 +555,10 @@ export class ListsService {
     data: {
       name: string;
       description?: string;
-      listType?: 'movie' | 'tv' | 'mixed';
+      listType?: "movie" | "tv" | "mixed";
       isPublic?: boolean;
       syncWatchStatus?: boolean;
-    }
+    },
   ) {
     const [list] = await db
       .insert(lists)
@@ -552,28 +566,28 @@ export class ListsService {
         ownerId,
         name: data.name,
         description: data.description,
-        listType: data.listType ?? 'mixed',
+        listType: data.listType ?? "mixed",
         isPublic: data.isPublic ?? false,
         syncWatchStatus: data.syncWatchStatus ?? false,
       })
       .returning();
-    
+
     // Create activity entry
     await this.activityService.createActivity({
       userId: ownerId,
-      activityType: 'list_management',
+      activityType: "list_management",
       listId: list.id,
-      metadata: { action: 'created', list_name: list.name },
+      metadata: { action: "created", list_name: list.name },
     });
-    
+
     return list;
   }
-  
+
   async addCollaborator(
     listId: string,
     userId: string,
     invitedBy: string,
-    permissionLevel: 'collaborator' | 'viewer'
+    permissionLevel: "collaborator" | "viewer",
   ) {
     return await db.transaction(async (tx) => {
       // Check if user is already a collaborator
@@ -583,15 +597,15 @@ export class ListsService {
         .where(
           and(
             eq(listCollaborators.listId, listId),
-            eq(listCollaborators.userId, userId)
-          )
+            eq(listCollaborators.userId, userId),
+          ),
         )
         .limit(1);
-      
+
       if (existing.length > 0) {
-        throw new Error('User is already a collaborator');
+        throw new Error("User is already a collaborator");
       }
-      
+
       // Add collaborator
       const [collaborator] = await tx
         .insert(listCollaborators)
@@ -603,7 +617,7 @@ export class ListsService {
           joinedAt: new Date(),
         })
         .returning();
-      
+
       // Send notification
       await this.notificationService.sendCollaboratorInvitation({
         listId,
@@ -611,34 +625,34 @@ export class ListsService {
         invitedBy,
         permissionLevel,
       });
-      
+
       // Create activity entry
       await this.activityService.createActivity({
         userId: invitedBy,
-        activityType: 'list_management',
+        activityType: "list_management",
         listId,
         metadata: {
-          action: 'collaborator_added',
+          action: "collaborator_added",
           collaborator_username: collaborator.user?.username,
           permission_level: permissionLevel,
         },
         collaborators: [userId],
       });
-      
+
       return collaborator;
     });
   }
-  
+
   async addListItem(
     listId: string,
     userId: string,
     item: {
       tmdbId: number;
-      contentType: 'movie' | 'tv';
+      contentType: "movie" | "tv";
       title: string;
       posterPath?: string;
       notes?: string;
-    }
+    },
   ) {
     return await db.transaction(async (tx) => {
       // Check for duplicates
@@ -649,23 +663,23 @@ export class ListsService {
           and(
             eq(listItems.listId, listId),
             eq(listItems.tmdbId, item.tmdbId),
-            eq(listItems.contentType, item.contentType)
-          )
+            eq(listItems.contentType, item.contentType),
+          ),
         )
         .limit(1);
-      
+
       if (existing.length > 0) {
         return { item: existing[0], duplicate: true };
       }
-      
+
       // Get next sort order
       const maxOrder = await tx
         .select({ max: max(listItems.sortOrder) })
         .from(listItems)
         .where(eq(listItems.listId, listId));
-      
+
       const sortOrder = (maxOrder[0]?.max ?? 0) + 1;
-      
+
       // Add item
       const [newItem] = await tx
         .insert(listItems)
@@ -680,20 +694,20 @@ export class ListsService {
           sortOrder,
         })
         .returning();
-      
+
       // Create activity entry
       await this.activityService.createActivity({
         userId,
-        activityType: 'list_content',
+        activityType: "list_content",
         listId,
         tmdbId: item.tmdbId,
         contentType: item.contentType,
         metadata: {
-          action: 'added',
+          action: "added",
           content_title: item.title,
         },
       });
-      
+
       return { item: newItem, duplicate: false };
     });
   }
@@ -718,4 +732,4 @@ export class ListsService {
 
 ---
 
-*This feature document should be updated as the lists and collaboration system evolves and new sharing requirements are identified.*
+_This feature document should be updated as the lists and collaboration system evolves and new sharing requirements are identified._

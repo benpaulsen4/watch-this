@@ -23,7 +23,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId || !collaboratorUserId) {
       return NextResponse.json(
         { error: "List ID and collaborator user ID are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -37,7 +37,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     ) {
       return NextResponse.json(
         { error: "Valid permission level is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -55,7 +55,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (existingList.ownerId !== userId) {
       return NextResponse.json(
         { error: "Only the list owner can update collaborator permissions" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -70,15 +70,15 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         and(
           eq(listCollaborators.listId, listId),
-          eq(listCollaborators.userId, collaboratorUserId)
-        )
+          eq(listCollaborators.userId, collaboratorUserId),
+        ),
       )
       .limit(1);
 
     if (!existingCollaborator) {
       return NextResponse.json(
         { error: "Collaborator not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -112,7 +112,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error updating collaborator:", error);
     return NextResponse.json(
       { error: "Failed to update collaborator" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -129,7 +129,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId || !collaboratorUserId) {
       return NextResponse.json(
         { error: "List ID and collaborator user ID are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -147,7 +147,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (existingList.ownerId !== userId) {
       return NextResponse.json(
         { error: "Only the list owner can remove collaborators" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -161,15 +161,15 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         and(
           eq(listCollaborators.listId, listId),
-          eq(listCollaborators.userId, collaboratorUserId)
-        )
+          eq(listCollaborators.userId, collaboratorUserId),
+        ),
       )
       .limit(1);
 
     if (!existingCollaborator) {
       return NextResponse.json(
         { error: "Collaborator not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -201,7 +201,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     } catch (activityError) {
       console.error(
         "Failed to create activity for collaborator removal:",
-        activityError
+        activityError,
       );
       // Don't fail the main operation if activity creation fails
     }
@@ -215,7 +215,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error removing collaborator:", error);
     return NextResponse.json(
       { error: "Failed to remove collaborator" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

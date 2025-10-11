@@ -1,11 +1,14 @@
-import { forwardRef, useState, useEffect, useRef } from 'react';
-import { cn } from '@/lib/utils';
-import { Input } from './Input';
-import { Button } from './Button';
-import { Search, X } from 'lucide-react';
+import { forwardRef, useState, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
+import { Input } from "../ui/Input";
+import { Button } from "../ui/Button";
+import { Search, X } from "lucide-react";
 
 export interface SearchInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'size'> {
+  extends Omit<
+    React.InputHTMLAttributes<HTMLInputElement>,
+    "onChange" | "size"
+  > {
   onSearch?: (query: string) => void;
   onClear?: () => void;
   loading?: boolean;
@@ -13,17 +16,22 @@ export interface SearchInputProps
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ 
-    className, 
-    onSearch, 
-    onClear, 
-    loading = false,
-    debounceMs = 500,
-    value: controlledValue,
-    defaultValue,
-    ...props 
-  }, ref) => {
-    const [internalValue, setInternalValue] = useState(controlledValue ?? defaultValue ?? '');
+  (
+    {
+      className,
+      onSearch,
+      onClear,
+      loading = false,
+      debounceMs = 500,
+      value: controlledValue,
+      defaultValue,
+      ...props
+    },
+    ref,
+  ) => {
+    const [internalValue, setInternalValue] = useState(
+      controlledValue ?? defaultValue ?? "",
+    );
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Clear timeout on unmount
@@ -38,12 +46,12 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = e.target.value;
       setInternalValue(newValue);
-      
+
       // Clear any existing timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
+
       // Set a new timeout
       timeoutRef.current = setTimeout(() => {
         onSearch?.(newValue);
@@ -51,10 +59,10 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     };
 
     const handleClear = () => {
-      setInternalValue('');
+      setInternalValue("");
       onClear?.();
-      onSearch?.('');
-      
+      onSearch?.("");
+
       // Clear any existing timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -62,11 +70,11 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     };
 
     return (
-      <div className={cn('relative flex items-center gap-2', className)}>
+      <div className={cn("relative flex items-center gap-2", className)}>
         <div className="relative flex-1">
           {/* Search icon */}
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          
+
           {/* Input */}
           <Input
             ref={ref}
@@ -77,7 +85,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             placeholder="Search movies and TV shows..."
             {...props}
           />
-          
+
           {/* Clear button */}
           {internalValue && (
             <Button
@@ -90,7 +98,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
               <X className="h-4 w-4" />
             </Button>
           )}
-          
+
           {/* Loading indicator */}
           {loading && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -100,9 +108,9 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         </div>
       </div>
     );
-  }
+  },
 );
 
-SearchInput.displayName = 'SearchInput';
+SearchInput.displayName = "SearchInput";
 
 export { SearchInput };

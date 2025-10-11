@@ -22,7 +22,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -39,15 +39,15 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(lists.id, listId),
           // User must be owner or collaborator to view collaborators
-          eq(lists.ownerId, userId)
-        )
+          eq(lists.ownerId, userId),
+        ),
       )
       .limit(1);
 
     if (!listData) {
       return NextResponse.json(
         { error: "List not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -70,7 +70,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error fetching collaborators:", error);
     return NextResponse.json(
       { error: "Failed to fetch collaborators" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -86,7 +86,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -97,14 +97,14 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!username || username.trim().length === 0) {
       return NextResponse.json(
         { error: "Username is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(PermissionLevel).includes(permissionLevel)) {
       return NextResponse.json(
         { error: "Invalid permission level" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -122,7 +122,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (existingList.ownerId !== userId) {
       return NextResponse.json(
         { error: "Only the list owner can add collaborators" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -145,7 +145,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (targetUser.id === userId) {
       return NextResponse.json(
         { error: "Cannot add yourself as a collaborator" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -156,15 +156,15 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         and(
           eq(listCollaborators.listId, listId),
-          eq(listCollaborators.userId, targetUser.id)
-        )
+          eq(listCollaborators.userId, targetUser.id),
+        ),
       )
       .limit(1);
 
     if (existingCollaborator) {
       return NextResponse.json(
         { error: "User is already a collaborator on this list" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -195,7 +195,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     } catch (activityError) {
       console.error(
         "Failed to create activity for collaborator addition:",
-        activityError
+        activityError,
       );
       // Don't fail the main operation if activity creation fails
     }
@@ -218,7 +218,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error adding collaborator:", error);
     return NextResponse.json(
       { error: "Failed to add collaborator" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

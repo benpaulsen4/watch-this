@@ -22,7 +22,7 @@ export async function GET() {
         sameSite: "strict",
         maxAge: 10 * 60, // 10 minutes
         path: "/api/auth/authenticate",
-      }
+      },
     );
 
     return response;
@@ -31,7 +31,7 @@ export async function GET() {
 
     return NextResponse.json(
       { error: "Failed to generate authentication options" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

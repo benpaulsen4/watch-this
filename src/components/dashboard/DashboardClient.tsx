@@ -1,31 +1,35 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { Search, List } from 'lucide-react';
-import type { TMDBMovie, TMDBTVShow } from '@/lib/tmdb/client';
-import { ContentCard } from '@/components/ui/ContentCard';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Button } from '@/components/ui/Button';
-import {ProfileImage} from '@/components/ui';
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { Search, List } from "lucide-react";
+import type { TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/Button";
 import { ActivityFeed } from "@/components/activity/ActivityFeed";
-import { useUser } from '@/lib/auth/context';
+import { useUser } from "../providers/AuthProvider";
+import { ProfileImage } from "../ui/ProfileImage";
+import { ContentCard } from "../content/ContentCard";
 
 export function DashboardClient() {
   const router = useRouter();
   const user = useUser();
-  const [trendingContent, setTrendingContent] = useState<(TMDBMovie | TMDBTVShow)[]>([]);
+  const [trendingContent, setTrendingContent] = useState<
+    (TMDBMovie | TMDBTVShow)[]
+  >([]);
   const [contentLoading, setContentLoading] = useState(true);
 
   const loadTrendingContent = useCallback(async () => {
     try {
-      const response = await fetch('/api/tmdb/trending?media_type=all&time_window=day');
+      const response = await fetch(
+        "/api/tmdb/trending?media_type=all&time_window=day",
+      );
       if (response.ok) {
         const data = await response.json();
         setTrendingContent(data.results?.slice(0, 6) || []);
       }
     } catch (error) {
-      console.error('Failed to load trending content:', error);
+      console.error("Failed to load trending content:", error);
     } finally {
       setContentLoading(false);
     }
@@ -44,19 +48,27 @@ export function DashboardClient() {
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold text-red-500">WatchThis</h1>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" onClick={() => router.push('/lists')}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/lists")}
+              >
                 <List className="h-4 w-4" />
-                <span className='ml-2 hidden sm:block'>My Lists</span>
+                <span className="ml-2 hidden sm:block">My Lists</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={() => router.push('/search')}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/search")}
+              >
                 <Search className="h-4 w-4" />
-                <span className='ml-2 hidden sm:block'>Discover</span>
+                <span className="ml-2 hidden sm:block">Discover</span>
               </Button>
               {user && (
                 <button
-                  onClick={() => router.push('/profile')}
+                  onClick={() => router.push("/profile")}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors border border-gray-700 hover:border-gray-600"
                   title="Profile Settings"
                 >
@@ -78,22 +90,22 @@ export function DashboardClient() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Activity Feed */}
         <section className="mb-8">
-          <ActivityFeed currentUsername={user?.username ?? ''} />
+          <ActivityFeed currentUsername={user?.username ?? ""} />
         </section>
 
         {/* Trending Content */}
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-100">Trending Today</h2>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => router.push('/search')}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/search")}
             >
               View All
             </Button>
           </div>
-          
+
           {contentLoading ? (
             <div className="flex justify-center py-8">
               <LoadingSpinner size="lg" variant="primary" />

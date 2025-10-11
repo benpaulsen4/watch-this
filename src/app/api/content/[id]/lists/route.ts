@@ -14,7 +14,7 @@ async function handler(request: AuthenticatedRequest) {
     if (isNaN(contentId)) {
       return NextResponse.json(
         { error: "Invalid content ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -29,12 +29,9 @@ async function handler(request: AuthenticatedRequest) {
       .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
       .where(
         and(
-          or(
-            eq(lists.ownerId, userId),
-            eq(listCollaborators.userId, userId)
-          ),
-          eq(listItems.tmdbId, contentId)
-        )
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+          eq(listItems.tmdbId, contentId),
+        ),
       );
 
     const results = userListsWithContent.map((item) => ({
@@ -47,7 +44,7 @@ async function handler(request: AuthenticatedRequest) {
     console.error("Error fetching lists with content:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

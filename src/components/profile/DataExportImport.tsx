@@ -1,13 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
-import { Download, Upload, FileText, Database, AlertCircle, CheckCircle, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent } from '@/components/ui/Card';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useState, useRef } from "react";
+import {
+  Download,
+  Upload,
+  FileText,
+  Database,
+  AlertCircle,
+  CheckCircle,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
-type ExportFormat = 'json' | 'csv';
-type ImportStatus = 'idle' | 'uploading' | 'success' | 'error';
+type ExportFormat = "json" | "csv";
+type ImportStatus = "idle" | "uploading" | "success" | "error";
 
 interface ImportResult {
   success: boolean;
@@ -21,7 +29,7 @@ interface ImportResult {
 
 export function DataExportImport() {
   const [exportLoading, setExportLoading] = useState(false);
-  const [importStatus, setImportStatus] = useState<ImportStatus>('idle');
+  const [importStatus, setImportStatus] = useState<ImportStatus>("idle");
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   // Import is now JSON-only, no format selection needed
@@ -29,21 +37,21 @@ export function DataExportImport() {
 
   const handleExport = async (format: ExportFormat) => {
     setExportLoading(true);
-    
+
     try {
       const response = await fetch(`/api/profile/export?format=${format}`);
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to export data');
+        throw new Error(errorData.error || "Failed to export data");
       }
 
       // Parse the JSON response to get data and filename
       const responseData = await response.json();
       const { data, filename, isZip } = responseData;
-      
+
       if (!data || !filename) {
-        throw new Error('Invalid response format from server');
+        throw new Error("Invalid response format from server");
       }
 
       let blob: Blob;
@@ -54,14 +62,14 @@ export function DataExportImport() {
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
         }
-        blob = new Blob([bytes], { type: 'application/zip' });
+        blob = new Blob([bytes], { type: "application/zip" });
       } else {
         // For JSON files, data is the actual content
-        blob = new Blob([data], { type: 'application/json' });
+        blob = new Blob([data], { type: "application/json" });
       }
-      
+
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
@@ -69,8 +77,8 @@ export function DataExportImport() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Export failed:', error);
-      alert(error instanceof Error ? error.message : 'Failed to export data');
+      console.error("Export failed:", error);
+      alert(error instanceof Error ? error.message : "Failed to export data");
     } finally {
       setExportLoading(false);
     }
@@ -80,48 +88,48 @@ export function DataExportImport() {
     const file = event.target.files?.[0];
     if (file) {
       // Validate that it's a JSON file
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      if (extension !== 'json') {
-        alert('Only JSON files are supported for import.');
+      const extension = file.name.split(".").pop()?.toLowerCase();
+      if (extension !== "json") {
+        alert("Only JSON files are supported for import.");
         return;
       }
-      
+
       setSelectedFile(file);
       setImportResult(null);
-      setImportStatus('idle');
+      setImportStatus("idle");
     }
   };
 
   const handleImport = async () => {
     if (!selectedFile) return;
 
-    setImportStatus('uploading');
+    setImportStatus("uploading");
     setImportResult(null);
 
     try {
       const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('format', 'json'); // Always JSON now
+      formData.append("file", selectedFile);
+      formData.append("format", "json"); // Always JSON now
 
-      const response = await fetch('/api/profile/import', {
-        method: 'POST',
+      const response = await fetch("/api/profile/import", {
+        method: "POST",
         body: formData,
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to import data');
+        throw new Error(result.error || "Failed to import data");
       }
 
       setImportResult(result);
-      setImportStatus('success');
+      setImportStatus("success");
       setSelectedFile(null);
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     } catch (error) {
-      console.error('Import failed:', error);
+      console.error("Import failed:", error);
       setImportResult({
         success: false,
         imported: {
@@ -129,22 +137,25 @@ export function DataExportImport() {
           contentStatus: 0,
           episodeStatus: 0,
         },
-        errors: [error instanceof Error ? error.message : 'Failed to import data']
+        errors: [
+          error instanceof Error ? error.message : "Failed to import data",
+        ],
       });
-      setImportStatus('error');
+      setImportStatus("error");
     }
   };
 
   const clearImportResult = () => {
     setImportResult(null);
-    setImportStatus('idle');
+    setImportStatus("idle");
   };
 
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm text-gray-400">
-          Export your lists and data for backup, or import data from a previous export.
+          Export your lists and data for backup, or import data from a previous
+          export.
         </p>
       </div>
 
@@ -156,23 +167,26 @@ export function DataExportImport() {
               <Download className="h-6 w-6 text-green-400" />
             </div>
             <div className="flex-1">
-              <h4 className="text-lg font-medium text-gray-100 mb-2">Export Data</h4>
+              <h4 className="text-lg font-medium text-gray-100 mb-2">
+                Export Data
+              </h4>
               <p className="text-sm text-gray-400 mb-4">
-                Download all your data in JSON format or as a ZIP file containing CSV files for backup or migration.
+                Download all your data in JSON format or as a ZIP file
+                containing CSV files for backup or migration.
               </p>
               <div className="flex gap-3 flex-col sm:flex-row">
                 <Button
-                  onClick={() => handleExport('json')}
+                  onClick={() => handleExport("json")}
                   disabled={exportLoading}
                   loading={exportLoading}
                   size="sm"
                 >
-                    <Database className="h-4 w-4 mr-2" />
+                  <Database className="h-4 w-4 mr-2" />
                   Export as JSON
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => handleExport('csv')}
+                  onClick={() => handleExport("csv")}
                   disabled={exportLoading}
                   loading={exportLoading}
                   size="sm"
@@ -194,11 +208,14 @@ export function DataExportImport() {
               <Upload className="h-6 w-6 text-blue-400" />
             </div>
             <div className="flex-1">
-              <h4 className="text-lg font-medium text-gray-100 mb-2">Import Data</h4>
+              <h4 className="text-lg font-medium text-gray-100 mb-2">
+                Import Data
+              </h4>
               <p className="text-sm text-gray-400 mb-4">
-                Upload a previously exported JSON file to restore your lists, content status, and episode watch history.
+                Upload a previously exported JSON file to restore your lists,
+                content status, and episode watch history.
               </p>
-              
+
               <div className="space-y-4">
                 <div>
                   <input
@@ -227,10 +244,10 @@ export function DataExportImport() {
                   <div className="space-y-3">
                     <Button
                       onClick={handleImport}
-                      disabled={importStatus === 'uploading'}
+                      disabled={importStatus === "uploading"}
                       size="sm"
                     >
-                      {importStatus === 'uploading' ? (
+                      {importStatus === "uploading" ? (
                         <LoadingSpinner size="sm" className="mr-2" />
                       ) : (
                         <Upload className="h-4 w-4 mr-2" />
@@ -251,49 +268,63 @@ export function DataExportImport() {
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-3">
-                {importStatus === 'success' ? (
+                {importStatus === "success" ? (
                   <CheckCircle className="h-5 w-5 text-green-400 mt-0.5" />
                 ) : (
                   <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
                 )}
                 <div>
-                  <h4 className={`font-medium mb-2 ${
-                    importStatus === 'success' ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {importStatus === 'success' ? 'Import Completed' : 'Import Failed'}
+                  <h4
+                    className={`font-medium mb-2 ${
+                      importStatus === "success"
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {importStatus === "success"
+                      ? "Import Completed"
+                      : "Import Failed"}
                   </h4>
-                  
+
                   {importResult.success && (
                     <div className="text-sm text-gray-300 mb-2 space-y-1">
                       <p>Successfully imported:</p>
                       <ul className="ml-4 space-y-1">
                         <li>• {importResult.imported.lists} list(s)</li>
-                        <li>• {importResult.imported.contentStatus} content status entries</li>
-                        <li>• {importResult.imported.episodeStatus} episode watch entries</li>
+                        <li>
+                          • {importResult.imported.contentStatus} content status
+                          entries
+                        </li>
+                        <li>
+                          • {importResult.imported.episodeStatus} episode watch
+                          entries
+                        </li>
                       </ul>
                     </div>
                   )}
-                  
+
                   {importResult.errors.length > 0 && (
                     <div className="space-y-1">
-                      <p className="text-sm text-gray-400">Issues encountered:</p>
+                      <p className="text-sm text-gray-400">
+                        Issues encountered:
+                      </p>
                       <ul className="text-sm text-gray-300 space-y-1">
                         {importResult.errors.slice(0, 5).map((error, index) => (
-                          <li key={index} className="text-red-400">• {error}</li>
+                          <li key={index} className="text-red-400">
+                            • {error}
+                          </li>
                         ))}
                         {importResult.errors.length > 5 && (
-                          <li className="text-gray-400">... and {importResult.errors.length - 5} more</li>
+                          <li className="text-gray-400">
+                            ... and {importResult.errors.length - 5} more
+                          </li>
                         )}
                       </ul>
                     </div>
                   )}
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearImportResult}
-              >
+              <Button variant="ghost" size="sm" onClick={clearImportResult}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -306,13 +337,26 @@ export function DataExportImport() {
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5" />
           <div>
-            <h4 className="font-medium text-yellow-400 mb-1">Important Notes</h4>
+            <h4 className="font-medium text-yellow-400 mb-1">
+              Important Notes
+            </h4>
             <ul className="text-sm text-gray-300 space-y-1">
-              <li>• Importing data will add to your existing data, not replace it</li>
-              <li>• Duplicate items may be created if you import the same data multiple times</li>
+              <li>
+                • Importing data will add to your existing data, not replace it
+              </li>
+              <li>
+                • Duplicate items may be created if you import the same data
+                multiple times
+              </li>
               <li>• Large files may take some time to process</li>
-              <li>• Only JSON files exported from WatchThis are supported for import</li>
-              <li>• CSV exports are provided as ZIP files containing separate CSV files for different data types</li>
+              <li>
+                • Only JSON files exported from WatchThis are supported for
+                import
+              </li>
+              <li>
+                • CSV exports are provided as ZIP files containing separate CSV
+                files for different data types
+              </li>
             </ul>
           </div>
         </div>

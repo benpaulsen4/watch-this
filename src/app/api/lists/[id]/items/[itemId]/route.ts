@@ -22,7 +22,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId || !itemId) {
       return NextResponse.json(
         { error: "List ID and Item ID are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -34,15 +34,15 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         and(
           eq(lists.id, listId),
-          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-        )
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+        ),
       )
       .limit(1);
 
     if (!listData) {
       return NextResponse.json(
         { error: "List not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -62,7 +62,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!existingItem) {
       return NextResponse.json(
         { error: "Item not found in this list" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -94,7 +94,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     } catch (activityError) {
       console.error(
         "Failed to create activity for list item removal:",
-        activityError
+        activityError,
       );
       // Don't fail the main operation if activity creation fails
     }
@@ -106,7 +106,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error removing item from list:", error);
     return NextResponse.json(
       { error: "Failed to remove item from list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -123,7 +123,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId || !itemId) {
       return NextResponse.json(
         { error: "List ID and Item ID are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -138,16 +138,16 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           or(
             eq(lists.ownerId, userId),
             eq(listCollaborators.userId, userId),
-            eq(lists.isPublic, true)
-          )
-        )
+            eq(lists.isPublic, true),
+          ),
+        ),
       )
       .limit(1);
 
     if (!listData) {
       return NextResponse.json(
         { error: "List not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -168,7 +168,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!item) {
       return NextResponse.json(
         { error: "Item not found in this list" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -177,7 +177,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error fetching list item:", error);
     return NextResponse.json(
       { error: "Failed to fetch list item" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

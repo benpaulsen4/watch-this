@@ -30,7 +30,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     return NextResponse.json(
       { error: "Failed to retrieve devices" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

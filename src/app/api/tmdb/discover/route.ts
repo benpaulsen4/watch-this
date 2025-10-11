@@ -19,12 +19,12 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (type && !["movie", "tv"].includes(type)) {
       return NextResponse.json(
         { error: 'Type must be either "movie" or "tv"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const { page: validatedPage, error: pageError } = validatePagination(
-      searchParams.get("page")
+      searchParams.get("page"),
     );
     if (pageError) {
       return pageError;
@@ -90,11 +90,11 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         results: promises.flatMap((item) => item.results),
         total_pages: promises.reduce(
           (acc, item) => Math.max(acc, item.total_pages),
-          0
+          0,
         ),
         total_results: promises.reduce(
           (acc, item) => acc + item.total_results,
-          0
+          0,
         ),
       };
     }
@@ -104,7 +104,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       const enrichedResults = await Promise.all(
         results.results.map(async (item) => {
           return await enrichWithContentStatus(item, request.user.id);
-        })
+        }),
       );
 
       results.results = enrichedResults;

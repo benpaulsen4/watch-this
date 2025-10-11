@@ -18,34 +18,42 @@ import {
   handleApiError,
 } from "@/lib/auth/api-middleware";
 import { eq, and } from "drizzle-orm";
-import { syncStatusToCollaborators } from "@/lib/activity/sync-utils";
-import { tmdbClient, TMDBMovie, TMDBTVShow } from "@/lib";
+import { syncStatusToCollaborators } from "@/lib/activity/activityUtils";
+import { tmdbClient, TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
 
 // Helper function to remove schedules when a show is completed or dropped
 async function removeSchedulesForCompletedOrDroppedShow(
   userId: string,
   tmdbId: number,
   contentType: string,
-  status: string
+  status: string,
 ) {
   // Only remove schedules for TV shows that are completed or dropped
-  if (contentType === ContentType.TV && (status === "completed" || status === "dropped")) {
+  if (
+    contentType === ContentType.TV &&
+    (status === "completed" || status === "dropped")
+  ) {
     try {
       const deletedSchedules = await db
         .delete(showSchedules)
         .where(
           and(
             eq(showSchedules.userId, userId),
-            eq(showSchedules.tmdbId, tmdbId)
-          )
+            eq(showSchedules.tmdbId, tmdbId),
+          ),
         )
         .returning();
-      
+
       if (deletedSchedules.length > 0) {
-        console.log(`Automatically removed ${deletedSchedules.length} schedule(s) for ${status} show ${tmdbId}`);
+        console.log(
+          `Automatically removed ${deletedSchedules.length} schedule(s) for ${status} show ${tmdbId}`,
+        );
       }
     } catch (error) {
-      console.error("Error removing schedules for completed/dropped show:", error);
+      console.error(
+        "Error removing schedules for completed/dropped show:",
+        error,
+      );
       // Don't fail the main operation if schedule cleanup fails
     }
   }
@@ -62,14 +70,14 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType) {
       return NextResponse.json(
         { error: "tmdbId and contentType are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(ContentType).includes(contentType as ContentTypeEnum)) {
       return NextResponse.json(
         { error: "Invalid content type. Must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -80,8 +88,8 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, parseInt(tmdbId)),
-          eq(userContentStatus.contentType, contentType)
-        )
+          eq(userContentStatus.contentType, contentType),
+        ),
       )
       .limit(1);
 
@@ -108,14 +116,14 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType || !status) {
       return NextResponse.json(
         { error: "tmdbId, contentType, and status are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(ContentType).includes(contentType as ContentTypeEnum)) {
       return NextResponse.json(
         { error: "Invalid content type. Must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -123,12 +131,12 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (contentType === ContentType.MOVIE) {
       if (
         !Object.values(MovieWatchStatus).includes(
-          status as MovieWatchStatusEnum
+          status as MovieWatchStatusEnum,
         )
       ) {
         return NextResponse.json(
           { error: "Invalid movie status. Must be 'planning' or 'completed'" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     } else if (contentType === ContentType.TV) {
@@ -138,7 +146,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             error:
               "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -151,8 +159,8 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, contentType)
-        )
+          eq(userContentStatus.contentType, contentType),
+        ),
       )
       .limit(1);
 
@@ -169,8 +177,8 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
           and(
             eq(userContentStatus.userId, userId),
             eq(userContentStatus.tmdbId, tmdbId),
-            eq(userContentStatus.contentType, contentType)
-          )
+            eq(userContentStatus.contentType, contentType),
+          ),
         )
         .returning();
     } else {
@@ -187,14 +195,19 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     }
 
     // Remove schedules if show is completed or dropped
-    await removeSchedulesForCompletedOrDroppedShow(userId, tmdbId, contentType, status);
+    await removeSchedulesForCompletedOrDroppedShow(
+      userId,
+      tmdbId,
+      contentType,
+      status,
+    );
 
     // Sync status to collaborators if applicable
     const syncedCollaboratorIds = await syncStatusToCollaborators(
       userId,
       tmdbId,
       contentType,
-      status
+      status,
     );
 
     // Create activity entry
@@ -246,14 +259,14 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType) {
       return NextResponse.json(
         { error: "tmdbId and contentType are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(ContentType).includes(contentType as ContentTypeEnum)) {
       return NextResponse.json(
         { error: "Invalid content type. Must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -262,14 +275,14 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       if (contentType === ContentType.MOVIE) {
         if (
           !Object.values(MovieWatchStatus).includes(
-            status as MovieWatchStatusEnum
+            status as MovieWatchStatusEnum,
           )
         ) {
           return NextResponse.json(
             {
               error: "Invalid movie status. Must be 'planning' or 'completed'",
             },
-            { status: 400 }
+            { status: 400 },
           );
         }
       } else if (contentType === ContentType.TV) {
@@ -281,7 +294,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
               error:
                 "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'",
             },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -295,15 +308,15 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, contentType)
-        )
+          eq(userContentStatus.contentType, contentType),
+        ),
       )
       .limit(1);
 
     if (existingStatus.length === 0) {
       return NextResponse.json(
         { error: "Content status not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -324,14 +337,19 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, contentType)
-        )
+          eq(userContentStatus.contentType, contentType),
+        ),
       )
       .returning();
 
     // Remove schedules if show is completed or dropped
     if (status !== undefined) {
-      await removeSchedulesForCompletedOrDroppedShow(userId, tmdbId, contentType, status);
+      await removeSchedulesForCompletedOrDroppedShow(
+        userId,
+        tmdbId,
+        contentType,
+        status,
+      );
     }
 
     // Sync status to collaborators if applicable
@@ -340,7 +358,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
         userId,
         tmdbId,
         contentType,
-        status
+        status,
       );
 
       // Create activity entry
@@ -389,14 +407,14 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType) {
       return NextResponse.json(
         { error: "tmdbId and contentType are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(ContentType).includes(contentType as ContentTypeEnum)) {
       return NextResponse.json(
         { error: "Invalid content type. Must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -408,15 +426,15 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, parseInt(tmdbId)),
-          eq(userContentStatus.contentType, contentType)
-        )
+          eq(userContentStatus.contentType, contentType),
+        ),
       )
       .limit(1);
 
     if (existingStatus.length === 0) {
       return NextResponse.json(
         { error: "Content status not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -426,8 +444,8 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, parseInt(tmdbId)),
-          eq(userContentStatus.contentType, contentType)
-        )
+          eq(userContentStatus.contentType, contentType),
+        ),
       );
 
     return NextResponse.json({

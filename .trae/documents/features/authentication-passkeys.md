@@ -7,12 +7,14 @@ WatchThis uses WebAuthn/Passkeys for passwordless authentication, providing a se
 ## Product Requirements
 
 ### User Stories
+
 - **As a new user**, I want to register using my device's biometric authentication so I can securely access my account without remembering passwords
 - **As a returning user**, I want to sign in quickly using my fingerprint or face recognition
 - **As a security-conscious user**, I want to manage multiple devices and see which devices have access to my account
 - **As a user with multiple devices**, I want to register additional passkeys so I can access my account from any device
 
 ### Acceptance Criteria
+
 - Users can register new accounts using WebAuthn passkeys
 - Users can sign in using any registered passkey
 - Users can view and manage their registered devices
@@ -53,13 +55,13 @@ graph TD
     B --> D[Auth API Routes]
     D --> E[Passkey Service]
     E --> F[Database]
-    
+
     subgraph "Frontend"
         A
         B
         C
     end
-    
+
     subgraph "Backend"
         D
         E
@@ -99,6 +101,7 @@ CREATE INDEX idx_passkey_credentials_credential_id ON passkey_credentials(creden
 ### API Endpoints
 
 #### Registration
+
 ```typescript
 // POST /api/auth/register/begin
 interface RegisterBeginRequest {
@@ -127,6 +130,7 @@ interface RegisterCompleteResponse {
 ```
 
 #### Authentication
+
 ```typescript
 // POST /api/auth/login/begin
 interface LoginBeginRequest {
@@ -156,6 +160,7 @@ interface LoginCompleteResponse {
 ```
 
 #### Device Management
+
 ```typescript
 // GET /api/profile/devices
 interface DevicesResponse {
@@ -181,6 +186,7 @@ interface UpdateDeviceRequest {
 ### Frontend Components
 
 #### Auth Page Structure
+
 ```typescript
 // app/(public)/auth/page.tsx
 export default function AuthPage() {
@@ -201,42 +207,43 @@ export function AuthForm() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // WebAuthn registration/authentication logic
 }
 ```
 
 #### WebAuthn Service
+
 ```typescript
 // lib/auth/webauthn-client.ts
 export class WebAuthnClient {
   async register(username: string): Promise<User> {
     // 1. Get registration options from server
-    const beginResponse = await fetch('/api/auth/register/begin', {
-      method: 'POST',
+    const beginResponse = await fetch("/api/auth/register/begin", {
+      method: "POST",
       body: JSON.stringify({ username }),
     });
-    
+
     const { options, challenge } = await beginResponse.json();
-    
+
     // 2. Create credential using WebAuthn API
-    const credential = await navigator.credentials.create({
+    const credential = (await navigator.credentials.create({
       publicKey: options,
-    }) as PublicKeyCredential;
-    
+    })) as PublicKeyCredential;
+
     // 3. Complete registration on server
-    const completeResponse = await fetch('/api/auth/register/complete', {
-      method: 'POST',
+    const completeResponse = await fetch("/api/auth/register/complete", {
+      method: "POST",
       body: JSON.stringify({
         username,
         credential: credential.response,
         challenge,
       }),
     });
-    
+
     return completeResponse.json();
   }
-  
+
   async authenticate(username: string): Promise<User> {
     // Similar flow for authentication
   }
@@ -259,17 +266,17 @@ export class WebAuthnError extends Error {
   constructor(
     message: string,
     public code: string,
-    public userMessage: string
+    public userMessage: string,
   ) {
     super(message);
   }
 }
 
 export const WebAuthnErrorCodes = {
-  NOT_SUPPORTED: 'webauthn_not_supported',
-  USER_CANCELLED: 'user_cancelled',
-  INVALID_CREDENTIAL: 'invalid_credential',
-  NETWORK_ERROR: 'network_error',
+  NOT_SUPPORTED: "webauthn_not_supported",
+  USER_CANCELLED: "user_cancelled",
+  INVALID_CREDENTIAL: "invalid_credential",
+  NETWORK_ERROR: "network_error",
 } as const;
 
 // Error handling in components
@@ -277,7 +284,7 @@ function handleWebAuthnError(error: unknown) {
   if (error instanceof WebAuthnError) {
     toast.error(error.userMessage);
   } else {
-    toast.error('An unexpected error occurred');
+    toast.error("An unexpected error occurred");
   }
 }
 ```
@@ -292,10 +299,10 @@ function handleWebAuthnError(error: unknown) {
 // lib/auth/webauthn-support.ts
 export function isWebAuthnSupported(): boolean {
   return (
-    typeof window !== 'undefined' &&
-    'credentials' in navigator &&
-    'create' in navigator.credentials &&
-    'get' in navigator.credentials
+    typeof window !== "undefined" &&
+    "credentials" in navigator &&
+    "create" in navigator.credentials &&
+    "get" in navigator.credentials
   );
 }
 ```
@@ -323,4 +330,4 @@ export function isWebAuthnSupported(): boolean {
 
 ---
 
-*This feature document should be updated as the authentication system evolves and new requirements are identified.*
+_This feature document should be updated as the authentication system evolves and new requirements are identified._

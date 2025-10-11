@@ -23,7 +23,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -51,16 +51,16 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           or(
             eq(lists.ownerId, userId),
             eq(listCollaborators.userId, userId),
-            eq(lists.isPublic, true)
-          )
-        )
+            eq(lists.isPublic, true),
+          ),
+        ),
       )
       .limit(1);
 
     if (!listData) {
       return NextResponse.json(
         { error: "List not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -96,11 +96,13 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
           listItemId: item.id,
           createdAt: item.createdAt,
         };
-      })
+      }),
     );
 
     const enrichedItems = await Promise.all(
-      tmdbItems.map(async (item) => await enrichWithContentStatus(item, userId))
+      tmdbItems.map(
+        async (item) => await enrichWithContentStatus(item, userId),
+      ),
     );
 
     const listWithItems = {
@@ -114,7 +116,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error fetching list:", error);
     return NextResponse.json(
       { error: "Failed to fetch list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -129,7 +131,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -151,7 +153,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (existingList.ownerId !== userId) {
       return NextResponse.json(
         { error: "Only the list owner can update this list" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -160,13 +162,13 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       if (!name || name.trim().length === 0) {
         return NextResponse.json(
           { error: "List name is required" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (name.length > 100) {
         return NextResponse.json(
           { error: "List name must be 100 characters or less" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -176,7 +178,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       if (!validListTypes.includes(listType)) {
         return NextResponse.json(
           { error: "Invalid list type. Must be 'movies', 'tv', or 'mixed'" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -235,7 +237,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     } catch (activityError) {
       console.error(
         "Failed to create activity for list update:",
-        activityError
+        activityError,
       );
       // Don't fail the main operation if activity creation fails
     }
@@ -245,7 +247,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error updating list:", error);
     return NextResponse.json(
       { error: "Failed to update list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -260,7 +262,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -278,7 +280,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (existingList.ownerId !== userId) {
       return NextResponse.json(
         { error: "Only the list owner can delete this list" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -306,7 +308,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     } catch (activityError) {
       console.error(
         "Failed to create activity for list deletion:",
-        activityError
+        activityError,
       );
       // Don't fail the main operation if activity creation fails
     }
@@ -316,7 +318,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error deleting list:", error);
     return NextResponse.json(
       { error: "Failed to delete list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

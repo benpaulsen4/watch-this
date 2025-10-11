@@ -7,6 +7,7 @@ The Search & Content Discovery system enables users to find movies and TV shows 
 ## Current Implementation Status
 
 ### Implemented Features
+
 - **Text Search**: Basic search functionality for movies and TV shows by title
 - **Content Discovery**: Trending content display (daily/weekly)
 - **Content Filtering**: Basic filtering by content type, genre, year, and sorting
@@ -16,6 +17,7 @@ The Search & Content Discovery system enables users to find movies and TV shows 
 - **Episode Tracking**: Track watched episodes for TV shows
 
 ### User Stories (Current Implementation)
+
 - **As a content seeker**, I can search for movies and TV shows by title to find specific content
 - **As a discovery user**, I can browse trending content to find popular movies and TV shows
 - **As a filter user**, I can filter content by type, genre, year, and sort by different criteria
@@ -26,26 +28,30 @@ The Search & Content Discovery system enables users to find movies and TV shows 
 ### Search Types & Methods (Current)
 
 #### Text Search
+
 - **Search Input**: Debounced search input with loading states
 - **Multi-type Search**: Search across movies and TV shows simultaneously
 - **Year Filtering**: Optional year filtering for specific content types
 
 #### Discovery Methods
+
 - **Trending Content**: Daily and weekly trending content from TMDB
 - **Discover Content**: Browse content with filtering and sorting options
 - **Genre Filtering**: Filter content by specific genres
 
 #### Current Filtering Options
-| Filter Category | Implementation |
-|----------------|----------------|
-| **Content Type** | All, Movies, TV Shows |
-| **Genre** | Dropdown selection from TMDB genres |
-| **Release Year** | Dropdown selection (last 50 years) |
-| **Sort By** | Popularity, Rating, Release Date, Title |
+
+| Filter Category  | Implementation                          |
+| ---------------- | --------------------------------------- |
+| **Content Type** | All, Movies, TV Shows                   |
+| **Genre**        | Dropdown selection from TMDB genres     |
+| **Release Year** | Dropdown selection (last 50 years)      |
+| **Sort By**      | Popularity, Rating, Release Date, Title |
 
 ### Acceptance Criteria (Current)
 
 #### Search Functionality
+
 - ✅ Search with debounced input (500ms delay)
 - ✅ Search across movies and TV shows
 - ✅ Year filtering for specific content types
@@ -53,12 +59,14 @@ The Search & Content Discovery system enables users to find movies and TV shows 
 - ✅ Clear search functionality
 
 #### Content Discovery
+
 - ✅ Trending content from TMDB (day/week options)
 - ✅ Genre-based filtering
 - ✅ Sort by popularity, rating, release date, title
 - ✅ Load more functionality for discover content
 
 #### Results & Display
+
 - ✅ Content cards with poster, title, year, rating, and type
 - ✅ Watch status badges on content cards
 - ✅ Detailed modal views with comprehensive information
@@ -66,6 +74,7 @@ The Search & Content Discovery system enables users to find movies and TV shows 
 - ✅ List management integration
 
 #### User Interactions
+
 - ✅ Click to view detailed content information
 - ✅ Update watch status directly from content cards or modals
 - ✅ Add/remove content from lists
@@ -100,13 +109,13 @@ graph TD
     C[SearchClient] --> D[Search API]
     C --> E[Discover API]
     C --> F[Genres API]
-    
+
     G[ContentCard] --> H[ContentDetailsModal]
     H --> I[Details API]
     H --> J[Episodes API]
-    
+
     K[SearchInput] --> C
-    
+
     subgraph "Frontend Components"
         A
         C
@@ -114,7 +123,7 @@ graph TD
         H
         K
     end
-    
+
     subgraph "API Routes"
         B[/api/tmdb/trending]
         D[/api/tmdb/search]
@@ -123,19 +132,19 @@ graph TD
         I[/api/tmdb/details]
         J[/api/tmdb/episodes]
     end
-    
+
     subgraph "External Services"
         L[TMDB API]
         M[User Status/Lists APIs]
     end
-    
+
     B --> L
     D --> L
     E --> L
     F --> L
     I --> L
     J --> L
-    
+
     H --> M
 ```
 
@@ -144,6 +153,7 @@ graph TD
 The current implementation uses TMDB as the primary data source with minimal local caching. Content data is fetched on-demand and enriched with user-specific information (watch status, list membership) from the existing user data tables.
 
 #### Content Enrichment
+
 - TMDB content is enriched with user watch status from existing `user_watch_status` table
 - List membership is determined from existing `list_items` and `lists` tables
 - No local content indexing or search optimization is currently implemented
@@ -151,11 +161,12 @@ The current implementation uses TMDB as the primary data source with minimal loc
 ### API Endpoints (Current Implementation)
 
 #### Search API
+
 ```typescript
 // GET /api/tmdb/search
 interface SearchRequest {
   q: string; // Search query (required)
-  type?: 'movie' | 'tv' | 'all'; // Content type filter
+  type?: "movie" | "tv" | "all"; // Content type filter
   page?: number; // Pagination
   year?: number; // Year filter (only for specific types)
 }
@@ -169,10 +180,11 @@ interface SearchResponse {
 ```
 
 #### Discovery API
+
 ```typescript
 // GET /api/tmdb/discover
 interface DiscoverRequest {
-  type?: 'movie' | 'tv'; // Content type
+  type?: "movie" | "tv"; // Content type
   page?: number; // Pagination
   genre?: number; // Genre ID filter
   year?: number; // Year filter
@@ -188,8 +200,8 @@ interface DiscoverResponse {
 
 // GET /api/tmdb/trending
 interface TrendingRequest {
-  media_type?: 'all' | 'movie' | 'tv'; // Media type
-  time_window?: 'day' | 'week'; // Time window
+  media_type?: "all" | "movie" | "tv"; // Media type
+  time_window?: "day" | "week"; // Time window
 }
 
 interface TrendingResponse {
@@ -201,7 +213,7 @@ interface TrendingResponse {
 
 // GET /api/tmdb/genres
 interface GenresRequest {
-  type?: 'movie' | 'tv' | 'all'; // Genre type
+  type?: "movie" | "tv" | "all"; // Genre type
 }
 
 interface GenresResponse {
@@ -210,11 +222,12 @@ interface GenresResponse {
 ```
 
 #### Content Details API
+
 ```typescript
 // GET /api/tmdb/details
 interface DetailsRequest {
   id: string; // TMDB content ID
-  type: 'movie' | 'tv'; // Content type
+  type: "movie" | "tv"; // Content type
 }
 
 interface DetailsResponse {
@@ -237,9 +250,10 @@ interface EpisodesResponse {
 ### Frontend Components (Current Implementation)
 
 #### SearchClient Component
+
 ```typescript
 // components/search/SearchClient.tsx
-'use client';
+"use client";
 export function SearchClient() {
   // Main search and discovery interface
   // Features:
@@ -254,9 +268,10 @@ export function SearchClient() {
 ```
 
 #### DashboardClient Component
+
 ```typescript
 // components/dashboard/DashboardClient.tsx
-'use client';
+"use client";
 export function DashboardClient() {
   // Dashboard with trending content preview
   // Features:
@@ -268,6 +283,7 @@ export function DashboardClient() {
 ```
 
 #### SearchInput Component
+
 ```typescript
 // components/ui/SearchInput.tsx
 export function SearchInput() {
@@ -281,6 +297,7 @@ export function SearchInput() {
 ```
 
 #### ContentCard Component
+
 ```typescript
 // components/ui/ContentCard.tsx
 export function ContentCard() {
@@ -296,6 +313,7 @@ export function ContentCard() {
 ```
 
 #### ContentDetailsModal Component
+
 ```typescript
 // components/ui/ContentDetailsModal.tsx
 export function ContentDetailsModal() {
@@ -314,6 +332,7 @@ export function ContentDetailsModal() {
 ### Implementation Notes
 
 #### Current Architecture Characteristics
+
 - **Direct TMDB Integration**: All content data is fetched directly from TMDB API
 - **Minimal Caching**: Uses Next.js built-in caching (1 hour revalidation)
 - **Client-Side State Management**: React state for UI interactions and filtering
@@ -321,6 +340,7 @@ export function ContentDetailsModal() {
 - **Content Enrichment**: TMDB data is enriched with user watch status and list membership
 
 #### Key Implementation Details
+
 1. **Search**: Direct TMDB search API calls with basic filtering
 2. **Discovery**: TMDB discover and trending endpoints with client-side filtering
 3. **Content Details**: On-demand fetching of detailed content information
@@ -328,6 +348,7 @@ export function ContentDetailsModal() {
 5. **Performance**: Debounced search input and loading states for better UX
 
 #### Current Limitations
+
 - No local search indexing or optimization
 - No autocomplete suggestions
 - No advanced filtering beyond basic TMDB parameters
@@ -336,6 +357,7 @@ export function ContentDetailsModal() {
 - Limited offline functionality
 
 #### Future Enhancement Opportunities
+
 - Implement local content indexing for faster search
 - Add autocomplete with suggestion caching
 - Build recommendation engine based on user behavior
@@ -345,4 +367,4 @@ export function ContentDetailsModal() {
 
 ---
 
-*This feature document should be updated as search capabilities expand and new discovery methods are implemented.*
+_This feature document should be updated as search capabilities expand and new discovery methods are implemented._

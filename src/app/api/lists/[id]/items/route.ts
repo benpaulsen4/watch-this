@@ -21,7 +21,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -32,7 +32,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType || !title) {
       return NextResponse.json(
         { error: "tmdbId, contentType, and title are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -40,7 +40,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!["movie", "tv"].includes(contentType)) {
       return NextResponse.json(
         { error: 'contentType must be either "movie" or "tv"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -52,15 +52,15 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       .where(
         and(
           eq(lists.id, listId),
-          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-        )
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+        ),
       )
       .limit(1);
 
     if (!listData) {
       return NextResponse.json(
         { error: "List not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -72,15 +72,15 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         and(
           eq(listItems.listId, listId),
           eq(listItems.tmdbId, tmdbId),
-          eq(listItems.contentType, contentType)
-        )
+          eq(listItems.contentType, contentType),
+        ),
       )
       .limit(1);
 
     if (existingItem) {
       return NextResponse.json(
         { error: "This item is already in the list" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -122,7 +122,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     } catch (activityError) {
       console.error(
         "Failed to create activity for list item addition:",
-        activityError
+        activityError,
       );
       // Don't fail the main operation if activity creation fails
     }
@@ -132,7 +132,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error adding item to list:", error);
     return NextResponse.json(
       { error: "Failed to add item to list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

@@ -7,7 +7,10 @@ import {
   handleApiError,
 } from "@/lib/auth/api-middleware";
 import { eq, and } from "drizzle-orm";
-import { completeEpisodeUpdate, batchUpdateEpisodes } from "@/lib/episodes";
+import {
+  batchUpdateEpisodes,
+  completeEpisodeUpdate,
+} from "@/lib/episodes/episodeUtils";
 
 // GET /api/status/episodes - Get episode watch status for authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
@@ -21,7 +24,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId) {
       return NextResponse.json(
         { error: "tmdbId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -34,14 +37,14 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     // Filter by season if provided
     if (seasonNumber) {
       conditions.push(
-        eq(episodeWatchStatus.seasonNumber, parseInt(seasonNumber))
+        eq(episodeWatchStatus.seasonNumber, parseInt(seasonNumber)),
       );
     }
 
     // Filter by specific episode if both season and episode are provided
     if (episodeNumber) {
       conditions.push(
-        eq(episodeWatchStatus.episodeNumber, parseInt(episodeNumber))
+        eq(episodeWatchStatus.episodeNumber, parseInt(episodeNumber)),
       );
     }
 
@@ -67,21 +70,21 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || seasonNumber === undefined || episodeNumber === undefined) {
       return NextResponse.json(
         { error: "tmdbId, seasonNumber, and episodeNumber are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (typeof seasonNumber !== "number" || typeof episodeNumber !== "number") {
       return NextResponse.json(
         { error: "seasonNumber and episodeNumber must be numbers" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (seasonNumber < 0 || episodeNumber < 1) {
       return NextResponse.json(
         { error: "Invalid season or episode number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -91,7 +94,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       tmdbId,
       seasonNumber,
       episodeNumber,
-      watched
+      watched,
     );
 
     return NextResponse.json({ episode: result, newStatus }, { status: 201 });
@@ -111,21 +114,21 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !Array.isArray(episodes)) {
       return NextResponse.json(
         { error: "tmdbId and episodes array are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (episodes.length === 0) {
       return NextResponse.json(
         { error: "Episodes array cannot be empty" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (episodes.length > 100) {
       return NextResponse.json(
         { error: "Cannot update more than 100 episodes at once" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -141,7 +144,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
             error:
               "Each episode must have seasonNumber, episodeNumber, and watched properties",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -165,13 +168,13 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId) {
       return NextResponse.json(
         { error: "tmdbId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     let deleteCondition = and(
       eq(episodeWatchStatus.userId, userId),
-      eq(episodeWatchStatus.tmdbId, parseInt(tmdbId))
+      eq(episodeWatchStatus.tmdbId, parseInt(tmdbId)),
     );
 
     // If season and episode are specified, delete specific episode
@@ -180,7 +183,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
         eq(episodeWatchStatus.userId, userId),
         eq(episodeWatchStatus.tmdbId, parseInt(tmdbId)),
         eq(episodeWatchStatus.seasonNumber, parseInt(seasonNumber)),
-        eq(episodeWatchStatus.episodeNumber, parseInt(episodeNumber))
+        eq(episodeWatchStatus.episodeNumber, parseInt(episodeNumber)),
       );
     }
     // If only season is specified, delete all episodes in that season
@@ -188,7 +191,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       deleteCondition = and(
         eq(episodeWatchStatus.userId, userId),
         eq(episodeWatchStatus.tmdbId, parseInt(tmdbId)),
-        eq(episodeWatchStatus.seasonNumber, parseInt(seasonNumber))
+        eq(episodeWatchStatus.seasonNumber, parseInt(seasonNumber)),
       );
     }
     // If neither is specified, delete all episodes for the show

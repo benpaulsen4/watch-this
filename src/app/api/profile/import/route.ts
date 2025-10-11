@@ -25,7 +25,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!format || format !== "json") {
       return NextResponse.json(
         { error: "Only JSON format is supported for imports" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -45,7 +45,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             // Validate required fields
             if (!listData.name || typeof listData.name !== "string") {
               errors.push(
-                `Skipped list: name is required and must be a string`
+                `Skipped list: name is required and must be a string`,
               );
               continue;
             }
@@ -72,7 +72,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
                     !itemData.contentType
                   ) {
                     errors.push(
-                      `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`
+                      `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`,
                     );
                     continue;
                   }
@@ -86,7 +86,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
                   });
                 } catch (itemError) {
                   errors.push(
-                    `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`
+                    `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`,
                   );
                 }
               }
@@ -95,7 +95,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             importedListsCount++;
           } catch (listError) {
             errors.push(
-              `Failed to import list '${listData.name}': ${listError}`
+              `Failed to import list '${listData.name}': ${listError}`,
             );
           }
         }
@@ -111,7 +111,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
               !statusData.status
             ) {
               errors.push(
-                `Skipped content status: tmdbId, contentType, and status are required`
+                `Skipped content status: tmdbId, contentType, and status are required`,
               );
               continue;
             }
@@ -126,7 +126,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             ];
             if (!validStatuses.includes(statusData.status)) {
               errors.push(
-                `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid status '${statusData.status}'`
+                `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid status '${statusData.status}'`,
               );
               continue;
             }
@@ -135,7 +135,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             const validContentTypes = ["movie", "tv"];
             if (!validContentTypes.includes(statusData.contentType)) {
               errors.push(
-                `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid content type '${statusData.contentType}'`
+                `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid content type '${statusData.contentType}'`,
               );
               continue;
             }
@@ -171,7 +171,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
               errors.push(
                 `Failed to import content status for TMDB ID ${
                   statusData.tmdbId
-                }: ${error instanceof Error ? error.message : "Unknown error"}`
+                }: ${error instanceof Error ? error.message : "Unknown error"}`,
               );
               continue;
             }
@@ -179,7 +179,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             importedContentStatusCount++;
           } catch (statusError) {
             errors.push(
-              `Failed to import content status for TMDB ID ${statusData.tmdbId}: ${statusError}`
+              `Failed to import content status for TMDB ID ${statusData.tmdbId}: ${statusError}`,
             );
           }
         }
@@ -195,7 +195,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
               episodeData.episodeNumber === undefined
             ) {
               errors.push(
-                `Skipped episode status: tmdbId, seasonNumber, and episodeNumber are required`
+                `Skipped episode status: tmdbId, seasonNumber, and episodeNumber are required`,
               );
               continue;
             }
@@ -206,14 +206,14 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
             if (isNaN(seasonNum) || seasonNum < 0) {
               errors.push(
-                `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid season number '${episodeData.seasonNumber}'`
+                `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid season number '${episodeData.seasonNumber}'`,
               );
               continue;
             }
 
             if (isNaN(episodeNum) || episodeNum < 1) {
               errors.push(
-                `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid episode number '${episodeData.episodeNumber}'`
+                `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid episode number '${episodeData.episodeNumber}'`,
               );
               continue;
             }
@@ -253,7 +253,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
                   episodeData.tmdbId
                 } S${seasonNum}E${episodeNum}: ${
                   error instanceof Error ? error.message : "Unknown error"
-                }`
+                }`,
               );
               continue;
             }
@@ -261,7 +261,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             importedEpisodeStatusCount++;
           } catch (episodeError) {
             errors.push(
-              `Failed to import episode status for TMDB ID ${episodeData.tmdbId} S${episodeData.seasonNumber}E${episodeData.episodeNumber}: ${episodeError}`
+              `Failed to import episode status for TMDB ID ${episodeData.tmdbId} S${episodeData.seasonNumber}E${episodeData.episodeNumber}: ${episodeError}`,
             );
           }
         }
@@ -304,7 +304,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         {
           error: `Failed to parse ${format.toUpperCase()} file: ${parseError}`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
   } catch (error) {
@@ -312,7 +312,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
     return NextResponse.json(
       { error: "Failed to import data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

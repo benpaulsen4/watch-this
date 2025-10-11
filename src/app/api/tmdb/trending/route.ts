@@ -23,20 +23,20 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (mediaType && !validMediaTypes.includes(mediaType)) {
       return NextResponse.json(
         { error: 'Media type must be "all", "movie", or "tv"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (timeWindow && !validTimeWindows.includes(timeWindow)) {
       return NextResponse.json(
         { error: 'Time window must be "day" or "week"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const results = await tmdbClient.getTrending(
       mediaType || "all",
-      timeWindow || "week"
+      timeWindow || "week",
     );
 
     // Enrich results with watch status
@@ -44,7 +44,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       const enrichedResults = await Promise.all(
         results.results.map(async (item) => {
           return await enrichWithContentStatus(item, request.user.id);
-        })
+        }),
       );
 
       results.results = enrichedResults as TMDBSearchItem[];

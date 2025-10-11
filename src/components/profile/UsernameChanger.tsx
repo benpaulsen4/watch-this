@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Edit3, Check, X, AlertCircle, User as UserIcon } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { User } from '@/lib/auth';
+import { useState } from "react";
+import { Edit3, Check, X, AlertCircle, User as UserIcon } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { User } from "@/lib/auth/client";
 
 interface UsernameChangerProps {
   user: User;
@@ -19,21 +19,21 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
 
   const validateUsername = (username: string): string | null => {
     if (!username.trim()) {
-      return 'Username is required';
+      return "Username is required";
     }
-    
+
     if (username.length < 3) {
-      return 'Username must be at least 3 characters long';
+      return "Username must be at least 3 characters long";
     }
-    
+
     if (username.length > 50) {
-      return 'Username must be no more than 50 characters long';
+      return "Username must be no more than 50 characters long";
     }
-    
+
     if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-      return 'Username can only contain letters, numbers, hyphens, and underscores';
+      return "Username can only contain letters, numbers, hyphens, and underscores";
     }
-    
+
     return null;
   };
 
@@ -60,10 +60,10 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/session', {
-        method: 'PUT',
+      const response = await fetch("/api/auth/session", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username: newUsername.trim(),
@@ -73,9 +73,9 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
       if (!response.ok) {
         const errorData = await response.json();
         if (response.status === 409) {
-          setError('This username is already taken');
+          setError("This username is already taken");
         } else {
-          throw new Error(errorData.error || 'Failed to update username');
+          throw new Error(errorData.error || "Failed to update username");
         }
         return;
       }
@@ -84,7 +84,9 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
       onUserUpdate(updatedUser.user);
       setIsEditing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update username');
+      setError(
+        err instanceof Error ? err.message : "Failed to update username",
+      );
     } finally {
       setLoading(false);
     }
@@ -119,7 +121,10 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
           {isEditing ? (
             <div className="space-y-4">
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
+                <label
+                  htmlFor="username"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
                   Username
                 </label>
                 <div className="relative">
@@ -136,7 +141,8 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  3-50 characters, letters, numbers, hyphens, and underscores only
+                  3-50 characters, letters, numbers, hyphens, and underscores
+                  only
                 </p>
               </div>
 
@@ -150,11 +156,16 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
               <div className="flex gap-3">
                 <Button
                   onClick={handleSave}
-                  disabled={loading || !!validationError || !!error || newUsername === user.username}
+                  disabled={
+                    loading ||
+                    !!validationError ||
+                    !!error ||
+                    newUsername === user.username
+                  }
                   loading={loading}
                   size="sm"
                 >
-                    <Check className="h-4 w-4 mr-2" />
+                  <Check className="h-4 w-4 mr-2" />
                   Save
                 </Button>
                 <Button

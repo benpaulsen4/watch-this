@@ -29,7 +29,7 @@ export function useInfiniteScroll({
         }
       }
     },
-    [onLoadMore, hasMore, loading, debounceMs]
+    [onLoadMore, hasMore, loading, debounceMs],
   );
 
   useEffect(() => {

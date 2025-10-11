@@ -5,9 +5,7 @@ export default function PublicLayout({
 }) {
   return (
     <div className="min-h-screen bg-gray-950">
-      <main className="container mx-auto">
-        {children}
-      </main>
+      <main className="container mx-auto">{children}</main>
     </div>
   );
 }

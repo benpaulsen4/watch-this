@@ -20,7 +20,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (isNaN(tvId) || tvId <= 0) {
       return NextResponse.json(
         { error: "Invalid TV show ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -28,7 +28,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!seasonNumber) {
       return NextResponse.json(
         { error: "Season number is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -36,7 +36,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (isNaN(season) || season < 0) {
       return NextResponse.json(
         { error: "Invalid season number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -46,7 +46,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       if (isNaN(episode) || episode < 1) {
         return NextResponse.json(
           { error: "Invalid episode number" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -54,14 +54,14 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         const episodeDetails = await tmdbClient.getTVEpisodeDetails(
           tvId,
           season,
-          episode
+          episode,
         );
         return NextResponse.json({ episode: episodeDetails });
       } catch (error) {
         if (error instanceof Error && error.message.includes("404")) {
           return NextResponse.json(
             { error: "Episode not found" },
-            { status: 404 }
+            { status: 404 },
           );
         }
         throw error;
@@ -76,7 +76,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       if (error instanceof Error && error.message.includes("404")) {
         return NextResponse.json(
           { error: "Season not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       throw error;

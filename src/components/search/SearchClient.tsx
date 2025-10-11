@@ -1,119 +1,138 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Filter, TrendingUp } from 'lucide-react';
-import type { TMDBMovie, TMDBTVShow, TMDBGenre } from '@/lib/tmdb/client';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { ContentCard } from '@/components/ui/ContentCard';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { SearchInput } from '@/components/ui/SearchInput';
-import { Button } from '@/components/ui/Button';
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Filter, TrendingUp } from "lucide-react";
+import type { TMDBMovie, TMDBTVShow, TMDBGenre } from "@/lib/tmdb/client";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { SearchInput } from "@/components/search/SearchInput";
+import { Button } from "@/components/ui/Button";
+import { ContentCard } from "../content/ContentCard";
 
-type ContentType = 'all' | 'movie' | 'tv';
-type SortBy = 'popularity.desc' | 'vote_average.desc' | 'release_date.desc' | 'title.asc';
+type ContentType = "all" | "movie" | "tv";
+type SortBy =
+  | "popularity.desc"
+  | "vote_average.desc"
+  | "release_date.desc"
+  | "title.asc";
 
 export function SearchClient() {
   const router = useRouter();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<(TMDBMovie | TMDBTVShow)[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<
+    (TMDBMovie | TMDBTVShow)[]
+  >([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [contentType, setContentType] = useState<ContentType>('all');
+  const [contentType, setContentType] = useState<ContentType>("all");
   const [genres, setGenres] = useState<TMDBGenre[]>([]);
-  const [selectedGenre, setSelectedGenre] = useState<string>('');
-  const [selectedYear, setSelectedYear] = useState<string>('');
-  const [sortBy, setSortBy] = useState<SortBy>('popularity.desc');
+  const [selectedGenre, setSelectedGenre] = useState<string>("");
+  const [selectedYear, setSelectedYear] = useState<string>("");
+  const [sortBy, setSortBy] = useState<SortBy>("popularity.desc");
   const [showFilters, setShowFilters] = useState(false);
-  const [trendingContent, setTrendingContent] = useState<(TMDBMovie | TMDBTVShow)[]>([]);
-  const [discoverContent, setDiscoverContent] = useState<(TMDBMovie | TMDBTVShow)[]>([]);
+  const [trendingContent, setTrendingContent] = useState<
+    (TMDBMovie | TMDBTVShow)[]
+  >([]);
+  const [discoverContent, setDiscoverContent] = useState<
+    (TMDBMovie | TMDBTVShow)[]
+  >([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [contentLoading, setContentLoading] = useState(true);
 
   const loadGenres = async () => {
     try {
-      const response = await fetch('/api/tmdb/genres?type=all');
+      const response = await fetch("/api/tmdb/genres?type=all");
       if (response.ok) {
         const data = await response.json();
         setGenres(data.genres || []);
       }
     } catch (error) {
-      console.error('Failed to load genres:', error);
+      console.error("Failed to load genres:", error);
     }
   };
 
   const loadTrendingContent = async () => {
     try {
-      const response = await fetch('/api/tmdb/trending?media_type=all&time_window=day');
+      const response = await fetch(
+        "/api/tmdb/trending?media_type=all&time_window=day",
+      );
       if (response.ok) {
         const data = await response.json();
         setTrendingContent(data.results?.slice(0, 10) || []);
       }
     } catch (error) {
-      console.error('Failed to load trending content:', error);
+      console.error("Failed to load trending content:", error);
     }
   };
 
-  const loadDiscoverContent = useCallback(async (pageNum = 1, append = false) => {
-    try {
-      const params = new URLSearchParams({
-        page: pageNum.toString(),
-        sort_by: sortBy
-      });
-      
-      if (contentType !== 'all') params.append('type', contentType);
-      if (selectedGenre) params.append('with_genres', selectedGenre);
-      if (selectedYear) params.append('year', selectedYear);
+  const loadDiscoverContent = useCallback(
+    async (pageNum = 1, append = false) => {
+      try {
+        const params = new URLSearchParams({
+          page: pageNum.toString(),
+          sort_by: sortBy,
+        });
 
-      const response = await fetch(`/api/tmdb/discover?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        const newResults = data.results || [];
-        
-        if (append) {
-          setDiscoverContent(prev => [...prev, ...newResults]);
-        } else {
-          setDiscoverContent(newResults);
+        if (contentType !== "all") params.append("type", contentType);
+        if (selectedGenre) params.append("with_genres", selectedGenre);
+        if (selectedYear) params.append("year", selectedYear);
+
+        const response = await fetch(`/api/tmdb/discover?${params}`);
+        if (response.ok) {
+          const data = await response.json();
+          const newResults = data.results || [];
+
+          if (append) {
+            setDiscoverContent((prev) => [...prev, ...newResults]);
+          } else {
+            setDiscoverContent(newResults);
+          }
+
+          setHasMore(pageNum < (data.total_pages || 1));
         }
-        
-        setHasMore(pageNum < (data.total_pages || 1));
+      } catch (error) {
+        console.error("Failed to load discover content:", error);
+      } finally {
+        setContentLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load discover content:', error);
-    } finally {
-      setContentLoading(false);
-    }
-  }, [contentType, sortBy, selectedGenre, selectedYear]);
+    },
+    [contentType, sortBy, selectedGenre, selectedYear],
+  );
 
-  const handleSearch = useCallback(async (query: string) => {
-    setSearchQuery(query);
-    
-    if (!query.trim()) {
-      setSearchResults([]);
-      loadDiscoverContent();
-      return;
-    }
+  const handleSearch = useCallback(
+    async (query: string) => {
+      setSearchQuery(query);
 
-    setSearchLoading(true);
-    try {
-      const params = new URLSearchParams({
-        q: query,
-        type: contentType,
-      });
-      if (selectedYear && contentType !== 'all') params.append('year', selectedYear);
-      
-      const response = await fetch(`/api/tmdb/search?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.results || []);
+      if (!query.trim()) {
+        setSearchResults([]);
+        loadDiscoverContent();
+        return;
       }
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setSearchLoading(false);
-    }
-  }, [contentType, loadDiscoverContent, selectedYear]);
+
+      setSearchLoading(true);
+      try {
+        const params = new URLSearchParams({
+          q: query,
+          type: contentType,
+        });
+        if (selectedYear && contentType !== "all")
+          params.append("year", selectedYear);
+
+        const response = await fetch(`/api/tmdb/search?${params}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSearchResults(data.results || []);
+        }
+      } catch (error) {
+        console.error("Search failed:", error);
+      } finally {
+        setSearchLoading(false);
+      }
+    },
+    [contentType, loadDiscoverContent, selectedYear],
+  );
 
   useEffect(() => {
     loadGenres();
@@ -127,7 +146,15 @@ export function SearchClient() {
     } else {
       loadDiscoverContent();
     }
-  }, [contentType, selectedGenre, selectedYear, sortBy, searchQuery, handleSearch, loadDiscoverContent]);
+  }, [
+    contentType,
+    selectedGenre,
+    selectedYear,
+    sortBy,
+    searchQuery,
+    handleSearch,
+    loadDiscoverContent,
+  ]);
 
   const loadMore = () => {
     if (!searchQuery && hasMore) {
@@ -138,10 +165,10 @@ export function SearchClient() {
   };
 
   const clearFilters = () => {
-    setSelectedGenre('');
-    setSelectedYear('');
-    setSortBy('popularity.desc');
-    setContentType('all');
+    setSelectedGenre("");
+    setSelectedYear("");
+    setSortBy("popularity.desc");
+    setContentType("all");
   };
 
   const currentYear = new Date().getFullYear();
@@ -156,15 +183,19 @@ export function SearchClient() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push("/dashboard")}
+              >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <h1 className="text-xl font-bold text-gray-100">Discover</h1>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <Button
-                variant={showFilters ? 'default' : 'outline'}
+                variant={showFilters ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowFilters(!showFilters)}
               >
@@ -202,7 +233,9 @@ export function SearchClient() {
                   {/* TODO use select component */}
                   <select
                     value={contentType}
-                    onChange={(e) => setContentType(e.target.value as ContentType)}
+                    onChange={(e) =>
+                      setContentType(e.target.value as ContentType)
+                    }
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
                   >
                     <option value="all">All</option>
@@ -238,7 +271,7 @@ export function SearchClient() {
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
-                    disabled={!!searchQuery && contentType === 'all'}
+                    disabled={!!searchQuery && contentType === "all"}
                   >
                     <option value="">All Years</option>
                     {years.map((year) => (
@@ -280,11 +313,13 @@ export function SearchClient() {
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-100">
-              {searchQuery ? `Search Results for "${searchQuery}"` : 'Discover Content'}
+              {searchQuery
+                ? `Search Results for "${searchQuery}"`
+                : "Discover Content"}
             </h2>
           </div>
 
-          {(searchLoading || contentLoading) ? (
+          {searchLoading || contentLoading ? (
             <div className="flex justify-center py-8">
               <LoadingSpinner size="lg" variant="primary" />
             </div>
@@ -295,7 +330,7 @@ export function SearchClient() {
                   <ContentCard key={item.id} content={item} />
                 ))}
               </div>
-              
+
               {!searchQuery && hasMore && (
                 <div className="flex justify-center mt-8">
                   <Button onClick={loadMore} variant="outline">
@@ -307,7 +342,9 @@ export function SearchClient() {
           ) : (
             <div className="text-center py-8">
               <p className="text-gray-400">
-                {searchQuery ? `No results found for "${searchQuery}"` : 'No content available'}
+                {searchQuery
+                  ? `No results found for "${searchQuery}"`
+                  : "No content available"}
               </p>
             </div>
           )}
@@ -318,7 +355,9 @@ export function SearchClient() {
           <section className="mt-12">
             <div className="flex items-center gap-2 mb-6">
               <TrendingUp className="h-5 w-5 text-red-400" />
-              <h3 className="text-xl font-semibold text-gray-100">Trending Today</h3>
+              <h3 className="text-xl font-semibold text-gray-100">
+                Trending Today
+              </h3>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
               {trendingContent.map((item) => (

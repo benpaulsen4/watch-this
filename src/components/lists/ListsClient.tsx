@@ -1,17 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Users, Lock, Globe, Ellipsis, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { List } from '@/lib/db';
-import Image from 'next/image';
-import { getImageUrl } from '@/lib/tmdb';
-import { Badge } from '../ui';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Plus,
+  Users,
+  Lock,
+  Globe,
+  Ellipsis,
+  RefreshCw,
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { List } from "@/lib/db";
+import Image from "next/image";
+import { Badge } from "../ui/Badge";
+import { getImageUrl } from "@/lib/tmdb/client";
 
-interface ListResponse extends List{
+interface ListResponse extends List {
   itemCount: number;
   collaborators: number;
   posterPaths: string[];
@@ -32,9 +40,9 @@ const PosterCollage = ({ posterUrls }: { posterUrls: string[] }) => {
       case 1:
         return (
           <div className="w-full h-64 rounded-lg overflow-hidden">
-            <Image 
-              src={posterUrls[0]} 
-              alt="Poster" 
+            <Image
+              src={posterUrls[0]}
+              alt="Poster"
               className="w-full h-full object-cover"
               width={300}
               height={450}
@@ -45,13 +53,13 @@ const PosterCollage = ({ posterUrls }: { posterUrls: string[] }) => {
         return (
           <div className="grid grid-cols-2 gap-1 h-64 rounded-lg overflow-hidden">
             {posterUrls.slice(0, 2).map((url, index) => (
-              <Image 
+              <Image
                 key={index}
-                src={url} 
-                alt={`Poster ${index + 1}`} 
+                src={url}
+                alt={`Poster ${index + 1}`}
                 className="w-full h-full object-cover"
                 width={300}
-              height={450}
+                height={450}
               />
             ))}
           </div>
@@ -60,29 +68,26 @@ const PosterCollage = ({ posterUrls }: { posterUrls: string[] }) => {
         return (
           <div className="grid grid-cols-2 grid-rows-2 gap-1 h-64 rounded-lg overflow-hidden">
             {posterUrls.slice(0, 4).map((url, index) => (
-              <Image 
+              <Image
                 key={index}
-                src={url} 
-                alt={`Poster ${index + 1}`} 
+                src={url}
+                alt={`Poster ${index + 1}`}
                 className="w-full h-full object-cover"
                 width={300}
-              height={450}
+                height={450}
               />
             ))}
-            {posterUrls.length === 3 &&
-            <div className="w-full h-32 bg-gray-800 flex items-center justify-center mb-4">
-        <Ellipsis className='text-gray-500' />
-      </div>}
+            {posterUrls.length === 3 && (
+              <div className="w-full h-32 bg-gray-800 flex items-center justify-center mb-4">
+                <Ellipsis className="text-gray-500" />
+              </div>
+            )}
           </div>
         );
     }
   };
 
-  return (
-    <div className="mb-4">
-      {renderPosterGrid()}
-    </div>
-  );
+  return <div className="mb-4">{renderPosterGrid()}</div>;
 };
 
 export default function ListsClient() {
@@ -90,10 +95,10 @@ export default function ListsClient() {
   const [lists, setLists] = useState<ListResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newListName, setNewListName] = useState('');
-  const [newListDescription, setNewListDescription] = useState('');
+  const [newListName, setNewListName] = useState("");
+  const [newListDescription, setNewListDescription] = useState("");
   const [newListIsPublic, setNewListIsPublic] = useState(false);
-  const [newListType, setNewListType] = useState('mixed');
+  const [newListType, setNewListType] = useState("mixed");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,25 +107,24 @@ export default function ListsClient() {
       try {
         setLoading(true);
         setError(null);
-        
-        const response = await fetch('/api/lists');
-        
+
+        const response = await fetch("/api/lists");
+
         if (!response.ok) {
-          throw new Error('Failed to fetch lists');
+          throw new Error("Failed to fetch lists");
         }
-        
+
         const data = await response.json();
         const fetchedLists = data.lists || [];
         setLists(fetchedLists);
-
       } catch (err) {
-        console.error('Error fetching lists:', err);
-        setError('Failed to load lists. Please try again.');
+        console.error("Error fetching lists:", err);
+        setError("Failed to load lists. Please try again.");
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchLists();
   }, []);
 
@@ -129,14 +133,14 @@ export default function ListsClient() {
 
     setCreating(true);
     setError(null);
-    
+
     try {
-      const response = await fetch('/api/lists', {
-        method: 'POST',
+      const response = await fetch("/api/lists", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
+        credentials: "include",
         body: JSON.stringify({
           name: newListName.trim(),
           description: newListDescription.trim() || null,
@@ -144,24 +148,24 @@ export default function ListsClient() {
           isPublic: newListIsPublic,
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create list');
+        throw new Error(errorData.error || "Failed to create list");
       }
-      
+
       const data = await response.json();
-      setLists(prev => [data.list, ...prev]);
-      
+      setLists((prev) => [data.list, ...prev]);
+
       // Reset form
-      setNewListName('');
-      setNewListDescription('');
+      setNewListName("");
+      setNewListDescription("");
       setNewListIsPublic(false);
-      setNewListType('mixed');
+      setNewListType("mixed");
       setShowCreateForm(false);
     } catch (err) {
-      console.error('Error creating list:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create list');
+      console.error("Error creating list:", err);
+      setError(err instanceof Error ? err.message : "Failed to create list");
     } finally {
       setCreating(false);
     }
@@ -182,12 +186,16 @@ export default function ListsClient() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push("/dashboard")}
+              >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <h1 className="text-xl font-bold text-gray-100">My Lists</h1>
             </div>
-            
+
             <Button onClick={() => setShowCreateForm(true)}>
               <Plus className="h-5 w-5 mr-2" />
               Create List
@@ -223,7 +231,7 @@ export default function ListsClient() {
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Description
@@ -236,9 +244,12 @@ export default function ListsClient() {
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
-              
+
               <div>
-                <label htmlFor="listType" className="block text-sm font-medium text-gray-300 mb-2">
+                <label
+                  htmlFor="listType"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
                   List Type
                 </label>
                 <select
@@ -252,7 +263,7 @@ export default function ListsClient() {
                   <option value="tv">TV Shows Only</option>
                 </select>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -265,10 +276,10 @@ export default function ListsClient() {
                   Make this list public
                 </label>
               </div>
-              
+
               <div className="flex gap-3">
-                <Button 
-                  onClick={handleCreateList} 
+                <Button
+                  onClick={handleCreateList}
                   disabled={!newListName.trim() || creating}
                 >
                   {creating ? (
@@ -277,11 +288,11 @@ export default function ListsClient() {
                       Creating...
                     </>
                   ) : (
-                    'Create List'
+                    "Create List"
                   )}
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setShowCreateForm(false)}
                   disabled={creating}
                 >
@@ -313,8 +324,8 @@ export default function ListsClient() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {lists.map((list) => {
               return (
-                <Card 
-                  key={list.id} 
+                <Card
+                  key={list.id}
                   className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-all cursor-pointer hover:shadow-xl hover:shadow-black/25 group"
                   onClick={() => router.push(`/lists/${list.id}`)}
                 >
@@ -325,7 +336,13 @@ export default function ListsClient() {
                           <CardTitle className="text-gray-100 text-lg group-hover:text-white transition-colors">
                             {list.name}
                           </CardTitle>
-                          <Badge variant="genre">{list.listType === 'mixed' ? 'Mixed' : list.listType === 'movies' ? 'Movies' : 'TV Shows'}</Badge>
+                          <Badge variant="genre">
+                            {list.listType === "mixed"
+                              ? "Mixed"
+                              : list.listType === "movies"
+                                ? "Movies"
+                                : "TV Shows"}
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-gray-400">
                           <div className="flex items-center gap-1">
@@ -351,17 +368,23 @@ export default function ListsClient() {
                       </div>
                     </div>
                   </CardHeader>
-                  
+
                   <CardContent>
                     {list.description && (
                       <p className="text-gray-400 text-sm mb-4 line-clamp-2">
                         {list.description}
                       </p>
                     )}
-                    
+
                     {/* Poster Collage */}
-                    <PosterCollage posterUrls={list.posterPaths?.map(path => getImageUrl(path, 'w342')) as string[]} />
-                    
+                    <PosterCollage
+                      posterUrls={
+                        list.posterPaths?.map((path) =>
+                          getImageUrl(path, "w342"),
+                        ) as string[]
+                      }
+                    />
+
                     <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
                       <span>{list.itemCount} items</span>
                       <div className="flex items-center gap-1">
@@ -369,7 +392,7 @@ export default function ListsClient() {
                         <span>{list.collaborators}</span>
                       </div>
                     </div>
-                    
+
                     <div className="text-xs text-gray-600 mt-3">
                       Updated {new Date(list.updatedAt).toLocaleDateString()}
                     </div>

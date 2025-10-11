@@ -23,7 +23,7 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
       const intlWithSupported = Intl as typeof Intl & {
         supportedValuesOf?: (type: string) => string[];
       };
-      
+
       const supported = intlWithSupported.supportedValuesOf
         ? intlWithSupported.supportedValuesOf("timeZone")
         : [];
@@ -82,7 +82,7 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
 
   const localTZ = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-    []
+    [],
   );
 
   return (
@@ -107,7 +107,10 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
           {isEditing ? (
             <div className="space-y-4">
               <div>
-                <label htmlFor="timezone" className="block text-sm font-medium text-gray-300 mb-2">
+                <label
+                  htmlFor="timezone"
+                  className="block text-sm font-medium text-gray-300 mb-2"
+                >
                   Timezone
                 </label>
                 <div className="relative">

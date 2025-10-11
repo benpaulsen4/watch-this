@@ -37,39 +37,43 @@ graph TD
 ## 3. Core Architecture Patterns
 
 ### Server Components First
+
 - All pages are server components by default
 - Use "islands of reactivity" - wrap client components in Suspense
 - Pattern: `page.tsx` (server) → `<Suspense>` → `ClientComponent.tsx`
 
 ### Middleware Authentication
+
 - ALL authenticated API routes use `withAuth` from `/src/lib/auth/api-middleware.ts`
 - Guaranteed user context in protected routes
 
 ### Shared Layouts
+
 - Next.js layout system for common UI elements
 - Route groups for different auth states: `(authenticated)` and `(public)`
 
 ## 4. Route Structure
 
-| Route | Purpose | Auth Required |
-|-------|---------|---------------|
-| `/` | Home dashboard | Yes |
-| `/auth` | Authentication page | No |
-| `/lists` | My Lists page | Yes |
-| `/lists/[id]` | List details | Yes |
-| `/search` | Content discovery | Yes |
-| `/profile` | User profile | Yes |
-| `/activity` | Activity timeline | Yes |
-| `/api/auth/*` | Authentication endpoints | Mixed |
-| `/api/lists/*` | List management | Yes |
-| `/api/tmdb/*` | TMDB proxy endpoints | Yes |
-| `/api/status/*` | Watch status management | Yes |
-| `/api/activity/*` | Activity feed | Yes |
-| `/api/profile/*` | Profile management | Yes |
+| Route             | Purpose                  | Auth Required |
+| ----------------- | ------------------------ | ------------- |
+| `/`               | Home dashboard           | Yes           |
+| `/auth`           | Authentication page      | No            |
+| `/lists`          | My Lists page            | Yes           |
+| `/lists/[id]`     | List details             | Yes           |
+| `/search`         | Content discovery        | Yes           |
+| `/profile`        | User profile             | Yes           |
+| `/activity`       | Activity timeline        | Yes           |
+| `/api/auth/*`     | Authentication endpoints | Mixed         |
+| `/api/lists/*`    | List management          | Yes           |
+| `/api/tmdb/*`     | TMDB proxy endpoints     | Yes           |
+| `/api/status/*`   | Watch status management  | Yes           |
+| `/api/activity/*` | Activity feed            | Yes           |
+| `/api/profile/*`  | Profile management       | Yes           |
 
 ## 5. Database Schema Overview
 
 ### Core Tables
+
 - **users**: User accounts and profile information
 - **passkey_credentials**: WebAuthn credential storage
 - **lists**: User-created watchlists
@@ -80,6 +84,7 @@ graph TD
 - **activity_feed**: User activity tracking
 
 ### Key Relationships
+
 - Users own lists and can collaborate on others
 - Lists contain items (TMDB content references)
 - Users track watch status for content
@@ -88,11 +93,13 @@ graph TD
 ## 6. External Integrations
 
 ### TMDB API
+
 - Server-side proxy endpoints for content search and details
 - Caching strategy for frequently accessed content
 - Rate limiting and error handling
 
 ### WebAuthn/Passkeys
+
 - Browser-native authentication
 - Device-based credential storage
 - Cross-platform compatibility
@@ -116,11 +123,12 @@ graph TD
 ## 9. Development Standards
 
 ### File Organization
+
 ```
 src/
 ├── app/
 │   ├── (authenticated)/     # Protected routes
-│   ├── (public)/           # Public routes  
+│   ├── (public)/           # Public routes
 │   └── api/                # API routes
 ├── components/
 │   ├── ui/                 # Base components
@@ -132,12 +140,14 @@ src/
 ```
 
 ### Naming Conventions
+
 - **Pages**: `page.tsx`, `layout.tsx`
 - **Client Components**: Suffix with "Client" (e.g., `DashboardClient.tsx`)
 - **API Routes**: `route.ts`
 - **Files**: PascalCase for components, camelCase for utilities
 
 ### Code Standards
+
 - **TypeScript**: Strict configuration required
 - **Styling**: Tailwind CSS exclusively
 - **Error Handling**: Consistent error boundaries and API responses
@@ -145,4 +155,4 @@ src/
 
 ---
 
-*For detailed feature implementations, API specifications, and database schemas, refer to individual feature documents in the `/features/` directory.*
+_For detailed feature implementations, API specifications, and database schemas, refer to individual feature documents in the `/features/` directory._

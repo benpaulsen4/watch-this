@@ -81,7 +81,7 @@ export const listCollaborators = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.listId, table.userId)]
+  (table) => [unique().on(table.listId, table.userId)],
 );
 
 // List items table
@@ -100,7 +100,7 @@ export const listItems = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.listId, table.tmdbId, table.contentType)]
+  (table) => [unique().on(table.listId, table.tmdbId, table.contentType)],
 );
 
 // User content status table
@@ -122,7 +122,7 @@ export const userContentStatus = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.userId, table.tmdbId, table.contentType)]
+  (table) => [unique().on(table.userId, table.tmdbId, table.contentType)],
 );
 
 // Episode watch status table
@@ -150,9 +150,9 @@ export const episodeWatchStatus = pgTable(
       table.userId,
       table.tmdbId,
       table.seasonNumber,
-      table.episodeNumber
+      table.episodeNumber,
     ),
-  ]
+  ],
 );
 
 // Activity feed table
@@ -190,7 +190,7 @@ export const showSchedules = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.userId, table.tmdbId, table.dayOfWeek)]
+  (table) => [unique().on(table.userId, table.tmdbId, table.dayOfWeek)],
 );
 
 // Relations
@@ -211,7 +211,7 @@ export const passkeyCredentialsRelations = relations(
       fields: [passkeyCredentials.userId],
       references: [users.id],
     }),
-  })
+  }),
 );
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
@@ -235,7 +235,7 @@ export const listCollaboratorsRelations = relations(
       fields: [listCollaborators.userId],
       references: [users.id],
     }),
-  })
+  }),
 );
 
 export const listItemsRelations = relations(listItems, ({ one }) => ({
@@ -252,7 +252,7 @@ export const userContentStatusRelations = relations(
       fields: [userContentStatus.userId],
       references: [users.id],
     }),
-  })
+  }),
 );
 
 export const episodeWatchStatusRelations = relations(
@@ -262,7 +262,7 @@ export const episodeWatchStatusRelations = relations(
       fields: [episodeWatchStatus.userId],
       references: [users.id],
     }),
-  })
+  }),
 );
 
 export const activityFeedRelations = relations(activityFeed, ({ one }) => ({

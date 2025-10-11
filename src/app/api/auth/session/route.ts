@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       // Clear invalid session cookie
       const response = NextResponse.json(
         { error: "Invalid session" },
-        { status: 401 }
+        { status: 401 },
       );
       response.cookies.delete("session");
       return response;
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Failed to check session" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -56,7 +56,7 @@ export async function PUT(request: NextRequest) {
     if (!user) {
       const response = NextResponse.json(
         { error: "Invalid session" },
-        { status: 401 }
+        { status: 401 },
       );
       response.cookies.delete("session");
       return response;
@@ -70,7 +70,7 @@ export async function PUT(request: NextRequest) {
       if (typeof username !== "string" || username.trim().length === 0) {
         return NextResponse.json(
           { error: "Username must be a non-empty string" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       // Validate username format
@@ -81,7 +81,7 @@ export async function PUT(request: NextRequest) {
             error:
               "Username must be 3-50 characters and contain only letters, numbers, underscores, and hyphens",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -90,13 +90,13 @@ export async function PUT(request: NextRequest) {
       if (profilePictureUrl !== null && typeof profilePictureUrl !== "string") {
         return NextResponse.json(
           { error: "Profile picture URL must be a string or null" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (profilePictureUrl && profilePictureUrl.length > 500) {
         return NextResponse.json(
           { error: "Profile picture URL must be 500 characters or less" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       // Basic URL validation
@@ -106,7 +106,7 @@ export async function PUT(request: NextRequest) {
         } catch {
           return NextResponse.json(
             { error: "Profile picture URL must be a valid URL" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -117,24 +117,24 @@ export async function PUT(request: NextRequest) {
       if (typeof timezone !== "string" || timezone.trim().length === 0) {
         return NextResponse.json(
           { error: "Timezone must be a non-empty string" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (timezone.length > 100) {
         return NextResponse.json(
           { error: "Timezone must be 100 characters or less" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       try {
         // Validate via Intl API
         new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(
-          new Date()
+          new Date(),
         );
       } catch {
         return NextResponse.json(
           { error: "Invalid timezone" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -150,7 +150,7 @@ export async function PUT(request: NextRequest) {
       if (existingUser.length > 0) {
         return NextResponse.json(
           { error: "Username is already taken" },
-          { status: 409 }
+          { status: 409 },
         );
       }
     }
@@ -193,7 +193,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Failed to update profile" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

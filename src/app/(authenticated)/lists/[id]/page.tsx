@@ -1,6 +1,6 @@
-import { Suspense } from 'react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import ListDetailsClient from '@/components/lists/ListDetailsClient';
+import { Suspense } from "react";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import ListDetailsClient from "@/components/lists/ListDetailsClient";
 
 interface ListDetailsPageProps {
   params: Promise<{
@@ -8,14 +8,20 @@ interface ListDetailsPageProps {
   }>;
 }
 
-export default async function ListDetailsPage({ params }: ListDetailsPageProps) {
+export default async function ListDetailsPage({
+  params,
+}: ListDetailsPageProps) {
   const { id } = await params;
-  
+
   return (
-    <Suspense 
+    <Suspense
       fallback={
         <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-          <LoadingSpinner size="xl" variant="primary" text="Loading list details..." />
+          <LoadingSpinner
+            size="xl"
+            variant="primary"
+            text="Loading list details..."
+          />
         </div>
       }
     >

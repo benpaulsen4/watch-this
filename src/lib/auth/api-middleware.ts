@@ -7,7 +7,7 @@ export interface AuthenticatedRequest extends NextRequest {
 }
 
 export type AuthenticatedHandler = (
-  request: AuthenticatedRequest
+  request: AuthenticatedRequest,
 ) => Promise<NextResponse> | NextResponse;
 
 /**
@@ -24,7 +24,7 @@ export function withAuth(handler: AuthenticatedHandler) {
       if (!sessionToken) {
         return NextResponse.json(
           { error: "Authentication required" },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -34,7 +34,7 @@ export function withAuth(handler: AuthenticatedHandler) {
         // Clear invalid session cookie
         const response = NextResponse.json(
           { error: "Invalid session" },
-          { status: 401 }
+          { status: 401 },
         );
         response.cookies.delete("session");
         return response;
@@ -49,7 +49,7 @@ export function withAuth(handler: AuthenticatedHandler) {
       console.error("Authentication middleware error:", error);
       return NextResponse.json(
         { error: "Authentication failed" },
-        { status: 500 }
+        { status: 500 },
       );
     }
   };
@@ -68,14 +68,14 @@ export function handleApiError(error: unknown, context: string): NextResponse {
     if (error.message.includes("TMDB API error")) {
       return NextResponse.json(
         { error: "External service unavailable" },
-        { status: 503 }
+        { status: 503 },
       );
     }
 
     if (error.message.includes("rate limit")) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again later." },
-        { status: 429 }
+        { status: 429 },
       );
     }
   }
@@ -91,7 +91,7 @@ export function handleApiError(error: unknown, context: string): NextResponse {
  */
 export function validatePagination(
   page: string | null,
-  maxPage: number = 1000
+  maxPage: number = 1000,
 ): { page: number; error?: NextResponse } {
   const pageNum = parseInt(page || "1");
 
@@ -100,7 +100,7 @@ export function validatePagination(
       page: 1,
       error: NextResponse.json(
         { error: `Page must be between 1 and ${maxPage}` },
-        { status: 400 }
+        { status: 400 },
       ),
     };
   }
