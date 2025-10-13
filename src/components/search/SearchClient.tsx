@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Filter, TrendingUp } from "lucide-react";
 import type { TMDBMovie, TMDBTVShow, TMDBGenre } from "@/lib/tmdb/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SearchInput } from "@/components/search/SearchInput";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "../ui/PageHeader";
 import { ContentCard } from "../content/ContentCard";
+import { ContentCardSkeleton } from "../content/ContentCardSkeleton";
 
 type ContentType = "all" | "movie" | "tv";
 type SortBy =
@@ -17,53 +17,28 @@ type SortBy =
   | "release_date.desc"
   | "title.asc";
 
-export function SearchClient() {
+export interface SearchClientProps {
+  genres: TMDBGenre[];
+  trendingContent: (TMDBMovie | TMDBTVShow)[];
+}
+
+export function SearchClient({ genres, trendingContent }: SearchClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<
     (TMDBMovie | TMDBTVShow)[]
   >([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [contentType, setContentType] = useState<ContentType>("all");
-  const [genres, setGenres] = useState<TMDBGenre[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<string>("");
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortBy>("popularity.desc");
   const [showFilters, setShowFilters] = useState(false);
-  const [trendingContent, setTrendingContent] = useState<
-    (TMDBMovie | TMDBTVShow)[]
-  >([]);
   const [discoverContent, setDiscoverContent] = useState<
     (TMDBMovie | TMDBTVShow)[]
   >([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [contentLoading, setContentLoading] = useState(true);
-
-  const loadGenres = async () => {
-    try {
-      const response = await fetch("/api/tmdb/genres?type=all");
-      if (response.ok) {
-        const data = await response.json();
-        setGenres(data.genres || []);
-      }
-    } catch (error) {
-      console.error("Failed to load genres:", error);
-    }
-  };
-
-  const loadTrendingContent = async () => {
-    try {
-      const response = await fetch(
-        "/api/tmdb/trending?media_type=all&time_window=day",
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setTrendingContent(data.results?.slice(0, 10) || []);
-      }
-    } catch (error) {
-      console.error("Failed to load trending content:", error);
-    }
-  };
 
   const loadDiscoverContent = useCallback(
     async (pageNum = 1, append = false) => {
@@ -133,8 +108,6 @@ export function SearchClient() {
   );
 
   useEffect(() => {
-    loadGenres();
-    loadTrendingContent();
     loadDiscoverContent();
   }, [loadDiscoverContent]);
 
@@ -300,8 +273,10 @@ export function SearchClient() {
           </div>
 
           {searchLoading || contentLoading ? (
-            <div className="flex justify-center py-8">
-              <LoadingSpinner size="lg" variant="primary" />
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+              {Array.from({ length: 20 }).map((_, i) => (
+                <ContentCardSkeleton key={i} />
+              ))}
             </div>
           ) : displayContent.length > 0 ? (
             <>
