@@ -21,6 +21,7 @@ import type { TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
 import CollaborationModal from "./CollaborationModal";
 import ListSettingsModal from "./ListSettingsModal";
 import { useUser } from "../providers/AuthProvider";
+import { PageHeader } from "../ui/PageHeader";
 import { ContentCard } from "../content/ContentCard";
 
 interface ListItem extends TMDBMovie, TMDBTVShow {
@@ -132,84 +133,65 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/lists")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <h1 className="text-xl font-bold text-gray-100">{list.name}</h1>
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  {list.isPublic ? (
-                    <>
-                      <Globe className="h-3 w-3" />
-                      <span className="hidden sm:block">Public</span>
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="h-3 w-3" />
-                      <span className="hidden sm:block">Private</span>
-                    </>
-                  )}
-                  {list.syncWatchStatus && (
-                    <>
-                      <span>•</span>
-                      <div className="flex items-center gap-1">
-                        <RefreshCw className="h-3 w-3" />
-                        <span className="hidden sm:block">Sync</span>
-                      </div>
-                    </>
-                  )}
-                  <span>•</span>
-                  <div className="flex items-center gap-1">
-                    <FileStack className="h-3 w-3" />
-                    <span>{list.items.length}</span>
-                    <span className="hidden sm:block">items</span>
-                  </div>
-                  <span>•</span>
-                  <div className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    <span>{list.collaborators}</span>
-                    <span className="hidden sm:block">collaborators</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowCollaborationModal(true)}
-              >
-                <Share className="h-4 w-4" />
-                <span className="ml-2 hidden sm:block">Share</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSettingsModal(true)}
-              >
-                <Settings className="h-4 w-4" />
-                <span className="ml-2 hidden sm:block">Settings</span>
-              </Button>
-              <Button onClick={() => router.push("/search")}>
-                <Plus className="h-5 w-5" />
-                <span className="ml-2 hidden sm:block">Add Content</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader title={list.name} backLinkHref="/lists">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowCollaborationModal(true)}
+        >
+          <Share className="h-4 w-4" />
+          <span className="ml-2 hidden sm:block">Share</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowSettingsModal(true)}
+        >
+          <Settings className="h-4 w-4" />
+          <span className="ml-2 hidden sm:block">Settings</span>
+        </Button>
+        <Button onClick={() => router.push("/search")}>
+          <Plus className="h-5 w-5" />
+          <span className="ml-2 hidden sm:block">Add Content</span>
+        </Button>
+      </PageHeader>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
+          {list.isPublic ? (
+            <>
+              <Globe className="h-3 w-3" />
+              <span className="hidden sm:block">Public</span>
+            </>
+          ) : (
+            <>
+              <Lock className="h-3 w-3" />
+              <span className="hidden sm:block">Private</span>
+            </>
+          )}
+          {list.syncWatchStatus && (
+            <>
+              <span>•</span>
+              <div className="flex items-center gap-1">
+                <RefreshCw className="h-3 w-3" />
+                <span className="hidden sm:block">Sync</span>
+              </div>
+            </>
+          )}
+          <span>•</span>
+          <div className="flex items-center gap-1">
+            <FileStack className="h-3 w-3" />
+            <span>{list.items.length}</span>
+            <span className="hidden sm:block">items</span>
+          </div>
+          <span>•</span>
+          <div className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            <span>{list.collaborators}</span>
+            <span className="hidden sm:block">collaborators</span>
+          </div>
+        </div>
+
         {/* List Description */}
         {list.description && (
           <Card className="mb-8 bg-gray-900 border-gray-800">

@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { ActivityEntry } from "./ActivityEntry";
 import { Button } from "@/components/ui/Button";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
-import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { TMDBTVShow } from "@/lib/tmdb/client";
 import { useUser } from "../providers/AuthProvider";
+import { PageHeader } from "../ui/PageHeader";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 
 interface UserStub {
@@ -41,7 +40,6 @@ export interface ActivityResponse {
 }
 
 export function ActivityTimelineClient() {
-  const router = useRouter();
   const user = useUser();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,25 +132,7 @@ export function ActivityTimelineClient() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/dashboard")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-xl font-bold text-gray-100">
-                Activity Timeline
-              </h1>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Activity Timeline" backLinkHref="/dashboard" />
 
       {/* Activity Feed */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

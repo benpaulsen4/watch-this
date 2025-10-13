@@ -1,3 +1,5 @@
+"use client";
+
 import { forwardRef, useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
 import { cn, formatVoteAverage } from "@/lib/utils";

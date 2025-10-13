@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Filter, TrendingUp } from "lucide-react";
+import { Filter, TrendingUp } from "lucide-react";
 import type { TMDBMovie, TMDBTVShow, TMDBGenre } from "@/lib/tmdb/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SearchInput } from "@/components/search/SearchInput";
 import { Button } from "@/components/ui/Button";
+import { PageHeader } from "../ui/PageHeader";
 import { ContentCard } from "../content/ContentCard";
 
 type ContentType = "all" | "movie" | "tv";
@@ -18,8 +18,6 @@ type SortBy =
   | "title.asc";
 
 export function SearchClient() {
-  const router = useRouter();
-
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<
     (TMDBMovie | TMDBTVShow)[]
@@ -178,34 +176,16 @@ export function SearchClient() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/dashboard")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-xl font-bold text-gray-100">Discover</h1>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button
-                variant={showFilters ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Discover" backLinkHref="/dashboard">
+        <Button
+          variant={showFilters ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Filters
+        </Button>
+      </PageHeader>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search */}

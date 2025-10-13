@@ -65,7 +65,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
     return (
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-100">Recent Activity</h2>
+          <h2 className="text-2xl font-bold text-gray-100">Activity</h2>
           <Button
             variant="outline"
             size="sm"
@@ -87,7 +87,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
     return (
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-100">Recent Activity</h2>
+          <h2 className="text-2xl font-bold text-gray-100">Activity</h2>
           <Button
             variant="outline"
             size="sm"

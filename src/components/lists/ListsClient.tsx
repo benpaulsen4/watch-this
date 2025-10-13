@@ -2,21 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Plus,
-  Users,
-  Lock,
-  Globe,
-  Ellipsis,
-  RefreshCw,
-} from "lucide-react";
+import { Plus, Users, Lock, Globe, Ellipsis, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { List } from "@/lib/db";
 import Image from "next/image";
 import { Badge } from "../ui/Badge";
+import { PageHeader } from "../ui/PageHeader";
 import { getImageUrl } from "@/lib/tmdb/client";
 
 interface ListResponse extends List {
@@ -181,28 +174,12 @@ export default function ListsClient() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/dashboard")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-xl font-bold text-gray-100">My Lists</h1>
-            </div>
-
-            <Button onClick={() => setShowCreateForm(true)}>
-              <Plus className="h-5 w-5 mr-2" />
-              Create List
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="My Lists" backLinkHref="/dashboard">
+        <Button onClick={() => setShowCreateForm(true)}>
+          <Plus className="h-5 w-5 mr-2" />
+          Create List
+        </Button>
+      </PageHeader>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Error Display */}
