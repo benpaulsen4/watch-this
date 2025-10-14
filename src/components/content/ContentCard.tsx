@@ -195,8 +195,8 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
               <Image
                 src={posterUrl}
                 alt={title}
-                width={300}
-                height={450}
+                width={200}
+                height={300}
                 className="w-full h-64 object-cover rounded-lg"
               />
             ) : (

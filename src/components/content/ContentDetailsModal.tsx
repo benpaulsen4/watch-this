@@ -61,7 +61,7 @@ export function ContentDetailsModal({
   const title = getContentTitle(content);
   const releaseDate = getContentReleaseDate(content);
   const contentType = getContentType(content);
-  const posterUrl = getImageUrl(content.poster_path, "w500");
+  const posterUrl = getImageUrl(content.poster_path, "w342");
   const backdropUrl = getImageUrl(content.backdrop_path, "w780");
   const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
 
@@ -175,8 +175,15 @@ export function ContentDetailsModal({
       onOpenChange={onClose}
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
     >
-      <Modal className="bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="relative">
+      <Modal className="bg-gray-900 rounded-xl max-w-4xl w-full max-h-[90vh] shadow-2xl relative">
+        {/* Close Button */}
+        <AriaButton
+          onPress={onClose}
+          className="absolute top-4 right-4 z-100 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </AriaButton>
+        <div className="relative overflow-y-auto max-h-[90vh] rounded-xl">
           {/* Backdrop Image */}
           {backdropUrl && (
             <div className="relative h-64 w-full">
@@ -189,14 +196,6 @@ export function ContentDetailsModal({
               <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent" />
             </div>
           )}
-
-          {/* Close Button */}
-          <AriaButton
-            onPress={onClose}
-            className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </AriaButton>
 
           {/* Content */}
           <div
