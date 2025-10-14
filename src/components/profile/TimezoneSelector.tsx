@@ -28,7 +28,7 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
         ? intlWithSupported.supportedValuesOf("timeZone")
         : [];
       if (supported && Array.isArray(supported) && supported.length > 0) {
-        supported.push("UTC"); // UTC not included in chrome supported list
+        if (!supported.includes("UTC")) supported.push("UTC"); // UTC not included in chrome supported list
         setTimezones(supported);
       } else {
         // Fallback small list

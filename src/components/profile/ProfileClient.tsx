@@ -36,13 +36,8 @@ export function ProfileClient() {
   return (
     <div className="min-h-screen bg-gray-950">
       <PageHeader title="My Profile" backLinkHref="/dashboard">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleLogout}
-          className="text-red-400 border-red-400 hover:bg-red-400 hover:text-white"
-        >
-          <LogOut className="h-4 w-4 mr-2" />
+        <Button variant="destructive" onClick={handleLogout}>
+          <LogOut className="h-5 w-5 mr-2" />
           Logout
         </Button>
       </PageHeader>
@@ -51,7 +46,7 @@ export function ProfileClient() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
-            <Card variant="entertainment">
+            <Card size="sm">
               <CardContent>
                 <nav className="space-y-2">
                   <button
