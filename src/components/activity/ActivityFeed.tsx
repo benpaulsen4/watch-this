@@ -26,22 +26,13 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isMdUp, setIsMdUp] = useState(false);
-
-  // Detect Tailwind's md breakpoint (min-width: 768px)
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const handler = (e: MediaQueryListEvent) => setIsMdUp(e.matches);
-    setIsMdUp(mq.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
 
   const fetchActivities = useCallback(async () => {
     try {
+      const mq = window.matchMedia("(min-width: 768px)");
+      const mdUp = mq.matches;
       setLoading(true);
-      const limit = isMdUp ? 10 : 5;
-      const response = await fetch(`/api/activity?limit=${limit}`);
+      const response = await fetch(`/api/activity?limit=${mdUp ? 10 : 5}`);
       if (!response.ok) {
         throw new Error("Failed to fetch activities");
       }
@@ -55,7 +46,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
     } finally {
       setLoading(false);
     }
-  }, [isMdUp]);
+  }, []);
 
   useEffect(() => {
     fetchActivities();
@@ -74,11 +65,13 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
             View All
           </Button>
         </div>
-        <LoadingSpinner
-          size="lg"
-          variant="primary"
-          text="Loading activities..."
-        />
+        <div className="flex flex-col items-center justify-center py-24">
+          <LoadingSpinner
+            size="lg"
+            variant="primary"
+            text="Loading activities..."
+          />
+        </div>
       </div>
     );
   }
@@ -96,7 +89,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
             View All
           </Button>
         </div>
-        <div className="text-center py-8">
+        <div className="flex flex-col items-center justify-center py-24">
           <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
         </div>
       </div>

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { TMDBTVShow } from "@/lib/tmdb/client";
 import { useUser } from "../providers/AuthProvider";
-import { PageHeader } from "../ui/PageHeader";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 
 interface UserStub {
@@ -106,7 +105,7 @@ export function ActivityTimelineClient() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="flex flex-col items-center justify-center py-12">
         <LoadingSpinner
           size="xl"
           variant="primary"
@@ -118,7 +117,7 @@ export function ActivityTimelineClient() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center justify-center py-12">
         <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
         <Button
           onClick={() => fetchActivities(undefined, true)}
@@ -131,49 +130,44 @@ export function ActivityTimelineClient() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950">
-      <PageHeader title="Activity Timeline" backLinkHref="/dashboard" />
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {activities.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-600 dark:text-gray-400">
+            No activities found. Start watching content or managing your lists
+            to see activity here.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {activities.map((activity) => (
+            <ActivityEntry
+              key={activity.id}
+              activity={activity}
+              currentUsername={user?.username || ""}
+            />
+          ))}
 
-      {/* Activity Feed */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activities.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 dark:text-gray-400">
-              No activities found. Start watching content or managing your lists
-              to see activity here.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {activities.map((activity) => (
-              <ActivityEntry
-                key={activity.id}
-                activity={activity}
-                currentUsername={user?.username || ""}
-              />
-            ))}
+          {/* Infinite scroll trigger */}
+          <div ref={targetRef} className="h-4" />
 
-            {/* Infinite scroll trigger */}
-            <div ref={targetRef} className="h-4" />
+          {/* Loading more indicator */}
+          {loadingMore && (
+            <div className="flex items-center justify-center py-4">
+              <LoadingSpinner variant="primary" text="Loading more..." />
+            </div>
+          )}
 
-            {/* Loading more indicator */}
-            {loadingMore && (
-              <div className="flex items-center justify-center py-4">
-                <LoadingSpinner variant="primary" text="Loading more..." />
-              </div>
-            )}
-
-            {/* End of feed indicator */}
-            {!hasMore && activities.length > 0 && (
-              <div className="text-center py-8">
-                <p className="text-gray-500 dark:text-gray-400">
-                  You&apos;ve reached the end of your activity timeline.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
+          {/* End of feed indicator */}
+          {!hasMore && activities.length > 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400">
+                You&apos;ve reached the end of your activity timeline.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </main>
   );
 }
