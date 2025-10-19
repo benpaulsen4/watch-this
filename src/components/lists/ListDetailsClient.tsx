@@ -157,7 +157,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
       </PageHeader>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
+        <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           {list.isPublic ? (
             <>
               <Globe className="h-3 w-3" />
@@ -178,20 +178,23 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
               </div>
             </>
           )}
+          {list.collaborators > 0 && (
+            <>
+              <span>•</span>
+              <div className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                <span>{list.collaborators}</span>
+                <span className="hidden sm:block">collaborators</span>
+              </div>
+            </>
+          )}
           <span>•</span>
           <div className="flex items-center gap-1">
             <FileStack className="h-3 w-3" />
             <span>{list.items.length}</span>
             <span className="hidden sm:block">items</span>
           </div>
-          <span>•</span>
-          <div className="flex items-center gap-1">
-            <Users className="h-3 w-3" />
-            <span>{list.collaborators}</span>
-            <span className="hidden sm:block">collaborators</span>
-          </div>
         </div>
-
         {/* List Description */}
         {list.description && (
           <Card className="mb-8 bg-gray-900 border-gray-800">
