@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Modal,
   ModalOverlay,
@@ -24,14 +25,17 @@ import { ListSelector } from "./ListSelector";
 import { StatusSegmentedSelector } from "./StatusSegmentedSelector";
 import { EpisodeTracker } from "./EpisodeTracker";
 import { ScheduleManager } from "./ScheduleManager";
+import { useStreamingPreferences } from "../providers/AuthProvider";
 import type {
   TMDBMovie,
   TMDBTVShow,
   TMDBMovieDetails,
   TMDBTVShowDetails,
+  UserStreamingProvider,
 } from "@/lib/tmdb/client";
 import type { WatchStatusEnum, ContentTypeEnum } from "@/lib/db/schema";
 import { Badge } from "../ui/Badge";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
 
 export interface ContentDetailsModalProps {
   content: TMDBMovie | TMDBTVShow;
@@ -54,9 +58,35 @@ export function ContentDetailsModal({
     TMDBMovieDetails | TMDBTVShowDetails | null
   >(null);
   const [watchStatus, setWatchStatus] = useState<WatchStatusEnum | null>(
-    content.watchStatus ?? null,
+    content.watchStatus ?? null
   );
   const [selectedTab, setSelectedTab] = useState<string>("overview");
+  const [contentStreaming, setContentStreaming] = useState<{
+    flatrate?: Array<{
+      provider_id: number;
+      provider_name: string;
+      logo_path: string | null;
+    }>;
+    ads?: Array<{
+      provider_id: number;
+      provider_name: string;
+      logo_path: string | null;
+    }>;
+    buy?: Array<{
+      provider_id: number;
+      provider_name: string;
+      logo_path: string | null;
+    }>;
+    rent?: Array<{
+      provider_id: number;
+      provider_name: string;
+      logo_path: string | null;
+    }>;
+  } | null>(null);
+  const [streamingLoading, setStreamingLoading] = useState<boolean>(false);
+
+  // Use streaming preferences from context
+  const { streamingPreferences } = useStreamingPreferences();
 
   const title = getContentTitle(content);
   const releaseDate = getContentReleaseDate(content);
@@ -85,7 +115,7 @@ export function ContentDetailsModal({
       const fetchDetails = async () => {
         try {
           const details = await fetch(
-            `/api/tmdb/details?type=${contentType}&id=${content.id}`,
+            `/api/tmdb/details?type=${contentType}&id=${content.id}`
           );
           const data = await details.json();
           setDetailedContent(data);
@@ -96,6 +126,32 @@ export function ContentDetailsModal({
       fetchDetails();
     }
   }, [isOpen, content.id, contentType, detailedContent]);
+
+  // Fetch content providers when modal opens and streaming preferences are available
+  useEffect(() => {
+    const loadContentProviders = async () => {
+      if (!isOpen || !streamingPreferences?.country) {
+        setStreamingLoading(false);
+        return;
+      }
+
+      try {
+        setStreamingLoading(true);
+        const region = streamingPreferences.country.toUpperCase();
+        const providersRes = await fetch(
+          `/api/watch/content?type=${contentType}&id=${content.id}&region=${region}`
+        );
+        const providersData = await providersRes.json();
+        setContentStreaming(providersData?.providers || null);
+      } catch (e) {
+        console.error("Failed to load streaming providers", e);
+        setContentStreaming(null);
+      } finally {
+        setStreamingLoading(false);
+      }
+    };
+    loadContentProviders();
+  }, [isOpen, content.id, contentType, streamingPreferences?.country]);
 
   const handleStatusChange = async (newStatus: WatchStatusEnum) => {
     try {
@@ -159,7 +215,7 @@ export function ContentDetailsModal({
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.error || "Failed to remove content from list",
+          errorData.error || "Failed to remove content from list"
         );
       } else {
         onRemove?.();
@@ -202,7 +258,7 @@ export function ContentDetailsModal({
           <div
             className={cn(
               "p-4 sm:p-6",
-              backdropUrl ? "-mt-32 relative z-10" : "",
+              backdropUrl ? "-mt-32 relative z-10" : ""
             )}
           >
             <div className="flex flex-col lg:flex-row gap-6">
@@ -306,7 +362,7 @@ export function ContentDetailsModal({
                           "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent",
                           isSelected
                             ? "text-red-400 border-red-500"
-                            : "hover:text-gray-100 hover:border-gray-500",
+                            : "hover:text-gray-100 hover:border-gray-500"
                         )
                       }
                     >
@@ -320,7 +376,7 @@ export function ContentDetailsModal({
                             "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent",
                             isSelected
                               ? "text-red-400 border-red-500"
-                              : "hover:text-gray-100 hover:border-gray-500",
+                              : "hover:text-gray-100 hover:border-gray-500"
                           )
                         }
                       >
@@ -334,7 +390,7 @@ export function ContentDetailsModal({
                           "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent",
                           isSelected
                             ? "text-red-400 border-red-500"
-                            : "hover:text-gray-100 hover:border-gray-500",
+                            : "hover:text-gray-100 hover:border-gray-500"
                         )
                       }
                     >
@@ -348,7 +404,7 @@ export function ContentDetailsModal({
                             "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent",
                             isSelected
                               ? "text-red-400 border-red-500"
-                              : "hover:text-gray-100 hover:border-gray-500",
+                              : "hover:text-gray-100 hover:border-gray-500"
                           )
                         }
                       >
@@ -386,6 +442,138 @@ export function ContentDetailsModal({
                           </div>
                         </div>
                       )}
+
+                    {/* Streaming */}
+                    {(!streamingPreferences?.country || !streamingLoading) && (
+                      <div className="mb-6">
+                        <h3 className="text-lg font-semibold text-gray-100 mb-2">
+                          Streaming
+                        </h3>
+                        {!streamingPreferences?.country ? (
+                          <div className="p-4 border border-gray-700 rounded-lg bg-gray-800/50">
+                            <p className="text-sm text-gray-300 mb-3">
+                              Set up your streaming preferences to see where
+                              this content is available.
+                            </p>
+                            <Link
+                              href="/profile#streaming"
+                              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-400 hover:text-red-300 border border-red-500/50 hover:border-red-500 rounded-md transition-colors"
+                            >
+                              <Tv className="w-4 h-4" />
+                              Configure Streaming Settings
+                            </Link>
+                          </div>
+                        ) : streamingLoading ? (
+                          <LoadingSpinner text="Loading streaming providers..." />
+                        ) : !contentStreaming?.flatrate &&
+                          !contentStreaming?.ads ? (
+                          <p className="text-sm text-gray-400">
+                            No streaming providers found for{" "}
+                            {streamingPreferences.country.toUpperCase()}.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-3">
+                            {(() => {
+                              // Get subscribed provider IDs
+                              const subscribedProviders = (
+                                (streamingPreferences?.providers as UserStreamingProvider[]) ||
+                                []
+                              )
+                                .filter(
+                                  (provider: UserStreamingProvider) =>
+                                    provider.region ===
+                                    streamingPreferences.country?.toUpperCase()
+                                )
+                                .map(
+                                  (provider: UserStreamingProvider) =>
+                                    provider.id
+                                );
+
+                              // Combine and deduplicate providers
+                              const allProviders = [
+                                ...(contentStreaming?.flatrate || []),
+                                ...(contentStreaming?.ads || []),
+                              ];
+
+                              // Remove duplicates based on provider_id
+                              const uniqueProviders = allProviders.filter(
+                                (provider, index, self) =>
+                                  index ===
+                                  self.findIndex(
+                                    (p) =>
+                                      p.provider_id === provider.provider_id
+                                  )
+                              );
+
+                              // Sort providers: subscribed first, then others
+                              const sortedProviders = uniqueProviders.sort(
+                                (a, b) => {
+                                  const aIsSubscribed =
+                                    subscribedProviders.includes(a.provider_id);
+                                  const bIsSubscribed =
+                                    subscribedProviders.includes(b.provider_id);
+
+                                  if (aIsSubscribed && !bIsSubscribed)
+                                    return -1;
+                                  if (!aIsSubscribed && bIsSubscribed) return 1;
+                                  return 0;
+                                }
+                              );
+
+                              return sortedProviders.map((p) => {
+                                const isSubscribed =
+                                  subscribedProviders.includes(p.provider_id);
+                                const logoUrl = getImageUrl(p.logo_path, "w92");
+                                return (
+                                  <div
+                                    key={`${p.provider_id}`}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm ${
+                                      isSubscribed
+                                        ? "border-red-500/50 bg-red-500/10 text-red-300"
+                                        : "border-gray-700 text-gray-300 opacity-60"
+                                    }`}
+                                  >
+                                    {logoUrl ? (
+                                      <Image
+                                        src={logoUrl}
+                                        alt={p.provider_name}
+                                        width={24}
+                                        height={24}
+                                        className="w-6 h-6 rounded"
+                                      />
+                                    ) : (
+                                      <div className="w-6 h-6 bg-gray-800 rounded" />
+                                    )}
+                                    <span>{p.provider_name}</span>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Attribution */}
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold text-gray-100 mb-2">
+                        Powered By
+                      </h3>
+                      <div className="flex flex-wrap gap-4">
+                        <Image
+                          src="/tmdb.svg"
+                          alt="TMDB"
+                          width={96}
+                          height={24}
+                        />
+                        <Image
+                          src="/justwatch.svg"
+                          alt="JustWatch"
+                          width={96}
+                          height={24}
+                        />
+                      </div>
+                    </div>
                   </TabPanel>
 
                   {contentType === "tv" && (

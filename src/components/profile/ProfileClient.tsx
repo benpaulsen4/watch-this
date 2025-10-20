@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   User as UserIcon,
@@ -8,6 +7,7 @@ import {
   Shield,
   LogOut,
   ArrowLeft,
+  Tv,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -17,13 +17,19 @@ import { PasskeyDevicesViewer } from "./PasskeyDevicesViewer";
 import { DataExportImport } from "./DataExportImport";
 import { TimezoneSelector } from "./TimezoneSelector";
 import { useAuth } from "../providers/AuthProvider";
+import { StreamingPreferences } from "./StreamingPreferences";
+import { useFragmentNavigation } from "@/hooks/useFragmentNavigation";
+
+type ProfileTab = "profile" | "security" | "data" | "streaming";
 
 export function ProfileClient() {
   const router = useRouter();
   const { user, refreshSession } = useAuth();
-  const [activeTab, setActiveTab] = useState<"profile" | "security" | "data">(
-    "profile",
-  );
+  
+  const { activeTab, setActiveTab } = useFragmentNavigation<ProfileTab>({
+    defaultTab: "profile",
+    validTabs: ["profile", "security", "data", "streaming"],
+  });
 
   const handleLogout = async () => {
     try {
@@ -98,6 +104,17 @@ export function ProfileClient() {
                     Security
                   </button>
                   <button
+                    onClick={() => setActiveTab("streaming")}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                      activeTab === "streaming"
+                        ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                        : "text-gray-300 hover:bg-gray-800 hover:text-gray-100"
+                    }`}
+                  >
+                    <Tv className="h-4 w-4" />
+                    Streaming
+                  </button>
+                  <button
                     onClick={() => setActiveTab("data")}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
                       activeTab === "data"
@@ -166,6 +183,21 @@ export function ProfileClient() {
                   </CardHeader>
                   <CardContent>
                     <DataExportImport />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {activeTab === "streaming" && (
+              <div className="space-y-6">
+                <Card variant="entertainment">
+                  <CardHeader>
+                    <CardTitle className="text-gray-100">
+                      Streaming Preferences
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <StreamingPreferences />
                   </CardContent>
                 </Card>
               </div>

@@ -18,6 +18,7 @@ export const users = pgTable("users", {
   username: varchar("username", { length: 50 }).notNull().unique(),
   profilePictureUrl: varchar("profile_picture_url", { length: 500 }),
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
+  country: varchar("country", { length: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -193,6 +194,25 @@ export const showSchedules = pgTable(
   (table) => [unique().on(table.userId, table.tmdbId, table.dayOfWeek)],
 );
 
+// User streaming providers table
+export const userStreamingProviders = pgTable(
+  "user_streaming_providers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    providerId: integer("provider_id").notNull(),
+    providerName: varchar("provider_name", { length: 100 }),
+    logoPath: varchar("logo_path", { length: 255 }),
+    region: varchar("region", { length: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [unique().on(table.userId, table.providerId, table.region)],
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   passkeyCredentials: many(passkeyCredentials),
@@ -202,6 +222,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   episodeStatuses: many(episodeWatchStatus),
   activities: many(activityFeed),
   showSchedules: many(showSchedules),
+  streamingProviders: many(userStreamingProviders),
 }));
 
 export const passkeyCredentialsRelations = relations(
@@ -283,6 +304,16 @@ export const showSchedulesRelations = relations(showSchedules, ({ one }) => ({
   }),
 }));
 
+export const userStreamingProvidersRelations = relations(
+  userStreamingProviders,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userStreamingProviders.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -310,6 +341,10 @@ export type NewActivityFeed = typeof activityFeed.$inferInsert;
 
 export type ShowSchedule = typeof showSchedules.$inferSelect;
 export type NewShowSchedule = typeof showSchedules.$inferInsert;
+
+export type UserStreamingProvider = typeof userStreamingProviders.$inferSelect;
+export type NewUserStreamingProvider =
+  typeof userStreamingProviders.$inferInsert;
 
 // Enums for type safety
 export const ListType = {
