@@ -7,6 +7,7 @@ interface PageHeaderProps {
   title: string;
   titleClassName?: string;
   backLinkHref?: string;
+  subheaderSlot?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -14,6 +15,7 @@ export function PageHeader({
   title,
   titleClassName,
   backLinkHref,
+  subheaderSlot,
   children,
 }: PageHeaderProps) {
   return (
@@ -28,11 +30,17 @@ export function PageHeader({
                 </Link>
               </Button>
             )}
-            <h1
-              className={cn("text-xl font-bold text-gray-100", titleClassName)}
-            >
-              {title}
-            </h1>
+            <div className="flex flex-col gap-1">
+              <h1
+                className={cn(
+                  "text-xl font-bold text-gray-100",
+                  titleClassName
+                )}
+              >
+                {title}
+              </h1>
+              {subheaderSlot}
+            </div>
           </div>
 
           {children && (

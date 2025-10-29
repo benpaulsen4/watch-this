@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Plus,
-  Trash2,
   Users,
   Lock,
   Globe,
@@ -16,7 +14,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import type { TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
 import CollaborationModal from "./CollaborationModal";
 import ListSettingsModal from "./ListSettingsModal";
@@ -46,94 +43,79 @@ interface List {
 }
 
 interface ListDetailsClientProps {
-  listId: string;
+  initialList: List;
 }
 
-export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
+export default function ListDetailsClient({
+  initialList,
+}: ListDetailsClientProps) {
   const router = useRouter();
   const user = useUser();
-  const [list, setList] = useState<List | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [list, setList] = useState<List>(initialList);
   const [showCollaborationModal, setShowCollaborationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-  const fetchListDetails = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch(`/api/lists/${listId}`);
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError("List not found");
-        } else {
-          setError("Failed to load list details");
-        }
-        return;
-      }
-
-      const data = await response.json();
-      setList(data);
-    } catch (err) {
-      console.error("Error fetching list details:", err);
-      setError("Failed to load list details");
-    } finally {
-      setLoading(false);
-    }
-  }, [listId]);
-
-  useEffect(() => {
-    fetchListDetails();
-  }, [fetchListDetails]);
-
   const handleListUpdate = (updatedList: Partial<List>) => {
-    setList((prev) => (prev ? { ...prev, ...updatedList } : null));
+    setList((prev) => ({ ...prev, ...updatedList }));
   };
 
   const handleListDelete = () => {
     router.push("/lists");
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <LoadingSpinner
-          size="xl"
-          variant="primary"
-          text="Loading list details..."
-        />
-      </div>
-    );
-  }
-
-  if (error || !list) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Trash2 className="h-8 w-8 text-gray-600" />
-          </div>
-          <h3 className="text-xl font-medium text-gray-300 mb-2">
-            {error || "List not found"}
-          </h3>
-          <p className="text-gray-500 mb-6">
-            The list you&apos;re looking for doesn&apos;t exist or has been
-            deleted.
-          </p>
-          <Button onClick={() => router.push("/lists")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Lists
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const handleContentRemoved = (listItemId: string) => {
+    setList((prev) => ({
+      ...prev,
+      items: prev.items.filter((item) => item.listItemId !== listItemId),
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <PageHeader title={list.name} backLinkHref="/lists">
+      <PageHeader
+        title={list.name}
+        backLinkHref="/lists"
+        subheaderSlot={
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            {list.isPublic ? (
+              <>
+                <Globe className="h-3 w-3" />
+                <span className="hidden sm:block">Public</span>
+              </>
+            ) : (
+              <>
+                <Lock className="h-3 w-3" />
+                <span className="hidden sm:block">Private</span>
+              </>
+            )}
+            {list.syncWatchStatus && (
+              <>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3" />
+                  <span className="hidden sm:block">Sync</span>
+                </div>
+              </>
+            )}
+            {list.collaborators > 0 && (
+              <>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  <span>{list.collaborators}</span>
+                  <span className="hidden sm:block">collaborators</span>
+                </div>
+              </>
+            )}
+            <span>•</span>
+            <div className="flex items-center gap-1">
+              <FileStack className="h-3 w-3" />
+              <span>{list.items.length}</span>
+              <span className="hidden sm:block">items</span>
+            </div>
+          </div>
+        }
+      >
         <Button
           variant="outline"
           size="sm"
@@ -157,44 +139,6 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
       </PageHeader>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
-          {list.isPublic ? (
-            <>
-              <Globe className="h-3 w-3" />
-              <span className="hidden sm:block">Public</span>
-            </>
-          ) : (
-            <>
-              <Lock className="h-3 w-3" />
-              <span className="hidden sm:block">Private</span>
-            </>
-          )}
-          {list.syncWatchStatus && (
-            <>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <RefreshCw className="h-3 w-3" />
-                <span className="hidden sm:block">Sync</span>
-              </div>
-            </>
-          )}
-          {list.collaborators > 0 && (
-            <>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                <span>{list.collaborators}</span>
-                <span className="hidden sm:block">collaborators</span>
-              </div>
-            </>
-          )}
-          <span>•</span>
-          <div className="flex items-center gap-1">
-            <FileStack className="h-3 w-3" />
-            <span>{list.items.length}</span>
-            <span className="hidden sm:block">items</span>
-          </div>
-        </div>
         {/* List Description */}
         {list.description && (
           <Card className="mb-8 bg-gray-900 border-gray-800">
@@ -233,8 +177,8 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
                   content={contentData as TMDBMovie | TMDBTVShow}
                   addedDate={createdAt}
                   showAddedDate={true}
-                  currentListId={listId}
-                  onRemoveFromList={() => fetchListDetails()}
+                  currentListId={list.id}
+                  onRemoveFromList={() => handleContentRemoved(listItemId)}
                 />
               );
             })}
@@ -246,7 +190,7 @@ export default function ListDetailsClient({ listId }: ListDetailsClientProps) {
       <CollaborationModal
         isOpen={showCollaborationModal}
         onClose={() => setShowCollaborationModal(false)}
-        listId={listId}
+        listId={list.id}
         listName={list?.name || ""}
         isOwner={user?.id === list?.ownerId}
         ownerUsername={list?.ownerUsername}
