@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { List } from "@/lib/db";
 import { PageHeader } from "../ui/PageHeader";
 import { ListCard } from "./ListCard";
@@ -16,10 +15,13 @@ export interface ListResponse extends List {
   posterPaths: string[];
 }
 
-export default function ListsClient() {
+export default function ListsClient({
+  initialLists,
+}: {
+  initialLists: ListResponse[];
+}) {
   const router = useRouter();
-  const [lists, setLists] = useState<ListResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [lists, setLists] = useState<ListResponse[]>(initialLists);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [newListDescription, setNewListDescription] = useState("");
@@ -27,32 +29,6 @@ export default function ListsClient() {
   const [newListType, setNewListType] = useState("mixed");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchLists = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch("/api/lists");
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch lists");
-        }
-
-        const data = await response.json();
-        const fetchedLists = data.lists || [];
-        setLists(fetchedLists);
-      } catch (err) {
-        console.error("Error fetching lists:", err);
-        setError("Failed to load lists. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLists();
-  }, []);
 
   const handleCreateList = async () => {
     if (!newListName.trim()) return;
@@ -96,14 +72,6 @@ export default function ListsClient() {
       setCreating(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <LoadingSpinner size="xl" variant="primary" text="Loading lists..." />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -190,16 +158,10 @@ export default function ListsClient() {
               <div className="flex gap-3">
                 <Button
                   onClick={handleCreateList}
-                  disabled={!newListName.trim() || creating}
+                  disabled={!newListName.trim()}
+                  loading={creating}
                 >
-                  {creating ? (
-                    <>
-                      <LoadingSpinner size="sm" className="mr-2" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create List"
-                  )}
+                  Create List
                 </Button>
                 <Button
                   variant="outline"
