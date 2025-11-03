@@ -242,7 +242,7 @@ class TMDBClient {
         Accept: "application/json",
       },
       next: {
-        revalidate: 3600, // Cache for 1 hour
+        revalidate: 36000, // Cache for 10 hours
       },
     });
 

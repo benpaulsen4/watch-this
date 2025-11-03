@@ -174,7 +174,11 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
   }
 
   if (loading) {
-    return <LoadingSpinner variant="primary" text="Loading schedules..." />;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <LoadingSpinner size="lg" text="Loading schedule..." />
+      </div>
+    );
   }
 
   return (

@@ -119,7 +119,7 @@ export function ListSelector({
   if (loading) {
     return (
       <div className={cn("flex items-center justify-center p-8", className)}>
-        <LoadingSpinner size="lg" text="Loading lissts..." />
+        <LoadingSpinner size="lg" text="Loading lists..." />
       </div>
     );
   }

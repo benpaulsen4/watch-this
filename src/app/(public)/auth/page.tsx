@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { UAParser } from "ua-parser-js";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 type AuthMode = "signin" | "register";
 
@@ -27,7 +28,7 @@ function AuthPageContent() {
 
   const [mode, setMode] = useState<AuthMode>("signin");
   const [username, setUsername] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [platformAuthAvailable, setPlatformAuthAvailable] = useState(false);
@@ -42,6 +43,7 @@ function AuthPageContent() {
         const available = await isPlatformAuthenticatorAvailable();
         setPlatformAuthAvailable(available);
       }
+      setLoading(false);
     };
 
     checkSupport();
@@ -96,7 +98,7 @@ function AuthPageContent() {
     }
   };
 
-  if (!passkeySupported) {
+  if (!loading && !passkeySupported) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
         <Card variant="entertainment" className="w-full max-w-md">
@@ -182,7 +184,7 @@ function AuthPageContent() {
               )}
 
               {/* Platform Auth Warning */}
-              {!platformAuthAvailable && (
+              {!loading && !platformAuthAvailable && (
                 <div className="p-3 rounded-lg bg-yellow-600/20 border border-yellow-500/30">
                   <div className="flex items-start gap-2">
                     <Smartphone className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
@@ -206,7 +208,6 @@ function AuthPageContent() {
                 size="lg"
                 className="w-full"
                 loading={loading}
-                disabled={loading}
               >
                 {loading ? (
                   mode === "register" ? (
@@ -264,7 +265,7 @@ export default function AuthPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
+          <LoadingSpinner variant="primary" size="xl" />
         </div>
       }
     >
