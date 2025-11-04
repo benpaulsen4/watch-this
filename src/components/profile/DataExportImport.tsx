@@ -160,7 +160,7 @@ export function DataExportImport() {
       </div>
 
       {/* Export Section */}
-      <Card variant="entertainment">
+      <Card variant="outline">
         <CardContent>
           <div className="flex items-start gap-4">
             <div className="p-3 bg-green-500/20 rounded-lg">
@@ -201,7 +201,7 @@ export function DataExportImport() {
       </Card>
 
       {/* Import Section */}
-      <Card variant="entertainment">
+      <Card variant="outline">
         <CardContent>
           <div className="flex items-start gap-4">
             <div className="p-3 bg-blue-500/20 rounded-lg">

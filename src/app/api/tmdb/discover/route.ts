@@ -81,21 +81,19 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     } else if (type === "tv") {
       results = await tmdbClient.discoverTVShows(params);
     } else {
-      const promises = await Promise.all([
+      const [movies, tvShows] = await Promise.all([
         tmdbClient.discoverMovies(params),
         tmdbClient.discoverTVShows(params),
       ]);
+      const combinedDiscover = [...movies.results, ...tvShows.results].sort(
+        (a, b) => b.popularity - a.popularity,
+      );
+
       results = {
         page: validatedPage,
-        results: promises.flatMap((item) => item.results),
-        total_pages: promises.reduce(
-          (acc, item) => Math.max(acc, item.total_pages),
-          0,
-        ),
-        total_results: promises.reduce(
-          (acc, item) => acc + item.total_results,
-          0,
-        ),
+        results: combinedDiscover,
+        total_pages: movies.total_pages + tvShows.total_pages,
+        total_results: movies.total_results + tvShows.total_results,
       };
     }
 

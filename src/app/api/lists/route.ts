@@ -1,84 +1,22 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  lists,
-  listItems,
-  listCollaborators,
-  activityFeed,
-  ActivityType,
-} from "@/lib/db/schema";
+import { lists, activityFeed, ActivityType } from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { eq, or, sql, desc } from "drizzle-orm";
+import { getListsResponse } from "@/lib/lists/list-utils";
 
 // GET /api/lists - Get all lists for the authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const userId = request.user.id;
 
-    // Get lists with counts in a single optimized query
-    const userListsWithCounts = await db
-      .select({
-        id: lists.id,
-        name: lists.name,
-        description: lists.description,
-        listType: lists.listType,
-        isPublic: lists.isPublic,
-        syncWatchStatus: lists.syncWatchStatus,
-        ownerId: lists.ownerId,
-        createdAt: lists.createdAt,
-        updatedAt: lists.updatedAt,
-        itemCount: sql<number>`(
-          SELECT COUNT(*) 
-          FROM ${listItems} 
-          WHERE ${listItems.listId} = ${lists.id}
-        )`.as("item_count"),
-        collaborators: sql<number>`(
-          SELECT COUNT(*) 
-          FROM ${listCollaborators} 
-          WHERE ${listCollaborators.listId} = ${lists.id}
-        )`.as("collaborator_count"),
-      })
-      .from(lists)
-      .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
-      .where(
-        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
-      )
-      .groupBy(
-        lists.id,
-        lists.name,
-        lists.description,
-        lists.listType,
-        lists.isPublic,
-        lists.ownerId,
-        lists.createdAt,
-        lists.updatedAt,
-      );
-
-    // Get poster URLs for each list (up to 4 items)
-    const listsWithPosters = await Promise.all(
-      userListsWithCounts.map(async (list) => {
-        const posterItems = await db
-          .select({
-            posterPath: listItems.posterPath,
-          })
-          .from(listItems)
-          .where(eq(listItems.listId, list.id))
-          .orderBy(desc(listItems.createdAt))
-          .limit(4);
-
-        return {
-          ...list,
-          posterPaths: posterItems.map((i) => i.posterPath),
-        };
-      }),
-    );
+    const listsWithPosters = await getListsResponse(userId);
 
     return NextResponse.json({ lists: listsWithPosters });
   } catch (error) {
     console.error("Error fetching lists:", error);
     return NextResponse.json(
       { error: "Failed to fetch lists" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 });
@@ -100,14 +38,14 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
         { error: "List name is required" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
     if (name.length > 100) {
       return NextResponse.json(
         { error: "List name must be 100 characters or less" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -115,7 +53,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!validListTypes.includes(listType)) {
       return NextResponse.json(
         { error: "Invalid list type. Must be 'movies', 'tv', or 'mixed'" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -148,7 +86,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     } catch (activityError) {
       console.error(
         "Failed to create activity for list creation:",
-        activityError,
+        activityError
       );
       // Don't fail the main operation if activity creation fails
     }
@@ -165,7 +103,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error creating list:", error);
     return NextResponse.json(
       { error: "Failed to create list" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 });

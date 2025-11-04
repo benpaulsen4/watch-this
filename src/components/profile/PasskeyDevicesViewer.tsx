@@ -127,7 +127,7 @@ export function PasskeyDevicesViewer() {
 
       <div className="space-y-3">
         {devices.map((device) => (
-          <Card key={device.id} variant="entertainment">
+          <Card key={device.id} variant="outline">
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

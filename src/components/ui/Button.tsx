@@ -15,7 +15,7 @@ const buttonVariants = cva(
         outline:
           "border border-gray-600 bg-transparent text-gray-100 shadow-sm hover:bg-gray-800 hover:border-gray-500 active:scale-95",
         secondary:
-          "bg-gray-700 text-gray-100 shadow-sm hover:bg-gray-600 active:scale-95",
+          "border border-gray-600 bg-gray-800 text-gray-100 shadow-sm hover:bg-gray-600 active:scale-95",
         ghost:
           "text-gray-100 hover:bg-gray-800 hover:text-white active:scale-95",
         link: "text-red-400 underline-offset-4 hover:underline hover:text-red-300",
@@ -38,7 +38,7 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  },
+  }
 );
 
 export interface ButtonProps
@@ -60,7 +60,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       disabled,
       ...props
     },
-    ref,
+    ref
   ) => {
     const Comp = asChild ? Slot : "button";
 
@@ -100,7 +100,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         )}
       </Comp>
     );
-  },
+  }
 );
 
 Button.displayName = "Button";

@@ -1,14 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  User as UserIcon,
-  Settings,
-  Shield,
-  LogOut,
-  ArrowLeft,
-  Tv,
-} from "lucide-react";
+import { User as UserIcon, Settings, Shield, LogOut, Tv } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProfilePictureManager } from "./ProfilePictureManager";
@@ -16,6 +9,7 @@ import { UsernameChanger } from "./UsernameChanger";
 import { PasskeyDevicesViewer } from "./PasskeyDevicesViewer";
 import { DataExportImport } from "./DataExportImport";
 import { TimezoneSelector } from "./TimezoneSelector";
+import { PageHeader } from "../ui/PageHeader";
 import { useAuth } from "../providers/AuthProvider";
 import { StreamingPreferences } from "./StreamingPreferences";
 import { useFragmentNavigation } from "@/hooks/useFragmentNavigation";
@@ -25,7 +19,7 @@ type ProfileTab = "profile" | "security" | "data" | "streaming";
 export function ProfileClient() {
   const router = useRouter();
   const { user, refreshSession } = useAuth();
-  
+
   const { activeTab, setActiveTab } = useFragmentNavigation<ProfileTab>({
     defaultTab: "profile",
     validTabs: ["profile", "security", "data", "streaming"],
@@ -46,39 +40,18 @@ export function ProfileClient() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/dashboard")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <h1 className="text-xl font-bold text-gray-100">My Profile</h1>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLogout}
-              className="text-red-400 border-red-400 hover:bg-red-400 hover:text-white"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="My Profile" backLinkHref="/dashboard">
+        <Button variant="destructive" onClick={handleLogout}>
+          <LogOut className="h-5 w-5 mr-2" />
+          Logout
+        </Button>
+      </PageHeader>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
-            <Card variant="entertainment">
+            <Card size="sm">
               <CardContent>
                 <nav className="space-y-2">
                   <button
