@@ -95,14 +95,15 @@ npm run test:run
 - [x] Activity feed to see you and your friends recent activity on lists and watch status
 - [x] Quick complete action from content card
 - [x] Improved import and export for watch status
-- [ ] JustWatch integration with per-user streaming service configuration
-- [ ] Component refactoring and tech debt squashing
+- [x] JustWatch integration with per-user streaming service configuration
+- [x] Server-side component refactoring
+- [ ] React query drop-in
+- [ ] UI component standardization
 - [ ] Test writing
-- [ ] \*arr stack integration for when content is not on any configured streaming services
-- [ ] Multi-device passkey management
 - [ ] Recommendations of some kind
 - [ ] Cast tab for content details
+- [ ] \*arr stack integration for when content is not on any configured streaming services
+- [ ] Multi-device passkey management
 - [ ] Sorting and filtering inside lists
 - [ ] Statistics page in user profile
-- [ ] List quick access and refreshed list cards
 - [ ] Splash page
