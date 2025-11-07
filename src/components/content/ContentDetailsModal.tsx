@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -36,6 +36,7 @@ import type {
 import type { WatchStatusEnum, ContentTypeEnum } from "@/lib/db/schema";
 import { Badge } from "../ui/Badge";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface ContentDetailsModalProps {
   content: TMDBMovie | TMDBTVShow;
@@ -54,36 +55,11 @@ export function ContentDetailsModal({
   onShowStatusChanged,
   currentListId,
 }: ContentDetailsModalProps) {
-  const [detailedContent, setDetailedContent] = useState<
-    TMDBMovieDetails | TMDBTVShowDetails | null
-  >(null);
+  const queryClient = useQueryClient();
   const [watchStatus, setWatchStatus] = useState<WatchStatusEnum | null>(
     content.watchStatus ?? null
   );
   const [selectedTab, setSelectedTab] = useState<string>("overview");
-  const [contentStreaming, setContentStreaming] = useState<{
-    flatrate?: Array<{
-      provider_id: number;
-      provider_name: string;
-      logo_path: string | null;
-    }>;
-    ads?: Array<{
-      provider_id: number;
-      provider_name: string;
-      logo_path: string | null;
-    }>;
-    buy?: Array<{
-      provider_id: number;
-      provider_name: string;
-      logo_path: string | null;
-    }>;
-    rent?: Array<{
-      provider_id: number;
-      provider_name: string;
-      logo_path: string | null;
-    }>;
-  } | null>(null);
-  const [streamingLoading, setStreamingLoading] = useState<boolean>(false);
 
   // Use streaming preferences from context
   const { streamingPreferences } = useStreamingPreferences();
@@ -96,6 +72,18 @@ export function ContentDetailsModal({
   const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
 
   // Type-specific data from detailed content
+  const detailsQuery = useQuery<TMDBMovieDetails | TMDBTVShowDetails>({
+    queryKey: ["tmdb", "details", contentType, content.id],
+    enabled: isOpen,
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/tmdb/details?type=${contentType}&id=${content.id}`
+      );
+      return res.json();
+    },
+  });
+  const detailedContent: TMDBMovieDetails | TMDBTVShowDetails | null =
+    detailsQuery.data ?? null;
   const runtime =
     detailedContent && "runtime" in detailedContent
       ? detailedContent.runtime
@@ -109,121 +97,122 @@ export function ContentDetailsModal({
       ? detailedContent.number_of_episodes
       : null;
 
-  // Fetch detailed content information when modal opens
-  useEffect(() => {
-    if (isOpen && !detailedContent) {
-      const fetchDetails = async () => {
-        try {
-          const details = await fetch(
-            `/api/tmdb/details?type=${contentType}&id=${content.id}`
-          );
-          const data = await details.json();
-          setDetailedContent(data);
-        } catch (error) {
-          console.error("Error fetching content details:", error);
-        }
-      };
-      fetchDetails();
-    }
-  }, [isOpen, content.id, contentType, detailedContent]);
+  const contentProvidersQuery = useQuery<{
+    providers: {
+      flatrate?: Array<{
+        provider_id: number;
+        provider_name: string;
+        logo_path: string | null;
+      }>;
+      ads?: Array<{
+        provider_id: number;
+        provider_name: string;
+        logo_path: string | null;
+      }>;
+      buy?: Array<{
+        provider_id: number;
+        provider_name: string;
+        logo_path: string | null;
+      }>;
+      rent?: Array<{
+        provider_id: number;
+        provider_name: string;
+        logo_path: string | null;
+      }>;
+    } | null;
+  }>({
+    queryKey: [
+      "watch",
+      "content",
+      contentType,
+      content.id,
+      streamingPreferences?.country?.toUpperCase() ?? null,
+    ],
+    enabled: isOpen && !!streamingPreferences?.country,
+    queryFn: async () => {
+      const region = streamingPreferences!.country!.toUpperCase();
+      const providersRes = await fetch(
+        `/api/watch/content?type=${contentType}&id=${content.id}&region=${region}`
+      );
+      return providersRes.json();
+    },
+  });
+  const streamingLoading = contentProvidersQuery.isLoading;
+  const contentStreaming = contentProvidersQuery.data?.providers || null;
 
-  // Fetch content providers when modal opens and streaming preferences are available
-  useEffect(() => {
-    const loadContentProviders = async () => {
-      if (!isOpen || !streamingPreferences?.country) {
-        setStreamingLoading(false);
-        return;
-      }
-
-      try {
-        setStreamingLoading(true);
-        const region = streamingPreferences.country.toUpperCase();
-        const providersRes = await fetch(
-          `/api/watch/content?type=${contentType}&id=${content.id}&region=${region}`
-        );
-        const providersData = await providersRes.json();
-        setContentStreaming(providersData?.providers || null);
-      } catch (e) {
-        console.error("Failed to load streaming providers", e);
-        setContentStreaming(null);
-      } finally {
-        setStreamingLoading(false);
-      }
-    };
-    loadContentProviders();
-  }, [isOpen, content.id, contentType, streamingPreferences?.country]);
-
-  const handleStatusChange = async (newStatus: WatchStatusEnum) => {
-    try {
+  const updateStatusMutation = useMutation({
+    mutationFn: async (newStatus: WatchStatusEnum) => {
       const response = await fetch("/api/status/content", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tmdbId: content.id,
-          contentType: contentType,
+          contentType,
           status: newStatus,
         }),
       });
+      if (!response.ok) throw new Error("Failed to update watch status");
+      return { status: newStatus };
+    },
+    onSuccess: ({ status }) => {
+      setWatchStatus(status);
+      onShowStatusChanged?.(status);
+    },
+  });
 
-      if (response.ok) {
-        setWatchStatus(newStatus);
-        onShowStatusChanged?.(newStatus);
-      }
-    } catch (error) {
-      console.error("Error updating watch status:", error);
-    }
-  };
+  // Reset tab on close
+  if (!isOpen && selectedTab !== "overview") {
+    setSelectedTab("overview");
+  }
 
-  useEffect(() => {
-    if (!isOpen) {
-      setSelectedTab("overview");
-    }
-  }, [isOpen]);
-
-  const handleAddToList = async (listId: string) => {
-    try {
+  const addToListMutation = useMutation({
+    mutationFn: async (listId: string) => {
       const response = await fetch(`/api/lists/${listId}/items`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tmdbId: content.id,
-          contentType: contentType,
-          title: title,
+          contentType,
+          title,
           posterPath: content.poster_path,
         }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to add content to list");
       }
-    } catch (error) {
-      console.error("Error adding to list:", error);
-    }
-  };
+      return { listId };
+    },
+    onSuccess: ({ listId }) => {
+      // Invalidate list items for the specific list
+      queryClient.invalidateQueries({ queryKey: ["lists", listId, "items"] });
+    },
+  });
 
-  const handleRemoveFromList = async (listId: string, itemId: string) => {
-    try {
+  const removeFromListMutation = useMutation({
+    mutationFn: async ({
+      listId,
+      itemId,
+    }: {
+      listId: string;
+      itemId: string;
+    }) => {
       const response = await fetch(`/api/lists/${listId}/items/${itemId}`, {
         method: "DELETE",
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
           errorData.error || "Failed to remove content from list"
         );
-      } else {
-        onRemove?.();
       }
-    } catch (error) {
-      console.error("Error removing from list:", error);
-    }
-  };
+      return { listId, itemId };
+    },
+    onSuccess: ({ listId }) => {
+      queryClient.invalidateQueries({ queryKey: ["lists", listId, "items"] });
+      onRemove?.();
+    },
+  });
 
   return (
     <ModalOverlay
@@ -343,7 +332,9 @@ export function ContentDetailsModal({
                   <StatusSegmentedSelector
                     value={watchStatus}
                     contentType={contentType as ContentTypeEnum}
-                    onValueChange={handleStatusChange}
+                    onValueChange={(newStatus) =>
+                      updateStatusMutation.mutate(newStatus as WatchStatusEnum)
+                    }
                   />
                 </div>
 
@@ -577,13 +568,20 @@ export function ContentDetailsModal({
 
                   {contentType === "tv" && (
                     <TabPanel id="episodes" className="focus:outline-none">
-                      <EpisodeTracker
-                        tvShowId={content.id}
-                        onShowStatusChanged={(status) => {
-                          setWatchStatus(status);
-                          onShowStatusChanged?.(status);
-                        }}
-                      />
+                      {!detailedContent ? (
+                        <LoadingSpinner text="Loading show details..." />
+                      ) : (
+                        <EpisodeTracker
+                          tvShowId={content.id}
+                          tvShowDetails={
+                            detailedContent as TMDBTVShowDetails
+                          }
+                          onShowStatusChanged={(status) => {
+                            setWatchStatus(status);
+                            onShowStatusChanged?.(status);
+                          }}
+                        />
+                      )}
                     </TabPanel>
                   )}
 
@@ -601,8 +599,10 @@ export function ContentDetailsModal({
                       contentType={contentType}
                       contentId={content.id}
                       currentListId={currentListId}
-                      onAddToList={handleAddToList}
-                      onRemoveFromList={handleRemoveFromList}
+                      onAddToList={(listId) => addToListMutation.mutate(listId)}
+                      onRemoveFromList={(listId, itemId) =>
+                        removeFromListMutation.mutate({ listId, itemId })
+                      }
                     />
                   </TabPanel>
                 </Tabs>

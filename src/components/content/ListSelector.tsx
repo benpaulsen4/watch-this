@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo } from "react";
 import {
   Globe,
   Minus,
@@ -15,6 +15,7 @@ import type { List } from "@/lib/db/schema";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface ListSelectorProps {
   contentType: "movie" | "tv";
@@ -37,57 +38,36 @@ export function ListSelector({
   onRemoveFromList,
   className,
 }: ListSelectorProps) {
-  const [lists, setLists] = useState<ListResult[]>([]);
-  const [listsWithContent, setListsWithContent] = useState<
-    Record<string, string>
-  >({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchListsWithContent = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/content/${contentId}/lists`);
-      if (response.ok) {
-        const data = (await response.json()) as {
-          listId: string;
-          itemId: string;
-        }[];
-
-        setListsWithContent(
-          data.reduce(
-            (acc, list) => {
-              acc[list.listId] = list.itemId;
-              return acc;
-            },
-            {} as Record<string, string>,
-          ),
-        );
-      }
-    } catch (err) {
-      console.error("Failed to fetch lists with content:", err);
-    }
-  }, [contentId]);
-
-  const fetchLists = useCallback(async () => {
-    try {
-      setLoading(true);
+  const queryClient = useQueryClient();
+  const { data: listsData, isLoading, error } = useQuery<{ lists: ListResult[] }>({
+    queryKey: ["lists"],
+    queryFn: async () => {
       const response = await fetch("/api/lists");
-      if (!response.ok) {
-        throw new Error("Failed to fetch lists");
-      }
-      const data = await response.json();
-      setLists(data.lists || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch lists");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (!response.ok) throw new Error("Failed to fetch lists");
+      return response.json();
+    },
+  });
 
-  useEffect(() => {
-    fetchLists();
-    fetchListsWithContent();
-  }, [contentId, fetchListsWithContent, fetchLists]);
+  const { data: listsWithContentData } = useQuery<{
+    listId: string;
+    itemId: string;
+  }[]>({
+    queryKey: ["content", contentId, "lists"],
+    queryFn: async () => {
+      const response = await fetch(`/api/content/${contentId}/lists`);
+      if (!response.ok) throw new Error("Failed to fetch lists for content");
+      return response.json();
+    },
+  });
+
+  const lists = listsData?.lists || [];
+  const listsWithContent = useMemo(() => {
+    const data = listsWithContentData || [];
+    return data.reduce((acc, list) => {
+      acc[list.listId] = list.itemId;
+      return acc;
+    }, {} as Record<string, string>);
+  }, [listsWithContentData]);
 
   // Filter lists based on content type
   const filteredLists = lists.filter((list) => {
@@ -98,25 +78,16 @@ export function ListSelector({
   });
 
   const handleSelectList = (listId: string) => {
-    setListsWithContent((prev) => ({
-      ...prev,
-      [listId]: contentId.toString(),
-    }));
     onAddToList(listId);
-    setTimeout(() => fetchListsWithContent(), 500);
+    queryClient.invalidateQueries({ queryKey: ["content", contentId, "lists"] });
   };
 
   const handleRemoveFromList = (listId: string, itemId: string) => {
-    setListsWithContent((prev) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { [listId]: _, ...rest } = prev;
-      return rest;
-    });
     onRemoveFromList(listId, itemId);
-    setTimeout(() => fetchListsWithContent(), 500);
+    queryClient.invalidateQueries({ queryKey: ["content", contentId, "lists"] });
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className={cn("flex items-center justify-center p-8", className)}>
         <LoadingSpinner size="lg" text="Loading lists..." />
@@ -127,8 +98,8 @@ export function ListSelector({
   if (error) {
     return (
       <div className={cn("p-6 text-center", className)}>
-        <p className="text-red-400 mb-4">{error}</p>
-        <Button onClick={fetchLists} variant="outline" size="sm">
+        <p className="text-red-400 mb-4">{(error as Error).message}</p>
+        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["lists"] })} variant="outline" size="sm">
           <RotateCcw className="h-4 w-4 mr-2" />
           Retry
         </Button>

@@ -97,9 +97,10 @@ npm run test:run
 - [x] Improved import and export for watch status
 - [x] JustWatch integration with per-user streaming service configuration
 - [x] Server-side component refactoring
-- [ ] React query drop-in
+- [x] React query drop-in
 - [ ] UI component standardization
 - [ ] Test writing
+- [ ] RSC streaming implementation
 - [ ] Recommendations of some kind
 - [ ] Cast tab for content details
 - [ ] \*arr stack integration for when content is not on any configured streaming services

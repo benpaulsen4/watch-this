@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import {
   Shield,
   Smartphone,
@@ -11,6 +10,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useQuery } from "@tanstack/react-query";
 
 interface PasskeyDevice {
   id: string;
@@ -20,29 +20,22 @@ interface PasskeyDevice {
 }
 
 export function PasskeyDevicesViewer() {
-  const [devices, setDevices] = useState<PasskeyDevice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadDevices = useCallback(async () => {
-    try {
-      setError(null);
+  const {
+    data: devicesData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<{ devices: PasskeyDevice[] }>({
+    queryKey: ["profile", "devices"],
+    queryFn: async () => {
       const response = await fetch("/api/profile/devices");
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to load devices");
       }
-
-      const data = await response.json();
-      console.log(data);
-      setDevices(data.devices || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load devices");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return response.json();
+    },
+  });
 
   const getDeviceIcon = (deviceName?: string) => {
     const name = deviceName?.toLowerCase();
@@ -73,7 +66,7 @@ export function PasskeyDevicesViewer() {
     const lastUsed = new Date(lastUsedAt);
     const now = new Date();
     const diffInHours = Math.floor(
-      (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60),
+      (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60)
     );
 
     if (diffInHours < 1) return "Used recently";
@@ -84,11 +77,7 @@ export function PasskeyDevicesViewer() {
     return formatDate(lastUsedAt);
   };
 
-  useEffect(() => {
-    loadDevices();
-  }, [loadDevices]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center py-8">
         <LoadingSpinner size="lg" variant="primary" text="Loading devices..." />
@@ -110,8 +99,8 @@ export function PasskeyDevicesViewer() {
         <Button
           variant="outline"
           size="sm"
-          onClick={loadDevices}
-          disabled={loading}
+          onClick={() => refetch()}
+          disabled={isLoading}
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
@@ -121,12 +110,12 @@ export function PasskeyDevicesViewer() {
       {error && (
         <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
           <AlertCircle className="h-4 w-4" />
-          {error}
+          {(error as Error).message}
         </div>
       )}
 
       <div className="space-y-3">
-        {devices.map((device) => (
+        {(devicesData?.devices || []).map((device) => (
           <Card key={device.id} variant="outline">
             <CardContent>
               <div className="flex items-center justify-between">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Edit3, Check, X, AlertCircle, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { User } from "@/lib/auth/client";
+import { useMutation } from "@tanstack/react-query";
 
 interface UsernameChangerProps {
   user: User;
@@ -58,39 +59,34 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
 
     setLoading(true);
     setError(null);
+    await saveUsernameMutation.mutateAsync();
+  };
 
-    try {
+  const saveUsernameMutation = useMutation({
+    mutationFn: async () => {
       const response = await fetch("/api/auth/session", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: newUsername.trim(),
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: newUsername.trim() }),
       });
-
+      const errorData = await response.json();
       if (!response.ok) {
-        const errorData = await response.json();
         if (response.status === 409) {
-          setError("This username is already taken");
-        } else {
-          throw new Error(errorData.error || "Failed to update username");
+          throw new Error("This username is already taken");
         }
-        return;
+        throw new Error(errorData.error || "Failed to update username");
       }
-
-      const updatedUser = await response.json();
+      return errorData;
+    },
+    onSuccess: (updatedUser) => {
       onUserUpdate(updatedUser.user);
       setIsEditing(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update username",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to update username");
+    },
+    onSettled: () => setLoading(false),
+  });
 
   const handleCancel = () => {
     setNewUsername(user.username);

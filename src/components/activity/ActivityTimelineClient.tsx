@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { ActivityEntry } from "./ActivityEntry";
 import { Button } from "@/components/ui/Button";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { TMDBTVShow } from "@/lib/tmdb/client";
 import { useUser } from "../providers/AuthProvider";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 interface UserStub {
   id: string;
@@ -40,70 +41,46 @@ export interface ActivityResponse {
 
 export function ActivityTimelineClient() {
   const user = useUser();
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-
-  const fetchActivities = useCallback(
-    async (cursor?: string, reset = false) => {
-      try {
-        if (reset) {
-          setLoading(true);
-        } else {
-          setLoadingMore(true);
-        }
-
-        const params = new URLSearchParams();
-        params.set("limit", "20");
-        if (cursor) params.set("cursor", cursor);
-
-        const response = await fetch(`/api/activity?${params}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch activities");
-        }
-
-        const data: ActivityResponse = await response.json();
-
-        if (reset) {
-          setActivities(data.activities);
-        } else {
-          setActivities((prev) => [...prev, ...data.activities]);
-        }
-
-        setHasMore(data.hasMore);
-        setNextCursor(data.nextCursor || null);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    error,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["activity", "timeline"],
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams();
+      params.set("limit", "20");
+      if (pageParam) params.set("cursor", pageParam as string);
+      const response = await fetch(`/api/activity?${params}`);
+      if (!response.ok) throw new Error("Failed to fetch activities");
+      return response.json();
     },
-    [],
-  );
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
+  });
+
+  const activities = useMemo(() => {
+    const pages = (data?.pages || []) as Array<{ activities?: Activity[] }>;
+    return pages.flatMap((p) => p.activities || []);
+  }, [data?.pages]);
 
   const loadMore = useCallback(() => {
-    if (!loadingMore && hasMore && nextCursor) {
-      fetchActivities(nextCursor);
+    if (hasNextPage) {
+      fetchNextPage();
     }
-  }, [fetchActivities, loadingMore, hasMore, nextCursor]);
+  }, [fetchNextPage, hasNextPage]);
 
   // Set up infinite scroll
   const { targetRef } = useInfiniteScroll({
     onLoadMore: loadMore,
-    hasMore,
-    loading: loadingMore,
+    hasMore: !!hasNextPage,
+    loading: isFetchingNextPage,
   });
 
-  useEffect(() => {
-    fetchActivities(undefined, true);
-  }, [fetchActivities]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <LoadingSpinner
@@ -118,9 +95,9 @@ export function ActivityTimelineClient() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+        <p className="text-red-600 dark:text-red-400 mb-4">{(error as Error).message}</p>
         <Button
-          onClick={() => fetchActivities(undefined, true)}
+          onClick={() => fetchNextPage()}
           variant="outline"
         >
           Try Again
@@ -152,14 +129,14 @@ export function ActivityTimelineClient() {
           <div ref={targetRef} className="h-4" />
 
           {/* Loading more indicator */}
-          {loadingMore && (
+          {isFetchingNextPage && (
             <div className="flex items-center justify-center py-4">
               <LoadingSpinner variant="primary" text="Loading more..." />
             </div>
           )}
 
           {/* End of feed indicator */}
-          {!hasMore && activities.length > 0 && (
+          {!hasNextPage && activities.length > 0 && (
             <div className="text-center py-8">
               <p className="text-gray-500 dark:text-gray-400">
                 You&apos;ve reached the end of your activity timeline.

@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useState, useCallback, useRef, useEffect } from "react";
+import { forwardRef, useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { cn, formatVoteAverage } from "@/lib/utils";
 import {
@@ -16,6 +16,7 @@ import type { TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
 import type { ContentTypeEnum, WatchStatusEnum } from "@/lib/db/schema";
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
+import { useMutation } from "@tanstack/react-query";
 
 export interface ContentCardProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "content"> {
@@ -43,7 +44,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       onRemoveFromList,
       ...props
     },
-    ref,
+    ref
   ) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
@@ -56,63 +57,63 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
     const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const clickCountRef = useRef(0);
 
-    const handleQuickComplete = useCallback(async () => {
-      if (isQuickCompleting) return;
+    const completeMovieMutation = useMutation({
+      mutationFn: async () => {
+        const response = await fetch("/api/status/content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tmdbId: content.id,
+            contentType: "movie",
+            status: "completed",
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok)
+          throw new Error(data.error || "Failed to update movie status");
+        return data;
+      },
+      onSuccess: () => {
+        setWatchStatus("completed" as WatchStatusEnum);
+        setQuickCompleteMessage("Movie marked as watched!");
+      },
+    });
 
+    const completeNextEpisodeMutation = useMutation({
+      mutationFn: async () => {
+        const response = await fetch("/api/status/episodes/next", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tmdbId: content.id }),
+        });
+        const data = await response.json();
+        if (!response.ok)
+          throw new Error(
+            data.error || "Failed to mark next episode as watched"
+          );
+        return data;
+      },
+      onSuccess: (result) => {
+        if (result.newStatus)
+          setWatchStatus(result.newStatus as WatchStatusEnum);
+        const episodeDetails = result.episodeDetails;
+        setQuickCompleteMessage(
+          `S${episodeDetails.seasonNumber}E${episodeDetails.episodeNumber}: ${episodeDetails.name} marked as watched!`
+        );
+      },
+    });
+
+    const handleQuickComplete = async () => {
+      if (isQuickCompleting) return;
       setIsQuickCompleting(true);
       setShowTickAnimation(true);
-
       try {
         const contentType = getContentType(content);
-
         if (contentType === "movie") {
-          // For movies, mark as completed
-          const response = await fetch("/api/status/content", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tmdbId: content.id,
-              contentType: "movie",
-              status: "completed",
-            }),
-          });
-
-          if (response.ok) {
-            setWatchStatus("completed" as WatchStatusEnum);
-            setQuickCompleteMessage("Movie marked as watched!");
-          } else {
-            const error = await response.json();
-            throw new Error(error.error || "Failed to update movie status");
-          }
+          await completeMovieMutation.mutateAsync();
         } else {
-          // For TV shows, mark next episode as watched
-          const response = await fetch("/api/status/episodes/next", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tmdbId: content.id,
-            }),
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            if (result.newStatus) {
-              setWatchStatus(result.newStatus);
-            }
-
-            const episodeDetails = result.episodeDetails;
-            setQuickCompleteMessage(
-              `S${episodeDetails.seasonNumber}E${episodeDetails.episodeNumber}: ${episodeDetails.name} marked as watched!`,
-            );
-          } else {
-            const error = await response.json();
-            throw new Error(
-              error.error || "Failed to mark next episode as watched",
-            );
-          }
+          await completeNextEpisodeMutation.mutateAsync();
         }
-
-        // Hide animation after 2 seconds
         setTimeout(() => {
           setShowTickAnimation(false);
           setQuickCompleteMessage("");
@@ -120,10 +121,8 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       } catch (error) {
         console.error("Quick complete error:", error);
         setQuickCompleteMessage(
-          error instanceof Error ? error.message : "Failed to update status",
+          error instanceof Error ? error.message : "Failed to update status"
         );
-
-        // Hide error message after 3 seconds
         setTimeout(() => {
           setShowTickAnimation(false);
           setQuickCompleteMessage("");
@@ -131,7 +130,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       } finally {
         setIsQuickCompleting(false);
       }
-    }, [content, isQuickCompleting]);
+    };
 
     const handleCardClick = () => {
       clickCountRef.current += 1;
@@ -291,7 +290,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
         />
       </>
     );
-  },
+  }
 );
 
 ContentCard.displayName = "ContentCard";

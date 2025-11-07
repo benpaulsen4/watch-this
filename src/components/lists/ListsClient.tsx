@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { List } from "@/lib/db";
 import { PageHeader } from "../ui/PageHeader";
 import { ListCard } from "./ListCard";
+import { useMutation } from "@tanstack/react-query";
 
 export interface ListResponse extends List {
   itemCount: number;
@@ -30,18 +31,11 @@ export default function ListsClient({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCreateList = async () => {
-    if (!newListName.trim()) return;
-
-    setCreating(true);
-    setError(null);
-
-    try {
+  const createListMutation = useMutation({
+    mutationFn: async () => {
       const response = await fetch("/api/lists", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           name: newListName.trim(),
@@ -50,27 +44,30 @@ export default function ListsClient({
           isPublic: newListIsPublic,
         }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create list");
-      }
-
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to create list");
+      return data;
+    },
+    onSuccess: (data) => {
       setLists((prev) => [data.list, ...prev]);
-
-      // Reset form
       setNewListName("");
       setNewListDescription("");
       setNewListIsPublic(false);
       setNewListType("mixed");
       setShowCreateForm(false);
-    } catch (err) {
+    },
+    onError: (err: unknown) => {
       console.error("Error creating list:", err);
       setError(err instanceof Error ? err.message : "Failed to create list");
-    } finally {
-      setCreating(false);
-    }
+    },
+    onSettled: () => setCreating(false),
+  });
+
+  const handleCreateList = async () => {
+    if (!newListName.trim()) return;
+    setCreating(true);
+    setError(null);
+    await createListMutation.mutateAsync();
   };
 
   return (

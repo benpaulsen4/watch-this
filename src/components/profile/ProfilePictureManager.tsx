@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Camera, Check, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { User } from "@/lib/auth/client";
+import { useMutation } from "@tanstack/react-query";
 
 interface ProfilePictureManagerProps {
   user: User;
@@ -31,42 +32,36 @@ export function ProfilePictureManager({
     }
   };
 
+  const updatePictureMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/auth/session", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profilePictureUrl: newUrl.trim() || null }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to update profile picture");
+      return data;
+    },
+    onSuccess: (data) => {
+      onUserUpdate(data.user);
+      setIsEditing(false);
+      setPreviewError(false);
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to update profile picture");
+    },
+    onSettled: () => setLoading(false),
+  });
+
   const handleSave = async () => {
     if (!validateUrl(newUrl)) {
       setError("Please enter a valid HTTP or HTTPS URL");
       return;
     }
-
     setLoading(true);
     setError(null);
-
-    try {
-      const response = await fetch("/api/auth/session", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          profilePictureUrl: newUrl.trim() || null,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update profile picture");
-      }
-
-      const updatedUser = await response.json();
-      onUserUpdate(updatedUser.user);
-      setIsEditing(false);
-      setPreviewError(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to update profile picture",
-      );
-    } finally {
-      setLoading(false);
-    }
+    await updatePictureMutation.mutateAsync();
   };
 
   const handleCancel = () => {

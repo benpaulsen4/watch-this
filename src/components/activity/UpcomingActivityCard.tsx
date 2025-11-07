@@ -9,6 +9,7 @@ import { UpcomingActivity } from "./ActivityTimelineClient";
 import { getImageUrl } from "@/lib/tmdb/client";
 import { DAYS_OF_WEEK } from "../content/ScheduleManager";
 import { ContentDetailsModal } from "../content/ContentDetailsModal";
+import { useMutation } from "@tanstack/react-query";
 
 interface UpcomingActivityCardProps {
   upcoming: UpcomingActivity;
@@ -22,31 +23,24 @@ export function UpcomingActivityCard({
   const [isWatching, setIsWatching] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleMarkWatched = async () => {
-    try {
-      setIsWatching(true);
-
+  const markWatchedMutation = useMutation({
+    mutationFn: async () => {
       const response = await fetch("/api/status/episodes/next", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tmdbId: upcoming.id,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdbId: upcoming.id }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to mark episode as watched");
+      return data;
+    },
+    onSuccess: () => onEpisodeWatched?.(),
+    onSettled: () => setIsWatching(false),
+  });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to mark episode as watched");
-      }
-
-      onEpisodeWatched?.();
-    } catch (error) {
-      console.error("Error marking episode as watched:", error);
-    } finally {
-      setIsWatching(false);
-    }
+  const handleMarkWatched = async () => {
+    setIsWatching(true);
+    await markWatchedMutation.mutateAsync();
   };
 
   const posterUrl = getImageUrl(upcoming.poster_path, "w342");

@@ -7,6 +7,7 @@ import { getImageUrl } from "@/lib/tmdb/client";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { useStreamingPreferences } from "../providers/AuthProvider";
 import { Save, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Region {
   iso_3166_1: string;
@@ -27,13 +28,9 @@ interface SavedProvider {
 }
 
 export function StreamingPreferences() {
-  const [regions, setRegions] = useState<Region[]>([]);
   const [country, setCountry] = useState<string>("");
   const [region, setRegion] = useState<string>("");
-  const [providers, setProviders] = useState<Provider[]>([]);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
-  const [loading, setLoading] = useState<boolean>(true);
-  const [saving, setSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -43,14 +40,37 @@ export function StreamingPreferences() {
   const { streamingPreferences, refreshStreamingPreferences } =
     useStreamingPreferences();
 
+  // React Query: regions
+  const regionsQuery = useQuery<Region[]>({
+    queryKey: ["watch", "regions"],
+    queryFn: async () => {
+      const regionsRes = await fetch("/api/watch/regions");
+      const regionsData = await regionsRes.json();
+      return (regionsData?.results || []) as Region[];
+    },
+  });
+
+  // React Query: providers for a region
+  const providersQuery = useQuery<Provider[]>({
+    queryKey: ["watch", "providers", region],
+    enabled: !!region,
+    queryFn: async () => {
+      const res = await fetch(`/api/watch/providers?region=${region}`);
+      const data = await res.json();
+      return (data?.results || []) as Provider[];
+    },
+  });
+
+  const queryClient = useQueryClient();
+
   // Filter and paginate providers
   const filteredProviders = useMemo(() => {
+    const providers = providersQuery.data || [];
     if (!providers.length) return [];
-    
     return providers.filter((provider) =>
       provider.provider_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [providers, searchTerm]);
+  }, [providersQuery.data, searchTerm]);
 
   const totalPages = Math.ceil(filteredProviders.length / PROVIDERS_PER_PAGE);
   const paginatedProviders = useMemo(() => {
@@ -63,66 +83,35 @@ export function StreamingPreferences() {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  // Fetch regions and initialize from context preferences
+  // Initialize state from context preferences; no fetch here
   useEffect(() => {
-    const init = async () => {
-      try {
-        setLoading(true);
-        const regionsRes = await fetch("/api/watch/regions");
-        const regionsData = await regionsRes.json();
-
-        const regionsList: Region[] = regionsData?.results || [];
-        setRegions(regionsList);
-
-        // Use context preferences if available, but don't default to US
-        const userCountry: string | null = streamingPreferences?.country || null;
-        const savedProviders: SavedProvider[] =
-          streamingPreferences?.providers || [];
-
-        if (userCountry) {
-          const initialRegion = userCountry.toUpperCase();
-          setCountry(userCountry);
-          setRegion(initialRegion);
-
-          // Seed selection from saved providers filtered by region
-          const initialSelected: Record<number, boolean> = {};
-          savedProviders
-            .filter((p) => p.region === initialRegion)
-            .forEach((p) => {
-              initialSelected[p.id] = true;
-            });
-          setSelected(initialSelected);
-
-          // Fetch providers for region
-          await loadProviders(initialRegion);
-        } else {
-          // No country selected, clear everything
-          setCountry("");
-          setRegion("");
-          setSelected({});
-          setProviders([]);
-        }
-      } catch (e) {
-        console.error(e);
-        setError("Failed to load streaming preferences");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    init();
-  }, [streamingPreferences]);
-
-  const loadProviders = async (regionCode: string) => {
     try {
-      const res = await fetch(`/api/watch/providers?region=${regionCode}`);
-      const data = await res.json();
-      setProviders(data?.results || []);
+      const userCountry: string | null = streamingPreferences?.country || null;
+      const savedProviders: SavedProvider[] =
+        streamingPreferences?.providers || [];
+
+      if (userCountry) {
+        const initialRegion = userCountry.toUpperCase();
+        setCountry(userCountry);
+        setRegion(initialRegion);
+
+        const initialSelected: Record<number, boolean> = {};
+        savedProviders
+          .filter((p) => p.region === initialRegion)
+          .forEach((p) => {
+            initialSelected[p.id] = true;
+          });
+        setSelected(initialSelected);
+      } else {
+        setCountry("");
+        setRegion("");
+        setSelected({});
+      }
     } catch (e) {
       console.error(e);
-      setError("Failed to load providers");
+      setError("Failed to initialize streaming preferences");
     }
-  };
+  }, [streamingPreferences]);
 
   const handleCountryChange = async (code: string) => {
     setCountry(code);
@@ -131,7 +120,6 @@ export function StreamingPreferences() {
     setSelected({});
     setCurrentPage(1);
     setSearchTerm("");
-    await loadProviders(regionCode);
   };
 
   const toggleProvider = (id: number) => {
@@ -143,16 +131,12 @@ export function StreamingPreferences() {
     [selected]
   );
 
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      setError("");
-
+  const savePreferences = useMutation({
+    mutationFn: async () => {
       if (!country) {
-        setError("Please select a country before saving");
-        return;
+        throw new Error("Please select a country before saving");
       }
-
+      const providers = providersQuery.data || [];
       const payload = {
         country: country.toUpperCase(),
         region: region.toUpperCase(),
@@ -170,20 +154,27 @@ export function StreamingPreferences() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err?.error || "Failed to save preferences");
       }
-
-      // Refresh streaming preferences in context after successful save
+    },
+    onSuccess: async () => {
+      // Sync auth context (server data)
       await refreshStreamingPreferences();
-    } catch (e) {
-      console.error(e);
+      // Optionally invalidate any streaming-related queries
+      queryClient.invalidateQueries({
+        queryKey: ["watch", "providers", region],
+      });
+    },
+    onError: (e: unknown) => {
       setError(e instanceof Error ? e.message : "Failed to save");
-    } finally {
-      setSaving(false);
-    }
+    },
+  });
+
+  const handleSave = async () => {
+    setError("");
+    await savePreferences.mutateAsync();
   };
 
   return (
@@ -197,10 +188,10 @@ export function StreamingPreferences() {
           value={country}
           onChange={(e) => handleCountryChange(e.target.value)}
           className="w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-md px-3 py-2"
-          disabled={loading}
+          disabled={regionsQuery.isLoading}
         >
           <option value="">Select a country...</option>
-          {regions.map((r) => (
+          {(regionsQuery.data || []).map((r) => (
             <option key={r.iso_3166_1} value={r.iso_3166_1}>
               {r.english_name} ({r.iso_3166_1})
             </option>
@@ -218,7 +209,7 @@ export function StreamingPreferences() {
         </div>
 
         {/* Search input */}
-        {country && providers.length > 0 && (
+        {country && (providersQuery.data || []).length > 0 && (
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -231,14 +222,16 @@ export function StreamingPreferences() {
           </div>
         )}
 
-        {loading ? (
+        {providersQuery.isLoading ? (
           <LoadingSpinner text="Loading Providers..."></LoadingSpinner>
         ) : !country ? (
           <div className="text-gray-400 text-center py-8">
             Please select a country to view available streaming providers.
           </div>
-        ) : providers.length === 0 ? (
-          <div className="text-gray-400">No providers available for {region}</div>
+        ) : (providersQuery.data || []).length === 0 ? (
+          <div className="text-gray-400">
+            No providers available for {region}
+          </div>
         ) : filteredProviders.length === 0 ? (
           <div className="text-gray-400 text-center py-8">
             No providers found matching &quot;{searchTerm}&quot;.
@@ -247,51 +240,54 @@ export function StreamingPreferences() {
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {paginatedProviders.map((p) => {
-              const isSelected = !!selected[p.provider_id];
-              const logoUrl = p.logo_path
-                ? getImageUrl(p.logo_path, "w92")
-                : null;
-              return (
-                <button
-                  key={p.provider_id}
-                  type="button"
-                  onClick={() => toggleProvider(p.provider_id)}
-                  className={`flex items-center gap-3 p-3 rounded-md border transition-colors ${
-                    isSelected
-                      ? "border-red-500/50 bg-red-500/10"
-                      : "border-gray-700 hover:border-gray-600"
-                  }`}
-                >
-                  {logoUrl ? (
-                    <Image
-                      src={logoUrl}
-                      alt={p.provider_name}
-                      width={32}
-                      height={32}
-                      className="rounded"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 bg-gray-800 rounded" />
-                  )}
-                  <span
-                    className={`text-sm ${
-                      isSelected ? "text-red-400" : "text-gray-200"
+                const isSelected = !!selected[p.provider_id];
+                const logoUrl = p.logo_path
+                  ? getImageUrl(p.logo_path, "w92")
+                  : null;
+                return (
+                  <button
+                    key={p.provider_id}
+                    type="button"
+                    onClick={() => toggleProvider(p.provider_id)}
+                    className={`flex items-center gap-3 p-3 rounded-md border transition-colors ${
+                      isSelected
+                        ? "border-red-500/50 bg-red-500/10"
+                        : "border-gray-700 hover:border-gray-600"
                     }`}
                   >
-                    {p.provider_name}
-                  </span>
-                </button>
-              );
-            })}
+                    {logoUrl ? (
+                      <Image
+                        src={logoUrl}
+                        alt={p.provider_name}
+                        width={32}
+                        height={32}
+                        className="rounded"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-gray-800 rounded" />
+                    )}
+                    <span
+                      className={`text-sm ${
+                        isSelected ? "text-red-400" : "text-gray-200"
+                      }`}
+                    >
+                      {p.provider_name}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Pagination controls */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-400">
-                  Showing {((currentPage - 1) * PROVIDERS_PER_PAGE) + 1} to{" "}
-                  {Math.min(currentPage * PROVIDERS_PER_PAGE, filteredProviders.length)} of{" "}
-                  {filteredProviders.length} providers
+                  Showing {(currentPage - 1) * PROVIDERS_PER_PAGE + 1} to{" "}
+                  {Math.min(
+                    currentPage * PROVIDERS_PER_PAGE,
+                    filteredProviders.length
+                  )}{" "}
+                  of {filteredProviders.length} providers
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -327,7 +323,7 @@ export function StreamingPreferences() {
       {error && <div className="text-red-400 text-sm">{error}</div>}
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving} loading={loading}>
+        <Button onClick={handleSave} loading={savePreferences.isPending}>
           <Save className="w-5 h-5 mr-2"></Save> Save Preferences
         </Button>
       </div>

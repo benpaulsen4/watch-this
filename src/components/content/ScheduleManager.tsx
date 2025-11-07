@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Plus, X, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WatchStatusEnum } from "@/lib/db/schema";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { Button } from "../ui/Button";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface ScheduleManagerProps {
   tmdbId: number;
@@ -31,23 +32,22 @@ export const DAYS_OF_WEEK = [
 ];
 
 export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
-  const [schedules, setSchedules] = useState<Record<number, Schedule[]>>({});
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [otherShowsByDay, setOtherShowsByDay] = useState<
-    Record<number, string[]>
-  >({});
+  const queryClient = useQueryClient();
 
-  async function getSchedulesByDay(): Promise<Record<number, Schedule[]>> {
-    const response = await fetch(`/api/schedules`);
-    if (!response.ok) throw new Error("Failed to fetch schedules");
-    const data = await response.json();
-    return (data.schedules || {}) as Record<number, Schedule[]>;
-  }
+  const schedulesQuery = useQuery<Record<number, Schedule[]>>({
+    queryKey: ["schedules"],
+    queryFn: async () => {
+      const response = await fetch(`/api/schedules`);
+      if (!response.ok) throw new Error("Failed to fetch schedules");
+      const data = await response.json();
+      return (data.schedules || {}) as Record<number, Schedule[]>;
+    },
+  });
 
   function computeOtherShowsByDay(
     schedulesByDay: Record<number, Schedule[]>,
-    excludeTmdbId: number,
+    excludeTmdbId: number
   ): Record<number, string[]> {
     const result: Record<number, string[]> = {};
     for (let day = 0; day <= 6; day++) {
@@ -59,107 +59,80 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
     return result;
   }
 
-  const refreshOtherShows = useCallback(
-    async (currentSchedules: Record<number, Schedule[]>) => {
-      const otherByDay = computeOtherShowsByDay(currentSchedules, tmdbId);
-      setOtherShowsByDay(otherByDay);
-    },
-    [tmdbId],
+  const schedulesByDay = useMemo(
+    () => schedulesQuery.data || {},
+    [schedulesQuery.data]
+  );
+  const otherShowsByDay = useMemo(
+    () => computeOtherShowsByDay(schedulesByDay, tmdbId),
+    [schedulesByDay, tmdbId]
   );
 
-  // Initialize empty schedules for all days
-  useEffect(() => {
-    const emptySchedules: Record<number, Schedule[]> = {};
-    const emptyOther: Record<number, string[]> = {};
-    for (let day = 0; day <= 6; day++) {
-      emptySchedules[day] = [];
-      emptyOther[day] = [];
-    }
-    setSchedules(emptySchedules);
-    setOtherShowsByDay(emptyOther);
-  }, []);
+  // React Query handles loading/fetching; derived values computed via useMemo
 
-  // Fetch all schedules for the user and compute other shows per day
-  useEffect(() => {
-    const fetchSchedules = async () => {
-      try {
-        setLoading(true);
-        const schedulesByDay = await getSchedulesByDay();
-        setSchedules(schedulesByDay);
-        await refreshOtherShows(schedulesByDay);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch schedules",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSchedules();
-  }, [refreshOtherShows]);
-
-  const addToSchedule = async (dayOfWeek: number) => {
-    try {
+  const addToScheduleMutation = useMutation({
+    mutationFn: async (dayOfWeek: number) => {
       const response = await fetch("/api/schedules", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tmdbId,
-          dayOfWeek,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdbId, dayOfWeek }),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to add to schedule");
       }
-
-      const newSchedule = await response.json();
-
-      const updated = {
-        ...schedules,
-        [dayOfWeek]: [...(schedules[dayOfWeek] || []), newSchedule],
-      } as Record<number, Schedule[]>;
-      setSchedules(updated);
-      await refreshOtherShows(updated);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to add to schedule",
+      return response.json();
+    },
+    onSuccess: (newSchedule, dayOfWeek) => {
+      queryClient.setQueryData<Record<number, Schedule[]>>(
+        ["schedules"],
+        (prev) => {
+          const current = prev || {};
+          const updatedDay = [
+            ...(current[dayOfWeek] || []),
+            newSchedule as Schedule,
+          ];
+          return { ...current, [dayOfWeek]: updatedDay };
+        }
       );
-    }
-  };
+    },
+    onError: (err: unknown) => {
+      setError(
+        err instanceof Error ? err.message : "Failed to add to schedule"
+      );
+    },
+  });
 
-  const removeFromSchedule = async (dayOfWeek: number) => {
-    try {
+  const removeFromScheduleMutation = useMutation({
+    mutationFn: async (dayOfWeek: number) => {
       const response = await fetch(
         `/api/schedules?tmdbId=${tmdbId}&dayOfWeek=${dayOfWeek}`,
-        {
-          method: "DELETE",
-        },
+        { method: "DELETE" }
       );
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to remove from schedule");
       }
-
-      const updated = {
-        ...schedules,
-        [dayOfWeek]: (schedules[dayOfWeek] || []).filter(
-          (s) => s.tmdbId !== tmdbId,
-        ),
-      } as Record<number, Schedule[]>;
-      setSchedules(updated);
-      await refreshOtherShows(updated);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to remove from schedule",
+      return { dayOfWeek };
+    },
+    onSuccess: ({ dayOfWeek }) => {
+      queryClient.setQueryData<Record<number, Schedule[]>>(
+        ["schedules"],
+        (prev) => {
+          const current = prev || {};
+          const updatedDay = (current[dayOfWeek] || []).filter(
+            (s) => s.tmdbId !== tmdbId
+          );
+          return { ...current, [dayOfWeek]: updatedDay };
+        }
       );
-    }
-  };
+    },
+    onError: (err: unknown) => {
+      setError(
+        err instanceof Error ? err.message : "Failed to remove from schedule"
+      );
+    },
+  });
 
   // Don't allow scheduling for completed or dropped shows
   if (watchStatus === "completed" || watchStatus === "dropped") {
@@ -173,7 +146,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
     );
   }
 
-  if (loading) {
+  if (schedulesQuery.isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <LoadingSpinner size="lg" text="Loading schedule..." />
@@ -198,8 +171,8 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
 
       <div className="grid gap-3">
         {DAYS_OF_WEEK.map((day, index) => {
-          const isScheduled = (schedules[index] || []).some(
-            (s) => s.tmdbId === tmdbId,
+          const isScheduled = (schedulesByDay[index] || []).some(
+            (s) => s.tmdbId === tmdbId
           );
           const today = new Date().getDay();
           const isToday = index === today;
@@ -211,7 +184,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
                 "flex items-center justify-between p-4 rounded-lg border transition-colors, gap-2",
                 isToday
                   ? "bg-red-900/20 border-red-800"
-                  : "bg-gray-800/50 border-gray-700",
+                  : "bg-gray-800/50 border-gray-700"
               )}
             >
               <div className="flex flex-col gap-1">
@@ -219,13 +192,13 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
                   <div
                     className={cn(
                       "w-3 h-3 rounded-full",
-                      isScheduled ? "bg-red-500" : "bg-gray-600",
+                      isScheduled ? "bg-red-500" : "bg-gray-600"
                     )}
                   />
                   <span
                     className={cn(
                       "font-medium",
-                      isToday ? "text-red-400" : "text-gray-200",
+                      isToday ? "text-red-400" : "text-gray-200"
                     )}
                   >
                     {day}
@@ -251,7 +224,9 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
 
               <Button
                 onClick={() =>
-                  isScheduled ? removeFromSchedule(index) : addToSchedule(index)
+                  isScheduled
+                    ? removeFromScheduleMutation.mutate(index)
+                    : addToScheduleMutation.mutate(index)
                 }
                 variant={isScheduled ? "destructive" : "secondary"}
               >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Filter, TrendingUp } from "lucide-react";
 import type { TMDBMovie, TMDBTVShow, TMDBGenre } from "@/lib/tmdb/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { PageHeader } from "../ui/PageHeader";
 import { ContentCard } from "../content/ContentCard";
 import { ContentCardSkeleton } from "../content/ContentCardSkeleton";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 type ContentType = "all" | "movie" | "tv";
 type SortBy =
@@ -24,114 +25,71 @@ export interface SearchClientProps {
 
 export function SearchClient({ genres, trendingContent }: SearchClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<
-    (TMDBMovie | TMDBTVShow)[]
-  >([]);
-  const [searchLoading, setSearchLoading] = useState(false);
   const [contentType, setContentType] = useState<ContentType>("all");
   const [selectedGenre, setSelectedGenre] = useState<string>("");
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortBy>("popularity.desc");
   const [showFilters, setShowFilters] = useState(false);
-  const [discoverContent, setDiscoverContent] = useState<
-    (TMDBMovie | TMDBTVShow)[]
-  >([]);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [contentLoading, setContentLoading] = useState(true);
 
-  const loadDiscoverContent = useCallback(
-    async (pageNum = 1, append = false) => {
-      try {
-        const params = new URLSearchParams({
-          page: pageNum.toString(),
-          sort_by: sortBy,
-        });
-
-        if (contentType !== "all") params.append("type", contentType);
-        if (selectedGenre) params.append("with_genres", selectedGenre);
-        if (selectedYear) params.append("year", selectedYear);
-
-        const response = await fetch(`/api/tmdb/discover?${params}`);
-        if (response.ok) {
-          const data = await response.json();
-          const newResults = data.results || [];
-
-          if (append) {
-            setDiscoverContent((prev) => [...prev, ...newResults]);
-          } else {
-            setDiscoverContent(newResults);
-          }
-
-          setHasMore(pageNum < (data.total_pages || 1));
-        }
-      } catch (error) {
-        console.error("Failed to load discover content:", error);
-      } finally {
-        setContentLoading(false);
-      }
+  const discoverQuery = useInfiniteQuery<{
+    results: (TMDBMovie | TMDBTVShow)[];
+    total_pages: number;
+  }>({
+    queryKey: [
+      "tmdb",
+      "discover",
+      { contentType, sortBy, selectedGenre, selectedYear },
+    ],
+    queryFn: async ({ pageParam = 1 }) => {
+      const pageNum = typeof pageParam === "number" ? pageParam : 1;
+      const params = new URLSearchParams({
+        page: pageNum.toString(),
+        sort_by: sortBy,
+      });
+      if (contentType !== "all") params.append("type", contentType);
+      if (selectedGenre) params.append("with_genres", selectedGenre);
+      if (selectedYear) params.append("year", selectedYear);
+      const response = await fetch(`/api/tmdb/discover?${params}`);
+      if (!response.ok) throw new Error("Failed to load discover content");
+      return response.json();
     },
-    [contentType, sortBy, selectedGenre, selectedYear],
-  );
-
-  const handleSearch = useCallback(
-    async (query: string) => {
-      setSearchQuery(query);
-
-      if (!query.trim()) {
-        setSearchResults([]);
-        loadDiscoverContent();
-        return;
-      }
-
-      setSearchLoading(true);
-      try {
-        const params = new URLSearchParams({
-          q: query,
-          type: contentType,
-        });
-        if (selectedYear && contentType !== "all")
-          params.append("year", selectedYear);
-
-        const response = await fetch(`/api/tmdb/search?${params}`);
-        if (response.ok) {
-          const data = await response.json();
-          setSearchResults(data.results || []);
-        }
-      } catch (error) {
-        console.error("Search failed:", error);
-      } finally {
-        setSearchLoading(false);
-      }
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, pages) => {
+      const currentPage = pages.length;
+      return currentPage < (lastPage.total_pages || 1)
+        ? currentPage + 1
+        : undefined;
     },
-    [contentType, loadDiscoverContent, selectedYear],
-  );
+  });
+
+  const searchResultsQuery = useQuery<{ results: (TMDBMovie | TMDBTVShow)[] }>({
+    queryKey: ["tmdb", "search", { q: searchQuery, contentType, selectedYear }],
+    enabled: !!searchQuery.trim(),
+    queryFn: async () => {
+      const params = new URLSearchParams({ q: searchQuery, type: contentType });
+      if (selectedYear && contentType !== "all")
+        params.append("year", selectedYear);
+      const response = await fetch(`/api/tmdb/search?${params}`);
+      if (!response.ok) throw new Error("Search failed");
+      return response.json();
+    },
+  });
 
   useEffect(() => {
-    loadDiscoverContent();
-  }, [loadDiscoverContent]);
+    // reset page when filters change (discoverQuery refetches automatically)
+    setPage(1);
+  }, [contentType, selectedGenre, selectedYear, sortBy]);
 
-  useEffect(() => {
-    if (searchQuery) {
-      handleSearch(searchQuery);
-    } else {
-      loadDiscoverContent();
-    }
-  }, [
-    contentType,
-    selectedGenre,
-    selectedYear,
-    sortBy,
-    searchQuery,
-    handleSearch,
-    loadDiscoverContent,
-  ]);
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
 
   const loadMore = () => {
-    if (!searchQuery && hasMore) {
+    if (!searchQuery && discoverQuery.hasNextPage) {
       const nextPage = page + 1;
       setPage(nextPage);
-      loadDiscoverContent(nextPage, true);
+      discoverQuery.fetchNextPage();
     }
   };
 
@@ -145,7 +103,16 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
 
-  const displayContent = searchQuery ? searchResults : discoverContent;
+  const displayContent = useMemo(() => {
+    if (searchQuery) {
+      return searchResultsQuery.data?.results || [];
+    }
+    const pages = discoverQuery.data?.pages || [];
+    return pages.flatMap((p) => p.results || []);
+  }, [searchQuery, searchResultsQuery.data, discoverQuery.data]);
+
+  const searchLoading = searchResultsQuery.isFetching;
+  const contentLoading = discoverQuery.isLoading && displayContent.length === 0;
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -167,7 +134,7 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
             value={searchQuery}
             onSearch={handleSearch}
             placeholder="Search movies and TV shows..."
-            loading={searchLoading}
+            loading={searchResultsQuery.isFetching}
           />
         </div>
 
@@ -286,9 +253,13 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
                 ))}
               </div>
 
-              {!searchQuery && hasMore && (
+              {!searchQuery && discoverQuery.hasNextPage && (
                 <div className="flex justify-center mt-8">
-                  <Button onClick={loadMore} variant="outline">
+                  <Button
+                    onClick={loadMore}
+                    variant="outline"
+                    loading={discoverQuery.isFetchingNextPage}
+                  >
                     Load More
                   </Button>
                 </div>

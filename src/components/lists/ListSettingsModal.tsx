@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Trash2, Save, AlertTriangle } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 // Using local List interface to match API response format
 
 interface List {
@@ -46,8 +47,6 @@ export default function ListSettingsModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  if (!isOpen) return null;
-
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setError("");
@@ -65,18 +64,11 @@ export default function ListSettingsModal({
     return true;
   };
 
-  const handleSave = async () => {
-    if (!validateForm()) return;
-
-    setIsLoading(true);
-    setError("");
-
-    try {
+  const updateListMutation = useMutation({
+    mutationFn: async () => {
       const response = await fetch(`/api/lists/${list.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name.trim(),
           description: formData.description.trim() || null,
@@ -85,41 +77,49 @@ export default function ListSettingsModal({
           syncWatchStatus: formData.syncWatchStatus,
         }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update list");
-      }
-
-      const updatedList = await response.json();
-      onListUpdate(updatedList);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to update list");
+      return data;
+    },
+    onSuccess: (data) => {
+      onListUpdate(data);
       onClose();
-    } catch (err) {
+    },
+    onError: (err: unknown) => {
       setError(err instanceof Error ? err.message : "Failed to update list");
-    } finally {
-      setIsLoading(false);
-    }
+    },
+    onSettled: () => setIsLoading(false),
+  });
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
+    setIsLoading(true);
+    setError("");
+    await updateListMutation.mutateAsync();
   };
+
+  const deleteListMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/lists/${list.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to delete list");
+      return data;
+    },
+    onSuccess: () => {
+      onListDelete();
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to delete list");
+    },
+    onSettled: () => setIsDeleting(false),
+  });
 
   const handleDelete = async () => {
     setIsDeleting(true);
     setError("");
-
-    try {
-      const response = await fetch(`/api/lists/${list.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete list");
-      }
-
-      onListDelete();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete list");
-      setIsDeleting(false);
-    }
+    await deleteListMutation.mutateAsync();
   };
 
   const handleClose = () => {
@@ -128,6 +128,8 @@ export default function ListSettingsModal({
     setError("");
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">

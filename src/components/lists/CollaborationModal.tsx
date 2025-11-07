@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, UserPlus, Trash2, Users } from "lucide-react";
 import { PermissionLevel, type PermissionLevelEnum } from "@/lib/db/schema";
 import { ProfileImage } from "../ui/ProfileImage";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface Collaborator {
   id: string;
@@ -33,8 +34,6 @@ export default function CollaborationModal({
   ownerUsername,
   ownerProfilePictureUrl,
 }: CollaborationModalProps) {
-  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [newUsername, setNewUsername] = useState("");
@@ -42,75 +41,70 @@ export default function CollaborationModal({
     useState<PermissionLevelEnum>(PermissionLevel.COLLABORATOR);
   const [addingCollaborator, setAddingCollaborator] = useState(false);
 
-  // Fetch collaborators when modal opens
-  useEffect(() => {
-    const fetchCollaborators = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/lists/${listId}/collaborators`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch collaborators");
-        }
-        const data = await response.json();
-        setCollaborators(data.collaborators || []);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch collaborators",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (isOpen && isOwner) {
-      fetchCollaborators();
-    }
-  }, [isOpen, listId, isOwner]);
+  const queryClient = useQueryClient();
+
+  const collaboratorsQuery = useQuery<{ collaborators: Collaborator[] }>({
+    queryKey: ["lists", listId, "collaborators"],
+    enabled: isOpen && isOwner,
+    queryFn: async () => {
+      const response = await fetch(`/api/lists/${listId}/collaborators`);
+      if (!response.ok) throw new Error("Failed to fetch collaborators");
+      const data = await response.json();
+      return data;
+    },
+  });
 
   const addCollaborator = async () => {
     if (!newUsername.trim()) {
       setError("Username is required");
       return;
     }
-
-    setAddingCollaborator(true);
     setError(null);
     setSuccess(null);
+    addCollaboratorMutation.mutate({
+      username: newUsername.trim(),
+      permissionLevel: newPermissionLevel,
+    });
+  };
 
-    try {
+  const addCollaboratorMutation = useMutation({
+    mutationFn: async ({
+      username,
+      permissionLevel,
+    }: {
+      username: string;
+      permissionLevel: PermissionLevelEnum;
+    }) => {
+      setAddingCollaborator(true);
       const response = await fetch(`/api/lists/${listId}/collaborators`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: newUsername.trim(),
-          permissionLevel: newPermissionLevel,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, permissionLevel }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data.error || "Failed to add collaborator");
-      }
-
-      setCollaborators((prev) => [...prev, data.collaborator]);
+      return data;
+    },
+    onSuccess: (data) => {
       setSuccess(data.message);
       setNewUsername("");
       setNewPermissionLevel(PermissionLevel.COLLABORATOR);
-    } catch (err) {
+      queryClient.invalidateQueries({
+        queryKey: ["lists", listId, "collaborators"],
+      });
+    },
+    onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to add collaborator",
+        err instanceof Error ? err.message : "Failed to add collaborator"
       );
-    } finally {
-      setAddingCollaborator(false);
-    }
-  };
+    },
+    onSettled: () => setAddingCollaborator(false),
+  });
 
   const removeCollaborator = async (
     collaboratorUserId: string,
-    username: string,
+    username: string
   ) => {
     if (
       !confirm(`Are you sure you want to remove ${username} from this list?`)
@@ -120,73 +114,79 @@ export default function CollaborationModal({
 
     setError(null);
     setSuccess(null);
+    removeCollaboratorMutation.mutate({ collaboratorUserId });
+  };
 
-    try {
+  const removeCollaboratorMutation = useMutation({
+    mutationFn: async ({
+      collaboratorUserId,
+    }: {
+      collaboratorUserId: string;
+    }) => {
       const response = await fetch(
         `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
-        {
-          method: "DELETE",
-        },
+        { method: "DELETE" }
       );
-
       const data = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data.error || "Failed to remove collaborator");
-      }
-
-      setCollaborators((prev) =>
-        prev.filter((c) => c.userId !== collaboratorUserId),
-      );
-      setSuccess(data.message);
-    } catch (err) {
+      return { collaboratorUserId, message: data.message };
+    },
+    onSuccess: ({ message }) => {
+      setSuccess(message);
+      queryClient.invalidateQueries({
+        queryKey: ["lists", listId, "collaborators"],
+      });
+    },
+    onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to remove collaborator",
+        err instanceof Error ? err.message : "Failed to remove collaborator"
       );
-    }
-  };
+    },
+  });
 
   const updatePermission = async (
     collaboratorUserId: string,
-    newPermission: string,
+    newPermission: string
   ) => {
     setError(null);
     setSuccess(null);
+    updatePermissionMutation.mutate({ collaboratorUserId, newPermission });
+  };
 
-    try {
+  const updatePermissionMutation = useMutation({
+    mutationFn: async ({
+      collaboratorUserId,
+      newPermission,
+    }: {
+      collaboratorUserId: string;
+      newPermission: string;
+    }) => {
       const response = await fetch(
         `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            permissionLevel: newPermission,
-          }),
-        },
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ permissionLevel: newPermission }),
+        }
       );
-
       const data = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data.error || "Failed to update permission");
-      }
-
-      setCollaborators((prev) =>
-        prev.map((c) =>
-          c.userId === collaboratorUserId
-            ? { ...c, permissionLevel: newPermission }
-            : c,
-        ),
-      );
-      setSuccess(data.message);
-    } catch (err) {
+      return { collaboratorUserId, newPermission, message: data.message };
+    },
+    onSuccess: ({ message }) => {
+      setSuccess(message);
+      queryClient.invalidateQueries({
+        queryKey: ["lists", listId, "collaborators"],
+      });
+    },
+    onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to update permission",
+        err instanceof Error ? err.message : "Failed to update permission"
       );
-    }
-  };
+    },
+  });
 
   const clearMessages = () => {
     setError(null);
@@ -272,7 +272,7 @@ export default function CollaborationModal({
                     value={newPermissionLevel}
                     onChange={(e) =>
                       setNewPermissionLevel(
-                        e.target.value as PermissionLevelEnum,
+                        e.target.value as PermissionLevelEnum
                       )
                     }
                     className="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -330,14 +330,15 @@ export default function CollaborationModal({
                 <h3 className="text-lg font-medium text-white mb-4">
                   Collaborators
                 </h3>
-                {loading ? (
+                {collaboratorsQuery.isLoading ? (
                   <div className="text-center py-8">
                     <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
                     <p className="text-gray-400 mt-2">
                       Loading collaborators...
                     </p>
                   </div>
-                ) : collaborators.length === 0 ? (
+                ) : (collaboratorsQuery.data?.collaborators || []).length ===
+                  0 ? (
                   <div className="text-center py-8">
                     <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
                     <p className="text-gray-400">
@@ -346,62 +347,64 @@ export default function CollaborationModal({
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {collaborators.map((collaborator) => (
-                      <div
-                        key={collaborator.id}
-                        className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <ProfileImage
-                            username={collaborator.username}
-                            src={collaborator.profilePictureUrl}
-                            size="md"
-                          />
-                          <div>
-                            <p className="text-white font-medium">
-                              {collaborator.username}
-                            </p>
-                            <p className="text-gray-400 text-sm">
-                              {collaborator.permissionLevel ===
-                              PermissionLevel.COLLABORATOR
-                                ? "Can edit"
-                                : "View only"}
-                            </p>
+                    {(collaboratorsQuery.data?.collaborators || []).map(
+                      (collaborator) => (
+                        <div
+                          key={collaborator.id}
+                          className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <ProfileImage
+                              username={collaborator.username}
+                              src={collaborator.profilePictureUrl}
+                              size="md"
+                            />
+                            <div>
+                              <p className="text-white font-medium">
+                                {collaborator.username}
+                              </p>
+                              <p className="text-gray-400 text-sm">
+                                {collaborator.permissionLevel ===
+                                PermissionLevel.COLLABORATOR
+                                  ? "Can edit"
+                                  : "View only"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={collaborator.permissionLevel}
+                              onChange={(e) =>
+                                updatePermission(
+                                  collaborator.userId,
+                                  e.target.value
+                                )
+                              }
+                              className="px-3 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value={PermissionLevel.COLLABORATOR}>
+                                Collaborator
+                              </option>
+                              <option value={PermissionLevel.VIEWER}>
+                                Viewer
+                              </option>
+                            </select>
+                            <button
+                              onClick={() =>
+                                removeCollaborator(
+                                  collaborator.userId,
+                                  collaborator.username
+                                )
+                              }
+                              className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                              title="Remove collaborator"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={collaborator.permissionLevel}
-                            onChange={(e) =>
-                              updatePermission(
-                                collaborator.userId,
-                                e.target.value,
-                              )
-                            }
-                            className="px-3 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value={PermissionLevel.COLLABORATOR}>
-                              Collaborator
-                            </option>
-                            <option value={PermissionLevel.VIEWER}>
-                              Viewer
-                            </option>
-                          </select>
-                          <button
-                            onClick={() =>
-                              removeCollaborator(
-                                collaborator.userId,
-                                collaborator.username,
-                              )
-                            }
-                            className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                            title="Remove collaborator"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 )}
               </div>

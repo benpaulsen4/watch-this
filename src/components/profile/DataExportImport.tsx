@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useMutation } from "@tanstack/react-query";
 
 type ExportFormat = "json" | "csv";
 type ImportStatus = "idle" | "uploading" | "success" | "error";
@@ -35,39 +36,25 @@ export function DataExportImport() {
   // Import is now JSON-only, no format selection needed
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = async (format: ExportFormat) => {
-    setExportLoading(true);
-
-    try {
+  const exportMutation = useMutation({
+    mutationFn: async (format: ExportFormat) => {
       const response = await fetch(`/api/profile/export?format=${format}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to export data");
-      }
-
-      // Parse the JSON response to get data and filename
       const responseData = await response.json();
-      const { data, filename, isZip } = responseData;
-
-      if (!data || !filename) {
-        throw new Error("Invalid response format from server");
-      }
-
+      if (!response.ok)
+        throw new Error(responseData.error || "Failed to export data");
+      return responseData as { data: string; filename: string; isZip: boolean };
+    },
+    onSuccess: ({ data, filename, isZip }) => {
       let blob: Blob;
       if (isZip) {
-        // For ZIP files, data is base64 encoded
         const binaryString = atob(data);
         const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
+        for (let i = 0; i < binaryString.length; i++)
           bytes[i] = binaryString.charCodeAt(i);
-        }
         blob = new Blob([bytes], { type: "application/zip" });
       } else {
-        // For JSON files, data is the actual content
         blob = new Blob([data], { type: "application/json" });
       }
-
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -76,12 +63,17 @@ export function DataExportImport() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (error) {
+    },
+    onError: (error: unknown) => {
       console.error("Export failed:", error);
       alert(error instanceof Error ? error.message : "Failed to export data");
-    } finally {
-      setExportLoading(false);
-    }
+    },
+    onSettled: () => setExportLoading(false),
+  });
+
+  const handleExport = async (format: ExportFormat) => {
+    setExportLoading(true);
+    await exportMutation.mutateAsync(format);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,49 +92,44 @@ export function DataExportImport() {
     }
   };
 
-  const handleImport = async () => {
-    if (!selectedFile) return;
-
-    setImportStatus("uploading");
-    setImportResult(null);
-
-    try {
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
       const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("format", "json"); // Always JSON now
-
+      formData.append("file", file);
+      formData.append("format", "json");
       const response = await fetch("/api/profile/import", {
         method: "POST",
         body: formData,
       });
-
       const result = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(result.error || "Failed to import data");
-      }
-
+      return result as ImportResult;
+    },
+    onSuccess: (result) => {
       setImportResult(result);
       setImportStatus("success");
       setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (error) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    onError: (error: unknown) => {
       console.error("Import failed:", error);
       setImportResult({
         success: false,
-        imported: {
-          lists: 0,
-          contentStatus: 0,
-          episodeStatus: 0,
-        },
+        imported: { lists: 0, contentStatus: 0, episodeStatus: 0 },
         errors: [
           error instanceof Error ? error.message : "Failed to import data",
         ],
       });
       setImportStatus("error");
-    }
+    },
+  });
+
+  const handleImport = async () => {
+    if (!selectedFile) return;
+    setImportStatus("uploading");
+    setImportResult(null);
+    await importMutation.mutateAsync(selectedFile);
   };
 
   const clearImportResult = () => {

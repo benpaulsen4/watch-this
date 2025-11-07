@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Globe, Check, X, AlertCircle, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useMutation } from "@tanstack/react-query";
 
 type Props = {
   user: { timezone?: string };
@@ -55,24 +56,29 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    try {
+    await saveTimezoneMutation.mutateAsync();
+  };
+
+  const saveTimezoneMutation = useMutation({
+    mutationFn: async () => {
       const res = await fetch("/api/auth/session", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timezone }),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data?.error || "Failed to update timezone");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to update timezone");
+      return data;
+    },
+    onSuccess: async () => {
       await onUserUpdate();
       setIsEditing(false);
-    } catch (e: unknown) {
+    },
+    onError: (e: unknown) => {
       setError(e instanceof Error ? e.message : "Failed to update timezone");
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+    onSettled: () => setSaving(false),
+  });
 
   const handleCancel = () => {
     setTimezone(user.timezone || "UTC");

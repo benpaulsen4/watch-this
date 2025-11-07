@@ -1,18 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { ActivityEntry } from "./ActivityEntry";
 import { UpcomingActivityCard } from "./UpcomingActivityCard";
 import { Button } from "@/components/ui/Button";
 import { Activity as ActivityIcon } from "lucide-react";
 import Link from "next/link";
-import {
-  Activity,
-  ActivityResponse,
-  UpcomingActivity,
-} from "./ActivityTimelineClient";
+import { ActivityResponse } from "./ActivityTimelineClient";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { useQuery } from "@tanstack/react-query";
 
 interface ActivityFeedProps {
   currentUsername: string;
@@ -20,39 +17,31 @@ interface ActivityFeedProps {
 
 export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
   const router = useRouter();
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [upcomingActivities, setUpcomingActivities] = useState<
-    UpcomingActivity[]
-  >([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchActivities = useCallback(async () => {
-    try {
-      const mq = window.matchMedia("(min-width: 768px)");
-      const mdUp = mq.matches;
-      setLoading(true);
-      const response = await fetch(`/api/activity?limit=${mdUp ? 10 : 5}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch activities");
-      }
-
-      const data: ActivityResponse = await response.json();
-      setActivities(data.activities);
-      setUpcomingActivities(data.upcoming || []);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [mdUp, setMdUp] = useState(false);
 
   useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
+    const mq = window.matchMedia("(min-width: 768px)");
+    const handler = () => setMdUp(mq.matches);
+    handler();
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
-  if (loading) {
+  const {
+    data: activitiesData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<ActivityResponse>({
+    queryKey: ["activity", "feed", mdUp],
+    queryFn: async () => {
+      const response = await fetch(`/api/activity?limit=${mdUp ? 10 : 5}`);
+      if (!response.ok) throw new Error("Failed to fetch activities");
+      return response.json();
+    },
+  });
+
+  if (isLoading) {
     return (
       <div>
         <div className="flex items-center justify-between mb-6">
@@ -90,7 +79,9 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
           </Button>
         </div>
         <div className="flex flex-col items-center justify-center py-24">
-          <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+          <p className="text-red-600 dark:text-red-400 mb-4">
+            {(error as Error).message}
+          </p>
         </div>
       </div>
     );
@@ -110,22 +101,22 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
       </div>
 
       {/* Upcoming Activities Section */}
-      {upcomingActivities.length > 0 && (
+      {(activitiesData?.upcoming || []).length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {upcomingActivities.map((upcoming, index) => (
+          {(activitiesData?.upcoming || []).map((upcoming, index) => (
             <UpcomingActivityCard
               key={`${upcoming.id}-${index}`}
               upcoming={upcoming}
-              onEpisodeWatched={fetchActivities}
+              onEpisodeWatched={() => refetch()}
             />
           ))}
         </div>
       )}
 
       {/* Regular Activities Section */}
-      {activities.length > 0 ? (
+      {(activitiesData?.activities || []).length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2">
-          {activities.map((activity) => (
+          {(activitiesData?.activities || []).map((activity) => (
             <ActivityEntry
               key={activity.id}
               activity={activity}
@@ -133,7 +124,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
             />
           ))}
         </div>
-      ) : upcomingActivities.length === 0 ? (
+      ) : (activitiesData?.upcoming || []).length === 0 ? (
         <div className="text-center py-8">
           <ActivityIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400 mb-4">
