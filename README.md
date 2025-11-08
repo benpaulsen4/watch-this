@@ -102,9 +102,11 @@ npm run test:run
 - [ ] Test writing
 - [ ] RSC streaming implementation
 - [ ] Recommendations of some kind
+- [ ] New List creation shortcut from content details lists tab
 - [ ] Cast tab for content details
 - [ ] \*arr stack integration for when content is not on any configured streaming services
 - [ ] Multi-device passkey management
 - [ ] Sorting and filtering inside lists
 - [ ] Statistics page in user profile
 - [ ] Splash page
+- [ ] Docs

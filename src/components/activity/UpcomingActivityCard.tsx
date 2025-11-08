@@ -31,7 +31,8 @@ export function UpcomingActivityCard({
         body: JSON.stringify({ tmdbId: upcoming.id }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to mark episode as watched");
+      if (!response.ok)
+        throw new Error(data.error || "Failed to mark episode as watched");
       return data;
     },
     onSuccess: () => onEpisodeWatched?.(),
@@ -76,7 +77,7 @@ export function UpcomingActivityCard({
               <p className="text-gray-400 text-sm md:text-base">
                 It&apos;s {today}! Have you watched this today?
               </p>
-              <h3 className="text-gray-100 font-semibold text-xl truncate mb-4">
+              <h3 className="text-gray-100 font-semibold text-xl mb-4">
                 {upcoming.name}
               </h3>
               <div>

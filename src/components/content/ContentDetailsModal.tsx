@@ -36,7 +36,7 @@ import type {
 import type { WatchStatusEnum, ContentTypeEnum } from "@/lib/db/schema";
 import { Badge } from "../ui/Badge";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 export interface ContentDetailsModalProps {
   content: TMDBMovie | TMDBTVShow;
@@ -55,7 +55,6 @@ export function ContentDetailsModal({
   onShowStatusChanged,
   currentListId,
 }: ContentDetailsModalProps) {
-  const queryClient = useQueryClient();
   const [watchStatus, setWatchStatus] = useState<WatchStatusEnum | null>(
     content.watchStatus ?? null
   );
@@ -164,55 +163,6 @@ export function ContentDetailsModal({
   if (!isOpen && selectedTab !== "overview") {
     setSelectedTab("overview");
   }
-
-  const addToListMutation = useMutation({
-    mutationFn: async (listId: string) => {
-      const response = await fetch(`/api/lists/${listId}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tmdbId: content.id,
-          contentType,
-          title,
-          posterPath: content.poster_path,
-        }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to add content to list");
-      }
-      return { listId };
-    },
-    onSuccess: ({ listId }) => {
-      // Invalidate list items for the specific list
-      queryClient.invalidateQueries({ queryKey: ["lists", listId, "items"] });
-    },
-  });
-
-  const removeFromListMutation = useMutation({
-    mutationFn: async ({
-      listId,
-      itemId,
-    }: {
-      listId: string;
-      itemId: string;
-    }) => {
-      const response = await fetch(`/api/lists/${listId}/items/${itemId}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || "Failed to remove content from list"
-        );
-      }
-      return { listId, itemId };
-    },
-    onSuccess: ({ listId }) => {
-      queryClient.invalidateQueries({ queryKey: ["lists", listId, "items"] });
-      onRemove?.();
-    },
-  });
 
   return (
     <ModalOverlay
@@ -598,11 +548,10 @@ export function ContentDetailsModal({
                     <ListSelector
                       contentType={contentType}
                       contentId={content.id}
+                      title={title}
+                      posterPath={content.poster_path}
                       currentListId={currentListId}
-                      onAddToList={(listId) => addToListMutation.mutate(listId)}
-                      onRemoveFromList={(listId, itemId) =>
-                        removeFromListMutation.mutate({ listId, itemId })
-                      }
+                      onRemove={onRemove}
                     />
                   </TabPanel>
                 </Tabs>

@@ -15,14 +15,15 @@ import type { List } from "@/lib/db/schema";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface ListSelectorProps {
   contentType: "movie" | "tv";
   contentId: number;
+  title: string;
+  posterPath?: string | null;
   currentListId?: string;
-  onAddToList: (listId: string) => void;
-  onRemoveFromList: (listId: string, itemId: string) => void;
+  onRemove?: () => void;
   className?: string;
 }
 
@@ -33,13 +34,18 @@ export interface ListResult extends List {
 export function ListSelector({
   contentType,
   contentId,
+  title,
+  posterPath,
   currentListId,
-  onAddToList,
-  onRemoveFromList,
+  onRemove,
   className,
 }: ListSelectorProps) {
   const queryClient = useQueryClient();
-  const { data: listsData, isLoading, error } = useQuery<{ lists: ListResult[] }>({
+  const {
+    data: listsData,
+    isLoading,
+    error,
+  } = useQuery<{ lists: ListResult[] }>({
     queryKey: ["lists"],
     queryFn: async () => {
       const response = await fetch("/api/lists");
@@ -48,10 +54,12 @@ export function ListSelector({
     },
   });
 
-  const { data: listsWithContentData } = useQuery<{
-    listId: string;
-    itemId: string;
-  }[]>({
+  const { data: listsWithContentData } = useQuery<
+    {
+      listId: string;
+      itemId: string;
+    }[]
+  >({
     queryKey: ["content", contentId, "lists"],
     queryFn: async () => {
       const response = await fetch(`/api/content/${contentId}/lists`);
@@ -77,15 +85,61 @@ export function ListSelector({
     return false;
   });
 
-  const handleSelectList = (listId: string) => {
-    onAddToList(listId);
-    queryClient.invalidateQueries({ queryKey: ["content", contentId, "lists"] });
-  };
+  const addToListMutation = useMutation({
+    mutationFn: async (listId: string) => {
+      const response = await fetch(`/api/lists/${listId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tmdbId: contentId,
+          contentType,
+          title,
+          posterPath,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to add content to list");
+      }
+      return { listId };
+    },
+    onSuccess: async ({ listId }) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["lists", listId, "items"],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["content", contentId, "lists"],
+      });
+    },
+  });
 
-  const handleRemoveFromList = (listId: string, itemId: string) => {
-    onRemoveFromList(listId, itemId);
-    queryClient.invalidateQueries({ queryKey: ["content", contentId, "lists"] });
-  };
+  const removeFromListMutation = useMutation({
+    mutationFn: async ({
+      listId,
+      itemId,
+    }: {
+      listId: string;
+      itemId: string;
+    }) => {
+      const response = await fetch(`/api/lists/${listId}/items/${itemId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to remove content from list");
+      }
+      return { listId, itemId };
+    },
+    onSuccess: async ({ listId }) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["lists", listId, "items"],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["content", contentId, "lists"],
+      });
+      if (listId === currentListId) onRemove?.();
+    },
+  });
 
   if (isLoading) {
     return (
@@ -99,7 +153,11 @@ export function ListSelector({
     return (
       <div className={cn("p-6 text-center", className)}>
         <p className="text-red-400 mb-4">{(error as Error).message}</p>
-        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["lists"] })} variant="outline" size="sm">
+        <Button
+          onClick={() => queryClient.invalidateQueries({ queryKey: ["lists"] })}
+          variant="outline"
+          size="sm"
+        >
           <RotateCcw className="h-4 w-4 mr-2" />
           Retry
         </Button>
@@ -140,8 +198,8 @@ export function ListSelector({
                     {list.listType === "mixed"
                       ? "Mixed"
                       : list.listType === "movies"
-                        ? "Movies"
-                        : "TV Shows"}
+                      ? "Movies"
+                      : "TV Shows"}
                     <span>&nbsp;•&nbsp;</span>
                     {list.isPublic ? (
                       <>
@@ -179,7 +237,12 @@ export function ListSelector({
                   <div className="flex gap-1">
                     {hasContent ? (
                       <Button
-                        onClick={() => handleRemoveFromList(list.id, itemId)}
+                        onClick={() =>
+                          removeFromListMutation.mutate({
+                            listId: list.id,
+                            itemId,
+                          })
+                        }
                         size="sm"
                         variant="outline"
                         className="text-sm"
@@ -188,7 +251,7 @@ export function ListSelector({
                       </Button>
                     ) : (
                       <Button
-                        onClick={() => handleSelectList(list.id)}
+                        onClick={() => addToListMutation.mutate(list.id)}
                         size="sm"
                         variant="outline"
                         className="text-sm"
