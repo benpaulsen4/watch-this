@@ -8,21 +8,6 @@
 - **Pattern**: Use "islands of reactivity" - wrap client components in Suspense
 - **Structure**: `page.tsx` (server) → `<Suspense>` → `ClientComponent.tsx`
 
-```typescript
-// ✅ Server component page
-export default function Page() {
-  return (
-    <Suspense fallback={<LoadingSpinner />}>
-      <ClientComponent />
-    </Suspense>
-  );
-}
-
-// ✅ Client component for interactivity
-'use client';
-export function ClientComponent() { /* interactive logic */ }
-```
-
 ### 2. Shared Layouts
 
 - **MUST**: Use Next.js layout system for common UI elements
@@ -66,7 +51,7 @@ src/
 - **Pages**: `page.tsx`, `layout.tsx`
 - **Client Components**: Suffix with "Client" (e.g., `DashboardClient.tsx`)
 - **API Routes**: `route.ts`
-- **Files**: PascalCase for components, camelCase for utilities
+- **Files**: PascalCase for components, kebab-case for utilities
 
 ## Code Standards
 
@@ -88,23 +73,6 @@ src/
 - **MUST**: Use Tailwind CSS exclusively
 - **Colors**: `bg-gray-950` (background), `text-red-500` (accent), `border-gray-800`
 - **Pattern**: Mobile-first responsive design
-
-### Page Structure Template
-
-```typescript
-<div className="min-h-screen bg-gray-950">
-  <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between h-16">
-        {/* Header content */}
-      </div>
-    </div>
-  </header>
-  <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {/* Page content */}
-  </main>
-</div>
-```
 
 ## Performance Requirements
 

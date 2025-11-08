@@ -105,6 +105,7 @@ npm run test:run
 - [ ] New List creation shortcut from content details lists tab
 - [ ] Cast tab for content details
 - [ ] \*arr stack integration for when content is not on any configured streaming services
+- [ ] TMDB cache table to reduce spamming their API when fetching lists
 - [ ] Multi-device passkey management
 - [ ] Sorting and filtering inside lists
 - [ ] Statistics page in user profile
