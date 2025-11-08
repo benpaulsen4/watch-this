@@ -95,11 +95,10 @@ export function ActivityTimelineClient() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-red-600 dark:text-red-400 mb-4">{(error as Error).message}</p>
-        <Button
-          onClick={() => fetchNextPage()}
-          variant="outline"
-        >
+        <p className="text-red-600 dark:text-red-400 mb-4">
+          {(error as Error).message}
+        </p>
+        <Button onClick={() => fetchNextPage()} variant="outline">
           Try Again
         </Button>
       </div>

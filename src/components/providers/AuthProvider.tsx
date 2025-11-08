@@ -113,7 +113,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (state.user && !state.streamingPreferences && !state.streamingLoading) {
       refreshStreamingPreferences();
     }
-  }, [state.user, state.streamingPreferences, state.streamingLoading, refreshStreamingPreferences]);
+  }, [
+    state.user,
+    state.streamingPreferences,
+    state.streamingLoading,
+    refreshStreamingPreferences,
+  ]);
 
   const value: AuthContextType = {
     ...state,
@@ -150,6 +155,14 @@ export function useIsAuthenticated() {
 }
 
 export function useStreamingPreferences() {
-  const { streamingPreferences, streamingLoading, refreshStreamingPreferences } = useAuth();
-  return { streamingPreferences, streamingLoading, refreshStreamingPreferences };
+  const {
+    streamingPreferences,
+    streamingLoading,
+    refreshStreamingPreferences,
+  } = useAuth();
+  return {
+    streamingPreferences,
+    streamingLoading,
+    refreshStreamingPreferences,
+  };
 }

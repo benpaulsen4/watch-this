@@ -66,7 +66,7 @@ export function PasskeyDevicesViewer() {
     const lastUsed = new Date(lastUsedAt);
     const now = new Date();
     const diffInHours = Math.floor(
-      (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60)
+      (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60),
     );
 
     if (diffInHours < 1) return "Used recently";

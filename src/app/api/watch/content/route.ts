@@ -17,7 +17,7 @@ async function handler(request: AuthenticatedRequest) {
     if (!type || (type !== "movie" && type !== "tv")) {
       return NextResponse.json(
         { error: "type must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -25,14 +25,14 @@ async function handler(request: AuthenticatedRequest) {
     if (!numericId || Number.isNaN(numericId)) {
       return NextResponse.json(
         { error: "id must be a valid number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!region) {
       return NextResponse.json(
         { error: "region is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 

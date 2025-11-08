@@ -5,7 +5,11 @@ import {
   userStreamingProviders,
   type NewUserStreamingProvider,
 } from "@/lib/db/schema";
-import { withAuth, handleApiError, type AuthenticatedRequest } from "@/lib/auth/api-middleware";
+import {
+  withAuth,
+  handleApiError,
+  type AuthenticatedRequest,
+} from "@/lib/auth/api-middleware";
 import { eq, and } from "drizzle-orm";
 
 // GET /api/profile/streaming - Fetch user's streaming preferences
@@ -53,7 +57,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (country && !/^[A-Z]{2}$/i.test(country)) {
       return NextResponse.json(
         { error: "Invalid country code format. Expected 2-letter code." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -67,7 +71,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       if (!region || !/^[A-Z]{2}$/i.test(region)) {
         return NextResponse.json(
           { error: "Region is required and must be a 2-letter code." },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -80,8 +84,8 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         .where(
           and(
             eq(userStreamingProviders.userId, userId),
-            eq(userStreamingProviders.region, region.toUpperCase())
-          )
+            eq(userStreamingProviders.region, region.toUpperCase()),
+          ),
         );
 
       // Insert new set

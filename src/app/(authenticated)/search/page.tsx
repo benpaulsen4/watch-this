@@ -6,9 +6,9 @@ import { cookies } from "next/headers";
 
 export default async function SearchPage() {
   const user = await getCurrentUser((await cookies()).get("session")?.value);
-  
+
   if (!user) return null;
-  
+
   const [movieGenres, tvGenres] = await Promise.all([
     tmdbClient.getMovieGenres(),
     tmdbClient.getTVGenres(),
@@ -17,16 +17,19 @@ export default async function SearchPage() {
   // Combine and deduplicate genres
   const allGenres = [...movieGenres.genres, ...tvGenres.genres];
   const uniqueGenres = allGenres.filter(
-    (genre, index, self) =>
-      index === self.findIndex((g) => g.id === genre.id),
+    (genre, index, self) => index === self.findIndex((g) => g.id === genre.id),
   );
 
-  const sortedGenres = uniqueGenres.sort((a, b) => a.name.localeCompare(b.name));
-  
+  const sortedGenres = uniqueGenres.sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+
   const trending = await tmdbClient.getTrending("all", "day");
-  
-  const trendingContent = await Promise.all(trending.results.map(t => enrichWithContentStatus(t, user.id)))
+
+  const trendingContent = await Promise.all(
+    trending.results.map((t) => enrichWithContentStatus(t, user.id)),
+  );
   return (
-      <SearchClient genres={sortedGenres} trendingContent={trendingContent} />
+    <SearchClient genres={sortedGenres} trendingContent={trendingContent} />
   );
 }

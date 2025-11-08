@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { tmdbClient } from "@/lib/tmdb/client";
-import { withAuth, handleApiError, type AuthenticatedRequest } from "@/lib/auth/api-middleware";
+import {
+  withAuth,
+  handleApiError,
+  type AuthenticatedRequest,
+} from "@/lib/auth/api-middleware";
 
 async function handler(request: AuthenticatedRequest) {
   try {
@@ -20,12 +24,15 @@ async function handler(request: AuthenticatedRequest) {
     ]);
 
     // Merge and de-duplicate providers by provider_id
-    const map = new Map<number, {
-      provider_id: number;
-      provider_name: string;
-      logo_path: string | null;
-      display_priority: number;
-    }>();
+    const map = new Map<
+      number,
+      {
+        provider_id: number;
+        provider_name: string;
+        logo_path: string | null;
+        display_priority: number;
+      }
+    >();
 
     [...movieProviders.results, ...tvProviders.results].forEach((p) => {
       if (!map.has(p.provider_id)) {

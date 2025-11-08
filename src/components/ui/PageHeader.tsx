@@ -34,7 +34,7 @@ export function PageHeader({
               <h1
                 className={cn(
                   "text-xl font-bold text-gray-100",
-                  titleClassName
+                  titleClassName,
                 )}
               >
                 {title}

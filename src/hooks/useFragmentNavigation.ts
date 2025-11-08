@@ -21,22 +21,26 @@ export function useFragmentNavigation<T extends string>({
   // Function to get tab from fragment
   const getTabFromFragment = useCallback((): T => {
     if (typeof window === "undefined") return defaultTab;
-    
+
     const hash = window.location.hash.slice(1); // Remove the '#'
     return validTabs.includes(hash as T) ? (hash as T) : defaultTab;
   }, [defaultTab, validTabs]);
 
   // Function to update URL fragment without using Next.js router
-  const updateFragment = useCallback((tab: T) => {
-    if (typeof window === "undefined") return;
-    
-    const newUrl = tab === defaultTab 
-      ? window.location.pathname + window.location.search
-      : `${window.location.pathname}${window.location.search}#${tab}`;
-    
-    // Use history.replaceState to avoid triggering hashchange
-    window.history.replaceState(null, '', newUrl);
-  }, [defaultTab]);
+  const updateFragment = useCallback(
+    (tab: T) => {
+      if (typeof window === "undefined") return;
+
+      const newUrl =
+        tab === defaultTab
+          ? window.location.pathname + window.location.search
+          : `${window.location.pathname}${window.location.search}#${tab}`;
+
+      // Use history.replaceState to avoid triggering hashchange
+      window.history.replaceState(null, "", newUrl);
+    },
+    [defaultTab],
+  );
 
   // Initialize tab from URL fragment on mount
   useEffect(() => {
@@ -57,10 +61,13 @@ export function useFragmentNavigation<T extends string>({
   }, [getTabFromFragment]);
 
   // Custom setActiveTab that updates both state and URL
-  const setActiveTab = useCallback((tab: T) => {
-    setActiveTabState(tab);
-    updateFragment(tab);
-  }, [updateFragment]);
+  const setActiveTab = useCallback(
+    (tab: T) => {
+      setActiveTabState(tab);
+      updateFragment(tab);
+    },
+    [updateFragment],
+  );
 
   return {
     activeTab,

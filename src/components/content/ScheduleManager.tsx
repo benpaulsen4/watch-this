@@ -47,7 +47,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
 
   function computeOtherShowsByDay(
     schedulesByDay: Record<number, Schedule[]>,
-    excludeTmdbId: number
+    excludeTmdbId: number,
   ): Record<number, string[]> {
     const result: Record<number, string[]> = {};
     for (let day = 0; day <= 6; day++) {
@@ -61,11 +61,11 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
 
   const schedulesByDay = useMemo(
     () => schedulesQuery.data || {},
-    [schedulesQuery.data]
+    [schedulesQuery.data],
   );
   const otherShowsByDay = useMemo(
     () => computeOtherShowsByDay(schedulesByDay, tmdbId),
-    [schedulesByDay, tmdbId]
+    [schedulesByDay, tmdbId],
   );
 
   // React Query handles loading/fetching; derived values computed via useMemo
@@ -93,12 +93,12 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
             newSchedule as Schedule,
           ];
           return { ...current, [dayOfWeek]: updatedDay };
-        }
+        },
       );
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to add to schedule"
+        err instanceof Error ? err.message : "Failed to add to schedule",
       );
     },
   });
@@ -107,7 +107,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
     mutationFn: async (dayOfWeek: number) => {
       const response = await fetch(
         `/api/schedules?tmdbId=${tmdbId}&dayOfWeek=${dayOfWeek}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
       if (!response.ok) {
         const errorData = await response.json();
@@ -121,15 +121,15 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
         (prev) => {
           const current = prev || {};
           const updatedDay = (current[dayOfWeek] || []).filter(
-            (s) => s.tmdbId !== tmdbId
+            (s) => s.tmdbId !== tmdbId,
           );
           return { ...current, [dayOfWeek]: updatedDay };
-        }
+        },
       );
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to remove from schedule"
+        err instanceof Error ? err.message : "Failed to remove from schedule",
       );
     },
   });
@@ -172,7 +172,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
       <div className="grid gap-3">
         {DAYS_OF_WEEK.map((day, index) => {
           const isScheduled = (schedulesByDay[index] || []).some(
-            (s) => s.tmdbId === tmdbId
+            (s) => s.tmdbId === tmdbId,
           );
           const today = new Date().getDay();
           const isToday = index === today;
@@ -184,7 +184,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
                 "flex items-center justify-between p-4 rounded-lg border transition-colors, gap-2",
                 isToday
                   ? "bg-red-900/20 border-red-800"
-                  : "bg-gray-800/50 border-gray-700"
+                  : "bg-gray-800/50 border-gray-700",
               )}
             >
               <div className="flex flex-col gap-1">
@@ -192,13 +192,13 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
                   <div
                     className={cn(
                       "w-3 h-3 rounded-full",
-                      isScheduled ? "bg-red-500" : "bg-gray-600"
+                      isScheduled ? "bg-red-500" : "bg-gray-600",
                     )}
                   />
                   <span
                     className={cn(
                       "font-medium",
-                      isToday ? "text-red-400" : "text-gray-200"
+                      isToday ? "text-red-400" : "text-gray-200",
                     )}
                   >
                     {day}

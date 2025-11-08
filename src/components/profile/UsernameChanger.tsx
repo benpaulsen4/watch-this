@@ -83,7 +83,9 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
       setIsEditing(false);
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to update username");
+      setError(
+        err instanceof Error ? err.message : "Failed to update username",
+      );
     },
     onSettled: () => setLoading(false),
   });

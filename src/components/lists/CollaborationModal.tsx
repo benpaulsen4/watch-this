@@ -96,7 +96,7 @@ export default function CollaborationModal({
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to add collaborator"
+        err instanceof Error ? err.message : "Failed to add collaborator",
       );
     },
     onSettled: () => setAddingCollaborator(false),
@@ -104,7 +104,7 @@ export default function CollaborationModal({
 
   const removeCollaborator = async (
     collaboratorUserId: string,
-    username: string
+    username: string,
   ) => {
     if (
       !confirm(`Are you sure you want to remove ${username} from this list?`)
@@ -125,7 +125,7 @@ export default function CollaborationModal({
     }) => {
       const response = await fetch(
         `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
       const data = await response.json();
       if (!response.ok)
@@ -140,14 +140,14 @@ export default function CollaborationModal({
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to remove collaborator"
+        err instanceof Error ? err.message : "Failed to remove collaborator",
       );
     },
   });
 
   const updatePermission = async (
     collaboratorUserId: string,
-    newPermission: string
+    newPermission: string,
   ) => {
     setError(null);
     setSuccess(null);
@@ -168,7 +168,7 @@ export default function CollaborationModal({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ permissionLevel: newPermission }),
-        }
+        },
       );
       const data = await response.json();
       if (!response.ok)
@@ -183,7 +183,7 @@ export default function CollaborationModal({
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to update permission"
+        err instanceof Error ? err.message : "Failed to update permission",
       );
     },
   });
@@ -272,7 +272,7 @@ export default function CollaborationModal({
                     value={newPermissionLevel}
                     onChange={(e) =>
                       setNewPermissionLevel(
-                        e.target.value as PermissionLevelEnum
+                        e.target.value as PermissionLevelEnum,
                       )
                     }
                     className="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -377,7 +377,7 @@ export default function CollaborationModal({
                               onChange={(e) =>
                                 updatePermission(
                                   collaborator.userId,
-                                  e.target.value
+                                  e.target.value,
                                 )
                               }
                               className="px-3 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -393,7 +393,7 @@ export default function CollaborationModal({
                               onClick={() =>
                                 removeCollaborator(
                                   collaborator.userId,
-                                  collaborator.username
+                                  collaborator.username,
                                 )
                               }
                               className="p-2 text-gray-400 hover:text-red-400 transition-colors"
@@ -403,7 +403,7 @@ export default function CollaborationModal({
                             </button>
                           </div>
                         </div>
-                      )
+                      ),
                     )}
                   </div>
                 )}

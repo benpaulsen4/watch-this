@@ -68,7 +68,7 @@ export async function getListsResponse(userId: string) {
       lists.isPublic,
       lists.ownerId,
       lists.createdAt,
-      lists.updatedAt
+      lists.updatedAt,
     );
 
   // Get poster URLs for each list (up to 4 items)
@@ -80,7 +80,7 @@ export async function getListsResponse(userId: string) {
         })
         .from(listItems)
         .where(
-          and(eq(listItems.listId, list.id), isNotNull(listItems.posterPath))
+          and(eq(listItems.listId, list.id), isNotNull(listItems.posterPath)),
         )
         .orderBy(desc(listItems.createdAt))
         .limit(4);
@@ -89,13 +89,13 @@ export async function getListsResponse(userId: string) {
         ...list,
         posterPaths: posterItems.map((i) => i.posterPath!),
       };
-    })
+    }),
   );
 }
 
 export async function getListResponse(
   userId: string,
-  listId: string
+  listId: string,
 ): Promise<ListResponse | "notFound"> {
   try {
     // Check if user has access to this list (owner or collaborator)
@@ -122,9 +122,9 @@ export async function getListResponse(
           or(
             eq(lists.ownerId, userId),
             eq(listCollaborators.userId, userId),
-            eq(lists.isPublic, true)
-          )
-        )
+            eq(lists.isPublic, true),
+          ),
+        ),
       )
       .limit(1);
 
@@ -164,11 +164,13 @@ export async function getListResponse(
           listItemId: item.id,
           createdAt: item.createdAt.toISOString(),
         } as unknown as ListItem;
-      })
+      }),
     );
 
     const enrichedItems = (await Promise.all(
-      tmdbItems.map(async (item) => await enrichWithContentStatus(item, userId))
+      tmdbItems.map(
+        async (item) => await enrichWithContentStatus(item, userId),
+      ),
     )) as ListItem[];
 
     return {

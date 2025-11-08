@@ -40,7 +40,8 @@ export function ProfilePictureManager({
         body: JSON.stringify({ profilePictureUrl: newUrl.trim() || null }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to update profile picture");
+      if (!response.ok)
+        throw new Error(data.error || "Failed to update profile picture");
       return data;
     },
     onSuccess: (data) => {
@@ -49,7 +50,9 @@ export function ProfilePictureManager({
       setPreviewError(false);
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to update profile picture");
+      setError(
+        err instanceof Error ? err.message : "Failed to update profile picture",
+      );
     },
     onSettled: () => setLoading(false),
   });

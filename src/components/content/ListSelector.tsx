@@ -71,10 +71,13 @@ export function ListSelector({
   const lists = listsData?.lists || [];
   const listsWithContent = useMemo(() => {
     const data = listsWithContentData || [];
-    return data.reduce((acc, list) => {
-      acc[list.listId] = list.itemId;
-      return acc;
-    }, {} as Record<string, string>);
+    return data.reduce(
+      (acc, list) => {
+        acc[list.listId] = list.itemId;
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
   }, [listsWithContentData]);
 
   // Filter lists based on content type
@@ -198,8 +201,8 @@ export function ListSelector({
                     {list.listType === "mixed"
                       ? "Mixed"
                       : list.listType === "movies"
-                      ? "Movies"
-                      : "TV Shows"}
+                        ? "Movies"
+                        : "TV Shows"}
                     <span>&nbsp;•&nbsp;</span>
                     {list.isPublic ? (
                       <>
