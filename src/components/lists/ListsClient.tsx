@@ -9,6 +9,7 @@ import { List } from "@/lib/db";
 import { PageHeader } from "../ui/PageHeader";
 import { ListCard } from "./ListCard";
 import { useMutation } from "@tanstack/react-query";
+import Dropdown from "@/components/ui/Dropdown";
 
 export interface ListResponse extends List {
   itemCount: number;
@@ -121,22 +122,19 @@ export default function ListsClient({
               </div>
 
               <div>
-                <label
-                  htmlFor="listType"
-                  className="block text-sm font-medium text-gray-300 mb-2"
-                >
-                  List Type
-                </label>
-                <select
-                  id="listType"
-                  value={newListType}
-                  onChange={(e) => setNewListType(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="mixed">Mixed (Movies & TV Shows)</option>
-                  <option value="movies">Movies Only</option>
-                  <option value="tv">TV Shows Only</option>
-                </select>
+                <Dropdown
+                  label="List Type"
+                  placeholder="Select type"
+                  selectedKey={newListType}
+                  onSelectionChange={(key) =>
+                    setNewListType(String(key ?? newListType))
+                  }
+                  options={[
+                    { key: "mixed", label: "Mixed (Movies & TV Shows)" },
+                    { key: "movies", label: "Movies Only" },
+                    { key: "tv", label: "TV Shows Only" },
+                  ]}
+                />
               </div>
 
               <div className="flex items-center gap-2">

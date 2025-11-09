@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import Dropdown from "@/components/ui/Dropdown";
 
 interface Collaborator {
   id: string;
@@ -261,18 +262,24 @@ export default function CollaborationModal({
                     onKeyDown={(e) => e.key === "Enter" && addCollaborator()}
                   />
                 </div>
-                <select
-                  value={newPermissionLevel}
-                  onChange={(e) =>
-                    setNewPermissionLevel(e.target.value as PermissionLevelEnum)
+                <Dropdown
+                  placeholder="Collaborator"
+                  selectedKey={newPermissionLevel}
+                  onSelectionChange={(key) =>
+                    setNewPermissionLevel(
+                      (key as PermissionLevelEnum) ||
+                        PermissionLevel.COLLABORATOR
+                    )
                   }
-                  className="px-3 py-2 rounded-lg border border-gray-600 bg-transparent text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  <option value={PermissionLevel.COLLABORATOR}>
-                    Collaborator
-                  </option>
-                  <option value={PermissionLevel.VIEWER}>Viewer</option>
-                </select>
+                  options={[
+                    {
+                      key: PermissionLevel.COLLABORATOR,
+                      label: "Collaborator",
+                    },
+                    { key: PermissionLevel.VIEWER, label: "Viewer" },
+                  ]}
+                  className="sm:w-44"
+                />
                 <Button
                   onClick={addCollaborator}
                   disabled={addingCollaborator || !newUsername.trim()}
@@ -354,23 +361,25 @@ export default function CollaborationModal({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <select
-                            value={collaborator.permissionLevel}
-                            onChange={(e) =>
+                          <Dropdown
+                            placeholder="Collaborator"
+                            selectedKey={collaborator.permissionLevel}
+                            onSelectionChange={(key) =>
                               updatePermission(
                                 collaborator.userId,
-                                e.target.value
+                                String(key || PermissionLevel.COLLABORATOR)
                               )
                             }
-                            className="px-3 py-1 rounded-lg border border-gray-600 bg-transparent text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                          >
-                            <option value={PermissionLevel.COLLABORATOR}>
-                              Collaborator
-                            </option>
-                            <option value={PermissionLevel.VIEWER}>
-                              Viewer
-                            </option>
-                          </select>
+                            options={[
+                              {
+                                key: PermissionLevel.COLLABORATOR,
+                                label: "Collaborator",
+                              },
+                              { key: PermissionLevel.VIEWER, label: "Viewer" },
+                            ]}
+                            size="sm"
+                            className="w-44"
+                          />
                           <Button
                             variant="ghost"
                             size="icon"

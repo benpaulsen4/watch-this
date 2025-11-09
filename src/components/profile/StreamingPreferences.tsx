@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
+import Dropdown from "@/components/ui/Dropdown";
 import { getImageUrl } from "@/lib/tmdb/client";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { useStreamingPreferences } from "../providers/AuthProvider";
@@ -181,22 +182,17 @@ export function StreamingPreferences() {
     <div className="space-y-6">
       {/* Country selector */}
       <div>
-        <label className="block text-sm font-medium text-gray-200 mb-2">
-          Country/Region
-        </label>
-        <select
-          value={country}
-          onChange={(e) => handleCountryChange(e.target.value)}
-          className="w-full bg-gray-900 border border-gray-700 text-gray-100 rounded-md px-3 py-2"
-          disabled={regionsQuery.isLoading}
-        >
-          <option value="">Select a country...</option>
-          {(regionsQuery.data || []).map((r) => (
-            <option key={r.iso_3166_1} value={r.iso_3166_1}>
-              {r.english_name} ({r.iso_3166_1})
-            </option>
-          ))}
-        </select>
+        <Dropdown
+          label="Country/Region"
+          placeholder="Select a country..."
+          selectedKey={country || undefined}
+          onSelectionChange={(key) => handleCountryChange(String(key || ""))}
+          isDisabled={regionsQuery.isLoading}
+          options={(regionsQuery.data || []).map((r) => ({
+            key: r.iso_3166_1,
+            label: `${r.english_name} (${r.iso_3166_1})`,
+          }))}
+        />
       </div>
 
       {/* Providers grid */}

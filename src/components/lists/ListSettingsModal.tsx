@@ -5,6 +5,7 @@ import { Trash2, Save, AlertTriangle } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import Modal from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import Dropdown from "@/components/ui/Dropdown";
 // Using local List interface to match API response format
 
 interface List {
@@ -191,19 +192,20 @@ export default function ListSettingsModal({
 
             {/* List Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-200 mb-2">
-                List Type
-              </label>
-              <select
-                value={formData.listType}
-                onChange={(e) => handleInputChange("listType", e.target.value)}
-                disabled={!isOwner || isLoading}
-                className="w-full px-3 py-2 rounded-lg border border-gray-600 bg-transparent text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="mixed">Mixed (Movies & TV Shows)</option>
-                <option value="movie">Movies Only</option>
-                <option value="tv">TV Shows Only</option>
-              </select>
+              <Dropdown
+                label="List Type"
+                placeholder="Select type"
+                selectedKey={formData.listType}
+                onSelectionChange={(key) =>
+                  handleInputChange("listType", String(key || formData.listType))
+                }
+                isDisabled={!isOwner || isLoading}
+                options={[
+                  { key: "mixed", label: "Mixed (Movies & TV Shows)" },
+                  { key: "movie", label: "Movies Only" },
+                  { key: "tv", label: "TV Shows Only" },
+                ]}
+              />
             </div>
 
             {/* Visibility */}
