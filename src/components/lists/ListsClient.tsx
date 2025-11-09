@@ -11,6 +11,7 @@ import { ListCard } from "./ListCard";
 import { useMutation } from "@tanstack/react-query";
 import Dropdown from "@/components/ui/Dropdown";
 import { Switch } from "@/components/ui/Switch";
+import { Input, Textarea } from "@/components/ui/Input";
 
 export interface ListResponse extends List {
   itemCount: number;
@@ -96,55 +97,41 @@ export default function ListsClient({
               <CardTitle className="text-gray-100">Create New List</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  List Name *
-                </label>
-                <input
-                  type="text"
-                  value={newListName}
-                  onChange={(e) => setNewListName(e.target.value)}
-                  placeholder="Enter list name"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
+              <Input
+                label="List Name *"
+                type="text"
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                placeholder="Enter list name"
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={newListDescription}
-                  onChange={(e) => setNewListDescription(e.target.value)}
-                  placeholder="Describe your list (optional)"
-                  rows={3}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
+              <Textarea
+                label="Description"
+                value={newListDescription}
+                onChange={(e) => setNewListDescription(e.target.value)}
+                placeholder="Describe your list (optional)"
+                rows={3}
+              />
 
-              <div>
-                <Dropdown
-                  label="List Type"
-                  placeholder="Select type"
-                  selectedKey={newListType}
-                  onSelectionChange={(key) =>
-                    setNewListType(String(key ?? newListType))
-                  }
-                  options={[
-                    { key: "mixed", label: "Mixed (Movies & TV Shows)" },
-                    { key: "movies", label: "Movies Only" },
-                    { key: "tv", label: "TV Shows Only" },
-                  ]}
-                />
-              </div>
+              <Dropdown
+                label="List Type"
+                placeholder="Select type"
+                selectedKey={newListType}
+                onSelectionChange={(key) =>
+                  setNewListType(String(key ?? newListType))
+                }
+                options={[
+                  { key: "mixed", label: "Mixed (Movies & TV Shows)" },
+                  { key: "movies", label: "Movies Only" },
+                  { key: "tv", label: "TV Shows Only" },
+                ]}
+              />
 
-              <div>
-                <Switch
-                  label="Make this list public"
-                  isSelected={newListIsPublic}
-                  onChange={(selected) => setNewListIsPublic(selected)}
-                />
-              </div>
+              <Switch
+                label="Make this list public"
+                isSelected={newListIsPublic}
+                onChange={(selected) => setNewListIsPublic(selected)}
+              />
 
               <div className="flex gap-3">
                 <Button

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Edit3, Check, X, AlertCircle, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { User } from "@/lib/auth/client";
 import { useMutation } from "@tanstack/react-query";
 
@@ -126,14 +127,13 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
                   Username
                 </label>
                 <div className="relative">
-                  {/* TODO use input component */}
-                  <input
+                  {/* Use shared Input component */}
+                  <Input
                     id="username"
                     type="text"
                     value={newUsername}
                     onChange={(e) => handleUsernameChange(e.target.value)}
                     placeholder="Enter your username"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     disabled={loading}
                     maxLength={50}
                   />

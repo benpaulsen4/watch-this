@@ -18,13 +18,14 @@ const inputVariants = cva(
         default: "h-10",
         sm: "h-8",
         lg: "h-12 text-base",
+        textarea: "min-h-24 resize-none text-base",
       },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
     },
-  },
+  }
 );
 
 export interface InputProps
@@ -38,7 +39,7 @@ export interface InputProps
 const Input = forwardRef<HTMLInputElement, InputProps>(
   (
     { className, variant, size, error, label, helperText, id, ...props },
-    ref,
+    ref
   ) => {
     const inputId = id || `input-${Math.random().toString(36).substring(2)}`;
     const finalVariant = error ? "error" : variant;
@@ -48,7 +49,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="text-sm font-medium text-gray-200"
+            className="block text-sm font-medium text-gray-200 mb-2"
           >
             {label}
           </label>
@@ -56,9 +57,60 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           id={inputId}
           className={cn(
-            inputVariants({ variant: finalVariant, size, className }),
+            inputVariants({ variant: finalVariant, size, className })
           )}
           ref={ref}
+          {...props}
+        />
+        {(error || helperText) && (
+          <p
+            className={cn("text-xs", error ? "text-red-400" : "text-gray-500")}
+          >
+            {error || helperText}
+          </p>
+        )}
+      </div>
+    );
+  }
+);
+
+Input.displayName = "Input";
+
+export { Input, inputVariants };
+
+export interface TextareaProps
+  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "size">,
+    VariantProps<typeof inputVariants> {
+  error?: string;
+  label?: string;
+  helperText?: string;
+}
+
+const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+  (
+    { className, variant, size, error, label, helperText, id, rows, ...props },
+    ref,
+  ) => {
+    const textareaId = id || `textarea-${Math.random().toString(36).substring(2)}`;
+    const finalVariant = error ? "error" : variant;
+
+    return (
+      <div className="space-y-2">
+        {label && (
+          <label
+            htmlFor={textareaId}
+            className="block text-sm font-medium text-gray-200 mb-2"
+          >
+            {label}
+          </label>
+        )}
+        <textarea
+          id={textareaId}
+          className={cn(
+            inputVariants({ variant: finalVariant, size: size ?? "textarea", className }),
+          )}
+          ref={ref}
+          rows={rows ?? 3}
           {...props}
         />
         {(error || helperText) && (
@@ -73,6 +125,6 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
   },
 );
 
-Input.displayName = "Input";
+Textarea.displayName = "Textarea";
 
-export { Input, inputVariants };
+export { Textarea };

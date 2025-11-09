@@ -7,6 +7,7 @@ import Modal from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
 import { Switch } from "@/components/ui/Switch";
+import { Input, Textarea } from "@/components/ui/Input";
 // Using local List interface to match API response format
 
 interface List {
@@ -152,44 +153,28 @@ export default function ListSettingsModal({
         {!showDeleteConfirm ? (
           <>
             {/* List Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-200 mb-2">
-                List Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                disabled={!isOwner || isLoading}
-                className="w-full px-3 py-2 rounded-lg border border-gray-600 bg-transparent text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                placeholder="Enter list name"
-                maxLength={100}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                {formData.name.length}/100 characters
-              </p>
-            </div>
+            <Input
+              label="List Name * "
+              type="text"
+              value={formData.name}
+              onChange={(e) => handleInputChange("name", e.target.value)}
+              disabled={!isOwner || isLoading}
+              placeholder="Enter list name"
+              maxLength={100}
+              helperText={`${formData.name.length}/100 characters`}
+            />
 
             {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-gray-200 mb-2">
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  handleInputChange("description", e.target.value)
-                }
-                disabled={!isOwner || isLoading}
-                className="w-full px-3 py-2 rounded-lg border border-gray-600 bg-transparent text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
-                placeholder="Enter list description (optional)"
-                rows={3}
-                maxLength={500}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                {formData.description.length}/500 characters
-              </p>
-            </div>
+            <Textarea
+              label="Description"
+              value={formData.description}
+              onChange={(e) => handleInputChange("description", e.target.value)}
+              disabled={!isOwner || isLoading}
+              placeholder="Enter list description (optional)"
+              rows={3}
+              maxLength={500}
+              helperText={`${formData.description.length}/500 characters`}
+            />
 
             {/* List Type */}
             <div>
