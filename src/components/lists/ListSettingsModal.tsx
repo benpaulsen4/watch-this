@@ -6,6 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import Modal from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
+import { Switch } from "@/components/ui/Switch";
 // Using local List interface to match API response format
 
 interface List {
@@ -197,7 +198,10 @@ export default function ListSettingsModal({
                 placeholder="Select type"
                 selectedKey={formData.listType}
                 onSelectionChange={(key) =>
-                  handleInputChange("listType", String(key || formData.listType))
+                  handleInputChange(
+                    "listType",
+                    String(key || formData.listType)
+                  )
                 }
                 isDisabled={!isOwner || isLoading}
                 options={[
@@ -210,45 +214,26 @@ export default function ListSettingsModal({
 
             {/* Visibility */}
             <div>
-              <label className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  checked={formData.isPublic}
-                  onChange={(e) =>
-                    handleInputChange("isPublic", e.target.checked)
-                  }
-                  disabled={!isOwner || isLoading}
-                  className="w-4 h-4 text-red-600 bg-gray-900 border-gray-600 rounded focus:ring-red-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <span className="text-sm font-medium text-gray-300">
-                  Make this list public
-                </span>
-              </label>
-              <p className="text-xs text-gray-400 mt-1 ml-7">
-                Public lists can be discovered and viewed by other users
-              </p>
+              <Switch
+                label="Make this list public"
+                isSelected={formData.isPublic}
+                onChange={(selected) => handleInputChange("isPublic", selected)}
+                isDisabled={!isOwner || isLoading}
+                helperText="Public lists can be discovered and viewed by other users"
+              />
             </div>
 
             {/* Sync Watch Status */}
             <div>
-              <label className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  checked={formData.syncWatchStatus}
-                  onChange={(e) =>
-                    handleInputChange("syncWatchStatus", e.target.checked)
-                  }
-                  disabled={!isOwner || isLoading}
-                  className="w-4 h-4 text-green-600 bg-gray-900 border-gray-600 rounded focus:ring-green-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <span className="text-sm font-medium text-gray-300">
-                  Sync watch status with collaborators
-                </span>
-              </label>
-              <p className="text-xs text-gray-400 mt-1 ml-7">
-                When enabled, watch status updates will be synchronized across
-                all collaborators
-              </p>
+              <Switch
+                label="Sync watch status with collaborators"
+                isSelected={formData.syncWatchStatus}
+                onChange={(selected) =>
+                  handleInputChange("syncWatchStatus", selected)
+                }
+                isDisabled={!isOwner || isLoading}
+                helperText="When enabled, watch status updates will be synchronized across all collaborators"
+              />
             </div>
 
             {/* Action Buttons */}

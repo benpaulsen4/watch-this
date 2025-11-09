@@ -10,6 +10,7 @@ import { PageHeader } from "../ui/PageHeader";
 import { ListCard } from "./ListCard";
 import { useMutation } from "@tanstack/react-query";
 import Dropdown from "@/components/ui/Dropdown";
+import { Switch } from "@/components/ui/Switch";
 
 export interface ListResponse extends List {
   itemCount: number;
@@ -137,17 +138,12 @@ export default function ListsClient({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isPublic"
-                  checked={newListIsPublic}
-                  onChange={(e) => setNewListIsPublic(e.target.checked)}
-                  className="rounded border-gray-700 bg-gray-800 text-red-600 focus:ring-red-500"
+              <div>
+                <Switch
+                  label="Make this list public"
+                  isSelected={newListIsPublic}
+                  onChange={(selected) => setNewListIsPublic(selected)}
                 />
-                <label htmlFor="isPublic" className="text-sm text-gray-300">
-                  Make this list public
-                </label>
               </div>
 
               <div className="flex gap-3">
