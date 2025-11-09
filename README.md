@@ -98,14 +98,14 @@ npm run test:run
 - [x] JustWatch integration with per-user streaming service configuration
 - [x] Server-side component refactoring
 - [x] React query drop-in
-- [ ] UI component standardization
+- [x] UI component standardization
 - [ ] Test writing
-- [ ] RSC streaming implementation
-- [ ] Recommendations of some kind
 - [ ] New List creation shortcut from content details lists tab
 - [ ] Cast tab for content details
+- [ ] RSC streaming implementation
 - [ ] \*arr stack integration for when content is not on any configured streaming services
 - [ ] TMDB cache table to reduce spamming their API when fetching lists
+- [ ] Recommendations of some kind
 - [ ] Multi-device passkey management
 - [ ] Sorting and filtering inside lists
 - [ ] Statistics page in user profile

@@ -23,7 +23,7 @@ const spinnerVariants = cva(
       size: "default",
       variant: "default",
     },
-  },
+  }
 );
 
 export interface LoadingSpinnerProps
@@ -50,7 +50,7 @@ const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
         <div
           className={cn(
             "flex items-center gap-2",
-            centered && "justify-center",
+            centered && "justify-center"
           )}
         >
           {spinner}
@@ -64,48 +64,9 @@ const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
     }
 
     return spinner;
-  },
+  }
 );
 
 LoadingSpinner.displayName = "LoadingSpinner";
-
-// Full page loading component
-export interface PageLoadingProps {
-  text?: string;
-  variant?: VariantProps<typeof spinnerVariants>["variant"];
-}
-
-export function PageLoading({
-  text = "Loading...",
-  variant = "primary",
-}: PageLoadingProps) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-950">
-      <div className="flex flex-col items-center gap-4">
-        <LoadingSpinner size="xl" variant={variant} />
-        <p className="text-lg text-gray-300">{text}</p>
-      </div>
-    </div>
-  );
-}
-
-// Section loading component
-export interface SectionLoadingProps {
-  text?: string;
-  variant?: VariantProps<typeof spinnerVariants>["variant"];
-  className?: string;
-}
-
-export function SectionLoading({
-  text = "Loading...",
-  variant = "default",
-  className,
-}: SectionLoadingProps) {
-  return (
-    <div className={cn("flex items-center justify-center py-12", className)}>
-      <LoadingSpinner size="lg" variant={variant} text={text} />
-    </div>
-  );
-}
 
 export { LoadingSpinner, spinnerVariants };
