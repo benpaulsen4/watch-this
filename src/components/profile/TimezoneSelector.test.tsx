@@ -43,7 +43,7 @@ describe("TimezoneSelector", () => {
     const onUserUpdate = vi.fn();
     renderWithProviders(<TimezoneSelector user={{ timezone: "UTC" }} onUserUpdate={onUserUpdate} />);
 
-    expect(screen.getByText(/utc/i)).toBeInTheDocument();
+    expect(screen.getByText(/^UTC$/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /change timezone/i }));
     expect(screen.getByTestId("dropdown")).toBeInTheDocument();
   });
