@@ -176,7 +176,11 @@ export function StreamingPreferences() {
 
   const handleSave = async () => {
     setError("");
-    await savePreferences.mutateAsync();
+    try {
+      await savePreferences.mutateAsync();
+    } catch {
+      // Error state is handled in onError; swallow to avoid unhandled rejection
+    }
   };
 
   return (

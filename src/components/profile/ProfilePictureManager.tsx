@@ -65,7 +65,11 @@ export function ProfilePictureManager({
     }
     setLoading(true);
     setError(null);
-    await updatePictureMutation.mutateAsync();
+    try {
+      await updatePictureMutation.mutateAsync();
+    } catch {
+      // Error handled via onError; swallow to avoid unhandled rejection
+    }
   };
 
   const handleCancel = () => {

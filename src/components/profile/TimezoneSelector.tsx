@@ -57,7 +57,11 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    await saveTimezoneMutation.mutateAsync();
+    try {
+      await saveTimezoneMutation.mutateAsync();
+    } catch {
+      // Error state handled in onError
+    }
   };
 
   const saveTimezoneMutation = useMutation({

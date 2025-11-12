@@ -60,7 +60,11 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
 
     setLoading(true);
     setError(null);
-    await saveUsernameMutation.mutateAsync();
+    try {
+      await saveUsernameMutation.mutateAsync();
+    } catch {
+      // Error state handled in onError
+    }
   };
 
   const saveUsernameMutation = useMutation({

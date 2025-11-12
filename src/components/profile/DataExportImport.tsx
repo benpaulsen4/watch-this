@@ -73,7 +73,11 @@ export function DataExportImport() {
 
   const handleExport = async (format: ExportFormat) => {
     setExportLoading(true);
-    await exportMutation.mutateAsync(format);
+    try {
+      await exportMutation.mutateAsync(format);
+    } catch {
+      // Error surfaced via onError alert; swallow to avoid unhandled rejection
+    }
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,7 +133,11 @@ export function DataExportImport() {
     if (!selectedFile) return;
     setImportStatus("uploading");
     setImportResult(null);
-    await importMutation.mutateAsync(selectedFile);
+    try {
+      await importMutation.mutateAsync(selectedFile);
+    } catch {
+      // Error handled via onError; swallow to avoid unhandled rejection
+    }
   };
 
   const clearImportResult = () => {
