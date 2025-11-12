@@ -99,7 +99,7 @@ npm run test:run
 - [x] Server-side component refactoring
 - [x] React query drop-in
 - [x] UI component standardization
-- [ ] Test writing
+- [x] Test writing
 - [ ] New List creation shortcut from content details lists tab
 - [ ] Cast tab for content details
 - [ ] RSC streaming implementation
