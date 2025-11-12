@@ -6,6 +6,7 @@ import type { TMDBMovie, TMDBTVShow, TMDBGenre } from "@/lib/tmdb/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { SearchInput } from "@/components/search/SearchInput";
 import { Button } from "@/components/ui/Button";
+import Dropdown from "@/components/ui/Dropdown";
 import { PageHeader } from "../ui/PageHeader";
 import { ContentCard } from "../content/ContentCard";
 import { ContentCardSkeleton } from "../content/ContentCardSkeleton";
@@ -150,73 +151,80 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Content Type
                   </label>
-                  {/* TODO use select component */}
-                  <select
-                    value={contentType}
-                    onChange={(e) =>
-                      setContentType(e.target.value as ContentType)
+                  <Dropdown
+                    placeholder="All"
+                    selectedKey={contentType}
+                    onSelectionChange={(key) =>
+                      setContentType((key as ContentType) || "all")
                     }
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
-                  >
-                    <option value="all">All</option>
-                    <option value="movie">Movies</option>
-                    <option value="tv">TV Shows</option>
-                  </select>
+                    options={[
+                      { key: "all", label: "All" },
+                      { key: "movie", label: "Movies" },
+                      { key: "tv", label: "TV Shows" },
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Genre
                   </label>
-                  <select
-                    value={selectedGenre}
-                    onChange={(e) => setSelectedGenre(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
-                    disabled={!!searchQuery}
-                  >
-                    <option value="">All Genres</option>
-                    {genres.map((genre) => (
-                      <option key={genre.id} value={genre.id}>
-                        {genre.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    placeholder="All Genres"
+                    selectedKey={selectedGenre}
+                    onSelectionChange={(key) =>
+                      setSelectedGenre(String(key ?? ""))
+                    }
+                    isDisabled={!!searchQuery}
+                    options={[
+                      { key: "", label: "All Genres" },
+                      ...genres.map((genre) => ({
+                        key: String(genre.id),
+                        label: genre.name,
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Year
                   </label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
-                    disabled={!!searchQuery && contentType === "all"}
-                  >
-                    <option value="">All Years</option>
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    placeholder="All Years"
+                    selectedKey={selectedYear}
+                    onSelectionChange={(key) =>
+                      setSelectedYear(String(key ?? ""))
+                    }
+                    isDisabled={!!searchQuery && contentType === "all"}
+                    options={[
+                      { key: "", label: "All Years" },
+                      ...years.map((year) => ({
+                        key: String(year),
+                        label: String(year),
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Sort By
                   </label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as SortBy)}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-gray-100"
-                    disabled={!!searchQuery}
-                  >
-                    <option value="popularity.desc">Popularity</option>
-                    <option value="vote_average.desc">Rating</option>
-                    <option value="release_date.desc">Release Date</option>
-                    <option value="title.asc">Title</option>
-                  </select>
+                  <Dropdown
+                    placeholder="Popularity"
+                    selectedKey={sortBy}
+                    onSelectionChange={(key) =>
+                      setSortBy((key as SortBy) || "popularity.desc")
+                    }
+                    isDisabled={!!searchQuery}
+                    options={[
+                      { key: "popularity.desc", label: "Popularity" },
+                      { key: "vote_average.desc", label: "Rating" },
+                      { key: "release_date.desc", label: "Release Date" },
+                      { key: "title.asc", label: "Title" },
+                    ]}
+                  />
                 </div>
               </div>
 

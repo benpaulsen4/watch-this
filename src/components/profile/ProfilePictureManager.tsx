@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Camera, Check, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { User } from "@/lib/auth/client";
 import { useMutation } from "@tanstack/react-query";
 
@@ -64,7 +65,11 @@ export function ProfilePictureManager({
     }
     setLoading(true);
     setError(null);
-    await updatePictureMutation.mutateAsync();
+    try {
+      await updatePictureMutation.mutateAsync();
+    } catch {
+      // Error handled via onError; swallow to avoid unhandled rejection
+    }
   };
 
   const handleCancel = () => {
@@ -127,8 +132,8 @@ export function ProfilePictureManager({
                 >
                   Image URL
                 </label>
-                {/* TODO use input component */}
-                <input
+                {/* Use shared Input component */}
+                <Input
                   id="profile-url"
                   type="url"
                   value={newUrl}
@@ -137,7 +142,6 @@ export function ProfilePictureManager({
                     setError(null);
                   }}
                   placeholder="https://example.com/your-image.jpg"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   disabled={loading}
                 />
               </div>

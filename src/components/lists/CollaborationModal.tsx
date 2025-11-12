@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { X, UserPlus, Trash2, Users } from "lucide-react";
+import { UserPlus, Trash2, Users } from "lucide-react";
 import { PermissionLevel, type PermissionLevelEnum } from "@/lib/db/schema";
 import { ProfileImage } from "../ui/ProfileImage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Modal from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import Dropdown from "@/components/ui/Dropdown";
 
 interface Collaborator {
   id: string;
@@ -96,7 +100,7 @@ export default function CollaborationModal({
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to add collaborator",
+        err instanceof Error ? err.message : "Failed to add collaborator"
       );
     },
     onSettled: () => setAddingCollaborator(false),
@@ -104,7 +108,7 @@ export default function CollaborationModal({
 
   const removeCollaborator = async (
     collaboratorUserId: string,
-    username: string,
+    username: string
   ) => {
     if (
       !confirm(`Are you sure you want to remove ${username} from this list?`)
@@ -125,7 +129,7 @@ export default function CollaborationModal({
     }) => {
       const response = await fetch(
         `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
-        { method: "DELETE" },
+        { method: "DELETE" }
       );
       const data = await response.json();
       if (!response.ok)
@@ -140,14 +144,14 @@ export default function CollaborationModal({
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to remove collaborator",
+        err instanceof Error ? err.message : "Failed to remove collaborator"
       );
     },
   });
 
   const updatePermission = async (
     collaboratorUserId: string,
-    newPermission: string,
+    newPermission: string
   ) => {
     setError(null);
     setSuccess(null);
@@ -168,7 +172,7 @@ export default function CollaborationModal({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ permissionLevel: newPermission }),
-        },
+        }
       );
       const data = await response.json();
       if (!response.ok)
@@ -183,7 +187,7 @@ export default function CollaborationModal({
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to update permission",
+        err instanceof Error ? err.message : "Failed to update permission"
       );
     },
   });
@@ -193,225 +197,212 @@ export default function CollaborationModal({
     setSuccess(null);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
-        {/* Header // TODO Style colors are wrong, also doesn't use ARIA modal component */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <div className="flex items-center gap-3">
-            <Users className="w-6 h-6 text-blue-400" />
-            <div>
-              <h2 className="text-xl font-semibold text-white">
-                Manage Collaborators
-              </h2>
-              <p className="text-gray-400 text-sm">{listName}</p>
-            </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Manage Collaborators"
+      subtitle={listName}
+      size="lg"
+    >
+      <div className="space-y-6">
+        {!isOwner ? (
+          <div className="text-center py-8">
+            <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+            <p className="text-gray-400">
+              Only the list owner can manage collaborators.
+            </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-          {!isOwner ? (
-            <div className="text-center py-8">
-              <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-400">
-                Only the list owner can manage collaborators.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Messages */}
-              {error && (
-                <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200">
-                  {error}
-                  <button
+        ) : (
+          <>
+            {/* Messages */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/40 border border-red-700 rounded-lg text-red-200">
+                <div className="flex items-center justify-between">
+                  <span>{error}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={clearMessages}
-                    className="float-right text-red-400 hover:text-red-200"
+                    aria-label="Dismiss error"
                   >
-                    <X className="w-4 h-4" />
-                  </button>
+                    ✕
+                  </Button>
                 </div>
-              )}
-              {success && (
-                <div className="mb-4 p-3 bg-green-900/50 border border-green-700 rounded-lg text-green-200">
-                  {success}
-                  <button
+              </div>
+            )}
+            {success && (
+              <div className="mb-4 p-3 bg-green-900/40 border border-green-700 rounded-lg text-green-200">
+                <div className="flex items-center justify-between">
+                  <span>{success}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={clearMessages}
-                    className="float-right text-green-400 hover:text-green-200"
+                    aria-label="Dismiss message"
                   >
-                    <X className="w-4 h-4" />
-                  </button>
+                    ✕
+                  </Button>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Add Collaborator Form */}
-              <div className="mb-6 p-4 bg-gray-700/50 rounded-lg">
-                <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-                  <UserPlus className="w-5 h-5" />
-                  Add Collaborator
-                </h3>
-                <div className="flex gap-3 flex-col sm:flex-row">
-                  {/* TODO use input component */}
-                  <input
-                    type="text"
+            {/* Add Collaborator Form */}
+            <div className="mb-6 p-4 bg-gray-700/30 rounded-lg border border-gray-600">
+              <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+                <UserPlus className="w-5 h-5" />
+                Add Collaborator
+              </h3>
+              <div className="flex gap-3 flex-col sm:flex-row">
+                <div className="flex-1">
+                  <Input
                     placeholder="Enter username"
                     value={newUsername}
                     onChange={(e) => setNewUsername(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     onKeyDown={(e) => e.key === "Enter" && addCollaborator()}
                   />
-                  <select
-                    value={newPermissionLevel}
-                    onChange={(e) =>
-                      setNewPermissionLevel(
-                        e.target.value as PermissionLevelEnum,
-                      )
-                    }
-                    className="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value={PermissionLevel.COLLABORATOR}>
-                      Collaborator
-                    </option>
-                    <option value={PermissionLevel.VIEWER}>Viewer</option>
-                  </select>
-                  {/* TODO Use button component */}
-                  <button
-                    onClick={addCollaborator}
-                    disabled={addingCollaborator || !newUsername.trim()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    {addingCollaborator ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <UserPlus className="w-4 h-4" />
-                    )}
-                    Add
-                  </button>
+                </div>
+                <Dropdown
+                  placeholder="Collaborator"
+                  selectedKey={newPermissionLevel}
+                  onSelectionChange={(key) =>
+                    setNewPermissionLevel(
+                      (key as PermissionLevelEnum) ||
+                        PermissionLevel.COLLABORATOR
+                    )
+                  }
+                  options={[
+                    {
+                      key: PermissionLevel.COLLABORATOR,
+                      label: "Collaborator",
+                    },
+                    { key: PermissionLevel.VIEWER, label: "Viewer" },
+                  ]}
+                  className="sm:w-44"
+                />
+                <Button
+                  onClick={addCollaborator}
+                  disabled={addingCollaborator || !newUsername.trim()}
+                  loading={addingCollaborator}
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            {/* Owner Display */}
+            {ownerUsername && (
+              <div className="mb-6">
+                <h3 className="text-lg font-medium text-white mb-4">
+                  List Owner
+                </h3>
+                <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg border border-gray-600">
+                  <div className="flex items-center gap-3">
+                    <ProfileImage
+                      username={ownerUsername}
+                      src={ownerProfilePictureUrl}
+                      size="md"
+                    />
+                    <div>
+                      <p className="text-white font-medium">{ownerUsername}</p>
+                      <p className="text-gray-400 text-sm">Owner</p>
+                    </div>
+                  </div>
+                  <div className="px-3 py-1 bg-yellow-600/20 border border-yellow-600/30 rounded text-yellow-400 text-sm font-medium">
+                    Owner
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Owner Display */}
-              {ownerUsername && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-medium text-white mb-4">
-                    List Owner
-                  </h3>
-                  <div className="flex items-center justify-between p-4 bg-gray-700/30 rounded-lg border border-gray-600">
-                    <div className="flex items-center gap-3">
-                      <ProfileImage
-                        username={ownerUsername}
-                        src={ownerProfilePictureUrl}
-                        size="md"
-                      />
-                      <div>
-                        <p className="text-white font-medium">
-                          {ownerUsername}
-                        </p>
-                        <p className="text-gray-400 text-sm">Owner</p>
-                      </div>
-                    </div>
-                    <div className="px-3 py-1 bg-yellow-600/20 border border-yellow-600/30 rounded text-yellow-400 text-sm font-medium">
-                      Owner
-                    </div>
-                  </div>
+            {/* Collaborators List */}
+            <div>
+              <h3 className="text-lg font-medium text-white mb-4">
+                Collaborators
+              </h3>
+              {collaboratorsQuery.isLoading ? (
+                <div className="text-center py-8">
+                  <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-gray-400 mt-2">Loading collaborators...</p>
                 </div>
-              )}
-
-              {/* Collaborators List */}
-              <div>
-                <h3 className="text-lg font-medium text-white mb-4">
-                  Collaborators
-                </h3>
-                {collaboratorsQuery.isLoading ? (
-                  <div className="text-center py-8">
-                    <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-gray-400 mt-2">
-                      Loading collaborators...
-                    </p>
-                  </div>
-                ) : (collaboratorsQuery.data?.collaborators || []).length ===
-                  0 ? (
-                  <div className="text-center py-8">
-                    <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                    <p className="text-gray-400">
-                      No collaborators yet. Add some to start sharing!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {(collaboratorsQuery.data?.collaborators || []).map(
-                      (collaborator) => (
-                        <div
-                          key={collaborator.id}
-                          className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <ProfileImage
-                              username={collaborator.username}
-                              src={collaborator.profilePictureUrl}
-                              size="md"
-                            />
-                            <div>
-                              <p className="text-white font-medium">
-                                {collaborator.username}
-                              </p>
-                              <p className="text-gray-400 text-sm">
-                                {collaborator.permissionLevel ===
-                                PermissionLevel.COLLABORATOR
-                                  ? "Can edit"
-                                  : "View only"}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={collaborator.permissionLevel}
-                              onChange={(e) =>
-                                updatePermission(
-                                  collaborator.userId,
-                                  e.target.value,
-                                )
-                              }
-                              className="px-3 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value={PermissionLevel.COLLABORATOR}>
-                                Collaborator
-                              </option>
-                              <option value={PermissionLevel.VIEWER}>
-                                Viewer
-                              </option>
-                            </select>
-                            <button
-                              onClick={() =>
-                                removeCollaborator(
-                                  collaborator.userId,
-                                  collaborator.username,
-                                )
-                              }
-                              className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                              title="Remove collaborator"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+              ) : (collaboratorsQuery.data?.collaborators || []).length ===
+                0 ? (
+                <div className="text-center py-8">
+                  <Users className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400">
+                    No collaborators yet. Add some to start sharing!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(collaboratorsQuery.data?.collaborators || []).map(
+                    (collaborator) => (
+                      <div
+                        key={collaborator.id}
+                        className="flex items-center justify-between p-4 bg-gray-700/40 rounded-lg border border-gray-700"
+                      >
+                        <div className="flex items-center gap-3">
+                          <ProfileImage
+                            username={collaborator.username}
+                            src={collaborator.profilePictureUrl}
+                            size="md"
+                          />
+                          <div>
+                            <p className="text-white font-medium">
+                              {collaborator.username}
+                            </p>
+                            <p className="text-gray-400 text-sm">
+                              {collaborator.permissionLevel ===
+                              PermissionLevel.COLLABORATOR
+                                ? "Can edit"
+                                : "View only"}
+                            </p>
                           </div>
                         </div>
-                      ),
-                    )}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+                        <div className="flex items-center gap-2">
+                          <Dropdown
+                            placeholder="Collaborator"
+                            selectedKey={collaborator.permissionLevel}
+                            onSelectionChange={(key) =>
+                              updatePermission(
+                                collaborator.userId,
+                                String(key || PermissionLevel.COLLABORATOR)
+                              )
+                            }
+                            options={[
+                              {
+                                key: PermissionLevel.COLLABORATOR,
+                                label: "Collaborator",
+                              },
+                              { key: PermissionLevel.VIEWER, label: "Viewer" },
+                            ]}
+                            size="sm"
+                            className="w-44"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Remove collaborator"
+                            onClick={() =>
+                              removeCollaborator(
+                                collaborator.userId,
+                                collaborator.username
+                              )
+                            }
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

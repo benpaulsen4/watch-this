@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Globe, Check, X, AlertCircle, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import Dropdown from "@/components/ui/Dropdown";
 import { useMutation } from "@tanstack/react-query";
 
 type Props = {
@@ -56,7 +57,11 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    await saveTimezoneMutation.mutateAsync();
+    try {
+      await saveTimezoneMutation.mutateAsync();
+    } catch {
+      // Error state handled in onError
+    }
   };
 
   const saveTimezoneMutation = useMutation({
@@ -120,20 +125,15 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
                   Timezone
                 </label>
                 <div className="relative">
-                  {/* TODO use select component */}
-                  <select
-                    id="timezone"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    disabled={saving}
-                  >
-                    {timezones.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {tz}
-                      </option>
-                    ))}
-                  </select>
+                  <Dropdown
+                    placeholder="Select timezone..."
+                    selectedKey={timezone}
+                    onSelectionChange={(key) =>
+                      setTimezone(String(key ?? timezone))
+                    }
+                    isDisabled={saving}
+                    options={timezones.map((tz) => ({ key: tz, label: tz }))}
+                  />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   Browser detected: {localTZ}

@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { X, Trash2, Save, AlertTriangle } from "lucide-react";
+import { Trash2, Save, AlertTriangle } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
+import Modal from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import Dropdown from "@/components/ui/Dropdown";
+import { Switch } from "@/components/ui/Switch";
+import { Input, Textarea } from "@/components/ui/Input";
 // Using local List interface to match API response format
 
 interface List {
@@ -129,202 +134,157 @@ export default function ListSettingsModal({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
-        {/* Header // TODO does not use ARIA modal component */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <h2 className="text-xl font-semibold text-white">List Settings</h2>
-          <button
-            onClick={handleClose}
-            disabled={isLoading || isDeleting}
-            className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="List Settings"
+      subtitle={list.name}
+      isDismissable={!isLoading && !isDeleting}
+      size="md"
+    >
+      <div className="space-y-6">
+        {error && (
+          <div className="p-3 bg-red-900/40 border border-red-700 rounded-lg">
+            <p className="text-red-300 text-sm">{error}</p>
+          </div>
+        )}
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {error && (
-            <div className="bg-red-900/20 border border-red-700 rounded-lg p-3">
-              <p className="text-red-400 text-sm">{error}</p>
+        {!showDeleteConfirm ? (
+          <>
+            {/* List Name */}
+            <Input
+              label="List Name * "
+              type="text"
+              value={formData.name}
+              onChange={(e) => handleInputChange("name", e.target.value)}
+              disabled={!isOwner || isLoading}
+              placeholder="Enter list name"
+              maxLength={100}
+              helperText={`${formData.name.length}/100 characters`}
+            />
+
+            {/* Description */}
+            <Textarea
+              label="Description"
+              value={formData.description}
+              onChange={(e) => handleInputChange("description", e.target.value)}
+              disabled={!isOwner || isLoading}
+              placeholder="Enter list description (optional)"
+              rows={3}
+              maxLength={500}
+              helperText={`${formData.description.length}/500 characters`}
+            />
+
+            {/* List Type */}
+            <div>
+              <Dropdown
+                label="List Type"
+                placeholder="Select type"
+                selectedKey={formData.listType}
+                onSelectionChange={(key) =>
+                  handleInputChange(
+                    "listType",
+                    String(key || formData.listType)
+                  )
+                }
+                isDisabled={!isOwner || isLoading}
+                options={[
+                  { key: "mixed", label: "Mixed (Movies & TV Shows)" },
+                  { key: "movie", label: "Movies Only" },
+                  { key: "tv", label: "TV Shows Only" },
+                ]}
+              />
             </div>
-          )}
 
-          {!showDeleteConfirm ? (
-            <>
-              {/* List Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  List Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  disabled={!isOwner || isLoading}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder="Enter list name"
-                  maxLength={100}
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  {formData.name.length}/100 characters
-                </p>
-              </div>
+            {/* Visibility */}
+            <div>
+              <Switch
+                label="Make this list public"
+                isSelected={formData.isPublic}
+                onChange={(selected) => handleInputChange("isPublic", selected)}
+                isDisabled={!isOwner || isLoading}
+                helperText="Public lists can be discovered and viewed by other users"
+              />
+            </div>
 
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    handleInputChange("description", e.target.value)
-                  }
-                  disabled={!isOwner || isLoading}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
-                  placeholder="Enter list description (optional)"
-                  rows={3}
-                  maxLength={500}
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  {formData.description.length}/500 characters
-                </p>
-              </div>
+            {/* Sync Watch Status */}
+            <div>
+              <Switch
+                label="Sync watch status with collaborators"
+                isSelected={formData.syncWatchStatus}
+                onChange={(selected) =>
+                  handleInputChange("syncWatchStatus", selected)
+                }
+                isDisabled={!isOwner || isLoading}
+                helperText="When enabled, watch status updates will be synchronized across all collaborators"
+              />
+            </div>
 
-              {/* List Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  List Type
-                </label>
-                <select
-                  value={formData.listType}
-                  onChange={(e) =>
-                    handleInputChange("listType", e.target.value)
-                  }
-                  disabled={!isOwner || isLoading}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            {/* Action Buttons */}
+            {isOwner && (
+              <div className="flex flex-col space-y-3 pt-4">
+                <Button onClick={handleSave} loading={isLoading}>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Changes
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isLoading}
                 >
-                  <option value="mixed">Mixed (Movies & TV Shows)</option>
-                  <option value="movies">Movies Only</option>
-                  <option value="tv">TV Shows Only</option>
-                </select>
-              </div>
-
-              {/* Visibility */}
-              <div>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={formData.isPublic}
-                    onChange={(e) =>
-                      handleInputChange("isPublic", e.target.checked)
-                    }
-                    disabled={!isOwner || isLoading}
-                    className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <span className="text-sm font-medium text-gray-300">
-                    Make this list public
-                  </span>
-                </label>
-                <p className="text-xs text-gray-400 mt-1 ml-7">
-                  Public lists can be discovered and viewed by other users
-                </p>
-              </div>
-
-              {/* Sync Watch Status */}
-              <div>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={formData.syncWatchStatus}
-                    onChange={(e) =>
-                      handleInputChange("syncWatchStatus", e.target.checked)
-                    }
-                    disabled={!isOwner || isLoading}
-                    className="w-4 h-4 text-green-600 bg-gray-800 border-gray-600 rounded focus:ring-green-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <span className="text-sm font-medium text-gray-300">
-                    Sync watch status with collaborators
-                  </span>
-                </label>
-                <p className="text-xs text-gray-400 mt-1 ml-7">
-                  When enabled, watch status updates will be synchronized across
-                  all collaborators
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              {isOwner && (
-                <div className="flex flex-col space-y-3 pt-4">
-                  <button
-                    onClick={handleSave}
-                    disabled={isLoading}
-                    className="flex items-center justify-center space-x-2 w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{isLoading ? "Saving..." : "Save Changes"}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    disabled={isLoading}
-                    className="flex items-center justify-center space-x-2 w-full px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Delete List</span>
-                  </button>
-                </div>
-              )}
-
-              {!isOwner && (
-                <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">
-                  <p className="text-yellow-400 text-sm">
-                    Only the list owner can modify these settings.
-                  </p>
-                </div>
-              )}
-            </>
-          ) : (
-            /* Delete Confirmation */
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <AlertTriangle className="w-12 h-12 text-red-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white mb-2">
+                  <Trash2 className="w-4 h-4 mr-2" />
                   Delete List
-                </h3>
-                <p className="text-gray-300 text-sm">
-                  Are you sure you want to delete &quot;{list.name}&quot;? This
-                  action cannot be undone. All items and collaborators will be
-                  removed.
+                </Button>
+              </div>
+            )}
+
+            {!isOwner && (
+              <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">
+                <p className="text-yellow-400 text-sm">
+                  Only the list owner can modify these settings.
                 </p>
               </div>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isDeleting}
-                  className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-600/50 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
-                >
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </button>
-              </div>
+            )}
+          </>
+        ) : (
+          /* Delete Confirmation */
+          <div className="text-center space-y-4">
+            <div className="flex justify-center">
+              <AlertTriangle className="w-12 h-12 text-red-400" />
             </div>
-          )}
-        </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-2">
+                Delete List
+              </h3>
+              <p className="text-gray-300 text-sm">
+                Are you sure you want to delete &quot;{list.name}&quot;? This
+                action cannot be undone. All items and collaborators will be
+                removed.
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1"
+                loading={isDeleting}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
