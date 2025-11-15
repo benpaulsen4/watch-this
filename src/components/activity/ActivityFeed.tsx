@@ -10,6 +10,7 @@ import { ActivityResponse } from "./ActivityTimelineClient";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { useQuery } from "@tanstack/react-query";
+import ListSettingsModal from "@/components/lists/ListSettingsModal";
 
 interface ActivityFeedProps {
   currentUsername: string;
@@ -18,6 +19,7 @@ interface ActivityFeedProps {
 export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
   const router = useRouter();
   const [mdUp, setMdUp] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
@@ -133,12 +135,22 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
             <Button asChild size="sm">
-              <Link href="/discover">Discover Content</Link>
+              <Link href="/search">Discover Content</Link>
             </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/lists/new">Create List</Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCreateModal(true)}
+            >
+              Create List
             </Button>
           </div>
+          <ListSettingsModal
+            isOpen={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            mode="create"
+            isOwner
+          />
         </div>
       ) : null}
     </div>

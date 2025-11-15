@@ -41,7 +41,7 @@ const initialList: ListResponse = {
 };
 
 describe("ListsClient", () => {
-  it("shows create form when clicking header button", async () => {
+  it("shows create modal when clicking header button", async () => {
     const user = userEvent.setup();
     renderWithClient(<ListsClient initialLists={[initialList]} />);
 
@@ -49,24 +49,20 @@ describe("ListsClient", () => {
     expect(screen.getByText(/Create New List/i)).toBeInTheDocument();
   });
 
-  it("disables Create List button when name is empty", async () => {
+  it("shows validation error when creating with empty name", async () => {
     const user = userEvent.setup();
     renderWithClient(<ListsClient initialLists={[initialList]} />);
 
     await user.click(screen.getByRole("button", { name: /Create List/i }));
-    // There are two 'Create List' buttons (header and form); pick the form's button
-    const createButtons = screen.getAllByRole("button", {
-      name: /^Create List$/i,
-    });
-    const formCreateBtn = createButtons[createButtons.length - 1];
-    expect(formCreateBtn).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    expect(screen.getByText(/List name is required/i)).toBeInTheDocument();
   });
 
   it("creates a new list and adds it to the grid", async () => {
     const user = userEvent.setup();
     renderWithClient(<ListsClient initialLists={[]} />);
 
-    // Open form
+    // Open modal
     await user.click(screen.getByRole("button", { name: /Create List/i }));
 
     // Fill fields
@@ -119,11 +115,7 @@ describe("ListsClient", () => {
       return { ok: true, json: async () => ({}) } as any;
     });
 
-    const createButtons = screen.getAllByRole("button", {
-      name: /^Create List$/i,
-    });
-    const formCreateBtn = createButtons[createButtons.length - 1];
-    await user.click(formCreateBtn);
+    await user.click(screen.getByRole("button", { name: /^Create$/i }));
 
     // New list should appear
     expect(await screen.findByText("My New List")).toBeInTheDocument();

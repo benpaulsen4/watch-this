@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ActivityFeed } from "./ActivityFeed";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -100,8 +101,22 @@ describe("ActivityFeed", () => {
         /No recent activity\. Start watching content or managing your lists to see activity here\./,
       ),
     ).toBeInTheDocument();
-    // CTA links exist
+    // CTA links/buttons exist
     expect(screen.getByText("Discover Content")).toBeInTheDocument();
     expect(screen.getByText("Create List")).toBeInTheDocument();
+  });
+
+  it("opens create list modal from empty state CTA", async () => {
+    const response = { activities: [], upcoming: [], hasMore: false };
+    // @ts-expect-error allow assigning to global
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => response }));
+    renderWithClient(<ActivityFeed currentUsername="alice" />);
+    expect(await screen.findByText(/No recent activity/)).toBeInTheDocument();
+    // Click Create List
+    const btn = screen.getByRole("button", { name: /Create List/i });
+    const user = userEvent.setup();
+    await user.click(btn);
+    // Modal title appears
+    expect(await screen.findByText(/Create New List/i)).toBeInTheDocument();
   });
 });

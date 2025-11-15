@@ -46,7 +46,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
     // Check if user has access to this list (owner or collaborator)
     const [listData] = await db
-      .select({ ownerId: lists.ownerId })
+      .select({ ownerId: lists.ownerId, listType: lists.listType, name: lists.name })
       .from(lists)
       .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
       .where(
@@ -61,6 +61,25 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       return NextResponse.json(
         { error: "List not found or access denied" },
         { status: 404 },
+      );
+    }
+
+    // Enforce list type compatibility
+    if (
+      listData.listType !== "mixed" &&
+      !(
+        (listData.listType === "movies" && contentType === "movie") ||
+        (listData.listType === "tv" && contentType === "tv")
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            listData.listType === "movies"
+              ? "This list accepts only movies"
+              : "This list accepts only TV shows",
+        },
+        { status: 400 },
       );
     }
 
@@ -99,13 +118,6 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
 
     // Generate activity for content addition
     try {
-      // Check if this is a collaborative list
-      const [listInfo] = await db
-        .select({ ownerId: lists.ownerId, name: lists.name })
-        .from(lists)
-        .where(eq(lists.id, listId))
-        .limit(1);
-
       await db.insert(activityFeed).values({
         userId,
         activityType: ActivityType.LIST_ITEM_ADDED,
@@ -114,7 +126,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         listId,
         metadata: {
           title: title,
-          listName: listInfo?.name || "Unknown List",
+          listName: listData?.name || "Unknown List",
           posterPath: posterPath || null,
         },
         createdAt: new Date(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Globe,
   Minus,
@@ -16,6 +16,7 @@ import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import ListSettingsModal from "@/components/lists/ListSettingsModal";
 
 export interface ListSelectorProps {
   contentType: "movie" | "tv";
@@ -41,6 +42,7 @@ export function ListSelector({
   className,
 }: ListSelectorProps) {
   const queryClient = useQueryClient();
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const {
     data: listsData,
     isLoading,
@@ -71,13 +73,10 @@ export function ListSelector({
   const lists = listsData?.lists || [];
   const listsWithContent = useMemo(() => {
     const data = listsWithContentData || [];
-    return data.reduce(
-      (acc, list) => {
-        acc[list.listId] = list.itemId;
-        return acc;
-      },
-      {} as Record<string, string>,
-    );
+    return data.reduce((acc, list) => {
+      acc[list.listId] = list.itemId;
+      return acc;
+    }, {} as Record<string, string>);
   }, [listsWithContentData]);
 
   // Filter lists based on content type
@@ -201,8 +200,8 @@ export function ListSelector({
                     {list.listType === "mixed"
                       ? "Mixed"
                       : list.listType === "movies"
-                        ? "Movies"
-                        : "TV Shows"}
+                      ? "Movies"
+                      : "TV Shows"}
                     <span>&nbsp;•&nbsp;</span>
                     {list.isPublic ? (
                       <>
@@ -269,6 +268,26 @@ export function ListSelector({
           </div>
         );
       })}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setShowCreateModal(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add to new list
+        </Button>
+      </div>
+      <ListSettingsModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        mode="create"
+        isOwner
+        allowedListTypes={
+          contentType === "movie" ? ["mixed", "movies"] : ["mixed", "tv"]
+        }
+        onListCreate={async (created) => {
+          setShowCreateModal(false);
+          await addToListMutation.mutateAsync(created.id);
+          await queryClient.invalidateQueries({ queryKey: ["lists"] });
+        }}
+      />
     </div>
   );
 }

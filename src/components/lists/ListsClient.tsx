@@ -4,14 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { List } from "@/lib/db";
 import { PageHeader } from "../ui/PageHeader";
 import { ListCard } from "./ListCard";
-import { useMutation } from "@tanstack/react-query";
-import Dropdown from "@/components/ui/Dropdown";
-import { Switch } from "@/components/ui/Switch";
-import { Input, Textarea } from "@/components/ui/Input";
+import ListSettingsModal from "@/components/lists/ListSettingsModal";
 
 export interface ListResponse extends List {
   itemCount: number;
@@ -26,132 +22,27 @@ export default function ListsClient({
 }) {
   const router = useRouter();
   const [lists, setLists] = useState<ListResponse[]>(initialLists);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newListName, setNewListName] = useState("");
-  const [newListDescription, setNewListDescription] = useState("");
-  const [newListIsPublic, setNewListIsPublic] = useState(false);
-  const [newListType, setNewListType] = useState("mixed");
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const createListMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/lists", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: newListName.trim(),
-          description: newListDescription.trim() || null,
-          listType: newListType,
-          isPublic: newListIsPublic,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to create list");
-      return data;
-    },
-    onSuccess: (data) => {
-      setLists((prev) => [data.list, ...prev]);
-      setNewListName("");
-      setNewListDescription("");
-      setNewListIsPublic(false);
-      setNewListType("mixed");
-      setShowCreateForm(false);
-    },
-    onError: (err: unknown) => {
-      console.error("Error creating list:", err);
-      setError(err instanceof Error ? err.message : "Failed to create list");
-    },
-    onSettled: () => setCreating(false),
-  });
-
-  const handleCreateList = async () => {
-    if (!newListName.trim()) return;
-    setCreating(true);
-    setError(null);
-    await createListMutation.mutateAsync();
-  };
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-950">
       <PageHeader title="My Lists" backLinkHref="/dashboard">
-        <Button onClick={() => setShowCreateForm(true)}>
+        <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="h-5 w-5 mr-2" />
           Create List
         </Button>
       </PageHeader>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Error Display */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-900/50 border border-red-800 rounded-lg">
-            <p className="text-red-200">{error}</p>
-          </div>
-        )}
-
-        {/* Create List Form */}
-        {showCreateForm && (
-          <Card className="mb-8 bg-gray-900 border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-gray-100">Create New List</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Input
-                label="List Name *"
-                type="text"
-                value={newListName}
-                onChange={(e) => setNewListName(e.target.value)}
-                placeholder="Enter list name"
-              />
-
-              <Textarea
-                label="Description"
-                value={newListDescription}
-                onChange={(e) => setNewListDescription(e.target.value)}
-                placeholder="Describe your list (optional)"
-                rows={3}
-              />
-
-              <Dropdown
-                label="List Type"
-                placeholder="Select type"
-                selectedKey={newListType}
-                onSelectionChange={(key) =>
-                  setNewListType(String(key ?? newListType))
-                }
-                options={[
-                  { key: "mixed", label: "Mixed (Movies & TV Shows)" },
-                  { key: "movies", label: "Movies Only" },
-                  { key: "tv", label: "TV Shows Only" },
-                ]}
-              />
-
-              <Switch
-                label="Make this list public"
-                isSelected={newListIsPublic}
-                onChange={(selected) => setNewListIsPublic(selected)}
-              />
-
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleCreateList}
-                  disabled={!newListName.trim()}
-                  loading={creating}
-                >
-                  Create List
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCreateForm(false)}
-                  disabled={creating}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <ListSettingsModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          mode="create"
+          isOwner
+          onListCreate={(created) => {
+            setLists((prev) => [created as any, ...prev]);
+          }}
+        />
 
         {/* Lists Grid */}
         {lists.length === 0 ? (
@@ -165,7 +56,7 @@ export default function ListsClient({
             <p className="text-gray-500 mb-6">
               Create your first list to start organizing your favorite content
             </p>
-            <Button onClick={() => setShowCreateForm(true)}>
+            <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Your First List
             </Button>

@@ -348,7 +348,7 @@ export type NewUserStreamingProvider =
 
 // Enums for type safety
 export const ListType = {
-  MOVIE: "movie",
+  MOVIE: "movies",
   TV: "tv",
   MIXED: "mixed",
 } as const;

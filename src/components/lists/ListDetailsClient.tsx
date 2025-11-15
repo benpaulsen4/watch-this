@@ -30,7 +30,7 @@ interface List {
   id: string;
   name: string;
   description: string | null;
-  listType: "movie" | "tv" | "mixed";
+  listType: "movies" | "tv" | "mixed";
   isPublic: boolean;
   syncWatchStatus: boolean;
   ownerId: string;
@@ -55,7 +55,13 @@ export default function ListDetailsClient({
   const [showCollaborationModal, setShowCollaborationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-  const handleListUpdate = (updatedList: Partial<List>) => {
+  const handleListUpdate = (updatedList: {
+    name?: string;
+    description?: string | null;
+    listType?: "mixed" | "movies" | "tv";
+    isPublic?: boolean;
+    syncWatchStatus?: boolean;
+  }) => {
     setList((prev) => ({ ...prev, ...updatedList }));
   };
 
