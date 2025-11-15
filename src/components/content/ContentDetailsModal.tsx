@@ -187,6 +187,7 @@ export function ContentDetailsModal({
                 src={backdropUrl}
                 alt={title}
                 fill
+                sizes="(max-width: 896px) 100vw, 896px"
                 className="object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent" />
