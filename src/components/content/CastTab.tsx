@@ -49,6 +49,7 @@ export function CastTab({ contentType, contentId }: CastTabProps) {
     <div className="text-gray-400 text-sm">No cast information available.</div>
   ) : (
     <>
+      <h3 className="text-lg font-semibold text-gray-100 mb-4">Cast</h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {pageItems.map((c) => {
           const faceUrl = getImageUrl(c.profile_path, "w154");
