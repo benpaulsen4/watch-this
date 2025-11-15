@@ -8,13 +8,12 @@ import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
 import { Switch } from "@/components/ui/Switch";
 import { Input, Textarea } from "@/components/ui/Input";
-// Using local List interface to match API response format
 
-interface List {
+interface ListBase {
   id: string;
   name: string;
   description: string | null;
-  listType: "movie" | "tv" | "mixed";
+  listType: "mixed" | "movies" | "tv";
   isPublic: boolean;
   syncWatchStatus: boolean;
   ownerId: string;
@@ -23,29 +22,50 @@ interface List {
   updatedAt: string;
 }
 
+interface ListUpdatePayload {
+  name?: string;
+  description?: string | null;
+  listType?: "mixed" | "movies" | "tv";
+  isPublic?: boolean;
+  syncWatchStatus?: boolean;
+}
+
+interface CreatedList extends ListBase {
+  collaborators: number;
+  itemCount: number;
+}
+
+type Mode = "edit" | "create";
+
 interface ListSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  list: List;
-  isOwner: boolean;
-  onListUpdate: (updatedList: Partial<List>) => void;
-  onListDelete: () => void;
+  list?: ListBase;
+  isOwner?: boolean;
+  mode?: Mode;
+  onListUpdate?: (updatedList: ListUpdatePayload) => void;
+  onListDelete?: () => void;
+  onListCreate?: (createdList: CreatedList) => void;
+  allowedListTypes?: Array<"mixed" | "movies" | "tv">;
 }
 
 export default function ListSettingsModal({
   isOpen,
   onClose,
   list,
-  isOwner,
+  isOwner = true,
+  mode = "edit",
   onListUpdate,
   onListDelete,
+  onListCreate,
+  allowedListTypes,
 }: ListSettingsModalProps) {
   const [formData, setFormData] = useState({
-    name: list.name,
-    description: list.description || "",
-    listType: list.listType,
-    isPublic: list.isPublic,
-    syncWatchStatus: list.syncWatchStatus,
+    name: list?.name ?? "",
+    description: list?.description ?? "",
+    listType: list?.listType ?? "mixed",
+    isPublic: list?.isPublic ?? false,
+    syncWatchStatus: list?.syncWatchStatus ?? false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -66,12 +86,16 @@ export default function ListSettingsModal({
       setError("List name must be 100 characters or less");
       return false;
     }
+    if (mode === "create" && allowedListTypes && !allowedListTypes.includes(formData.listType as any)) {
+      setError("Invalid list type for this action");
+      return false;
+    }
     return true;
   };
 
   const updateListMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/lists/${list.id}`, {
+      const response = await fetch(`/api/lists/${list?.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -87,7 +111,7 @@ export default function ListSettingsModal({
       return data;
     },
     onSuccess: (data) => {
-      onListUpdate(data);
+      onListUpdate?.(data as ListUpdatePayload);
       onClose();
     },
     onError: (err: unknown) => {
@@ -103,9 +127,38 @@ export default function ListSettingsModal({
     await updateListMutation.mutateAsync();
   };
 
+  const createListMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/lists`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          description: formData.description.trim() || null,
+          listType: formData.listType,
+          isPublic: formData.isPublic,
+          syncWatchStatus: formData.syncWatchStatus,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to create list");
+      return data;
+    },
+    onSuccess: (data) => {
+      const created: CreatedList = (data as { list: CreatedList }).list ?? (data as CreatedList);
+      onListCreate?.(created);
+      onClose();
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof Error ? err.message : "Failed to create list");
+    },
+    onSettled: () => setIsLoading(false),
+  });
+
   const deleteListMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/lists/${list.id}`, {
+      const response = await fetch(`/api/lists/${list?.id}`, {
         method: "DELETE",
       });
       const data = await response.json();
@@ -113,7 +166,7 @@ export default function ListSettingsModal({
       return data;
     },
     onSuccess: () => {
-      onListDelete();
+      onListDelete?.();
     },
     onError: (err: unknown) => {
       setError(err instanceof Error ? err.message : "Failed to delete list");
@@ -138,8 +191,8 @@ export default function ListSettingsModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="List Settings"
-      subtitle={list.name}
+      title={mode === "create" ? "Create New List" : "List Settings"}
+      subtitle={mode === "create" ? undefined : list?.name}
       isDismissable={!isLoading && !isDeleting}
       size="md"
     >
@@ -150,7 +203,7 @@ export default function ListSettingsModal({
           </div>
         )}
 
-        {!showDeleteConfirm ? (
+        {!showDeleteConfirm || mode === "create" ? (
           <>
             {/* List Name */}
             <Input
@@ -158,7 +211,7 @@ export default function ListSettingsModal({
               type="text"
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
-              disabled={!isOwner || isLoading}
+              disabled={(mode === "edit" && !isOwner) || isLoading}
               placeholder="Enter list name"
               maxLength={100}
               helperText={`${formData.name.length}/100 characters`}
@@ -169,7 +222,7 @@ export default function ListSettingsModal({
               label="Description"
               value={formData.description}
               onChange={(e) => handleInputChange("description", e.target.value)}
-              disabled={!isOwner || isLoading}
+              disabled={(mode === "edit" && !isOwner) || isLoading}
               placeholder="Enter list description (optional)"
               rows={3}
               maxLength={500}
@@ -188,12 +241,16 @@ export default function ListSettingsModal({
                     String(key || formData.listType)
                   )
                 }
-                isDisabled={!isOwner || isLoading}
-                options={[
-                  { key: "mixed", label: "Mixed (Movies & TV Shows)" },
-                  { key: "movie", label: "Movies Only" },
-                  { key: "tv", label: "TV Shows Only" },
-                ]}
+                isDisabled={(mode === "edit" && !isOwner) || isLoading}
+                options={(
+                  allowedListTypes ?? ["mixed", "movies", "tv"]
+                ).map((key) =>
+                  key === "mixed"
+                    ? { key: "mixed", label: "Mixed (Movies & TV Shows)" }
+                    : key === "movies"
+                      ? { key: "movies", label: "Movies Only" }
+                      : { key: "tv", label: "TV Shows Only" }
+                )}
               />
             </div>
 
@@ -203,7 +260,7 @@ export default function ListSettingsModal({
                 label="Make this list public"
                 isSelected={formData.isPublic}
                 onChange={(selected) => handleInputChange("isPublic", selected)}
-                isDisabled={!isOwner || isLoading}
+                isDisabled={(mode === "edit" && !isOwner) || isLoading}
                 helperText="Public lists can be discovered and viewed by other users"
               />
             </div>
@@ -216,34 +273,48 @@ export default function ListSettingsModal({
                 onChange={(selected) =>
                   handleInputChange("syncWatchStatus", selected)
                 }
-                isDisabled={!isOwner || isLoading}
+                isDisabled={(mode === "edit" && !isOwner) || isLoading}
                 helperText="When enabled, watch status updates will be synchronized across all collaborators"
               />
             </div>
 
             {/* Action Buttons */}
-            {isOwner && (
+            {mode === "edit" ? (
+              isOwner ? (
+                <div className="flex flex-col space-y-3 pt-4">
+                  <Button onClick={handleSave} loading={isLoading}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Changes
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isLoading}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete List
+                  </Button>
+                </div>
+              ) : (
+                <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">
+                  <p className="text-yellow-400 text-sm">
+                    Only the list owner can modify these settings.
+                  </p>
+                </div>
+              )
+            ) : (
               <div className="flex flex-col space-y-3 pt-4">
-                <Button onClick={handleSave} loading={isLoading}>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Changes
-                </Button>
                 <Button
-                  variant="destructive"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={isLoading}
+                  onClick={async () => {
+                    if (!validateForm()) return;
+                    setIsLoading(true);
+                    setError("");
+                    await createListMutation.mutateAsync();
+                  }}
+                  loading={isLoading}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete List
+                  Create
                 </Button>
-              </div>
-            )}
-
-            {!isOwner && (
-              <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">
-                <p className="text-yellow-400 text-sm">
-                  Only the list owner can modify these settings.
-                </p>
               </div>
             )}
           </>
@@ -258,7 +329,7 @@ export default function ListSettingsModal({
                 Delete List
               </h3>
               <p className="text-gray-300 text-sm">
-                Are you sure you want to delete &quot;{list.name}&quot;? This
+                Are you sure you want to delete &quot;{list?.name}&quot;? This
                 action cannot be undone. All items and collaborators will be
                 removed.
               </p>

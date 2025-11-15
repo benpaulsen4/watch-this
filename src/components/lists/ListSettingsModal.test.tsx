@@ -117,4 +117,45 @@ describe("ListSettingsModal", () => {
     await user.click(screen.getByRole("button", { name: /^Delete$/i }));
     expect(onListDelete).toHaveBeenCalled();
   });
+
+  it("creates a list in create mode and calls onListCreate", async () => {
+    const user = userEvent.setup();
+    const onListCreate = vi.fn();
+
+    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+      if (typeof input === "string" && input.includes("/api/lists") && init?.method === "POST") {
+        return {
+          ok: true,
+          json: async () => ({
+            list: {
+              id: "l-created",
+              name: "Created Name",
+              description: null,
+              listType: "mixed",
+              isPublic: false,
+              syncWatchStatus: false,
+              ownerId: "owner-1",
+              createdAt: "2024-01-03",
+              updatedAt: "2024-01-03",
+              itemCount: 0,
+              collaborators: 0,
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    renderWithClient(
+      <ListSettingsModal isOpen onClose={() => {}} mode="create" isOwner onListCreate={onListCreate} />,
+    );
+
+    // Fill name
+    await user.type(screen.getByLabelText(/List Name/i), "Created Name");
+    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+
+    expect(onListCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "l-created", name: "Created Name" }),
+    );
+  });
 });
