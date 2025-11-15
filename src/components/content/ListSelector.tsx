@@ -269,7 +269,11 @@ export function ListSelector({
         );
       })}
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => setShowCreateModal(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowCreateModal(true)}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add to new list
         </Button>

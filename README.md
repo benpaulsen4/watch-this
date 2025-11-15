@@ -100,8 +100,8 @@ npm run test:run
 - [x] React query drop-in
 - [x] UI component standardization
 - [x] Test writing
-- [ ] New List creation shortcut from content details lists tab
-- [ ] Cast tab for content details
+- [x] New List creation shortcut from content details lists tab
+- [x] Cast tab for content details
 - [ ] RSC streaming implementation
 - [ ] \*arr stack integration for when content is not on any configured streaming services
 - [ ] TMDB cache table to reduce spamming their API when fetching lists
