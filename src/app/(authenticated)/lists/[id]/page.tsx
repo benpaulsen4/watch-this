@@ -1,7 +1,7 @@
 import ListDetailsClient from "@/components/lists/ListDetailsClient";
 import { getCurrentUser } from "@/lib/auth/webauthn";
 import { cookies } from "next/headers";
-import { getListResponse } from "@/lib/lists/list-utils";
+import { getList } from "@/lib/lists/service";
 import { notFound } from "next/navigation";
 
 interface ListDetailsPageProps {
@@ -19,7 +19,7 @@ export default async function ListDetailsPage({
 
   if (user === null) return null;
 
-  const list = await getListResponse(user.id, id);
+  const list = await getList(user.id, id);
 
   if (list === "notFound") return notFound();
 

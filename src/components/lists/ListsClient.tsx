@@ -8,20 +8,15 @@ import { List } from "@/lib/db";
 import { PageHeader } from "../ui/PageHeader";
 import { ListCard } from "./ListCard";
 import ListSettingsModal from "@/components/lists/ListSettingsModal";
-
-export interface ListResponse extends List {
-  itemCount: number;
-  collaborators: number;
-  posterPaths: string[];
-}
+import { ListListsResponse } from "@/lib/lists/types";
 
 export default function ListsClient({
   initialLists,
 }: {
-  initialLists: ListResponse[];
+  initialLists: ListListsResponse[];
 }) {
   const router = useRouter();
-  const [lists, setLists] = useState<ListResponse[]>(initialLists);
+  const [lists, setLists] = useState<ListListsResponse[]>(initialLists);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   return (

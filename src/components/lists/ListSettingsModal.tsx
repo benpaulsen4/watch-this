@@ -8,44 +8,24 @@ import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
 import { Switch } from "@/components/ui/Switch";
 import { Input, Textarea } from "@/components/ui/Input";
-
-interface ListBase {
-  id: string;
-  name: string;
-  description: string | null;
-  listType: "mixed" | "movies" | "tv";
-  isPublic: boolean;
-  syncWatchStatus: boolean;
-  ownerId: string;
-  ownerUsername?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface ListUpdatePayload {
-  name?: string;
-  description?: string | null;
-  listType?: "mixed" | "movies" | "tv";
-  isPublic?: boolean;
-  syncWatchStatus?: boolean;
-}
-
-interface CreatedList extends ListBase {
-  collaborators: number;
-  itemCount: number;
-}
+import {
+  CreateListInput,
+  UpdateListInput,
+  ListListsResponse,
+  GetListResponse,
+} from "@/lib/lists/types";
 
 type Mode = "edit" | "create";
 
 interface ListSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  list?: ListBase;
+  list?: GetListResponse;
   isOwner?: boolean;
   mode?: Mode;
-  onListUpdate?: (updatedList: ListUpdatePayload) => void;
+  onListUpdate?: (updatedList: UpdateListInput) => void;
   onListDelete?: () => void;
-  onListCreate?: (createdList: CreatedList) => void;
+  onListCreate?: (createdList: ListListsResponse) => void;
   allowedListTypes?: Array<"mixed" | "movies" | "tv">;
 }
 
@@ -60,7 +40,7 @@ export default function ListSettingsModal({
   onListCreate,
   allowedListTypes,
 }: ListSettingsModalProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CreateListInput>({
     name: list?.name ?? "",
     description: list?.description ?? "",
     listType: list?.listType ?? "mixed",
@@ -86,7 +66,11 @@ export default function ListSettingsModal({
       setError("List name must be 100 characters or less");
       return false;
     }
-    if (mode === "create" && allowedListTypes && !allowedListTypes.includes(formData.listType as any)) {
+    if (
+      mode === "create" &&
+      allowedListTypes &&
+      !allowedListTypes.includes(formData.listType as any)
+    ) {
       setError("Invalid list type for this action");
       return false;
     }
@@ -100,7 +84,7 @@ export default function ListSettingsModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name.trim(),
-          description: formData.description.trim() || null,
+          description: (formData.description ?? "").trim() || null,
           listType: formData.listType,
           isPublic: formData.isPublic,
           syncWatchStatus: formData.syncWatchStatus,
@@ -111,7 +95,16 @@ export default function ListSettingsModal({
       return data;
     },
     onSuccess: (data) => {
-      onListUpdate?.(data as ListUpdatePayload);
+      const updated =
+        (data as { list: ListListsResponse }).list ??
+        (data as ListListsResponse);
+      onListUpdate?.({
+        name: updated.name,
+        description: updated.description,
+        listType: updated.listType as any,
+        isPublic: updated.isPublic,
+        syncWatchStatus: updated.syncWatchStatus,
+      });
       onClose();
     },
     onError: (err: unknown) => {
@@ -135,7 +128,7 @@ export default function ListSettingsModal({
         credentials: "include",
         body: JSON.stringify({
           name: formData.name.trim(),
-          description: formData.description.trim() || null,
+          description: (formData.description ?? "").trim() || null,
           listType: formData.listType,
           isPublic: formData.isPublic,
           syncWatchStatus: formData.syncWatchStatus,
@@ -146,7 +139,9 @@ export default function ListSettingsModal({
       return data;
     },
     onSuccess: (data) => {
-      const created: CreatedList = (data as { list: CreatedList }).list ?? (data as CreatedList);
+      const created: ListListsResponse =
+        (data as { list: ListListsResponse }).list ??
+        (data as ListListsResponse);
       onListCreate?.(created);
       onClose();
     },
@@ -220,13 +215,15 @@ export default function ListSettingsModal({
             {/* Description */}
             <Textarea
               label="Description"
-              value={formData.description}
+              value={formData.description ?? ""}
               onChange={(e) => handleInputChange("description", e.target.value)}
               disabled={(mode === "edit" && !isOwner) || isLoading}
               placeholder="Enter list description (optional)"
               rows={3}
               maxLength={500}
-              helperText={`${formData.description.length}/500 characters`}
+              helperText={`${
+                (formData.description ?? "").length
+              }/500 characters`}
             />
 
             {/* List Type */}
@@ -242,12 +239,11 @@ export default function ListSettingsModal({
                   )
                 }
                 isDisabled={(mode === "edit" && !isOwner) || isLoading}
-                options={(
-                  allowedListTypes ?? ["mixed", "movies", "tv"]
-                ).map((key) =>
-                  key === "mixed"
-                    ? { key: "mixed", label: "Mixed (Movies & TV Shows)" }
-                    : key === "movies"
+                options={(allowedListTypes ?? ["mixed", "movies", "tv"]).map(
+                  (key) =>
+                    key === "mixed"
+                      ? { key: "mixed", label: "Mixed (Movies & TV Shows)" }
+                      : key === "movies"
                       ? { key: "movies", label: "Movies Only" }
                       : { key: "tv", label: "TV Shows Only" }
                 )}

@@ -11,7 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { List } from "@/lib/db/schema";
+import type { ListListsResponse } from "@/lib/lists/types";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
@@ -26,10 +26,6 @@ export interface ListSelectorProps {
   currentListId?: string;
   onRemove?: () => void;
   className?: string;
-}
-
-export interface ListResult extends List {
-  collaborators: number;
 }
 
 export function ListSelector({
@@ -47,7 +43,7 @@ export function ListSelector({
     data: listsData,
     isLoading,
     error,
-  } = useQuery<{ lists: ListResult[] }>({
+  } = useQuery<{ lists: ListListsResponse[] }>({
     queryKey: ["lists"],
     queryFn: async () => {
       const response = await fetch("/api/lists");
@@ -70,7 +66,7 @@ export function ListSelector({
     },
   });
 
-  const lists = listsData?.lists || [];
+  const lists = (listsData?.lists || []) as ListListsResponse[];
   const listsWithContent = useMemo(() => {
     const data = listsWithContentData || [];
     return data.reduce((acc, list) => {

@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  lists,
-  listCollaborators,
-  users,
-  activityFeed,
-  ActivityType,
-} from "@/lib/db/schema";
+import { lists, listCollaborators, users } from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and } from "drizzle-orm";
 import { PermissionLevel } from "@/lib/db/schema";
+import { listListCollaborators, createListCollaborator } from "@/lib/lists/service";
+import { CreateCollaboratorInput } from "@/lib/lists/types";
 
 // GET /api/lists/[id]/collaborators - Get all collaborators for a list
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
@@ -26,46 +22,20 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    // Check if user has access to this list (owner or collaborator)
-    const [listData] = await db
-      .select({
-        id: lists.id,
-        ownerId: lists.ownerId,
-        name: lists.name,
-      })
-      .from(lists)
-      .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
-      .where(
-        and(
-          eq(lists.id, listId),
-          // User must be owner or collaborator to view collaborators
-          eq(lists.ownerId, userId),
-        ),
-      )
-      .limit(1);
-
-    if (!listData) {
+    const result = await listListCollaborators(userId, listId);
+    if (result === "notFound") {
       return NextResponse.json(
-        { error: "List not found or access denied" },
+        { error: "List not found" },
         { status: 404 },
       );
     }
-
-    // Get all collaborators for this list
-    const collaborators = await db
-      .select({
-        id: listCollaborators.id,
-        userId: listCollaborators.userId,
-        username: users.username,
-        profilePictureUrl: users.profilePictureUrl,
-        permissionLevel: listCollaborators.permissionLevel,
-        createdAt: listCollaborators.createdAt,
-      })
-      .from(listCollaborators)
-      .innerJoin(users, eq(users.id, listCollaborators.userId))
-      .where(eq(listCollaborators.listId, listId));
-
-    return NextResponse.json({ collaborators });
+    if (result === "forbidden") {
+      return NextResponse.json(
+        { error: "Only the list owner can view collaborators" },
+        { status: 403 },
+      );
+    }
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching collaborators:", error);
     return NextResponse.json(
@@ -90,7 +60,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as CreateCollaboratorInput;
     const { username, permissionLevel = PermissionLevel.COLLABORATOR } = body;
 
     // Validate input
@@ -108,112 +78,26 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    // Check if user owns this list
-    const [existingList] = await db
-      .select({ ownerId: lists.ownerId, name: lists.name })
-      .from(lists)
-      .where(eq(lists.id, listId))
-      .limit(1);
-
-    if (!existingList) {
+    const result = await createListCollaborator(userId, listId, { username, permissionLevel });
+    if (result === "notFound") {
       return NextResponse.json({ error: "List not found" }, { status: 404 });
     }
-
-    if (existingList.ownerId !== userId) {
+    if (result === "forbidden") {
       return NextResponse.json(
         { error: "Only the list owner can add collaborators" },
         { status: 403 },
       );
     }
-
-    // Check if the user to be added exists
-    const [targetUser] = await db
-      .select({
-        id: users.id,
-        username: users.username,
-        profilePictureUrl: users.profilePictureUrl,
-      })
-      .from(users)
-      .where(eq(users.username, username.trim()))
-      .limit(1);
-
-    if (!targetUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (result === "invalidUser") {
+      return NextResponse.json({ error: "Invalid target user" }, { status: 400 });
     }
-
-    // Check if user is trying to add themselves
-    if (targetUser.id === userId) {
-      return NextResponse.json(
-        { error: "Cannot add yourself as a collaborator" },
-        { status: 400 },
-      );
-    }
-
-    // Check if user is already a collaborator
-    const [existingCollaborator] = await db
-      .select({ id: listCollaborators.id })
-      .from(listCollaborators)
-      .where(
-        and(
-          eq(listCollaborators.listId, listId),
-          eq(listCollaborators.userId, targetUser.id),
-        ),
-      )
-      .limit(1);
-
-    if (existingCollaborator) {
+    if (result === "conflict") {
       return NextResponse.json(
         { error: "User is already a collaborator on this list" },
         { status: 409 },
       );
     }
-
-    // Add the collaborator
-    const [newCollaborator] = await db
-      .insert(listCollaborators)
-      .values({
-        listId,
-        userId: targetUser.id,
-        permissionLevel,
-      })
-      .returning();
-
-    // Generate activity for collaborator addition
-    try {
-      await db.insert(activityFeed).values({
-        userId,
-        activityType: ActivityType.COLLABORATOR_ADDED,
-        listId,
-        metadata: {
-          listName: existingList.name,
-          collaboratorUsername: targetUser.username,
-          collaboratorUserId: targetUser.id,
-          permissionLevel,
-        },
-        createdAt: new Date(),
-      });
-    } catch (activityError) {
-      console.error(
-        "Failed to create activity for collaborator addition:",
-        activityError,
-      );
-      // Don't fail the main operation if activity creation fails
-    }
-
-    // Return the collaborator with user info
-    const collaboratorWithUser = {
-      id: newCollaborator.id,
-      userId: targetUser.id,
-      username: targetUser.username,
-      profilePictureUrl: targetUser.profilePictureUrl,
-      permissionLevel: newCollaborator.permissionLevel,
-      createdAt: newCollaborator.createdAt,
-    };
-
-    return NextResponse.json({
-      collaborator: collaboratorWithUser,
-      message: `${targetUser.username} has been added as a ${permissionLevel} to ${existingList.name}`,
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error adding collaborator:", error);
     return NextResponse.json(
