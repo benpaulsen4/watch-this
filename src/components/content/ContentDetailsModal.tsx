@@ -38,6 +38,7 @@ import { Badge } from "../ui/Badge";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CastTab } from "./CastTab";
+import type { CreateOrUpdateContentStatusResult } from "@/lib/content-status/types";
 
 export interface ContentDetailsModalProps {
   content: TMDBMovie | TMDBTVShow;
@@ -141,7 +142,9 @@ export function ContentDetailsModal({
   const contentStreaming = contentProvidersQuery.data?.providers || null;
 
   const updateStatusMutation = useMutation({
-    mutationFn: async (newStatus: WatchStatusEnum) => {
+    mutationFn: async (
+      newStatus: WatchStatusEnum
+    ): Promise<CreateOrUpdateContentStatusResult> => {
       const response = await fetch("/api/status/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -152,11 +155,11 @@ export function ContentDetailsModal({
         }),
       });
       if (!response.ok) throw new Error("Failed to update watch status");
-      return { status: newStatus };
+      return response.json();
     },
-    onSuccess: ({ status }) => {
-      setWatchStatus(status);
-      onShowStatusChanged?.(status);
+    onSuccess: (_data, variables) => {
+      setWatchStatus(variables as WatchStatusEnum);
+      onShowStatusChanged?.(variables as WatchStatusEnum);
     },
   });
 

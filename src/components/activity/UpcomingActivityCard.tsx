@@ -10,6 +10,7 @@ import { getImageUrl } from "@/lib/tmdb/client";
 import { DAYS_OF_WEEK } from "../content/ScheduleManager";
 import { ContentDetailsModal } from "../content/ContentDetailsModal";
 import { useMutation } from "@tanstack/react-query";
+import type { MarkNextEpisodeResult } from "@/lib/episodes/types";
 
 interface UpcomingActivityCardProps {
   upcoming: UpcomingActivity;
@@ -24,7 +25,7 @@ export function UpcomingActivityCard({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const markWatchedMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<MarkNextEpisodeResult> => {
       const response = await fetch("/api/status/episodes/next", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
