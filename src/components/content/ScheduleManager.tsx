@@ -7,18 +7,15 @@ import { WatchStatusEnum } from "@/lib/db/schema";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { Button } from "../ui/Button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  GetSchedulesResponse,
+  ScheduleItem,
+  SchedulesByDay,
+} from "@/lib/schedules/types";
 
 interface ScheduleManagerProps {
   tmdbId: number;
   watchStatus: WatchStatusEnum;
-}
-
-interface Schedule {
-  id: string;
-  tmdbId: number;
-  dayOfWeek: number;
-  createdAt: Date;
-  title?: string | null;
 }
 
 export const DAYS_OF_WEEK = [
@@ -35,19 +32,19 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const schedulesQuery = useQuery<Record<number, Schedule[]>>({
+  const schedulesQuery = useQuery<GetSchedulesResponse>({
     queryKey: ["schedules"],
     queryFn: async () => {
       const response = await fetch(`/api/schedules`);
       if (!response.ok) throw new Error("Failed to fetch schedules");
-      const data = await response.json();
-      return (data.schedules || {}) as Record<number, Schedule[]>;
+      const data = (await response.json()) as GetSchedulesResponse;
+      return data;
     },
   });
 
   function computeOtherShowsByDay(
-    schedulesByDay: Record<number, Schedule[]>,
-    excludeTmdbId: number,
+    schedulesByDay: SchedulesByDay,
+    excludeTmdbId: number
   ): Record<number, string[]> {
     const result: Record<number, string[]> = {};
     for (let day = 0; day <= 6; day++) {
@@ -60,12 +57,12 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
   }
 
   const schedulesByDay = useMemo(
-    () => schedulesQuery.data || {},
-    [schedulesQuery.data],
+    () => schedulesQuery.data?.schedules || ({} as SchedulesByDay),
+    [schedulesQuery.data]
   );
   const otherShowsByDay = useMemo(
     () => computeOtherShowsByDay(schedulesByDay, tmdbId),
-    [schedulesByDay, tmdbId],
+    [schedulesByDay, tmdbId]
   );
 
   // React Query handles loading/fetching; derived values computed via useMemo
@@ -81,24 +78,25 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to add to schedule");
       }
-      return response.json();
+      const data = (await response.json()) as ScheduleItem;
+      return data;
     },
-    onSuccess: (newSchedule, dayOfWeek) => {
-      queryClient.setQueryData<Record<number, Schedule[]>>(
-        ["schedules"],
-        (prev) => {
-          const current = prev || {};
-          const updatedDay = [
-            ...(current[dayOfWeek] || []),
-            newSchedule as Schedule,
-          ];
-          return { ...current, [dayOfWeek]: updatedDay };
-        },
-      );
+    onSuccess: (newItem, dayOfWeek) => {
+      queryClient.setQueryData<GetSchedulesResponse>(["schedules"], (prev) => {
+        const current = prev?.schedules || ({} as SchedulesByDay);
+        const updatedDay = [
+          ...(current[dayOfWeek] || []),
+          newItem as ScheduleItem,
+        ];
+        return {
+          schedules: { ...current, [dayOfWeek]: updatedDay },
+          totalShows: (prev?.totalShows ?? 0) + 1,
+        };
+      });
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to add to schedule",
+        err instanceof Error ? err.message : "Failed to add to schedule"
       );
     },
   });
@@ -107,29 +105,32 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
     mutationFn: async (dayOfWeek: number) => {
       const response = await fetch(
         `/api/schedules?tmdbId=${tmdbId}&dayOfWeek=${dayOfWeek}`,
-        { method: "DELETE" },
+        { method: "DELETE" }
       );
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to remove from schedule");
       }
-      return { dayOfWeek };
+      return response.json();
     },
-    onSuccess: ({ dayOfWeek }) => {
-      queryClient.setQueryData<Record<number, Schedule[]>>(
-        ["schedules"],
-        (prev) => {
-          const current = prev || {};
-          const updatedDay = (current[dayOfWeek] || []).filter(
-            (s) => s.tmdbId !== tmdbId,
-          );
-          return { ...current, [dayOfWeek]: updatedDay };
-        },
-      );
+    onSuccess: (result, dayOfWeek) => {
+      queryClient.setQueryData<GetSchedulesResponse>(["schedules"], (prev) => {
+        const current = prev?.schedules || ({} as SchedulesByDay);
+        const updatedDay = (current[dayOfWeek] || []).filter(
+          (s) => s.tmdbId !== tmdbId
+        );
+        const deletedCount = Array.isArray(result?.deletedSchedules)
+          ? result.deletedSchedules.length
+          : 1;
+        return {
+          schedules: { ...current, [dayOfWeek]: updatedDay },
+          totalShows: Math.max((prev?.totalShows ?? 0) - deletedCount, 0),
+        };
+      });
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to remove from schedule",
+        err instanceof Error ? err.message : "Failed to remove from schedule"
       );
     },
   });
@@ -172,7 +173,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
       <div className="grid gap-3">
         {DAYS_OF_WEEK.map((day, index) => {
           const isScheduled = (schedulesByDay[index] || []).some(
-            (s) => s.tmdbId === tmdbId,
+            (s) => s.tmdbId === tmdbId
           );
           const today = new Date().getDay();
           const isToday = index === today;
@@ -184,7 +185,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
                 "flex items-center justify-between p-4 rounded-lg border transition-colors, gap-2",
                 isToday
                   ? "bg-red-900/20 border-red-800"
-                  : "bg-gray-800/50 border-gray-700",
+                  : "bg-gray-800/50 border-gray-700"
               )}
             >
               <div className="flex flex-col gap-1">
@@ -192,13 +193,13 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
                   <div
                     className={cn(
                       "w-3 h-3 rounded-full",
-                      isScheduled ? "bg-red-500" : "bg-gray-600",
+                      isScheduled ? "bg-red-500" : "bg-gray-600"
                     )}
                   />
                   <span
                     className={cn(
                       "font-medium",
-                      isToday ? "text-red-400" : "text-gray-200",
+                      isToday ? "text-red-400" : "text-gray-200"
                     )}
                   >
                     {day}
