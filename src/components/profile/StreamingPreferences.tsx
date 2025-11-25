@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { getImageUrl } from "@/lib/tmdb/client";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { useStreamingPreferences } from "../providers/AuthProvider";
+import type { StreamingPreferences as StreamingPreferencesType } from "@/lib/profile/streaming/types";
 import { Save, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -22,12 +23,7 @@ interface Provider {
   logo_path: string | null;
 }
 
-interface SavedProvider {
-  id: number;
-  name?: string | null;
-  logoPath?: string | null;
-  region: string;
-}
+type SavedProvider = StreamingPreferencesType["providers"][number];
 
 export function StreamingPreferences() {
   const [country, setCountry] = useState<string>("");

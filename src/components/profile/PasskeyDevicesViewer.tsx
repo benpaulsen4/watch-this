@@ -11,13 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useQuery } from "@tanstack/react-query";
-
-interface PasskeyDevice {
-  id: string;
-  deviceName: string;
-  createdAt: string;
-  lastUsed: string | null;
-}
+import type { PasskeyDevice } from "@/lib/profile/devices/types";
 
 export function PasskeyDevicesViewer() {
   const {
@@ -37,7 +31,7 @@ export function PasskeyDevicesViewer() {
     },
   });
 
-  const getDeviceIcon = (deviceName?: string) => {
+  const getDeviceIcon = (deviceName?: string | null) => {
     const name = deviceName?.toLowerCase();
     if (
       name?.includes("mobile") ||
@@ -66,7 +60,7 @@ export function PasskeyDevicesViewer() {
     const lastUsed = new Date(lastUsedAt);
     const now = new Date();
     const diffInHours = Math.floor(
-      (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60),
+      (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60)
     );
 
     if (diffInHours < 1) return "Used recently";
