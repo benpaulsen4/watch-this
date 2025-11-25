@@ -1,6 +1,7 @@
 "use client";
 
 import { getCurrentSession, User } from "@/lib/auth/client";
+import { StreamingPreferences } from "@/lib/profile/streaming/types";
 import React, {
   createContext,
   useContext,
@@ -8,16 +9,6 @@ import React, {
   useState,
   useCallback,
 } from "react";
-
-interface StreamingPreferences {
-  country: string | null;
-  providers: Array<{
-    id: number;
-    name?: string | null;
-    logoPath?: string | null;
-    region: string;
-  }>;
-}
 
 interface AuthState {
   user: User | null;

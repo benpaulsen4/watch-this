@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import ListsClient, { type ListResponse } from "./ListsClient";
+import ListsClient from "./ListsClient";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ListListsResponse } from "@/lib/lists/types";
 // Mock Next.js router to avoid app router invariant
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -25,7 +26,7 @@ function renderWithClient(ui: React.ReactElement) {
   );
 }
 
-const initialList: ListResponse = {
+const initialList: ListListsResponse = {
   id: "l1",
   name: "Favorites",
   description: null as any,

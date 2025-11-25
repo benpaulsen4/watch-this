@@ -6,7 +6,7 @@ import { UpcomingActivityCard } from "./UpcomingActivityCard";
 import { Button } from "@/components/ui/Button";
 import { Activity as ActivityIcon } from "lucide-react";
 import Link from "next/link";
-import { ActivityResponse } from "./ActivityTimelineClient";
+import type { ActivityTimelineResponse } from "@/lib/activity/types";
 import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { useQuery } from "@tanstack/react-query";
@@ -34,7 +34,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
     isLoading,
     error,
     refetch,
-  } = useQuery<ActivityResponse>({
+  } = useQuery<ActivityTimelineResponse>({
     queryKey: ["activity", "feed", mdUp],
     queryFn: async () => {
       const response = await fetch(`/api/activity?limit=${mdUp ? 10 : 5}`);
