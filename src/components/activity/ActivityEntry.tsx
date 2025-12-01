@@ -3,10 +3,10 @@
 import { formatDistanceToNow } from "date-fns";
 import { ProfileImage } from "@/components/ui/ProfileImage";
 import { ActivityType } from "@/lib/db/schema";
-import { Activity } from "./ActivityTimelineClient";
+import type { ActivityItem } from "@/lib/activity/types";
 
 interface ActivityEntryProps {
-  activity: Activity;
+  activity: ActivityItem;
   currentUsername: string;
 }
 
@@ -14,18 +14,24 @@ export function ActivityEntry({
   activity,
   currentUsername,
 }: ActivityEntryProps) {
-  const getActivityDescription = (activity: Activity) => {
+  const getActivityDescription = (activity: ActivityItem) => {
     const metadata = activity.metadata as Record<string, string>;
 
     switch (activity.activityType) {
       case ActivityType.STATUS_CHANGED:
         return `marked "${metadata.title || "Unknown"}" as ${metadata.status}`;
       case ActivityType.EPISODE_PROGRESS:
-        return `${metadata.watched ? "watched" : "marked not watched"} S${metadata.seasonNumber}E${metadata.episodeNumber} of "${metadata.title || "Unknown"}"`;
+        return `${metadata.watched ? "watched" : "marked not watched"} S${
+          metadata.seasonNumber
+        }E${metadata.episodeNumber} of "${metadata.title || "Unknown"}"`;
       case ActivityType.LIST_ITEM_ADDED:
-        return `added "${metadata.title || "Unknown"}" to ${metadata.listName || "a list"}`;
+        return `added "${metadata.title || "Unknown"}" to ${
+          metadata.listName || "a list"
+        }`;
       case ActivityType.LIST_ITEM_REMOVED:
-        return `removed "${metadata.title || "Unknown"}" from ${metadata.listName || "a list"}`;
+        return `removed "${metadata.title || "Unknown"}" from ${
+          metadata.listName || "a list"
+        }`;
       case ActivityType.LIST_CREATED:
         return `created list "${metadata.listName || "Unknown"}"`;
       case ActivityType.LIST_UPDATED:
@@ -33,9 +39,13 @@ export function ActivityEntry({
       case ActivityType.LIST_DELETED:
         return `deleted list "${metadata.listName || "Unknown"}"`;
       case ActivityType.COLLABORATOR_ADDED:
-        return `added ${metadata.collaboratorUsername || "someone"} as ${metadata.permissionLevel || "collaborator"} to "${metadata.listName || "a list"}"`;
+        return `added ${metadata.collaboratorUsername || "someone"} as ${
+          metadata.permissionLevel || "collaborator"
+        } to "${metadata.listName || "a list"}"`;
       case ActivityType.COLLABORATOR_REMOVED:
-        return `removed ${metadata.collaboratorUsername || "someone"} from "${metadata.listName || "a list"}"`;
+        return `removed ${metadata.collaboratorUsername || "someone"} from "${
+          metadata.listName || "a list"
+        }"`;
       case ActivityType.PROFILE_IMPORT:
         const lists = metadata.lists ? parseInt(metadata.lists) : 0;
         const contentStatus = metadata.contentStatus
@@ -50,11 +60,11 @@ export function ActivityEntry({
         if (lists > 0) parts.push(`${lists} list${lists === 1 ? "" : "s"}`);
         if (contentStatus > 0)
           parts.push(
-            `${contentStatus} content status${contentStatus === 1 ? "" : "es"}`,
+            `${contentStatus} content status${contentStatus === 1 ? "" : "es"}`
           );
         if (episodeStatus > 0)
           parts.push(
-            `${episodeStatus} episode status${episodeStatus === 1 ? "" : "es"}`,
+            `${episodeStatus} episode status${episodeStatus === 1 ? "" : "es"}`
           );
 
         let result = `imported ${parts.join(", ")}`;
@@ -67,7 +77,7 @@ export function ActivityEntry({
     }
   };
 
-  const getProfileImages = (activity: Activity) => {
+  const getProfileImages = (activity: ActivityItem) => {
     if (activity.isCollaborative && (activity.collaborators?.length ?? 0) > 0) {
       return (
         <div className="flex -space-x-4">
@@ -99,7 +109,10 @@ export function ActivityEntry({
     }
   };
 
-  const getUsernameString = (activity: Activity, currentUsername: string) => {
+  const getUsernameString = (
+    activity: ActivityItem,
+    currentUsername: string
+  ) => {
     const replaceWithYou = (username: string) =>
       username === currentUsername ? "you" : username;
 
@@ -114,7 +127,7 @@ export function ActivityEntry({
 
       if (collaborators.length <= 3) {
         const lastCollaborator = replaceWithYou(
-          collaborators[collaborators.length - 1].username,
+          collaborators[collaborators.length - 1].username
         );
         const otherCollaborators = collaborators
           .slice(0, -1)

@@ -1,258 +1,40 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { db } from "@/lib/db";
-import {
-  activityFeed,
-  users,
-  lists,
-  listCollaborators,
-  showSchedules,
-  userContentStatus,
-  episodeWatchStatus,
-} from "@/lib/db/schema";
-import {
-  eq,
-  desc,
-  and,
-  or,
-  inArray,
-  lt,
-  arrayContains,
-  sql,
-} from "drizzle-orm";
-import { tmdbClient } from "@/lib/tmdb/client";
+import { listActivityTimeline } from "@/lib/activity/service";
+import type { ActivityTimelineResponse } from "@/lib/activity/types";
 
 // GET /api/activity - Get paginated activity timeline
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "10");
-    const cursor = searchParams.get("cursor"); // ISO timestamp for cursor-based pagination
-    const type = searchParams.get("type"); // Optional filter by activity type
+    const cursor = searchParams.get("cursor") || undefined;
+    const type = searchParams.get("type") || undefined;
 
-    // Build the query conditions
-    let whereConditions;
-
-    if (cursor && type) {
-      whereConditions = and(
-        or(
-          eq(activityFeed.userId, request.user.id),
-          arrayContains(activityFeed.collaborators, [request.user.id]),
-        ),
-        lt(activityFeed.createdAt, new Date(cursor)),
-        eq(activityFeed.activityType, type),
-      );
-    } else if (cursor) {
-      whereConditions = and(
-        or(
-          eq(activityFeed.userId, request.user.id),
-          arrayContains(activityFeed.collaborators, [request.user.id]),
-        ),
-        lt(activityFeed.createdAt, new Date(cursor)),
-      );
-    } else if (type) {
-      whereConditions = and(
-        or(
-          eq(activityFeed.userId, request.user.id),
-          arrayContains(activityFeed.collaborators, [request.user.id]),
-        ),
-        eq(activityFeed.activityType, type),
-      );
-    } else {
-      whereConditions = or(
-        eq(activityFeed.userId, request.user.id),
-        arrayContains(activityFeed.collaborators, [request.user.id]),
-      );
-    }
-
-    // Get user's collaborative lists to include collaborative activities
-    const userCollaborativeLists = await db
-      .select({ listId: lists.id })
-      .from(lists)
-      .leftJoin(listCollaborators, eq(lists.id, listCollaborators.listId))
-      .where(
-        or(
-          eq(lists.ownerId, request.user.id),
-          eq(listCollaborators.userId, request.user.id),
-        ),
-      );
-
-    const collaborativeListIds = userCollaborativeLists.map((l) => l.listId);
-
-    // Include activities from collaborative lists
-    if (collaborativeListIds.length > 0) {
-      let collaborativeConditions = and(
-        inArray(activityFeed.listId, collaborativeListIds),
-        eq(activityFeed.isCollaborative, true),
-      );
-
-      if (cursor) {
-        collaborativeConditions = and(
-          collaborativeConditions,
-          lt(activityFeed.createdAt, new Date(cursor)),
-        );
+    const result = await listActivityTimeline(
+      request.user.id,
+      request.user.timezone,
+      {
+        limit,
+        cursor,
+        type,
       }
-
-      if (type) {
-        collaborativeConditions = and(
-          collaborativeConditions,
-          eq(activityFeed.activityType, type),
-        );
-      }
-
-      whereConditions = or(whereConditions, collaborativeConditions);
-    }
-
-    const activities = await db
-      .select({
-        id: activityFeed.id,
-        userId: activityFeed.userId,
-        activityType: activityFeed.activityType,
-        tmdbId: activityFeed.tmdbId,
-        contentType: activityFeed.contentType,
-        listId: activityFeed.listId,
-        metadata: activityFeed.metadata,
-        collaborators: activityFeed.collaborators,
-        isCollaborative: activityFeed.isCollaborative,
-        createdAt: activityFeed.createdAt,
-        username: users.username,
-        userProfilePicture: users.profilePictureUrl,
-      })
-      .from(activityFeed)
-      .leftJoin(users, eq(activityFeed.userId, users.id))
-      .where(whereConditions)
-      .orderBy(desc(activityFeed.createdAt))
-      .limit(limit + 1); // Fetch one extra to determine if there are more
-
-    const hasMore = activities.length > limit;
-    const resultActivities = hasMore ? activities.slice(0, limit) : activities;
-
-    const allCollaborators = await db
-      .select({
-        id: users.id,
-        username: users.username,
-        profilePictureUrl: users.profilePictureUrl,
-      })
-      .from(users)
-      .where(
-        inArray(
-          users.id,
-          resultActivities.flatMap((activity) => activity.collaborators ?? []),
-        ),
-      );
-
-    const nextCursor =
-      hasMore && resultActivities.length > 0
-        ? resultActivities[resultActivities.length - 1].createdAt.toISOString()
-        : null;
-
-    const userTimezone = request.user.timezone;
-
-    // Determine today's day in user's timezone
-    const dayNameFormatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: userTimezone,
-      weekday: "short",
-    });
-    const dayName = dayNameFormatter.format(new Date());
-    const dayMap: Record<string, number> = {
-      Sun: 0,
-      Mon: 1,
-      Tue: 2,
-      Wed: 3,
-      Thu: 4,
-      Fri: 5,
-      Sat: 6,
-    };
-    const today = dayMap[dayName] ?? new Date().getDay();
-
-    const upcomingActivities = await db
-      .select({
-        tmdbId: showSchedules.tmdbId,
-        scheduleId: showSchedules.id,
-        status: userContentStatus.status,
-      })
-      .from(showSchedules)
-      .innerJoin(
-        userContentStatus,
-        and(
-          eq(showSchedules.userId, userContentStatus.userId),
-          eq(showSchedules.tmdbId, userContentStatus.tmdbId),
-          eq(userContentStatus.contentType, "tv"),
-        ),
-      )
-      .where(
-        and(
-          eq(showSchedules.userId, request.user.id),
-          eq(showSchedules.dayOfWeek, today),
-        ),
-      );
-
-    // For each scheduled show, find the next episode to watch
-    const upcomingWithEpisodes = await Promise.all(
-      upcomingActivities.map(async (activity) => {
-        // Check if there are any episodes watched today to filter out
-        const watchedToday = await db
-          .select()
-          .from(episodeWatchStatus)
-          .where(
-            and(
-              eq(episodeWatchStatus.userId, request.user.id),
-              eq(episodeWatchStatus.tmdbId, activity.tmdbId),
-              eq(episodeWatchStatus.watched, true),
-              // Compare dates using the user's timezone rather than DB server timezone
-              sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`,
-            ),
-          );
-
-        // If episodes were watched today, skip this show
-        if (watchedToday.length > 0) {
-          return null;
-        }
-
-        // Get show details from TMDB
-        const showDetails = await tmdbClient.getTVShowDetails(activity.tmdbId);
-
-        return {
-          ...showDetails,
-          scheduleId: activity.scheduleId,
-          watchStatus: activity.status,
-        };
-      }),
     );
 
-    return NextResponse.json({
-      activities: resultActivities.map((activity) => ({
-        id: activity.id,
-        activityType: activity.activityType,
-        user: {
-          id: activity.userId,
-          username: activity.username,
-          profilePictureUrl: activity.userProfilePicture,
-        },
-        metadata: activity.metadata,
-        createdAt: activity.createdAt,
-        contentType: activity.contentType,
-        tmdbId: activity.tmdbId,
-        listId: activity.listId,
-        isCollaborative: activity.isCollaborative,
-        collaborators: activity.collaborators?.map((collaboratorId) => ({
-          id: collaboratorId,
-          username: allCollaborators.find((c) => c.id === collaboratorId)
-            ?.username,
-          profilePictureUrl: allCollaborators.find(
-            (c) => c.id === collaboratorId,
-          )?.profilePictureUrl,
-        })),
-      })),
-      upcoming: upcomingWithEpisodes.filter((upcoming) => upcoming !== null),
-      hasMore,
-      nextCursor,
-    });
+    if (typeof result === "string") {
+      if (result === "invalidCursor") {
+        return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
+      }
+      return NextResponse.json({ error: "Bad request" }, { status: 400 });
+    }
+
+    const typed: ActivityTimelineResponse = result;
+    return NextResponse.json(typed);
   } catch (error) {
     console.error("Error fetching activity timeline:", error);
     return NextResponse.json(
       { error: "Failed to fetch activity timeline" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 });

@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { ListResponse } from "./ListsClient";
+import type { ListListsResponse } from "@/lib/lists/types";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/Card";
 import { getImageUrl } from "@/lib/tmdb/client";
 import {
@@ -15,7 +15,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 export interface ListCardProps {
-  list: ListResponse;
+  list: ListListsResponse;
   onClick?: () => void;
 }
 

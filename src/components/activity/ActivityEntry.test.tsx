@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { ActivityEntry } from "./ActivityEntry";
 import { ActivityType } from "@/lib/db/schema";
-import type { Activity } from "./ActivityTimelineClient";
+import type { ActivityItem } from "@/lib/activity/types";
 
 // Make relative time deterministic
 vi.mock("date-fns", () => ({
@@ -12,8 +12,8 @@ vi.mock("date-fns", () => ({
 const baseUser = { id: "u1", username: "alice", profilePictureUrl: null };
 
 function makeActivity(
-  overrides: Partial<Activity> & { activityType: string }
-): Activity {
+  overrides: Partial<ActivityItem> & { activityType: string }
+): ActivityItem {
   return {
     id: "a1",
     user: baseUser,
@@ -25,7 +25,7 @@ function makeActivity(
     collaborators: [],
     createdAt: new Date().toISOString(),
     ...overrides,
-  } as Activity;
+  } as ActivityItem;
 }
 
 describe("ActivityEntry", () => {

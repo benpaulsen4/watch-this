@@ -4,40 +4,14 @@ import { useCallback, useMemo } from "react";
 import { ActivityEntry } from "./ActivityEntry";
 import { Button } from "@/components/ui/Button";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
-import { TMDBTVShow } from "@/lib/tmdb/client";
+import type {
+  ActivityItem,
+  UpcomingActivity,
+  ActivityTimelineResponse,
+} from "@/lib/activity/types";
 import { useUser } from "../providers/AuthProvider";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { useInfiniteQuery } from "@tanstack/react-query";
-
-interface UserStub {
-  id: string;
-  username: string;
-  profilePictureUrl?: string | null;
-}
-
-export interface Activity {
-  id: string;
-  activityType: string;
-  user: UserStub;
-  tmdbId?: number;
-  contentType?: string;
-  listId?: string;
-  metadata?: Record<string, unknown>;
-  isCollaborative: boolean;
-  collaborators?: UserStub[];
-  createdAt: string;
-}
-
-export interface UpcomingActivity extends TMDBTVShow {
-  scheduleId: string;
-}
-
-export interface ActivityResponse {
-  activities: Activity[];
-  upcoming?: UpcomingActivity[];
-  hasMore: boolean;
-  nextCursor?: string;
-}
 
 export function ActivityTimelineClient() {
   const user = useUser();
@@ -59,11 +33,12 @@ export function ActivityTimelineClient() {
       return response.json();
     },
     initialPageParam: undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
+    getNextPageParam: (lastPage: ActivityTimelineResponse) =>
+      lastPage.nextCursor || undefined,
   });
 
   const activities = useMemo(() => {
-    const pages = (data?.pages || []) as Array<{ activities?: Activity[] }>;
+    const pages = (data?.pages || []) as ActivityTimelineResponse[];
     return pages.flatMap((p) => p.activities || []);
   }, [data?.pages]);
 
@@ -116,7 +91,7 @@ export function ActivityTimelineClient() {
         </div>
       ) : (
         <div className="space-y-4">
-          {activities.map((activity) => (
+          {activities.map((activity: ActivityItem) => (
             <ActivityEntry
               key={activity.id}
               activity={activity}

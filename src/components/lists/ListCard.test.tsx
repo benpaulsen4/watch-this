@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { ListCard } from "./ListCard";
-import type { ListResponse } from "./ListsClient";
+import type { ListListsResponse } from "@/lib/lists/types";
 
 // Mock next/image to a plain img for test environment
 vi.mock("next/image", () => ({
@@ -16,7 +16,9 @@ vi.mock("@/lib/tmdb/client", () => ({
   getImageUrl: (path: string) => `http://image.test${path}`,
 }));
 
-function makeList(overrides: Partial<ListResponse> = {}): ListResponse {
+function makeList(
+  overrides: Partial<ListListsResponse> = {}
+): ListListsResponse {
   return {
     id: "l1",
     name: "Weekend Picks",
@@ -33,7 +35,7 @@ function makeList(overrides: Partial<ListResponse> = {}): ListResponse {
     collaborators: 2,
     posterPaths: ["/a.jpg", "/b.jpg", "/c.jpg"],
     ...overrides,
-  } as unknown as ListResponse;
+  } as unknown as ListListsResponse;
 }
 
 describe("ListCard", () => {

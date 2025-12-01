@@ -9,15 +9,11 @@ import Modal from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import Dropdown from "@/components/ui/Dropdown";
-
-interface Collaborator {
-  id: string;
-  userId: string;
-  username: string;
-  profilePictureUrl?: string | null;
-  permissionLevel: string;
-  createdAt: string;
-}
+import {
+  Collaborator,
+  CreateCollaboratorInput,
+  UpdateCollaboratorInput,
+} from "@/lib/lists/types";
 
 interface CollaborationModalProps {
   isOpen: boolean;
@@ -75,10 +71,7 @@ export default function CollaborationModal({
     mutationFn: async ({
       username,
       permissionLevel,
-    }: {
-      username: string;
-      permissionLevel: PermissionLevelEnum;
-    }) => {
+    }: CreateCollaboratorInput) => {
       setAddingCollaborator(true);
       const response = await fetch(`/api/lists/${listId}/collaborators`, {
         method: "POST",
@@ -151,7 +144,7 @@ export default function CollaborationModal({
 
   const updatePermission = async (
     collaboratorUserId: string,
-    newPermission: string
+    newPermission: PermissionLevelEnum
   ) => {
     setError(null);
     setSuccess(null);
@@ -164,7 +157,7 @@ export default function CollaborationModal({
       newPermission,
     }: {
       collaboratorUserId: string;
-      newPermission: string;
+      newPermission: PermissionLevelEnum;
     }) => {
       const response = await fetch(
         `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
@@ -367,7 +360,8 @@ export default function CollaborationModal({
                             onSelectionChange={(key) =>
                               updatePermission(
                                 collaborator.userId,
-                                String(key || PermissionLevel.COLLABORATOR)
+                                (key as PermissionLevelEnum) ||
+                                  PermissionLevel.COLLABORATOR
                               )
                             }
                             options={[

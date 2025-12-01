@@ -20,30 +20,10 @@ import ListSettingsModal from "./ListSettingsModal";
 import { useUser } from "../providers/AuthProvider";
 import { PageHeader } from "../ui/PageHeader";
 import { ContentCard } from "../content/ContentCard";
-
-interface ListItem extends TMDBMovie, TMDBTVShow {
-  listItemId: string;
-  createdAt: string;
-}
-
-interface List {
-  id: string;
-  name: string;
-  description: string | null;
-  listType: "movies" | "tv" | "mixed";
-  isPublic: boolean;
-  syncWatchStatus: boolean;
-  ownerId: string;
-  ownerUsername?: string;
-  ownerProfilePictureUrl?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  items: ListItem[];
-  collaborators: number;
-}
+import { GetListResponse } from "@/lib/lists/types";
 
 interface ListDetailsClientProps {
-  initialList: List;
+  initialList: GetListResponse;
 }
 
 export default function ListDetailsClient({
@@ -51,7 +31,7 @@ export default function ListDetailsClient({
 }: ListDetailsClientProps) {
   const router = useRouter();
   const user = useUser();
-  const [list, setList] = useState<List>(initialList);
+  const [list, setList] = useState<GetListResponse>(initialList);
   const [showCollaborationModal, setShowCollaborationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 

@@ -1,6 +1,6 @@
 import ListsClient from "@/components/lists/ListsClient";
 import { getCurrentUser } from "@/lib/auth/webauthn";
-import { getListsResponse } from "@/lib/lists/list-utils";
+import { listLists } from "@/lib/lists/service";
 import { cookies } from "next/headers";
 
 export default async function ListsPage() {
@@ -8,7 +8,7 @@ export default async function ListsPage() {
 
   if (user === null) return null;
 
-  const listsWithPosters = await getListsResponse(user.id);
+  const listsWithPosters = await listLists(user.id);
 
   return <ListsClient initialLists={listsWithPosters} />;
 }

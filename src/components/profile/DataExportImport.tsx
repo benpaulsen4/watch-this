@@ -14,19 +14,12 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useMutation } from "@tanstack/react-query";
+import type { ImportResult } from "@/lib/profile/data/types";
 
 type ExportFormat = "json" | "csv";
 type ImportStatus = "idle" | "uploading" | "success" | "error";
 
-interface ImportResult {
-  success: boolean;
-  imported: {
-    lists: number;
-    contentStatus: number;
-    episodeStatus: number;
-  };
-  errors: string[];
-}
+// ImportResult type is shared from lib
 
 export function DataExportImport() {
   const [exportLoading, setExportLoading] = useState(false);
