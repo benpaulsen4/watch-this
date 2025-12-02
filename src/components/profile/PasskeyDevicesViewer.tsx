@@ -10,8 +10,11 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { PasskeyDevice } from "@/lib/profile/devices/types";
+import { useState, useEffect } from "react";
+import Modal from "@/components/ui/Modal";
+import { initiatePasskeyClaim } from "@/lib/auth/client";
 
 export function PasskeyDevicesViewer() {
   const {
@@ -30,6 +33,66 @@ export function PasskeyDevicesViewer() {
       return response.json();
     },
   });
+
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimInfo, setClaimInfo] = useState<null | {
+    claimId: string;
+    claimCode: string;
+    token: string;
+    magicLink: string;
+    qrPayload: string;
+    expiresAt: string;
+  }>(null);
+  const [isInitiating, setIsInitiating] = useState(false);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!isClaimModalOpen) return;
+    const timer = setInterval(() => {
+      refetch();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [isClaimModalOpen, refetch]);
+
+  const initiateClaimMutation = useMutation({
+    mutationFn: initiatePasskeyClaim,
+    onSuccess: (info) => {
+      setClaimInfo(info);
+      setIsClaimModalOpen(true);
+    },
+  });
+
+  const startClaim = async () => {
+    setIsInitiating(true);
+    try {
+      await initiateClaimMutation.mutateAsync();
+    } finally {
+      setIsInitiating(false);
+    }
+  };
+
+  const canDelete = (devicesData?.devices?.length || 0) > 1;
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/profile/devices/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete device");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile", "devices"] });
+    },
+  });
+
+  const deleteDevice = async (id: string) => {
+    if (!canDelete) return;
+    await deleteMutation.mutateAsync(id);
+  };
 
   const getDeviceIcon = (deviceName?: string | null) => {
     const name = deviceName?.toLowerCase();
@@ -80,72 +143,161 @@ export function PasskeyDevicesViewer() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium text-gray-100 mb-2">
-            Passkey Devices
-          </h3>
-          <p className="text-sm text-gray-400">
-            Manage the devices registered for passwordless authentication.
-          </p>
+    <>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-medium text-gray-100 mb-2">
+              Passkey Devices
+            </h3>
+            <p className="text-sm text-gray-400">
+              Manage the devices registered for passwordless authentication.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isLoading}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={startClaim}
+              disabled={isInitiating}
+            >
+              Add Passkey
+            </Button>
+          </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
 
-      {error && (
-        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-          <AlertCircle className="h-4 w-4" />
-          {(error as Error).message}
-        </div>
-      )}
+        {error && (
+          <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+            <AlertCircle className="h-4 w-4" />
+            {(error as Error).message}
+          </div>
+        )}
 
-      <div className="space-y-3">
-        {(devicesData?.devices || []).map((device) => (
-          <Card key={device.id} variant="outline">
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {getDeviceIcon(device.deviceName)}
-                  <div>
-                    <h4 className="font-medium text-gray-100">
-                      {device.deviceName}
-                    </h4>
-                    <div className="flex items-center gap-4 text-sm text-gray-400">
-                      <span>Added {formatDate(device.createdAt)}</span>
-                      <span>•</span>
-                      <span>{getLastUsedText(device.lastUsed)}</span>
+        <div className="space-y-3">
+          {(devicesData?.devices || []).map((device) => (
+            <Card key={device.id} variant="outline">
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {getDeviceIcon(device.deviceName)}
+                    <div>
+                      <h4 className="font-medium text-gray-100">
+                        {device.deviceName}
+                      </h4>
+                      <div className="flex items-center gap-4 text-sm text-gray-400">
+                        <span>Added {formatDate(device.createdAt)}</span>
+                        <span>•</span>
+                        <span>{getLastUsedText(device.lastUsed)}</span>
+                      </div>
                     </div>
                   </div>
+                  <div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteDevice(device.id)}
+                      disabled={!canDelete}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <Shield className="h-5 w-5 text-blue-400 mt-0.5" />
-          <div>
-            <h4 className="font-medium text-blue-400 mb-1">About Passkeys</h4>
-            <p className="text-sm text-gray-300">
-              Passkeys are a secure, passwordless way to sign in using your
-              device&apos;s built-in authentication (like fingerprint, face
-              recognition, or PIN). They&apos;re more secure than passwords and
-              can&apos;t be phished or stolen.
-            </p>
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Shield className="h-5 w-5 text-blue-400 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-blue-400 mb-1">About Passkeys</h4>
+              <p className="text-sm text-gray-300">
+                Passkeys are a secure, passwordless way to sign in using your
+                device&apos;s built-in authentication (like fingerprint, face
+                recognition, or PIN). They&apos;re more secure than passwords
+                and can&apos;t be phished or stolen.
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      <Modal
+        isOpen={isClaimModalOpen}
+        onClose={() => setIsClaimModalOpen(false)}
+        title="Add a New Passkey"
+        subtitle="Use your other device to scan the QR or open the link"
+        size="md"
+      >
+        {claimInfo ? (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-300">Claim Code</p>
+              <p className="text-lg font-semibold text-gray-100 tracking-widest">
+                {claimInfo.claimCode}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-300">Magic Link</p>
+              <a
+                href={claimInfo.magicLink}
+                className="text-blue-400 break-all"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {claimInfo.magicLink}
+              </a>
+            </div>
+            <div className="flex items-center justify-center">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                  claimInfo.qrPayload
+                )}`}
+                alt="QR Code"
+                className="rounded-lg border border-gray-800"
+              />
+            </div>
+            <p className="text-sm text-gray-400">
+              Expires at {formatDate(claimInfo.expiresAt)}
+            </p>
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await fetch(
+                      `/api/profile/devices/claims/${claimInfo.claimId}`,
+                      { method: "DELETE" }
+                    );
+                    setIsClaimModalOpen(false);
+                    setClaimInfo(null);
+                  } catch {}
+                }}
+              >
+                Cancel Claim
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-center py-6">
+            <LoadingSpinner
+              size="lg"
+              variant="primary"
+              text="Preparing claim..."
+            />
+          </div>
+        )}
+      </Modal>
+    </>
   );
 }

@@ -10,8 +10,8 @@ import {
   type AuthenticationResponseJSON,
 } from "@simplewebauthn/server";
 import { db } from "../db/index";
-import { users, passkeyCredentials, type User } from "../db";
-import { eq } from "drizzle-orm";
+import { users, passkeyCredentials, passkeyClaims, type User } from "../db";
+import { eq, and, isNull } from "drizzle-orm";
 import { SignJWT, jwtVerify } from "jose";
 
 const RP_NAME = process.env.WEBAUTHN_RP_NAME || "WatchThis";
@@ -117,6 +117,120 @@ export async function verifyPasskeyRegistration(
   return result;
 }
 
+// Generate registration options for adding an additional passkey to an existing user
+export async function generateAdditionalPasskeyRegistrationOptions(
+  userId: string
+) {
+  const userData = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (userData.length === 0) {
+    throw new Error("User not found");
+  }
+
+  const u = userData[0];
+
+  const options: GenerateRegistrationOptionsOpts = {
+    rpName: RP_NAME,
+    rpID: RP_ID,
+    userName: u.username,
+    userDisplayName: u.username,
+    timeout: 60000,
+    attestationType: "none",
+    authenticatorSelection: {
+      residentKey: "preferred",
+      userVerification: "preferred",
+      authenticatorAttachment: "platform",
+    },
+  };
+
+  return await generateRegistrationOptions(options);
+}
+
+// Verify registration response and add credential to existing user
+export async function verifyAdditionalPasskeyRegistration(
+  userId: string,
+  registrationResponse: RegistrationResponseJSON,
+  expectedChallenge: string,
+  deviceName?: string
+) {
+  const verification: VerifyRegistrationResponseOpts = {
+    response: registrationResponse,
+    expectedChallenge,
+    expectedOrigin: ORIGIN,
+    expectedRPID: RP_ID,
+  };
+
+  const verificationResult = await verifyRegistrationResponse(verification);
+
+  if (!verificationResult.verified || !verificationResult.registrationInfo) {
+    throw new Error("Registration verification failed");
+  }
+
+  const { credential } = verificationResult.registrationInfo;
+  const credentialID = credential.id;
+  const credentialPublicKey = credential.publicKey;
+  const counter = credential.counter;
+  const activeDevicesRows = await db
+    .select({ id: passkeyCredentials.id })
+    .from(passkeyCredentials)
+    .where(
+      and(
+        eq(passkeyCredentials.userId, userId),
+        isNull(passkeyCredentials.deletedAt)
+      )
+    );
+
+  if (activeDevicesRows.length >= 10) {
+    throw new Error("Maximum devices reached");
+  }
+
+  const [newCredential] = await db
+    .insert(passkeyCredentials)
+    .values({
+      userId,
+      credentialId: credentialID,
+      publicKey: Buffer.from(credentialPublicKey).toString("base64url"),
+      counter,
+      deviceName: deviceName || "Unknown Device",
+    })
+    .returning();
+
+  return { credential: newCredential };
+}
+
+// Create JWT claim token
+export async function createClaimToken(
+  claimId: string,
+  userId: string
+): Promise<string> {
+  const payload = { claimId, userId };
+
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("10m")
+    .sign(JWT_SECRET);
+}
+
+// Verify JWT claim token
+export async function verifyClaimToken(
+  token: string
+): Promise<{ claimId: string; userId: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    return {
+      claimId: payload.claimId as string,
+      userId: payload.userId as string,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Generate authentication options for existing user
 export async function generatePasskeyAuthenticationOptions() {
   const options: GenerateAuthenticationOptionsOpts = {
@@ -141,7 +255,12 @@ export async function verifyPasskeyAuthentication(
     })
     .from(passkeyCredentials)
     .innerJoin(users, eq(users.id, passkeyCredentials.userId))
-    .where(eq(passkeyCredentials.credentialId, authenticationResponse.id))
+    .where(
+      and(
+        eq(passkeyCredentials.credentialId, authenticationResponse.id),
+        isNull(passkeyCredentials.deletedAt)
+      )
+    )
     .limit(1);
 
   if (credentialData.length === 0) {

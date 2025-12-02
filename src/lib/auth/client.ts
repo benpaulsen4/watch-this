@@ -6,6 +6,8 @@ import {
   type PublicKeyCredentialCreationOptionsJSON,
   type PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
+import { UAParser } from "ua-parser-js";
+import type { ClaimInitiateResponse } from "@/lib/profile/devices/types";
 
 export interface RegistrationOptions {
   username: string;
@@ -104,6 +106,68 @@ export async function authenticatePasskey() {
     console.error("Authentication error:", error);
     throw error;
   }
+}
+
+// Initiate a claim to add a new passkey
+export async function initiatePasskeyClaim(): Promise<ClaimInitiateResponse> {
+  const response = await fetch("/api/profile/devices", { method: "POST" });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to initiate passkey claim");
+  }
+  return await response.json();
+}
+
+// Begin claim registration on another device using the magic link token
+export async function beginClaimRegistration(token: string): Promise<{
+  options: PublicKeyCredentialCreationOptionsJSON;
+  challengeToken: string;
+}> {
+  const response = await fetch(
+    `/api/auth/claim/begin?token=${encodeURIComponent(token)}`
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to begin claim registration");
+  }
+  return await response.json();
+}
+
+// Verify claim registration and attach credential to existing user
+export async function verifyClaimRegistration({
+  token,
+  challengeToken,
+  registrationResponse,
+  deviceName,
+}: {
+  token: string;
+  challengeToken: string;
+  registrationResponse: unknown;
+  deviceName?: string;
+}): Promise<{ success: boolean }> {
+  const { browser, os } = UAParser(navigator.userAgent);
+  const computedDeviceName =
+    deviceName ||
+    `${browser.name ?? "Unknown Browser"} on ${os.name ?? "Unknown OS"} ${
+      os.version
+    }`;
+
+  const response = await fetch("/api/auth/claim/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token,
+      challengeToken,
+      registrationResponse,
+      deviceName: computedDeviceName,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to verify claim registration");
+  }
+  return await response.json();
 }
 
 // Sign out user
