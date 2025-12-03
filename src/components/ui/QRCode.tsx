@@ -31,7 +31,7 @@ export default function QRCode({ value, size = 180, className }: QRCodeProps) {
 
   return (
     <img
-      src={src}
+      src={src || undefined}
       alt="QR Code"
       width={size}
       height={size}
