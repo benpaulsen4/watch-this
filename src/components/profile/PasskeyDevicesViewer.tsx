@@ -6,15 +6,19 @@ import {
   Monitor,
   AlertCircle,
   RefreshCw,
+  Copy as CopyIcon,
+  Check as CheckIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Input } from "@/components/ui/Input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { PasskeyDevice } from "@/lib/profile/devices/types";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
 import { initiatePasskeyClaim } from "@/lib/auth/client";
+import QRCode from "@/components/ui/QRCode";
 
 export function PasskeyDevicesViewer() {
   const {
@@ -44,21 +48,48 @@ export function PasskeyDevicesViewer() {
     expiresAt: string;
   }>(null);
   const [isInitiating, setIsInitiating] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!isClaimModalOpen) return;
+    setIsPolling(true);
+    const ids = (devicesData?.devices || []).map((d) => d.id);
     const timer = setInterval(() => {
-      refetch();
+      refetch().then(({ data }) => {
+        const currentIds = (data?.devices || []).map((d) => d.id);
+        const added = currentIds.some((id) => !ids.includes(id));
+        if (added) {
+          setIsClaimModalOpen(false);
+          setClaimInfo(null);
+          setIsPolling(false);
+          queryClient.invalidateQueries({ queryKey: ["profile", "devices"] });
+        }
+      });
     }, 4000);
-    return () => clearInterval(timer);
-  }, [isClaimModalOpen, refetch]);
+    return () => {
+      clearInterval(timer);
+      setIsPolling(false);
+    };
+  }, [isClaimModalOpen, refetch, queryClient]);
 
   const initiateClaimMutation = useMutation({
     mutationFn: initiatePasskeyClaim,
     onSuccess: (info) => {
+      setClaimError(null);
       setClaimInfo(info);
       setIsClaimModalOpen(true);
+    },
+    onError: (err) => {
+      const message =
+        (err as Error)?.message || "Failed to initiate passkey claim";
+      setClaimError(
+        message.toLowerCase().includes("rate limit")
+          ? "Too many Add Passkey attempts in the last hour. Please try again later."
+          : message
+      );
     },
   });
 
@@ -182,6 +213,13 @@ export function PasskeyDevicesViewer() {
           </div>
         )}
 
+        {claimError && (
+          <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+            <AlertCircle className="h-4 w-4" />
+            {claimError}
+          </div>
+        )}
+
         <div className="space-y-3">
           {(devicesData?.devices || []).map((device) => (
             <Card key={device.id} variant="outline">
@@ -241,35 +279,64 @@ export function PasskeyDevicesViewer() {
         {claimInfo ? (
           <div className="space-y-4">
             <div>
-              <p className="text-sm text-gray-300">Claim Code</p>
+              <p className="text-sm font-medium text-gray-200">Claim Code</p>
               <p className="text-lg font-semibold text-gray-100 tracking-widest">
                 {claimInfo.claimCode}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-300">Magic Link</p>
-              <a
-                href={claimInfo.magicLink}
-                className="text-blue-400 break-all"
-                target="_blank"
-                rel="noreferrer"
-              >
-                {claimInfo.magicLink}
-              </a>
+              <Input label="Magic Link" value={claimInfo.magicLink} readOnly />
+              <div className="mt-2 flex justify-between">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span>Open the link on the other device</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(claimInfo.magicLink);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1500);
+                    } catch {}
+                  }}
+                >
+                  {copied ? (
+                    <>
+                      <CheckIcon className="h-4 w-4 mr-2" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon className="h-4 w-4 mr-2" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center justify-center">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                  claimInfo.qrPayload
-                )}`}
-                alt="QR Code"
-                className="rounded-lg border border-gray-800"
-              />
+            <div>
+              <p className="text-sm font-medium text-gray-200">QR Code</p>
+              <div className="flex items-center justify-center">
+                <QRCode
+                  value={claimInfo.qrPayload}
+                  size={220}
+                  className="rounded-lg border border-gray-800"
+                />
+              </div>
             </div>
             <p className="text-sm text-gray-400">
               Expires at {formatDate(claimInfo.expiresAt)}
             </p>
-            <div className="flex justify-end">
+            <div className="flex justify-between">
+              {isPolling && (
+                <LoadingSpinner
+                  size="sm"
+                  variant="primary"
+                  text="Listening for new device..."
+                />
+              )}
+
               <Button
                 variant="outline"
                 size="sm"
