@@ -14,7 +14,10 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Input } from "@/components/ui/Input";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { PasskeyDevice } from "@/lib/profile/devices/types";
+import type {
+  ClaimInitiateResponse,
+  PasskeyDevice,
+} from "@/lib/profile/devices/types";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
 import { initiatePasskeyClaim } from "@/lib/auth/client";
@@ -39,14 +42,9 @@ export function PasskeyDevicesViewer() {
   });
 
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
-  const [claimInfo, setClaimInfo] = useState<null | {
-    claimId: string;
-    claimCode: string;
-    token: string;
-    magicLink: string;
-    qrPayload: string;
-    expiresAt: string;
-  }>(null);
+  const [claimInfo, setClaimInfo] = useState<ClaimInitiateResponse | null>(
+    null
+  );
   const [isInitiating, setIsInitiating] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [copied, setCopied] = useState(false);

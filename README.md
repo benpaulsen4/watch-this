@@ -102,7 +102,7 @@ npm run test:run
 - [x] Test writing
 - [x] New List creation shortcut from content details lists tab
 - [x] Cast tab for content details
-- [ ] Multi-device passkey management
+- [x] Multi-device passkey management
 - [ ] RSC streaming implementation
 - [ ] \*arr stack integration for when content is not on any configured streaming services
 - [ ] TMDB cache table to reduce spamming their API when fetching lists
