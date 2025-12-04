@@ -72,6 +72,12 @@ export function ActivityEntry({
           result += ` (${errors} error${errors === 1 ? "" : "s"})`;
 
         return result || "imported profile data";
+      case ActivityType.CLAIM_GENERATED:
+        return `generated a device claim`;
+      case ActivityType.CLAIM_CONSUMED:
+        return `added a new passkey`;
+      case ActivityType.PASSKEY_DELETED:
+        return `deleted a passkey`;
       default:
         return "performed an action";
     }

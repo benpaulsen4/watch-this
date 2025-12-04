@@ -37,6 +37,7 @@ export const passkeyCredentials = pgTable("passkey_credentials", {
   publicKey: text("public_key").notNull(),
   counter: bigint("counter", { mode: "number" }).default(0).notNull(),
   deviceName: varchar("device_name", { length: 100 }),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -82,7 +83,7 @@ export const listCollaborators = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.listId, table.userId)],
+  (table) => [unique().on(table.listId, table.userId)]
 );
 
 // List items table
@@ -101,7 +102,7 @@ export const listItems = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.listId, table.tmdbId, table.contentType)],
+  (table) => [unique().on(table.listId, table.tmdbId, table.contentType)]
 );
 
 // User content status table
@@ -123,7 +124,7 @@ export const userContentStatus = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.userId, table.tmdbId, table.contentType)],
+  (table) => [unique().on(table.userId, table.tmdbId, table.contentType)]
 );
 
 // Episode watch status table
@@ -151,9 +152,9 @@ export const episodeWatchStatus = pgTable(
       table.userId,
       table.tmdbId,
       table.seasonNumber,
-      table.episodeNumber,
+      table.episodeNumber
     ),
-  ],
+  ]
 );
 
 // Activity feed table
@@ -174,6 +175,22 @@ export const activityFeed = pgTable("activity_feed", {
     .notNull(),
 });
 
+// Passkey claims table
+export const passkeyClaims = pgTable("passkey_claims", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  claimCode: varchar("claim_code", { length: 64 }).notNull().unique(),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  initiator: varchar("initiator", { length: 10 }).notNull().default("user"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+});
+
 // Show schedules table
 export const showSchedules = pgTable(
   "show_schedules",
@@ -191,7 +208,7 @@ export const showSchedules = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.userId, table.tmdbId, table.dayOfWeek)],
+  (table) => [unique().on(table.userId, table.tmdbId, table.dayOfWeek)]
 );
 
 // User streaming providers table
@@ -210,12 +227,13 @@ export const userStreamingProviders = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.userId, table.providerId, table.region)],
+  (table) => [unique().on(table.userId, table.providerId, table.region)]
 );
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   passkeyCredentials: many(passkeyCredentials),
+  passkeyClaims: many(passkeyClaims),
   ownedLists: many(lists),
   collaborations: many(listCollaborators),
   contentStatuses: many(userContentStatus),
@@ -232,7 +250,7 @@ export const passkeyCredentialsRelations = relations(
       fields: [passkeyCredentials.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
@@ -256,7 +274,7 @@ export const listCollaboratorsRelations = relations(
       fields: [listCollaborators.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 export const listItemsRelations = relations(listItems, ({ one }) => ({
@@ -273,7 +291,7 @@ export const userContentStatusRelations = relations(
       fields: [userContentStatus.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 export const episodeWatchStatusRelations = relations(
@@ -283,7 +301,7 @@ export const episodeWatchStatusRelations = relations(
       fields: [episodeWatchStatus.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 export const activityFeedRelations = relations(activityFeed, ({ one }) => ({
@@ -294,6 +312,13 @@ export const activityFeedRelations = relations(activityFeed, ({ one }) => ({
   list: one(lists, {
     fields: [activityFeed.listId],
     references: [lists.id],
+  }),
+}));
+
+export const passkeyClaimsRelations = relations(passkeyClaims, ({ one }) => ({
+  user: one(users, {
+    fields: [passkeyClaims.userId],
+    references: [users.id],
   }),
 }));
 
@@ -311,7 +336,7 @@ export const userStreamingProvidersRelations = relations(
       fields: [userStreamingProviders.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 // Types
@@ -320,6 +345,8 @@ export type NewUser = typeof users.$inferInsert;
 
 export type PasskeyCredential = typeof passkeyCredentials.$inferSelect;
 export type NewPasskeyCredential = typeof passkeyCredentials.$inferInsert;
+export type PasskeyClaim = typeof passkeyClaims.$inferSelect;
+export type NewPasskeyClaim = typeof passkeyClaims.$inferInsert;
 
 export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
@@ -397,6 +424,9 @@ export const ActivityType = {
   COLLABORATOR_ADDED: "collaborator_added",
   COLLABORATOR_REMOVED: "collaborator_removed",
   PROFILE_IMPORT: "profile_import",
+  CLAIM_GENERATED: "claim_generated",
+  CLAIM_CONSUMED: "claim_consumed",
+  PASSKEY_DELETED: "passkey_deleted",
 } as const;
 
 export type ListTypeEnum = (typeof ListType)[keyof typeof ListType];
