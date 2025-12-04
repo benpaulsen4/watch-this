@@ -36,7 +36,10 @@ describe("UpcomingActivityCard", () => {
   it("renders poster image and opens modal when clicked", async () => {
     const upcoming = { id: 101, name: "The Show", poster_path: "/poster.jpg" };
     renderWithClient(
-      <UpcomingActivityCard upcoming={upcoming as any} onEpisodeWatched={() => {}} />,
+      <UpcomingActivityCard
+        upcoming={upcoming as any}
+        onEpisodeWatched={() => {}}
+      />,
     );
 
     const img = await screen.findByRole("img");

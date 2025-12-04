@@ -15,7 +15,9 @@ function createQueryClient() {
 
 function renderWithProviders(ui: React.ReactElement) {
   const client = createQueryClient();
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
 }
 
 const genres = [
@@ -133,14 +135,16 @@ describe("SearchClient", () => {
 
   it("shows trending and discover results and loads more", async () => {
     renderWithProviders(
-      <SearchClient genres={genres} trendingContent={trending} />
+      <SearchClient genres={genres} trendingContent={trending} />,
     );
 
     expect(screen.getByText(/Discover Content/i)).toBeInTheDocument();
     expect(screen.getByText(/Trending Today/i)).toBeInTheDocument();
 
     await screen.findByText(/Discover Movie 1/i);
-    expect(screen.getByRole("button", { name: /Load More/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Load More/i }),
+    ).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /Load More/i }));
@@ -148,22 +152,28 @@ describe("SearchClient", () => {
   });
 
   it("opens filters and clears to default params", async () => {
-    renderWithProviders(
-      <SearchClient genres={genres} trendingContent={[]} />
-    );
+    renderWithProviders(<SearchClient genres={genres} trendingContent={[]} />);
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /Filters/i }));
     await screen.findByText(/Content Type/i);
 
-    const contentTypeSection = screen.getByText(/Content Type/i).closest("div")!;
-    const trigger = contentTypeSection.querySelector('button[aria-haspopup="listbox"]') as HTMLButtonElement;
+    const contentTypeSection = screen
+      .getByText(/Content Type/i)
+      .closest("div")!;
+    const trigger = contentTypeSection.querySelector(
+      'button[aria-haspopup="listbox"]',
+    ) as HTMLButtonElement;
     await user.click(trigger);
     await user.click(screen.getByRole("option", { name: /Movies/i }));
 
     await waitFor(() => {
       const calls = fetchMock.mock.calls.map((c) => String(c[0]));
-      expect(calls.some((u) => u.includes("/api/tmdb/discover") && u.includes("type=movie"))).toBe(true);
+      expect(
+        calls.some(
+          (u) => u.includes("/api/tmdb/discover") && u.includes("type=movie"),
+        ),
+      ).toBe(true);
     });
 
     const clearBtn = screen.getByRole("button", { name: /Clear Filters/i });
@@ -171,7 +181,9 @@ describe("SearchClient", () => {
 
     await waitFor(() => {
       const calls = fetchMock.mock.calls.map((c) => String(c[0]));
-      const lastDiscover = calls.reverse().find((u) => u.includes("/api/tmdb/discover"))!;
+      const lastDiscover = calls
+        .reverse()
+        .find((u) => u.includes("/api/tmdb/discover"))!;
       expect(lastDiscover.includes("sort_by=popularity.desc")).toBe(true);
       expect(lastDiscover.includes("type=")).toBe(false);
       expect(lastDiscover.includes("with_genres=")).toBe(false);
@@ -181,7 +193,7 @@ describe("SearchClient", () => {
 
   it("searches when typing and hides trending and load more", async () => {
     renderWithProviders(
-      <SearchClient genres={genres} trendingContent={trending} />
+      <SearchClient genres={genres} trendingContent={trending} />,
     );
 
     const input = screen.getByPlaceholderText(/Search movies and TV shows/i);
@@ -190,21 +202,21 @@ describe("SearchClient", () => {
 
     await screen.findByText(/Search Results for "Star"/i);
     expect(screen.queryByText(/Trending Today/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Load More/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Load More/i }),
+    ).not.toBeInTheDocument();
     await screen.findByText(/Star Movie/i);
   });
 
   it("shows empty state when no search results", async () => {
-    renderWithProviders(
-      <SearchClient genres={genres} trendingContent={[]} />
-    );
+    renderWithProviders(<SearchClient genres={genres} trendingContent={[]} />);
 
     const input = screen.getByPlaceholderText(/Search movies and TV shows/i);
     const user = userEvent.setup();
     await user.type(input, "Nothing");
 
     expect(
-      await screen.findByText(/No results found for "Nothing"/i)
+      await screen.findByText(/No results found for "Nothing"/i),
     ).toBeInTheDocument();
   });
 });

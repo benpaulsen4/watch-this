@@ -286,7 +286,7 @@ class TMDBClient {
   private async request<T>(
     endpoint: string,
     params: Record<string, string> = {},
-    postProcessor?: (data: T) => T
+    postProcessor?: (data: T) => T,
   ): Promise<T> {
     if (!TMDB_API_KEY) {
       throw new Error("TMDB_API_KEY environment variable is required");
@@ -310,7 +310,7 @@ class TMDBClient {
 
     if (!response.ok) {
       throw new Error(
-        `TMDB API error: ${response.status} ${response.statusText}`
+        `TMDB API error: ${response.status} ${response.statusText}`,
       );
     }
 
@@ -337,7 +337,7 @@ class TMDBClient {
   // Watch providers for a region (movie/tv)
   async getWatchProviders(
     type: ContentType,
-    region: string
+    region: string,
   ): Promise<{ results: TMDBWatchProvider[] }> {
     const endpoint =
       type === "movie" ? "/watch/providers/movie" : "/watch/providers/tv";
@@ -350,7 +350,7 @@ class TMDBClient {
   // Search for movies and TV shows
   async searchMulti(
     query: string,
-    page: number = 1
+    page: number = 1,
   ): Promise<TMDBMultiSearchResult> {
     return this.request<TMDBMultiSearchResult>(
       "/search/multi",
@@ -361,9 +361,9 @@ class TMDBClient {
       (data) => ({
         ...data,
         results: data.results.filter(
-          (item) => (item.media_type as string) !== "person"
+          (item) => (item.media_type as string) !== "person",
         ),
-      })
+      }),
     );
   }
 
@@ -371,7 +371,7 @@ class TMDBClient {
   async searchMovies(
     query: string,
     page: number = 1,
-    year?: number
+    year?: number,
   ): Promise<TMDBSearchResult> {
     const queryParams: Record<string, string> = {
       query: encodeURIComponent(query),
@@ -385,7 +385,7 @@ class TMDBClient {
   async searchTVShows(
     query: string,
     page: number = 1,
-    year?: number
+    year?: number,
   ): Promise<TMDBSearchResult> {
     const queryParams: Record<string, string> = {
       query: encodeURIComponent(query),
@@ -408,7 +408,7 @@ class TMDBClient {
   // Get trending content
   async getTrending(
     mediaType: "all" | "movie" | "tv" = "all",
-    timeWindow: "day" | "week" = "week"
+    timeWindow: "day" | "week" = "week",
   ): Promise<TMDBMultiSearchResult> {
     return this.request<TMDBMultiSearchResult>(
       `/trending/${mediaType}/${timeWindow}`,
@@ -416,9 +416,9 @@ class TMDBClient {
       (data) => ({
         ...data,
         results: data.results.filter(
-          (item) => (item.media_type as string) !== "person"
+          (item) => (item.media_type as string) !== "person",
         ),
-      })
+      }),
     );
   }
 
@@ -453,7 +453,7 @@ class TMDBClient {
       genre?: number;
       year?: number;
       sortBy?: string;
-    } = {}
+    } = {},
   ): Promise<TMDBSearchResult> {
     const queryParams: Record<string, string> = {
       page: (params.page || 1).toString(),
@@ -478,7 +478,7 @@ class TMDBClient {
       genre?: number;
       year?: number;
       sortBy?: string;
-    } = {}
+    } = {},
   ): Promise<TMDBSearchResult> {
     const queryParams: Record<string, string> = {
       page: (params.page || 1).toString(),
@@ -499,7 +499,7 @@ class TMDBClient {
   // Get TV show season details with episodes
   async getTVSeasonDetails(
     tvId: number,
-    seasonNumber: number
+    seasonNumber: number,
   ): Promise<TMDBSeason> {
     return this.request<TMDBSeason>(`/tv/${tvId}/season/${seasonNumber}`);
   }
@@ -508,16 +508,16 @@ class TMDBClient {
   async getTVEpisodeDetails(
     tvId: number,
     seasonNumber: number,
-    episodeNumber: number
+    episodeNumber: number,
   ): Promise<TMDBEpisode> {
     return this.request<TMDBEpisode>(
-      `/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}`
+      `/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}`,
     );
   }
   // Get content-specific watch providers (per region)
   async getContentWatchProviders(
     type: "movie" | "tv",
-    id: number
+    id: number,
   ): Promise<TMDBContentWatchProviders> {
     const path =
       type === "movie"
@@ -532,7 +532,7 @@ class TMDBClient {
 
   async getTVAggregateCredits(tvId: number): Promise<TMDBTVAggregateCredits> {
     return this.request<TMDBTVAggregateCredits>(
-      `/tv/${tvId}/aggregate_credits`
+      `/tv/${tvId}/aggregate_credits`,
     );
   }
 }
@@ -540,7 +540,14 @@ class TMDBClient {
 // Utility functions for image URLs
 export function getImageUrl(
   path: string | null,
-  size: "w92" | "w154" | "w185" | "w342" | "w500" | "w780" | "original" = "w500"
+  size:
+    | "w92"
+    | "w154"
+    | "w185"
+    | "w342"
+    | "w500"
+    | "w780"
+    | "original" = "w500",
 ): string | null {
   if (!path) return null;
   return `${TMDB_IMAGE_BASE_URL}/${size}${path}`;
@@ -548,7 +555,7 @@ export function getImageUrl(
 
 export function getBackdropUrl(
   path: string | null,
-  size: "w300" | "w780" | "w1280" | "original" = "w1280"
+  size: "w300" | "w780" | "w1280" | "original" = "w1280",
 ): string | null {
   if (!path) return null;
   return `${TMDB_IMAGE_BASE_URL}/${size}${path}`;
@@ -560,7 +567,7 @@ export function isMovie(content: TMDBMovie | TMDBTVShow): content is TMDBMovie {
 }
 
 export function isTVShow(
-  content: TMDBMovie | TMDBTVShow
+  content: TMDBMovie | TMDBTVShow,
 ): content is TMDBTVShow {
   return "name" in content;
 }

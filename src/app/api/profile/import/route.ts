@@ -14,7 +14,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!format || format !== "json") {
       return NextResponse.json(
         { error: "Only JSON format is supported for imports" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const fileContent = await file.text();
@@ -22,7 +22,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "parseError") {
       return NextResponse.json(
         { error: `Failed to parse JSON file` },
-        { status: 400 }
+        { status: 400 },
       );
     }
     return NextResponse.json(result);
@@ -30,7 +30,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Import data error:", error);
     return NextResponse.json(
       { error: "Failed to import data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

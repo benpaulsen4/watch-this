@@ -46,16 +46,16 @@ describe("ActivityFeed", () => {
     // @ts-expect-error allow assigning to global
     global.fetch = vi.fn(() => new Promise(() => {}));
     renderWithClient(<ActivityFeed currentUsername="alice" />);
-    expect(
-      screen.getByText(/Loading activities.../),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Loading activities.../)).toBeInTheDocument();
   });
 
   it("shows error message when fetch fails", async () => {
     // @ts-expect-error allow assigning to global
     global.fetch = vi.fn(async () => ({ ok: false, json: async () => ({}) }));
     renderWithClient(<ActivityFeed currentUsername="alice" />);
-    expect(await screen.findByText(/Failed to fetch activities/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Failed to fetch activities/),
+    ).toBeInTheDocument();
   });
 
   it("renders upcoming and activity sections on success", async () => {
@@ -71,13 +71,14 @@ describe("ActivityFeed", () => {
           createdAt: new Date().toISOString(),
         },
       ],
-      upcoming: [
-        { id: 101, name: "The Show", poster_path: "/poster.jpg" },
-      ],
+      upcoming: [{ id: 101, name: "The Show", poster_path: "/poster.jpg" }],
       hasMore: false,
     };
     // @ts-expect-error allow assigning to global
-    global.fetch = vi.fn(async () => ({ ok: true, json: async () => response }));
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => response,
+    }));
     renderWithClient(<ActivityFeed currentUsername="alice" />);
 
     // Header and View All button
@@ -94,7 +95,10 @@ describe("ActivityFeed", () => {
   it("shows empty state when no upcoming and no activities", async () => {
     const response = { activities: [], upcoming: [], hasMore: false };
     // @ts-expect-error allow assigning to global
-    global.fetch = vi.fn(async () => ({ ok: true, json: async () => response }));
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => response,
+    }));
     renderWithClient(<ActivityFeed currentUsername="alice" />);
     expect(
       await screen.findByText(
@@ -109,7 +113,10 @@ describe("ActivityFeed", () => {
   it("opens create list modal from empty state CTA", async () => {
     const response = { activities: [], upcoming: [], hasMore: false };
     // @ts-expect-error allow assigning to global
-    global.fetch = vi.fn(async () => ({ ok: true, json: async () => response }));
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => response,
+    }));
     renderWithClient(<ActivityFeed currentUsername="alice" />);
     expect(await screen.findByText(/No recent activity/)).toBeInTheDocument();
     // Click Create List

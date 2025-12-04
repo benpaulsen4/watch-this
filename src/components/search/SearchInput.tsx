@@ -4,11 +4,10 @@ import { Input } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { Search, X } from "lucide-react";
 
-export interface SearchInputProps
-  extends Omit<
-    React.InputHTMLAttributes<HTMLInputElement>,
-    "onChange" | "size"
-  > {
+export interface SearchInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "onChange" | "size"
+> {
   onSearch?: (query: string) => void;
   onClear?: () => void;
   loading?: boolean;

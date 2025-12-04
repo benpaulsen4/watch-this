@@ -19,7 +19,7 @@ describe("Card", () => {
         </CardHeader>
         <CardContent>Content</CardContent>
         <CardFooter>Footer</CardFooter>
-      </Card>
+      </Card>,
     );
 
     expect(screen.getByText("Title")).toBeInTheDocument();

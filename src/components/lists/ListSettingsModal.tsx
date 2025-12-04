@@ -235,7 +235,7 @@ export default function ListSettingsModal({
                 onSelectionChange={(key) =>
                   handleInputChange(
                     "listType",
-                    String(key || formData.listType)
+                    String(key || formData.listType),
                   )
                 }
                 isDisabled={(mode === "edit" && !isOwner) || isLoading}
@@ -244,8 +244,8 @@ export default function ListSettingsModal({
                     key === "mixed"
                       ? { key: "mixed", label: "Mixed (Movies & TV Shows)" }
                       : key === "movies"
-                      ? { key: "movies", label: "Movies Only" }
-                      : { key: "tv", label: "TV Shows Only" }
+                        ? { key: "movies", label: "Movies Only" }
+                        : { key: "tv", label: "TV Shows Only" },
                 )}
               />
             </div>

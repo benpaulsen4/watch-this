@@ -95,7 +95,7 @@ vi.mock("@/lib/db", () => {
 // Mock claim token generator
 vi.mock("@/lib/auth/webauthn", () => ({
   createClaimToken: vi.fn(
-    async (claimId: string, userId: string) => `mocktoken-${claimId}-${userId}`
+    async (claimId: string, userId: string) => `mocktoken-${claimId}-${userId}`,
   ),
 }));
 
@@ -223,12 +223,12 @@ describe("devices service", () => {
     expect(info.claimId).toBe("claim-123");
     expect(info.token).toBe("mocktoken-claim-123-user-1");
     expect(info.magicLink).toMatch(
-      /^https:\/\/demo\.vercel\.app\/auth\/claim\?token=.+/
+      /^https:\/\/demo\.vercel\.app\/auth\/claim\?token=.+/,
     );
     expect(info.qrPayload).toBe(info.magicLink);
     expect(info.claimCode).toHaveLength(12);
     expect(info.expiresAt).toBe(
-      new Date(Date.now() + 10 * 60 * 1000).toISOString()
+      new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     );
 
     const { activityFeed, db: db2 } = await mockedDbModule;

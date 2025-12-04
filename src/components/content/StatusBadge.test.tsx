@@ -1,10 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { StatusBadge, getAvailableStatuses, getStatusConfig, isValidStatusForContentType } from "./StatusBadge";
+import {
+  StatusBadge,
+  getAvailableStatuses,
+  getStatusConfig,
+  isValidStatusForContentType,
+} from "./StatusBadge";
 
 describe("StatusBadge", () => {
   it("renders label and title for each valid status", () => {
-    const statuses = ["planning", "watching", "paused", "completed", "dropped"] as const;
+    const statuses = [
+      "planning",
+      "watching",
+      "paused",
+      "completed",
+      "dropped",
+    ] as const;
     statuses.forEach((status) => {
       render(<StatusBadge status={status} />);
       const label = getStatusConfig(status)?.label ?? status;
@@ -30,7 +41,13 @@ describe("StatusBadge", () => {
 
   it("validates available statuses per content type", () => {
     expect(getAvailableStatuses("movie")).toEqual(["planning", "completed"]);
-    expect(getAvailableStatuses("tv")).toEqual(["planning", "watching", "paused", "completed", "dropped"]);
+    expect(getAvailableStatuses("tv")).toEqual([
+      "planning",
+      "watching",
+      "paused",
+      "completed",
+      "dropped",
+    ]);
     expect(isValidStatusForContentType("completed", "movie")).toBe(true);
     expect(isValidStatusForContentType("watching", "movie")).toBe(false);
     expect(isValidStatusForContentType("watching", "tv")).toBe(true);

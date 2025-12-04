@@ -25,7 +25,8 @@ const popoverClasses =
   "w-[var(--trigger-width)] rounded-lg border border-gray-700 bg-gray-900 text-gray-100 shadow-xl shadow-black/30 overflow-hidden";
 
 export interface DropdownProps
-  extends Omit<React.ComponentProps<typeof Select>, "children">,
+  extends
+    Omit<React.ComponentProps<typeof Select>, "children">,
     VariantProps<typeof inputVariants> {
   label?: string;
   placeholder?: string;
@@ -53,7 +54,7 @@ export function Dropdown({
   ariaLabel,
   ...selectProps
 }: DropdownProps) {
-  const finalVariant = error ? "error" : variant ?? "default";
+  const finalVariant = error ? "error" : (variant ?? "default");
   const computedAriaLabel = label
     ? undefined
     : ariaLabel || (typeof placeholder === "string" ? placeholder : "Select");
@@ -78,7 +79,7 @@ export function Dropdown({
               "inline-flex items-center justify-between",
               inputVariants({ variant: finalVariant, size }),
               (isFocusVisible || isPressed) &&
-                "border-red-500 outline-none ring-2 ring-red-500 ring-offset-2 ring-offset-gray-900"
+                "border-red-500 outline-none ring-2 ring-red-500 ring-offset-2 ring-offset-gray-900",
             )
           }
         >
@@ -105,7 +106,7 @@ export function Dropdown({
                     "hover:bg-gray-800 hover:text-white",
                     isFocusVisible &&
                       "ring-2 ring-red-500 ring-offset-2 ring-offset-gray-900",
-                    isDisabled && "opacity-50 cursor-not-allowed"
+                    isDisabled && "opacity-50 cursor-not-allowed",
                   )
                 }
               >

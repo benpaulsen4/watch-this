@@ -15,7 +15,7 @@ import type { ExportFormat, ExportResponse, ImportResult } from "./types";
 export async function exportUserData(
   userId: string,
   username: string,
-  format: ExportFormat
+  format: ExportFormat,
 ): Promise<ExportResponse | "zipFailed"> {
   const timestamp = new Date().toISOString().split("T")[0];
 
@@ -129,7 +129,7 @@ export async function exportUserData(
           createdAt: Date | null;
         }[];
       }
-    >
+    >,
   );
 
   const listsArray = Object.values(listsData);
@@ -191,7 +191,7 @@ export async function exportUserData(
               ? `"${fieldStr.replace(/"/g, '""')}"`
               : fieldStr;
           })
-          .join(",")
+          .join(","),
       )
       .join("\n");
 
@@ -307,7 +307,7 @@ export async function exportUserData(
 export async function importUserData(
   userId: string,
   fileContent: string,
-  format: "json"
+  format: "json",
 ): Promise<ImportResult | "parseError"> {
   let importedListsCount = 0;
   let importedContentStatusCount = 0;
@@ -347,7 +347,7 @@ export async function importUserData(
                 !itemData.contentType
               ) {
                 errors.push(
-                  `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`
+                  `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`,
                 );
                 continue;
               }
@@ -360,7 +360,7 @@ export async function importUserData(
               });
             } catch (itemError) {
               errors.push(
-                `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`
+                `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`,
               );
             }
           }
@@ -381,7 +381,7 @@ export async function importUserData(
           !statusData.status
         ) {
           errors.push(
-            `Skipped content status: tmdbId, contentType, and status are required`
+            `Skipped content status: tmdbId, contentType, and status are required`,
           );
           continue;
         }
@@ -394,14 +394,14 @@ export async function importUserData(
         ];
         if (!validStatuses.includes(statusData.status)) {
           errors.push(
-            `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid status '${statusData.status}'`
+            `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid status '${statusData.status}'`,
           );
           continue;
         }
         const validContentTypes = ["movie", "tv"];
         if (!validContentTypes.includes(statusData.contentType)) {
           errors.push(
-            `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid content type '${statusData.contentType}'`
+            `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid content type '${statusData.contentType}'`,
           );
           continue;
         }
@@ -435,14 +435,14 @@ export async function importUserData(
           errors.push(
             `Failed to import content status for TMDB ID ${
               statusData.tmdbId
-            }: ${error instanceof Error ? error.message : "Unknown error"}`
+            }: ${error instanceof Error ? error.message : "Unknown error"}`,
           );
           continue;
         }
         importedContentStatusCount++;
       } catch (statusError) {
         errors.push(
-          `Failed to import content status for TMDB ID ${statusData.tmdbId}: ${statusError}`
+          `Failed to import content status for TMDB ID ${statusData.tmdbId}: ${statusError}`,
         );
       }
     }
@@ -457,7 +457,7 @@ export async function importUserData(
           episodeData.episodeNumber === undefined
         ) {
           errors.push(
-            `Skipped episode status: tmdbId, seasonNumber, and episodeNumber are required`
+            `Skipped episode status: tmdbId, seasonNumber, and episodeNumber are required`,
           );
           continue;
         }
@@ -465,13 +465,13 @@ export async function importUserData(
         const episodeNum = parseInt(episodeData.episodeNumber);
         if (isNaN(seasonNum) || seasonNum < 0) {
           errors.push(
-            `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid season number '${episodeData.seasonNumber}'`
+            `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid season number '${episodeData.seasonNumber}'`,
           );
           continue;
         }
         if (isNaN(episodeNum) || episodeNum < 1) {
           errors.push(
-            `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid episode number '${episodeData.episodeNumber}'`
+            `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid episode number '${episodeData.episodeNumber}'`,
           );
           continue;
         }
@@ -509,14 +509,14 @@ export async function importUserData(
               episodeData.tmdbId
             } S${seasonNum}E${episodeNum}: ${
               error instanceof Error ? error.message : "Unknown error"
-            }`
+            }`,
           );
           continue;
         }
         importedEpisodeStatusCount++;
       } catch (episodeError) {
         errors.push(
-          `Failed to import episode status for TMDB ID ${episodeData.tmdbId} S${episodeData.seasonNumber}E${episodeData.episodeNumber}: ${episodeError}`
+          `Failed to import episode status for TMDB ID ${episodeData.tmdbId} S${episodeData.seasonNumber}E${episodeData.episodeNumber}: ${episodeError}`,
         );
       }
     }

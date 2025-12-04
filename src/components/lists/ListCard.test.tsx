@@ -17,7 +17,7 @@ vi.mock("@/lib/tmdb/client", () => ({
 }));
 
 function makeList(
-  overrides: Partial<ListListsResponse> = {}
+  overrides: Partial<ListListsResponse> = {},
 ): ListListsResponse {
   return {
     id: "l1",

@@ -18,7 +18,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         limit,
         cursor,
         type,
-      }
+      },
     );
 
     if (typeof result === "string") {
@@ -34,7 +34,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error fetching activity timeline:", error);
     return NextResponse.json(
       { error: "Failed to fetch activity timeline" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

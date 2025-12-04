@@ -34,21 +34,21 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType) {
       return NextResponse.json(
         { error: "tmdbId and contentType are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(ContentType).includes(contentType as ContentTypeEnum)) {
       return NextResponse.json(
         { error: "Invalid content type. Must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const result = await getContentStatus(
       userId,
       parseInt(tmdbId),
-      contentType
+      contentType,
     );
     return NextResponse.json(result);
   } catch (error) {
@@ -67,14 +67,14 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType || !status) {
       return NextResponse.json(
         { error: "tmdbId, contentType, and status are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(ContentType).includes(contentType as ContentTypeEnum)) {
       return NextResponse.json(
         { error: "Invalid content type. Must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -82,12 +82,12 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (contentType === ContentType.MOVIE) {
       if (
         !Object.values(MovieWatchStatus).includes(
-          status as MovieWatchStatusEnum
+          status as MovieWatchStatusEnum,
         )
       ) {
         return NextResponse.json(
           { error: "Invalid movie status. Must be 'planning' or 'completed'" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     } else if (contentType === ContentType.TV) {
@@ -97,7 +97,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
             error:
               "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -127,14 +127,14 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType) {
       return NextResponse.json(
         { error: "tmdbId and contentType are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(ContentType).includes(contentType as ContentTypeEnum)) {
       return NextResponse.json(
         { error: "Invalid content type. Must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -143,14 +143,14 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       if (contentType === ContentType.MOVIE) {
         if (
           !Object.values(MovieWatchStatus).includes(
-            status as MovieWatchStatusEnum
+            status as MovieWatchStatusEnum,
           )
         ) {
           return NextResponse.json(
             {
               error: "Invalid movie status. Must be 'planning' or 'completed'",
             },
-            { status: 400 }
+            { status: 400 },
           );
         }
       } else if (contentType === ContentType.TV) {
@@ -162,7 +162,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
               error:
                 "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'",
             },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -176,7 +176,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "notFound") {
       return NextResponse.json(
         { error: "Content status not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     return NextResponse.json(result);
@@ -196,26 +196,26 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType) {
       return NextResponse.json(
         { error: "tmdbId and contentType are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!Object.values(ContentType).includes(contentType as ContentTypeEnum)) {
       return NextResponse.json(
         { error: "Invalid content type. Must be 'movie' or 'tv'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const result = await deleteContentStatus(
       userId,
       parseInt(tmdbId),
-      contentType
+      contentType,
     );
     if (result === "notFound") {
       return NextResponse.json(
         { error: "Content status not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     return NextResponse.json(result);

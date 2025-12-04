@@ -16,7 +16,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -27,7 +27,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error fetching list:", error);
     return NextResponse.json(
       { error: "Failed to fetch list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -42,7 +42,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -54,13 +54,13 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       if (!name || name.trim().length === 0) {
         return NextResponse.json(
           { error: "List name is required" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (name.length > 100) {
         return NextResponse.json(
           { error: "List name must be 100 characters or less" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -70,7 +70,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       if (!validListTypes.includes(listType)) {
         return NextResponse.json(
           { error: "Invalid list type. Must be 'movies', 'tv', or 'mixed'" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -82,7 +82,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (updated === "forbidden") {
       return NextResponse.json(
         { error: "Only the list owner can update this list" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -91,7 +91,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error updating list:", error);
     return NextResponse.json(
       { error: "Failed to update list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -106,7 +106,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -117,7 +117,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "forbidden") {
       return NextResponse.json(
         { error: "Only the list owner can delete this list" },
-        { status: 403 }
+        { status: 403 },
       );
     }
     return NextResponse.json(result);
@@ -125,7 +125,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error deleting list:", error);
     return NextResponse.json(
       { error: "Failed to delete list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

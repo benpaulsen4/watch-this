@@ -25,11 +25,12 @@ const inputVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
+  },
 );
 
 export interface InputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
+  extends
+    Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
     VariantProps<typeof inputVariants> {
   error?: string;
   label?: string;
@@ -39,7 +40,7 @@ export interface InputProps
 const Input = forwardRef<HTMLInputElement, InputProps>(
   (
     { className, variant, size, error, label, helperText, id, ...props },
-    ref
+    ref,
   ) => {
     const inputId = id || `input-${Math.random().toString(36).substring(2)}`;
     const finalVariant = error ? "error" : variant;
@@ -57,7 +58,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           id={inputId}
           className={cn(
-            inputVariants({ variant: finalVariant, size, className })
+            inputVariants({ variant: finalVariant, size, className }),
           )}
           ref={ref}
           {...props}
@@ -71,7 +72,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 Input.displayName = "Input";
@@ -79,7 +80,8 @@ Input.displayName = "Input";
 export { Input, inputVariants };
 
 export interface TextareaProps
-  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "size">,
+  extends
+    Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "size">,
     VariantProps<typeof inputVariants> {
   error?: string;
   label?: string;
@@ -91,7 +93,8 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     { className, variant, size, error, label, helperText, id, rows, ...props },
     ref,
   ) => {
-    const textareaId = id || `textarea-${Math.random().toString(36).substring(2)}`;
+    const textareaId =
+      id || `textarea-${Math.random().toString(36).substring(2)}`;
     const finalVariant = error ? "error" : variant;
 
     return (
@@ -107,7 +110,11 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
           id={textareaId}
           className={cn(
-            inputVariants({ variant: finalVariant, size: size ?? "textarea", className }),
+            inputVariants({
+              variant: finalVariant,
+              size: size ?? "textarea",
+              className,
+            }),
           )}
           ref={ref}
           rows={rows ?? 3}

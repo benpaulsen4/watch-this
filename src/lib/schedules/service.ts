@@ -12,7 +12,7 @@ import {
 export async function listSchedules(
   userId: string,
   tmdbId?: number,
-  dayOfWeek?: number
+  dayOfWeek?: number,
 ): Promise<GetSchedulesResponse> {
   const where = [eq(showSchedules.userId, userId)];
   if (tmdbId !== undefined) where.push(eq(showSchedules.tmdbId, tmdbId));
@@ -43,7 +43,7 @@ export async function listSchedules(
       } catch {
         return { tmdbId: s.tmdbId, title: null } as const;
       }
-    })
+    }),
   );
   const titleMap = new Map<number, string | null>();
   titleResults.forEach((r) => titleMap.set(r.tmdbId, r.title));
@@ -63,7 +63,7 @@ export async function listSchedules(
 
 export async function createSchedule(
   userId: string,
-  input: CreateScheduleInput
+  input: CreateScheduleInput,
 ): Promise<ScheduleItem | "notFound" | "invalidStatus" | "duplicate"> {
   const { tmdbId, dayOfWeek } = input;
 
@@ -74,8 +74,8 @@ export async function createSchedule(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, "tv")
-      )
+        eq(userContentStatus.contentType, "tv"),
+      ),
     )
     .limit(1);
   if (contentStatus.length === 0) return "notFound";
@@ -90,8 +90,8 @@ export async function createSchedule(
       and(
         eq(showSchedules.userId, userId),
         eq(showSchedules.tmdbId, tmdbId),
-        eq(showSchedules.dayOfWeek, dayOfWeek)
-      )
+        eq(showSchedules.dayOfWeek, dayOfWeek),
+      ),
     )
     .limit(1);
   if (existing.length > 0) return "duplicate";
@@ -118,11 +118,11 @@ export async function createSchedule(
 export async function deleteSchedules(
   userId: string,
   tmdbId: number,
-  dayOfWeek?: number
+  dayOfWeek?: number,
 ): Promise<DeleteSchedulesResponse | "notFound"> {
   let where = and(
     eq(showSchedules.userId, userId),
-    eq(showSchedules.tmdbId, tmdbId)
+    eq(showSchedules.tmdbId, tmdbId),
   );
   if (dayOfWeek !== undefined) {
     where = and(where, eq(showSchedules.dayOfWeek, dayOfWeek));

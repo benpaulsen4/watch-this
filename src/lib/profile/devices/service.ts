@@ -21,8 +21,8 @@ export async function listDevices(userId: string): Promise<PasskeyDevice[]> {
     .where(
       and(
         eq(passkeyCredentials.userId, userId),
-        isNull(passkeyCredentials.deletedAt)
-      )
+        isNull(passkeyCredentials.deletedAt),
+      ),
     )
     .orderBy(desc(passkeyCredentials.lastUsed));
 
@@ -58,15 +58,15 @@ export async function countActiveDevices(userId: string): Promise<number> {
     .where(
       and(
         eq(passkeyCredentials.userId, userId),
-        isNull(passkeyCredentials.deletedAt)
-      )
+        isNull(passkeyCredentials.deletedAt),
+      ),
     );
   return rows.length;
 }
 
 export async function initiateClaim(
   userId: string,
-  initiator: ClaimInitiator
+  initiator: ClaimInitiator,
 ): Promise<ClaimInitiateResponse | "maxDevices" | "rateLimit"> {
   const activeDevices = await countActiveDevices(userId);
   if (activeDevices >= 10) {
@@ -80,8 +80,8 @@ export async function initiateClaim(
     .where(
       and(
         eq(passkeyClaims.userId, userId),
-        gt(passkeyClaims.createdAt, oneHourAgo)
-      )
+        gt(passkeyClaims.createdAt, oneHourAgo),
+      ),
     );
   if (claimsLastHour.length >= 5 && initiator === "user") {
     return "rateLimit";
@@ -116,14 +116,14 @@ export async function initiateClaim(
 
 export async function cancelClaim(
   userId: string,
-  claimId: string
+  claimId: string,
 ): Promise<"success" | "notFound"> {
   try {
     await db
       .update(passkeyClaims)
       .set({ status: "cancelled" })
       .where(
-        and(eq(passkeyClaims.id, claimId), eq(passkeyClaims.userId, userId))
+        and(eq(passkeyClaims.id, claimId), eq(passkeyClaims.userId, userId)),
       );
     return "success";
   } catch {
@@ -133,7 +133,7 @@ export async function cancelClaim(
 
 export async function deletePasskey(
   userId: string,
-  credentialId: string
+  credentialId: string,
 ): Promise<"success" | "minimum" | "notFound"> {
   try {
     const activeCount = await countActiveDevices(userId);
@@ -147,8 +147,8 @@ export async function deletePasskey(
       .where(
         and(
           eq(passkeyCredentials.id, credentialId),
-          eq(passkeyCredentials.userId, userId)
-        )
+          eq(passkeyCredentials.userId, userId),
+        ),
       );
 
     await db.insert(activityFeed).values({

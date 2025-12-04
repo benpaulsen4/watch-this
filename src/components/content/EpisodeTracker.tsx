@@ -50,10 +50,10 @@ export function EpisodeTracker({
   tvShowDetails,
 }: EpisodeTrackerProps) {
   const [updatingEpisodes, setUpdatingEpisodes] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [expandedSeasons, setExpandedSeasons] = useState<Set<number>>(
-    new Set()
+    new Set(),
   );
   const queryClient = useQueryClient();
 
@@ -62,7 +62,7 @@ export function EpisodeTracker({
     queryKey: ["episodes", tvShowId],
     queryFn: async () => {
       const statusResponse = await fetch(
-        `/api/status/episodes?tmdbId=${tvShowId}`
+        `/api/status/episodes?tmdbId=${tvShowId}`,
       );
       if (!statusResponse.ok)
         throw new Error("Failed to fetch episode watch statuses");
@@ -79,7 +79,7 @@ export function EpisodeTracker({
         seasonPromises.push(
           fetch(`/api/tmdb/episodes/${tvShowId}?season=${seasonNum}`)
             .then((res) => res.json())
-            .then((data) => ({ seasonNumber: seasonNum, ...data }))
+            .then((data) => ({ seasonNumber: seasonNum, ...data })),
         );
       }
 
@@ -90,7 +90,7 @@ export function EpisodeTracker({
           season: result.season,
           watchStatuses: watchStatuses.filter(
             (status: EpisodeWatchStatus) =>
-              status.seasonNumber === result.seasonNumber
+              status.seasonNumber === result.seasonNumber,
           ),
           isExpanded: false,
         }));
@@ -139,7 +139,7 @@ export function EpisodeTracker({
                       !(
                         status.seasonNumber === variables.seasonNumber &&
                         status.episodeNumber === variables.episodeNumber
-                      )
+                      ),
                   ),
                   {
                     id: `temp-${Date.now()}`,
@@ -156,7 +156,7 @@ export function EpisodeTracker({
                     !(
                       status.seasonNumber === variables.seasonNumber &&
                       status.episodeNumber === variables.episodeNumber
-                    )
+                    ),
                 );
             return { ...seasonData, watchStatuses: updated };
           }
@@ -169,7 +169,7 @@ export function EpisodeTracker({
   const toggleEpisodeWatched = async (
     seasonNumber: number,
     episodeNumber: number,
-    currentlyWatched: boolean
+    currentlyWatched: boolean,
   ) => {
     const episodeKey = `${seasonNumber}-${episodeNumber}`;
     setUpdatingEpisodes((prev) => new Set(prev).add(episodeKey));
@@ -228,10 +228,10 @@ export function EpisodeTracker({
 
   const toggleSeasonWatched = async (
     seasonNumber: number,
-    markAsWatched: boolean
+    markAsWatched: boolean,
   ) => {
     const seasonData = seasons.find(
-      (s) => s.season.season_number === seasonNumber
+      (s) => s.season.season_number === seasonNumber,
     );
     if (!seasonData) return;
     try {
@@ -251,10 +251,10 @@ export function EpisodeTracker({
   // Get episode watch status
   const getEpisodeWatchStatus = (
     seasonNumber: number,
-    episodeNumber: number
+    episodeNumber: number,
   ): boolean => {
     const seasonData = seasons.find(
-      (s) => s.season.season_number === seasonNumber
+      (s) => s.season.season_number === seasonNumber,
     );
     if (!seasonData) return false;
 
@@ -262,17 +262,17 @@ export function EpisodeTracker({
       (status) =>
         status.seasonNumber === seasonNumber &&
         status.episodeNumber === episodeNumber &&
-        status.watched
+        status.watched,
     );
   };
 
   // Get episode watch date
   const getEpisodeWatchDate = (
     seasonNumber: number,
-    episodeNumber: number
+    episodeNumber: number,
   ): Date | null => {
     const seasonData = seasons.find(
-      (s) => s.season.season_number === seasonNumber
+      (s) => s.season.season_number === seasonNumber,
     );
     if (!seasonData) return null;
 
@@ -280,7 +280,7 @@ export function EpisodeTracker({
       (status) =>
         status.seasonNumber === seasonNumber &&
         status.episodeNumber === episodeNumber &&
-        status.watched
+        status.watched,
     )?.watchedAt;
     return episodeDate ? new Date(episodeDate) : null;
   };
@@ -289,7 +289,7 @@ export function EpisodeTracker({
   const getSeasonProgress = (seasonData: SeasonData) => {
     const totalEpisodes = seasonData.season.episodes.length;
     const watchedEpisodes = seasonData.watchStatuses.filter(
-      (status) => status.watched
+      (status) => status.watched,
     ).length;
     return { watched: watchedEpisodes, total: totalEpisodes };
   };
@@ -374,7 +374,7 @@ export function EpisodeTracker({
                         onClick={() =>
                           toggleSeasonWatched(
                             seasonData.season.season_number,
-                            true
+                            true,
                           )
                         }
                         size="sm"
@@ -389,7 +389,7 @@ export function EpisodeTracker({
                         onClick={() =>
                           toggleSeasonWatched(
                             seasonData.season.season_number,
-                            false
+                            false,
                           )
                         }
                         size="sm"
@@ -411,11 +411,11 @@ export function EpisodeTracker({
                   {seasonData.season.episodes.map((episode) => {
                     const isWatched = getEpisodeWatchStatus(
                       seasonData.season.season_number,
-                      episode.episode_number
+                      episode.episode_number,
                     );
                     const watchDate = getEpisodeWatchDate(
                       seasonData.season.season_number,
-                      episode.episode_number
+                      episode.episode_number,
                     );
                     const episodeKey = `${seasonData.season.season_number}-${episode.episode_number}`;
                     const isInFuture = new Date(episode.air_date) > new Date();
@@ -429,7 +429,7 @@ export function EpisodeTracker({
                           "flex items-center gap-3 p-3 rounded-lg transition-colors",
                           "bg-gray-700/20 hover:bg-gray-700/50",
                           isWatched && "bg-gray-700/40",
-                          isInFuture && "bg-transparent hover:bg-transparent"
+                          isInFuture && "bg-transparent hover:bg-transparent",
                         )}
                       >
                         {/* Watch Toggle */}
@@ -438,7 +438,7 @@ export function EpisodeTracker({
                             toggleEpisodeWatched(
                               seasonData.season.season_number,
                               episode.episode_number,
-                              isWatched
+                              isWatched,
                             )
                           }
                           disabled={isUpdating || isInFuture}
@@ -449,7 +449,7 @@ export function EpisodeTracker({
                               ? "bg-green-500 border-green-500 text-white"
                               : "border-gray-500 hover:border-gray-400",
                             isUpdating && "opacity-50 cursor-not-allowed",
-                            isInFuture && "cursor-not-allowed"
+                            isInFuture && "cursor-not-allowed",
                           )}
                         >
                           {isUpdating ? (
@@ -475,7 +475,7 @@ export function EpisodeTracker({
                                   <Calendar className="h-3 w-3" />
                                   <span>
                                     {new Date(
-                                      episode.air_date
+                                      episode.air_date,
                                     ).toLocaleDateString()}
                                   </span>
                                 </div>

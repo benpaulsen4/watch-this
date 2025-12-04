@@ -20,7 +20,7 @@ describe("Button", () => {
     render(
       <Button asChild>
         <span data-testid="child">Inner</span>
-      </Button>
+      </Button>,
     );
     const child = screen.getByTestId("child");
     expect(child.tagName.toLowerCase()).toBe("span");

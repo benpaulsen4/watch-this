@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     if (!token || !challengeToken || !registrationResponse) {
       return NextResponse.json(
         { error: "Missing parameters" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       claim.userId,
       registrationResponse,
       challenge.challenge,
-      deviceName
+      deviceName,
     );
 
     await db
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     console.error("Claim verify error:", error);
     return NextResponse.json(
       { error: "Failed to verify claim" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

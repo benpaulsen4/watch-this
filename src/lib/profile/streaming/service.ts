@@ -11,7 +11,7 @@ import type {
 } from "./types";
 
 export async function getStreamingPreferences(
-  userId: string
+  userId: string,
 ): Promise<StreamingPreferences | "dbError"> {
   try {
     const [userRow] = await db
@@ -40,7 +40,7 @@ export async function getStreamingPreferences(
 
 export async function updateStreamingPreferences(
   userId: string,
-  payload: SaveStreamingPreferencesRequest
+  payload: SaveStreamingPreferencesRequest,
 ): Promise<StreamingPreferences | "invalidRegion" | "dbError"> {
   const country = payload.country;
   const region = (payload.region || country || "").toUpperCase();
@@ -59,8 +59,8 @@ export async function updateStreamingPreferences(
         .where(
           and(
             eq(userStreamingProviders.userId, userId),
-            eq(userStreamingProviders.region, region)
-          )
+            eq(userStreamingProviders.region, region),
+          ),
         );
 
       const trimmed = payload.providers.slice(0, 50);

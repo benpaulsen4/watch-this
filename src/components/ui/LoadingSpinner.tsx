@@ -23,11 +23,12 @@ const spinnerVariants = cva(
       size: "default",
       variant: "default",
     },
-  }
+  },
 );
 
 export interface LoadingSpinnerProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof spinnerVariants> {
   text?: string;
   centered?: boolean;
@@ -50,7 +51,7 @@ const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
         <div
           className={cn(
             "flex items-center gap-2",
-            centered && "justify-center"
+            centered && "justify-center",
           )}
         >
           {spinner}
@@ -64,7 +65,7 @@ const LoadingSpinner = forwardRef<HTMLDivElement, LoadingSpinnerProps>(
     }
 
     return spinner;
-  }
+  },
 );
 
 LoadingSpinner.displayName = "LoadingSpinner";

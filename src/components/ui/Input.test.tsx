@@ -22,10 +22,10 @@ describe("Input", () => {
         id="email"
         label="Email"
         helperText="We will not share your email"
-      />
+      />,
     );
     expect(
-      screen.getByText("We will not share your email")
+      screen.getByText("We will not share your email"),
     ).toBeInTheDocument();
   });
 

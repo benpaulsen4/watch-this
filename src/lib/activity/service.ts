@@ -30,7 +30,7 @@ import type {
 export async function listActivityTimeline(
   userId: string,
   userTimezone: string,
-  input: ListActivityInput
+  input: ListActivityInput,
 ): Promise<ActivityTimelineResponse | "invalidCursor"> {
   const limit = Math.max(1, input.limit || 10);
   let cursorDate: Date | undefined;
@@ -47,31 +47,31 @@ export async function listActivityTimeline(
     whereConditions = and(
       or(
         eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId])
+        arrayContains(activityFeed.collaborators, [userId]),
       ),
       lt(activityFeed.createdAt, cursorDate),
-      eq(activityFeed.activityType, input.type)
+      eq(activityFeed.activityType, input.type),
     );
   } else if (cursorDate) {
     whereConditions = and(
       or(
         eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId])
+        arrayContains(activityFeed.collaborators, [userId]),
       ),
-      lt(activityFeed.createdAt, cursorDate)
+      lt(activityFeed.createdAt, cursorDate),
     );
   } else if (input.type) {
     whereConditions = and(
       or(
         eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId])
+        arrayContains(activityFeed.collaborators, [userId]),
       ),
-      eq(activityFeed.activityType, input.type)
+      eq(activityFeed.activityType, input.type),
     );
   } else {
     whereConditions = or(
       eq(activityFeed.userId, userId),
-      arrayContains(activityFeed.collaborators, [userId])
+      arrayContains(activityFeed.collaborators, [userId]),
     );
   }
 
@@ -86,18 +86,18 @@ export async function listActivityTimeline(
   if (collaborativeListIds.length > 0) {
     let collaborativeConditions = and(
       inArray(activityFeed.listId, collaborativeListIds),
-      eq(activityFeed.isCollaborative, true)
+      eq(activityFeed.isCollaborative, true),
     );
     if (cursorDate) {
       collaborativeConditions = and(
         collaborativeConditions,
-        lt(activityFeed.createdAt, cursorDate)
+        lt(activityFeed.createdAt, cursorDate),
       );
     }
     if (input.type) {
       collaborativeConditions = and(
         collaborativeConditions,
-        eq(activityFeed.activityType, input.type)
+        eq(activityFeed.activityType, input.type),
       );
     }
     whereConditions = or(whereConditions, collaborativeConditions);
@@ -191,11 +191,11 @@ export async function listActivityTimeline(
       and(
         eq(showSchedules.userId, userContentStatus.userId),
         eq(showSchedules.tmdbId, userContentStatus.tmdbId),
-        eq(userContentStatus.contentType, "tv")
-      )
+        eq(userContentStatus.contentType, "tv"),
+      ),
     )
     .where(
-      and(eq(showSchedules.userId, userId), eq(showSchedules.dayOfWeek, today))
+      and(eq(showSchedules.userId, userId), eq(showSchedules.dayOfWeek, today)),
     );
 
   const upcoming: UpcomingActivity[] = [];
@@ -208,8 +208,8 @@ export async function listActivityTimeline(
           eq(episodeWatchStatus.userId, userId),
           eq(episodeWatchStatus.tmdbId, row.tmdbId),
           eq(episodeWatchStatus.watched, true),
-          sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`
-        )
+          sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`,
+        ),
       );
     if (watchedToday.length > 0) continue;
     try {

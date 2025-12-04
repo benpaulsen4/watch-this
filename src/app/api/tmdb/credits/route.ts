@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest, handleApiError } from "@/lib/auth/api-middleware";
-import { tmdbClient, TMDBMovieCastMember, TMDBTVAggregateCastMember } from "@/lib/tmdb/client";
+import {
+  withAuth,
+  AuthenticatedRequest,
+  handleApiError,
+} from "@/lib/auth/api-middleware";
+import {
+  tmdbClient,
+  TMDBMovieCastMember,
+  TMDBTVAggregateCastMember,
+} from "@/lib/tmdb/client";
 
 async function handler(request: AuthenticatedRequest) {
   try {

@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     }
 
     const options = await generateAdditionalPasskeyRegistrationOptions(
-      verified.userId
+      verified.userId,
     );
     const challengeToken = await createChallengeToken(options.challenge);
 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     console.error("Claim begin error:", error);
     return NextResponse.json(
       { error: "Failed to begin claim" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

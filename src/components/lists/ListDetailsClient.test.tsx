@@ -19,7 +19,9 @@ function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: 0, refetchOnWindowFocus: false } },
   });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
 }
 
 const initialList = {
@@ -43,7 +45,12 @@ describe("ListDetailsClient", () => {
     pushMock.mockReset();
     vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
       // Collaborators query returns none
-      if (typeof input === "string" && input.includes("/api/lists/") && input.endsWith("/collaborators") && (!init || init.method === "GET")) {
+      if (
+        typeof input === "string" &&
+        input.includes("/api/lists/") &&
+        input.endsWith("/collaborators") &&
+        (!init || init.method === "GET")
+      ) {
         return { ok: true, json: async () => ({ collaborators: [] }) } as any;
       }
       return { ok: true, json: async () => ({}) } as any;
@@ -74,7 +81,9 @@ describe("ListDetailsClient", () => {
 
     // Open Share (collaboration) modal
     await user.click(screen.getByRole("button", { name: /Share/i }));
-    expect(await screen.findByText(/Manage Collaborators/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Manage Collaborators/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Add Collaborator/i)).toBeInTheDocument();
 
     // Open Settings modal (text is inside a span)

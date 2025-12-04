@@ -12,7 +12,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Get devices error:", error);
     return NextResponse.json(
       { error: "Failed to retrieve devices" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -24,13 +24,13 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (res === "rateLimit") {
       return NextResponse.json(
         { error: "Rate limit exceeded. Try later." },
-        { status: 429 }
+        { status: 429 },
       );
     }
     if (res === "maxDevices") {
       return NextResponse.json(
         { error: "Maximum devices reached" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -39,7 +39,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Initiate claim error:", error);
     return NextResponse.json(
       { error: "Failed to initiate claim" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

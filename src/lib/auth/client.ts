@@ -124,7 +124,7 @@ export async function beginClaimRegistration(token: string): Promise<{
   challengeToken: string;
 }> {
   const response = await fetch(
-    `/api/auth/claim/begin?token=${encodeURIComponent(token)}`
+    `/api/auth/claim/begin?token=${encodeURIComponent(token)}`,
   );
   if (!response.ok) {
     const error = await response.json();

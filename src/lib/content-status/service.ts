@@ -29,13 +29,13 @@ function mapRow(row: any): ContentStatusItem {
     contentType: row.contentType,
     status: row.status,
     nextEpisodeDate: row.nextEpisodeDate
-      ? row.nextEpisodeDate.toISOString?.() ?? row.nextEpisodeDate
+      ? (row.nextEpisodeDate.toISOString?.() ?? row.nextEpisodeDate)
       : null,
     createdAt: row.createdAt
-      ? row.createdAt.toISOString?.() ?? row.createdAt
+      ? (row.createdAt.toISOString?.() ?? row.createdAt)
       : undefined,
     updatedAt: row.updatedAt
-      ? row.updatedAt.toISOString?.() ?? row.updatedAt
+      ? (row.updatedAt.toISOString?.() ?? row.updatedAt)
       : undefined,
   };
 }
@@ -43,7 +43,7 @@ function mapRow(row: any): ContentStatusItem {
 export async function getContentStatus(
   userId: string,
   tmdbId: number,
-  contentType: string
+  contentType: string,
 ): Promise<GetContentStatusResponse> {
   const status = await db
     .select()
@@ -52,8 +52,8 @@ export async function getContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType)
-      )
+        eq(userContentStatus.contentType, contentType),
+      ),
     )
     .limit(1);
   return { status: status[0] ? mapRow(status[0]) : null };
@@ -61,7 +61,7 @@ export async function getContentStatus(
 
 export async function createOrUpdateContentStatus(
   userId: string,
-  input: CreateOrUpdateContentStatusInput
+  input: CreateOrUpdateContentStatusInput,
 ): Promise<CreateOrUpdateContentStatusResult> {
   const { tmdbId, contentType, status } = input;
   try {
@@ -76,8 +76,8 @@ export async function createOrUpdateContentStatus(
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, contentType)
-        )
+          eq(userContentStatus.contentType, contentType),
+        ),
       )
       .limit(1);
     let result;
@@ -89,8 +89,8 @@ export async function createOrUpdateContentStatus(
           and(
             eq(userContentStatus.userId, userId),
             eq(userContentStatus.tmdbId, tmdbId),
-            eq(userContentStatus.contentType, contentType)
-          )
+            eq(userContentStatus.contentType, contentType),
+          ),
         )
         .returning();
     } else {
@@ -109,8 +109,8 @@ export async function createOrUpdateContentStatus(
           .where(
             and(
               eq(showSchedules.userId, userId),
-              eq(showSchedules.tmdbId, tmdbId)
-            )
+              eq(showSchedules.tmdbId, tmdbId),
+            ),
           );
       } catch {}
     }
@@ -118,7 +118,7 @@ export async function createOrUpdateContentStatus(
       userId,
       tmdbId,
       contentType,
-      status
+      status,
     );
     try {
       await db.insert(activityFeed).values({
@@ -147,7 +147,7 @@ export async function createOrUpdateContentStatus(
 
 export async function updateContentStatus(
   userId: string,
-  input: UpdateContentStatusInput
+  input: UpdateContentStatusInput,
 ): Promise<UpdateContentStatusResult> {
   const { tmdbId, contentType, status } = input;
   const existing = await db
@@ -157,8 +157,8 @@ export async function updateContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType)
-      )
+        eq(userContentStatus.contentType, contentType),
+      ),
     )
     .limit(1);
   if (existing.length === 0) return "notFound";
@@ -171,8 +171,8 @@ export async function updateContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType)
-      )
+        eq(userContentStatus.contentType, contentType),
+      ),
     )
     .returning();
   if (
@@ -186,15 +186,15 @@ export async function updateContentStatus(
         .where(
           and(
             eq(showSchedules.userId, userId),
-            eq(showSchedules.tmdbId, tmdbId)
-          )
+            eq(showSchedules.tmdbId, tmdbId),
+          ),
         );
     } catch {}
     const syncedCollaboratorIds = await syncStatusToCollaborators(
       userId,
       tmdbId,
       contentType,
-      status
+      status,
     );
     try {
       const contentDetails = await tmdbClient.getTVShowDetails(tmdbId);
@@ -219,7 +219,7 @@ export async function updateContentStatus(
 export async function deleteContentStatus(
   userId: string,
   tmdbId: number,
-  contentType: string
+  contentType: string,
 ): Promise<DeleteContentStatusResult | "notFound"> {
   const existing = await db
     .select()
@@ -228,8 +228,8 @@ export async function deleteContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType)
-      )
+        eq(userContentStatus.contentType, contentType),
+      ),
     )
     .limit(1);
   if (existing.length === 0) return "notFound";
@@ -239,8 +239,8 @@ export async function deleteContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType)
-      )
+        eq(userContentStatus.contentType, contentType),
+      ),
     );
   return { message: "Content status removed successfully" };
 }

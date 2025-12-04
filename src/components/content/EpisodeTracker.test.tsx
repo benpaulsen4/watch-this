@@ -6,12 +6,16 @@ import { EpisodeTracker } from "./EpisodeTracker";
 import type { TMDBTVShowDetails } from "@/lib/tmdb/client";
 
 function setupQueryClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
 }
 
 function renderWithQuery(ui: React.ReactElement, client?: QueryClient) {
   const queryClient = client ?? setupQueryClient();
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe("EpisodeTracker", () => {
@@ -47,23 +51,28 @@ describe("EpisodeTracker", () => {
       },
     };
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const method = (init?.method || "GET").toUpperCase();
-      if (url === `/api/status/episodes?tmdbId=${tvShowId}`) {
-        return { ok: true, json: async () => ({ episodes: [] }) } as Response;
-      }
-      if (url === `/api/tmdb/episodes/${tvShowId}?season=1`) {
-        return { ok: true, json: async () => seasonsData } as Response;
-      }
-      if (url === "/api/status/episodes" && method === "POST") {
-        return { ok: true, json: async () => ({ newStatus: "watching" }) } as Response;
-      }
-      if (url === "/api/status/episodes" && method === "PUT") {
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = (init?.method || "GET").toUpperCase();
+        if (url === `/api/status/episodes?tmdbId=${tvShowId}`) {
+          return { ok: true, json: async () => ({ episodes: [] }) } as Response;
+        }
+        if (url === `/api/tmdb/episodes/${tvShowId}?season=1`) {
+          return { ok: true, json: async () => seasonsData } as Response;
+        }
+        if (url === "/api/status/episodes" && method === "POST") {
+          return {
+            ok: true,
+            json: async () => ({ newStatus: "watching" }),
+          } as Response;
+        }
+        if (url === "/api/status/episodes" && method === "PUT") {
+          return { ok: true, json: async () => ({}) } as Response;
+        }
         return { ok: true, json: async () => ({}) } as Response;
-      }
-      return { ok: true, json: async () => ({}) } as Response;
-    }) as any;
+      },
+    ) as any;
     vi.spyOn(global, "fetch").mockImplementation(fetchMock);
   });
 
@@ -91,7 +100,7 @@ describe("EpisodeTracker", () => {
     } as any;
 
     renderWithQuery(
-      <EpisodeTracker tvShowId={tvShowId} tvShowDetails={details} />, 
+      <EpisodeTracker tvShowId={tvShowId} tvShowDetails={details} />,
     );
 
     // Wait for Episode Progress heading

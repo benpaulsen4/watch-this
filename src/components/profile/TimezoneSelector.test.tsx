@@ -26,7 +26,9 @@ function createQueryClient() {
 
 function renderWithProviders(ui: React.ReactElement) {
   const client = createQueryClient();
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe("TimezoneSelector", () => {
@@ -41,7 +43,12 @@ describe("TimezoneSelector", () => {
 
   it("renders view mode and switches to edit mode", () => {
     const onUserUpdate = vi.fn();
-    renderWithProviders(<TimezoneSelector user={{ timezone: "UTC" }} onUserUpdate={onUserUpdate} />);
+    renderWithProviders(
+      <TimezoneSelector
+        user={{ timezone: "UTC" }}
+        onUserUpdate={onUserUpdate}
+      />,
+    );
 
     expect(screen.getByText(/^UTC$/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /change timezone/i }));
@@ -49,9 +56,16 @@ describe("TimezoneSelector", () => {
   });
 
   it("updates timezone selection and saves", async () => {
-    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      { ok: true, json: async () => ({}) },
+    );
     const onUserUpdate = vi.fn();
-    renderWithProviders(<TimezoneSelector user={{ timezone: "UTC" }} onUserUpdate={onUserUpdate} />);
+    renderWithProviders(
+      <TimezoneSelector
+        user={{ timezone: "UTC" }}
+        onUserUpdate={onUserUpdate}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /change timezone/i }));
     const dropdown = screen.getByTestId("dropdown") as HTMLSelectElement;
@@ -63,15 +77,25 @@ describe("TimezoneSelector", () => {
     fireEvent.click(saveButton);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/auth/session", expect.objectContaining({ method: "PUT" }));
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/auth/session",
+        expect.objectContaining({ method: "PUT" }),
+      );
       expect(onUserUpdate).toHaveBeenCalled();
     });
   });
 
   it("shows error when save fails", async () => {
-    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, json: async () => ({ error: "Failed to update timezone" }) });
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      { ok: false, json: async () => ({ error: "Failed to update timezone" }) },
+    );
     const onUserUpdate = vi.fn();
-    renderWithProviders(<TimezoneSelector user={{ timezone: "UTC" }} onUserUpdate={onUserUpdate} />);
+    renderWithProviders(
+      <TimezoneSelector
+        user={{ timezone: "UTC" }}
+        onUserUpdate={onUserUpdate}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /change timezone/i }));
     const dropdown = screen.getByTestId("dropdown") as HTMLSelectElement;
@@ -79,7 +103,9 @@ describe("TimezoneSelector", () => {
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/failed to update timezone/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/failed to update timezone/i),
+      ).toBeInTheDocument();
     });
   });
 });

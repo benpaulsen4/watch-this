@@ -4,7 +4,10 @@ import { lists, listCollaborators, users } from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and } from "drizzle-orm";
 import { PermissionLevel } from "@/lib/db/schema";
-import { updateListCollaborator, deleteListCollaborator } from "@/lib/lists/service";
+import {
+  updateListCollaborator,
+  deleteListCollaborator,
+} from "@/lib/lists/service";
 import { UpdateCollaboratorInput } from "@/lib/lists/types";
 
 // PUT /api/lists/[id]/collaborators/[userId] - Update collaborator permissions
@@ -37,9 +40,17 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    const result = await updateListCollaborator(userId, listId, collaboratorUserId, { permissionLevel });
+    const result = await updateListCollaborator(
+      userId,
+      listId,
+      collaboratorUserId,
+      { permissionLevel },
+    );
     if (result === "notFound") {
-      return NextResponse.json({ error: "List or collaborator not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "List or collaborator not found" },
+        { status: 404 },
+      );
     }
     if (result === "forbidden") {
       return NextResponse.json(
@@ -73,9 +84,16 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    const result = await deleteListCollaborator(userId, listId, collaboratorUserId);
+    const result = await deleteListCollaborator(
+      userId,
+      listId,
+      collaboratorUserId,
+    );
     if (result === "notFound") {
-      return NextResponse.json({ error: "List or collaborator not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "List or collaborator not found" },
+        { status: 404 },
+      );
     }
     if (result === "forbidden") {
       return NextResponse.json(

@@ -22,7 +22,7 @@ function renderWithClient(ui: React.ReactElement) {
     defaultOptions: { queries: { retry: 0, refetchOnWindowFocus: false } },
   });
   return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
   );
 }
 

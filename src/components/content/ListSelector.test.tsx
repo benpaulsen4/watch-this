@@ -11,7 +11,7 @@ function setupQueryClient() {
 function renderWithQuery(ui: React.ReactElement, client?: QueryClient) {
   const queryClient = client ?? setupQueryClient();
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
   );
 }
 
@@ -52,7 +52,7 @@ describe("ListSelector", () => {
         }
         if (url === `/api/content/${contentId}/lists` && method === "GET") {
           const arr = Object.entries(listsWithContent).map(
-            ([listId, itemId]) => ({ listId, itemId })
+            ([listId, itemId]) => ({ listId, itemId }),
           );
           return { ok: true, json: async () => arr } as Response;
         }
@@ -72,7 +72,7 @@ describe("ListSelector", () => {
           return { ok: true, json: async () => ({}) } as Response;
         }
         return { ok: true, json: async () => ({}) } as Response;
-      }
+      },
     ) as any;
     vi.spyOn(global, "fetch").mockImplementation(fetchMock);
   });
@@ -91,13 +91,13 @@ describe("ListSelector", () => {
         title="Test Show"
         posterPath={null}
         currentListId="list2"
-      />
+      />,
     );
 
     // Shows both mixed and tv lists
     expect(await screen.findByText(/Mixed List/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /TV Shows/i })
+      screen.getByRole("heading", { name: /TV Shows/i }),
     ).toBeInTheDocument();
 
     // Current and Added badges
@@ -109,7 +109,7 @@ describe("ListSelector", () => {
     expect(addButtons.length).toBeGreaterThan(0);
     await user.click(addButtons[0]);
     await waitFor(() =>
-      expect(screen.getAllByText(/Added/i).length).toBeGreaterThan(1)
+      expect(screen.getAllByText(/Added/i).length).toBeGreaterThan(1),
     );
 
     // Remove from TV Shows list
@@ -147,7 +147,7 @@ describe("ListSelector", () => {
         }
         if (url === `/api/content/${contentId}/lists` && method === "GET") {
           const arr = Object.entries(listsWithContent).map(
-            ([listId, itemId]) => ({ listId, itemId })
+            ([listId, itemId]) => ({ listId, itemId }),
           );
           return { ok: true, json: async () => arr } as Response;
         }
@@ -180,7 +180,7 @@ describe("ListSelector", () => {
           } as Response;
         }
         return { ok: true, json: async () => ({}) } as Response;
-      }
+      },
     ) as any;
     vi.spyOn(global, "fetch").mockImplementation(fetchMock);
 
@@ -191,7 +191,7 @@ describe("ListSelector", () => {
         title="Test Show"
         posterPath={null}
       />,
-      client
+      client,
     );
 
     // Wait for lists to load

@@ -18,8 +18,10 @@ import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import { useMutation } from "@tanstack/react-query";
 
-export interface ContentCardProps
-  extends Omit<React.HTMLAttributes<HTMLDivElement>, "content"> {
+export interface ContentCardProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "content"
+> {
   content: TMDBMovie | TMDBTVShow;
   onContentClick?: (content: TMDBMovie | TMDBTVShow) => void;
   // List-specific props
@@ -44,7 +46,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       onRemoveFromList,
       ...props
     },
-    ref
+    ref,
   ) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
@@ -89,7 +91,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
         const data = await response.json();
         if (!response.ok)
           throw new Error(
-            data.error || "Failed to mark next episode as watched"
+            data.error || "Failed to mark next episode as watched",
           );
         return data;
       },
@@ -98,7 +100,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
           setWatchStatus(result.newStatus as WatchStatusEnum);
         const episodeDetails = result.episodeDetails;
         setQuickCompleteMessage(
-          `S${episodeDetails.seasonNumber}E${episodeDetails.episodeNumber}: ${episodeDetails.name} marked as watched!`
+          `S${episodeDetails.seasonNumber}E${episodeDetails.episodeNumber}: ${episodeDetails.name} marked as watched!`,
         );
       },
     });
@@ -121,7 +123,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       } catch (error) {
         console.error("Quick complete error:", error);
         setQuickCompleteMessage(
-          error instanceof Error ? error.message : "Failed to update status"
+          error instanceof Error ? error.message : "Failed to update status",
         );
         setTimeout(() => {
           setShowTickAnimation(false);
@@ -290,7 +292,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
         />
       </>
     );
-  }
+  },
 );
 
 ContentCard.displayName = "ContentCard";

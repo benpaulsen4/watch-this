@@ -32,7 +32,9 @@ function setupQueryClient() {
 
 function renderWithQuery(ui: React.ReactElement, client?: QueryClient) {
   const queryClient = client ?? setupQueryClient();
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe("ContentDetailsModal", () => {
@@ -67,13 +69,18 @@ describe("ContentDetailsModal", () => {
       if (url.startsWith("/api/watch/content?type=tv")) {
         const data = {
           providers: {
-            flatrate: [{ provider_id: 8, provider_name: "Netflix", logo_path: null }],
+            flatrate: [
+              { provider_id: 8, provider_name: "Netflix", logo_path: null },
+            ],
           },
         };
         return { ok: true, json: async () => data } as Response;
       }
       if (url.startsWith("/api/status/content") && init?.method === "POST") {
-        return { ok: true, json: async () => ({ status: "completed" }) } as Response;
+        return {
+          ok: true,
+          json: async () => ({ status: "completed" }),
+        } as Response;
       }
       // Default empty
       return { ok: true, json: async () => ({}) } as Response;
@@ -108,12 +115,16 @@ describe("ContentDetailsModal", () => {
     );
 
     // Tabs
-    expect(await screen.findByRole("tab", { name: /Overview/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("tab", { name: /Overview/i }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Episodes/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Lists/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Schedule/i })).toBeInTheDocument();
     // Streaming provider chip appears
-    await waitFor(() => expect(screen.getByText(/Netflix/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Netflix/i)).toBeInTheDocument(),
+    );
   });
 
   it("updates watch status via segmented selector", async () => {
@@ -148,7 +159,10 @@ describe("ContentDetailsModal", () => {
     const completed = await screen.findByRole("radio", { name: /completed/i });
     await user.click(completed);
     await waitFor(() => expect(onChanged).toHaveBeenCalledWith("completed"));
-    expect(fetchMock).toHaveBeenCalledWith("/api/status/content", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/status/content",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   // Note: Close button has no accessible label; skip click-close test.

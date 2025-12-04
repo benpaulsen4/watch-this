@@ -17,7 +17,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId || !itemId) {
       return NextResponse.json(
         { error: "List ID and Item ID are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -25,7 +25,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "notFound") {
       return NextResponse.json(
         { error: "Item or list not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     return NextResponse.json(result);
@@ -33,7 +33,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error removing item from list:", error);
     return NextResponse.json(
       { error: "Failed to remove item from list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

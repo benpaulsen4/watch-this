@@ -16,7 +16,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error fetching lists:", error);
     return NextResponse.json(
       { error: "Failed to fetch lists" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });
@@ -38,14 +38,14 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
         { error: "List name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (name.length > 100) {
       return NextResponse.json(
         { error: "List name must be 100 characters or less" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -53,7 +53,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!validListTypes.includes(listType)) {
       return NextResponse.json(
         { error: "Invalid list type. Must be 'movies', 'tv', or 'mixed'" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -69,7 +69,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error creating list:", error);
     return NextResponse.json(
       { error: "Failed to create list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

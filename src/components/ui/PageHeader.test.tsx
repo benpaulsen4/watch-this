@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 describe("PageHeader", () => {
   it("renders title and subheader slot", () => {
     render(
-      <PageHeader title="Dashboard" subheaderSlot={<span>Subheader</span>} />
+      <PageHeader title="Dashboard" subheaderSlot={<span>Subheader</span>} />,
     );
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(screen.getByText("Subheader")).toBeInTheDocument();
@@ -13,7 +13,7 @@ describe("PageHeader", () => {
 
   it("renders back link when href provided", () => {
     const { container } = render(
-      <PageHeader title="Test" backLinkHref="/home" />
+      <PageHeader title="Test" backLinkHref="/home" />,
     );
     const anchor = container.querySelector('a[href="/home"]');
     expect(anchor).toBeTruthy();
@@ -23,7 +23,7 @@ describe("PageHeader", () => {
     render(
       <PageHeader title="Test">
         <button type="button">Action</button>
-      </PageHeader>
+      </PageHeader>,
     );
     expect(screen.getByText("Action")).toBeInTheDocument();
   });

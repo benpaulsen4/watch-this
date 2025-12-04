@@ -12,10 +12,10 @@ describe("QRCode component", () => {
 
   it("renders img with alt, size and className", async () => {
     (QRCodeLib as any).toDataURL.mockResolvedValueOnce(
-      "data:image/png;base64,abc"
+      "data:image/png;base64,abc",
     );
     render(
-      <QRCode value="https://example.com" size={200} className="rounded" />
+      <QRCode value="https://example.com" size={200} className="rounded" />,
     );
 
     const img = await screen.findByAltText(/qr code/i);
@@ -27,7 +27,7 @@ describe("QRCode component", () => {
 
   it("calls qrcode.toDataURL with expected options and sets src on success", async () => {
     (QRCodeLib as any).toDataURL.mockResolvedValueOnce(
-      "data:image/png;base64,xyz"
+      "data:image/png;base64,xyz",
     );
     render(<QRCode value="payload" size={180} />);
 
@@ -69,7 +69,7 @@ describe("QRCode component", () => {
       expect(QRCodeLib.toDataURL).toHaveBeenCalledTimes(2);
       expect(QRCodeLib.toDataURL).toHaveBeenLastCalledWith(
         "two",
-        expect.objectContaining({ width: 220 })
+        expect.objectContaining({ width: 220 }),
       );
     });
 

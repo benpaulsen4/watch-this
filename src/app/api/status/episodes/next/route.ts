@@ -17,7 +17,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || typeof tmdbId !== "number") {
       return NextResponse.json(
         { error: "tmdbId is required and must be a number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -28,13 +28,13 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "noNextEpisode") {
       return NextResponse.json(
         { error: "No next episode available. You're all caught up!" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (result === "notAired") {
       return NextResponse.json(
         { error: "Next episode hasn't aired yet." },
-        { status: 400 }
+        { status: 400 },
       );
     }
     return NextResponse.json(result, { status: 201 });

@@ -57,10 +57,18 @@ describe("ProfileClient", () => {
     render(<ProfileClient />);
 
     // Sidebar entries
-    expect(screen.getByRole("button", { name: /profile/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /security/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /streaming/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /data management/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /profile/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /security/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /streaming/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /data management/i }),
+    ).toBeInTheDocument();
 
     // Default content
     expect(screen.getByText(/profile information/i)).toBeInTheDocument();
@@ -83,14 +91,18 @@ describe("ProfileClient", () => {
   });
 
   it("logs out and navigates to /auth", async () => {
-    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      { ok: true, json: async () => ({}) },
+    );
     render(<ProfileClient />);
 
     const logoutButton = screen.getByRole("button", { name: /logout/i });
     fireEvent.click(logoutButton);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/auth/signout", { method: "POST" });
+      expect(global.fetch).toHaveBeenCalledWith("/api/auth/signout", {
+        method: "POST",
+      });
     });
   });
 });

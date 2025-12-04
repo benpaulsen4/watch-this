@@ -11,7 +11,7 @@ const options: DropdownOption[] = [
 describe("Dropdown", () => {
   it("renders label and placeholder", () => {
     render(
-      <Dropdown label="Fruit" options={options} placeholder="Select a fruit" />
+      <Dropdown label="Fruit" options={options} placeholder="Select a fruit" />,
     );
     expect(screen.getByText("Fruit")).toBeInTheDocument();
     const trigger = screen.getByRole("button");
@@ -26,7 +26,7 @@ describe("Dropdown", () => {
         options={options}
         placeholder="Select a fruit"
         onSelectionChange={onSelectionChange}
-      />
+      />,
     );
     const trigger = screen.getByRole("button");
     await user.click(trigger);

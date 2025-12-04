@@ -16,7 +16,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "dbError") {
       return NextResponse.json(
         { error: "Fetch streaming preferences failed" },
-        { status: 500 }
+        { status: 500 },
       );
     }
     return NextResponse.json(result);
@@ -42,13 +42,13 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (country && !/^[A-Z]{2}$/i.test(country)) {
       return NextResponse.json(
         { error: "Invalid country code format. Expected 2-letter code." },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (providers && (!region || !/^[A-Z]{2}$/i.test(region))) {
       return NextResponse.json(
         { error: "Region is required and must be a 2-letter code." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,13 +60,13 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "invalidRegion") {
       return NextResponse.json(
         { error: "Region is required and must be a 2-letter code." },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (result === "dbError") {
       return NextResponse.json(
         { error: "Update streaming preferences failed" },
-        { status: 500 }
+        { status: 500 },
       );
     }
     return NextResponse.json(result);

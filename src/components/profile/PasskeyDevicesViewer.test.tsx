@@ -27,7 +27,7 @@ function createQueryClient() {
 function renderWithProviders(ui: React.ReactElement) {
   const client = createQueryClient();
   return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
   );
 }
 
@@ -46,7 +46,7 @@ describe("PasskeyDevicesViewer", () => {
 
   it("shows loading spinner initially", async () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      { ok: true, json: async () => ({ devices: [] }) }
+      { ok: true, json: async () => ({ devices: [] }) },
     );
     renderWithProviders(<PasskeyDevicesViewer />);
     expect(screen.getByText(/loading devices/i)).toBeInTheDocument();
@@ -73,7 +73,7 @@ describe("PasskeyDevicesViewer", () => {
             },
           ],
         }),
-      }
+      },
     );
 
     renderWithProviders(<PasskeyDevicesViewer />);
@@ -93,11 +93,11 @@ describe("PasskeyDevicesViewer", () => {
 
   it("shows error when API fails", async () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      { ok: false, json: async () => ({ error: "Failed to load devices" }) }
+      { ok: false, json: async () => ({ error: "Failed to load devices" }) },
     );
     renderWithProviders(<PasskeyDevicesViewer />);
     expect(
-      await screen.findByText(/failed to load devices/i)
+      await screen.findByText(/failed to load devices/i),
     ).toBeInTheDocument();
   });
 
@@ -129,7 +129,7 @@ describe("PasskeyDevicesViewer", () => {
             },
           ],
         }),
-      }
+      },
     );
 
     renderWithProviders(<PasskeyDevicesViewer />);
@@ -156,7 +156,7 @@ describe("PasskeyDevicesViewer", () => {
             },
           ],
         }),
-      }
+      },
     );
 
     const refreshButton = screen.getByRole("button", { name: /refresh/i });
@@ -164,7 +164,7 @@ describe("PasskeyDevicesViewer", () => {
     await screen.findByText(/laptop/i);
 
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      { ok: true, json: async () => ({}) }
+      { ok: true, json: async () => ({}) },
     );
     const deleteBtn = screen.getAllByRole("button", { name: /delete/i })[0];
     expect(deleteBtn).not.toBeDisabled();
@@ -174,15 +174,15 @@ describe("PasskeyDevicesViewer", () => {
       expect(
         calls.some(
           (c: any[]) =>
-            typeof c[0] === "string" && c[0].includes("/api/profile/devices/")
-        )
+            typeof c[0] === "string" && c[0].includes("/api/profile/devices/"),
+        ),
       ).toBe(true);
     });
   });
 
   it("initiates claim, shows modal with claim info and QR, copy works", async () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      { ok: true, json: async () => ({ devices: [] }) }
+      { ok: true, json: async () => ({ devices: [] }) },
     );
     (
       initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
@@ -206,20 +206,20 @@ describe("PasskeyDevicesViewer", () => {
     expect(await screen.findByText(/claim code/i)).toBeInTheDocument();
     expect(screen.getByText(/abcdefgh12/i)).toBeInTheDocument();
     expect(
-      screen.getByDisplayValue("https://site/auth/claim?token=tkn")
+      screen.getByDisplayValue("https://site/auth/claim?token=tkn"),
     ).toBeInTheDocument();
     expect(screen.getByAltText(/qr code/i)).toBeInTheDocument();
 
     const copyBtn = screen.getByRole("button", { name: /copy/i });
     await userEvent.click(copyBtn);
     expect(
-      await screen.findByRole("button", { name: /copied/i })
+      await screen.findByRole("button", { name: /copied/i }),
     ).toBeInTheDocument();
   });
 
   it("shows rate limit error on claim initiation failure", async () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      { ok: true, json: async () => ({ devices: [] }) }
+      { ok: true, json: async () => ({ devices: [] }) },
     );
     (
       initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
@@ -233,7 +233,7 @@ describe("PasskeyDevicesViewer", () => {
     await userEvent.click(addBtn);
 
     expect(
-      await screen.findByText(/too many add passkey attempts/i)
+      await screen.findByText(/too many add passkey attempts/i),
     ).toBeInTheDocument();
   });
 
@@ -242,7 +242,7 @@ describe("PasskeyDevicesViewer", () => {
       {
         ok: true,
         json: async () => ({ devices: [] }),
-      }
+      },
     );
     (
       initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
@@ -259,13 +259,13 @@ describe("PasskeyDevicesViewer", () => {
     await screen.findByText(/passkey devices/i);
     await userEvent.click(screen.getByRole("button", { name: /add passkey/i }));
     expect(
-      await screen.findByText(/listening for new device/i)
+      await screen.findByText(/listening for new device/i),
     ).toBeInTheDocument();
   });
 
   it("cancels claim and calls DELETE endpoint", async () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      { ok: true, json: async () => ({ devices: [] }) }
+      { ok: true, json: async () => ({ devices: [] }) },
     );
     (
       initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
@@ -285,7 +285,7 @@ describe("PasskeyDevicesViewer", () => {
           return { ok: true, json: async () => ({}) } as any;
         }
         return { ok: true, json: async () => ({ devices: [] }) } as any;
-      }
+      },
     );
 
     renderWithProviders(<PasskeyDevicesViewer />);
@@ -299,8 +299,8 @@ describe("PasskeyDevicesViewer", () => {
       const calls = (global.fetch as any).mock.calls;
       expect(
         calls.some((c: any[]) =>
-          String(c[0]).includes("/api/profile/devices/claims/")
-        )
+          String(c[0]).includes("/api/profile/devices/claims/"),
+        ),
       ).toBe(true);
     });
   });

@@ -43,7 +43,7 @@ const trackVariants = cva(
       size: "default",
       variant: "default",
     },
-  }
+  },
 );
 
 const thumbVariants = cva(
@@ -60,11 +60,12 @@ const thumbVariants = cva(
     defaultVariants: {
       size: "default",
     },
-  }
+  },
 );
 
 export interface SwitchProps
-  extends Omit<RASwitchProps, "children">,
+  extends
+    Omit<RASwitchProps, "children">,
     VariantProps<typeof switchRootVariants> {
   label?: string;
   helperText?: string;
@@ -83,16 +84,16 @@ const Switch = forwardRef<HTMLLabelElement, SwitchProps>(
       error,
       ...props
     },
-    ref
+    ref,
   ) => {
     const finalVariant = error ? "error" : variant;
     const currentSize: Size = size ?? "default";
 
     const rootClassName = cn(
-      switchRootVariants({ size: currentSize, className })
+      switchRootVariants({ size: currentSize, className }),
     );
     const trackClassName = cn(
-      trackVariants({ size: currentSize, variant: finalVariant })
+      trackVariants({ size: currentSize, variant: finalVariant }),
     );
     const thumbClassName = cn(thumbVariants({ size: currentSize }));
 
@@ -113,7 +114,7 @@ const Switch = forwardRef<HTMLLabelElement, SwitchProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 Switch.displayName = "Switch";

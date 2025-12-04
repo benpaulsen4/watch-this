@@ -29,13 +29,13 @@ function mapRow(row: any): EpisodeStatusItem {
     episodeNumber: row.episodeNumber,
     watched: row.watched,
     watchedAt: row.watchedAt
-      ? row.watchedAt.toISOString?.() ?? row.watchedAt
+      ? (row.watchedAt.toISOString?.() ?? row.watchedAt)
       : null,
     createdAt: row.createdAt
-      ? row.createdAt.toISOString?.() ?? row.createdAt
+      ? (row.createdAt.toISOString?.() ?? row.createdAt)
       : undefined,
     updatedAt: row.updatedAt
-      ? row.updatedAt.toISOString?.() ?? row.updatedAt
+      ? (row.updatedAt.toISOString?.() ?? row.updatedAt)
       : undefined,
   };
 }
@@ -44,7 +44,7 @@ export async function listEpisodeStatuses(
   userId: string,
   tmdbId: number,
   seasonNumber?: number,
-  episodeNumber?: number
+  episodeNumber?: number,
 ): Promise<ListEpisodeStatusResponse> {
   const conditions = [
     eq(episodeWatchStatus.userId, userId),
@@ -65,7 +65,7 @@ export async function listEpisodeStatuses(
 
 export async function updateEpisodeStatus(
   userId: string,
-  input: UpdateEpisodeStatusInput
+  input: UpdateEpisodeStatusInput,
 ): Promise<UpdateEpisodeStatusResult> {
   const { tmdbId, seasonNumber, episodeNumber, watched } = input;
   const { episode, newStatus } = await completeEpisodeUpdate(
@@ -73,7 +73,7 @@ export async function updateEpisodeStatus(
     tmdbId,
     seasonNumber,
     episodeNumber,
-    watched
+    watched,
   );
   return { episode: mapRow(episode), newStatus };
 }
@@ -81,7 +81,7 @@ export async function updateEpisodeStatus(
 export async function batchUpdateEpisodeStatuses(
   userId: string,
   tmdbId: number,
-  episodes: BatchUpdateEpisodesInputItem[]
+  episodes: BatchUpdateEpisodesInputItem[],
 ): Promise<BatchUpdateEpisodesResult> {
   const result = await batchUpdate(userId, tmdbId, episodes);
   return {
@@ -93,7 +93,7 @@ export async function batchUpdateEpisodeStatuses(
 
 export async function markNextEpisodeWatched(
   userId: string,
-  tmdbId: number
+  tmdbId: number,
 ): Promise<MarkNextEpisodeResult | MarkNextEpisodeError> {
   try {
     await tmdbClient.getTVShowDetails(tmdbId);
@@ -109,12 +109,12 @@ export async function markNextEpisodeWatched(
       and(
         eq(episodeWatchStatus.userId, userId),
         eq(episodeWatchStatus.tmdbId, tmdbId),
-        eq(episodeWatchStatus.watched, true)
-      )
+        eq(episodeWatchStatus.watched, true),
+      ),
     )
     .orderBy(
       desc(episodeWatchStatus.seasonNumber),
-      desc(episodeWatchStatus.episodeNumber)
+      desc(episodeWatchStatus.episodeNumber),
     );
   let nextSeasonNumber = 1;
   let nextEpisodeNumber = 1;
@@ -124,7 +124,7 @@ export async function markNextEpisodeWatched(
     try {
       seasonDetails = await tmdbClient.getTVSeasonDetails(
         tmdbId,
-        lastWatched.seasonNumber
+        lastWatched.seasonNumber,
       );
     } catch {
       throw new Error("Failed to get season details");
@@ -142,7 +142,7 @@ export async function markNextEpisodeWatched(
     nextEpisodeDetails = await tmdbClient.getTVEpisodeDetails(
       tmdbId,
       nextSeasonNumber,
-      nextEpisodeNumber
+      nextEpisodeNumber,
     );
   } catch (error) {
     if (error instanceof Error && error.message.includes("404"))
@@ -160,8 +160,8 @@ export async function markNextEpisodeWatched(
         eq(episodeWatchStatus.userId, userId),
         eq(episodeWatchStatus.tmdbId, tmdbId),
         eq(episodeWatchStatus.seasonNumber, nextSeasonNumber),
-        eq(episodeWatchStatus.episodeNumber, nextEpisodeNumber)
-      )
+        eq(episodeWatchStatus.episodeNumber, nextEpisodeNumber),
+      ),
     )
     .limit(1);
   let result;
@@ -174,8 +174,8 @@ export async function markNextEpisodeWatched(
           eq(episodeWatchStatus.userId, userId),
           eq(episodeWatchStatus.tmdbId, tmdbId),
           eq(episodeWatchStatus.seasonNumber, nextSeasonNumber),
-          eq(episodeWatchStatus.episodeNumber, nextEpisodeNumber)
-        )
+          eq(episodeWatchStatus.episodeNumber, nextEpisodeNumber),
+        ),
       )
       .returning();
   } else {
@@ -196,7 +196,7 @@ export async function markNextEpisodeWatched(
     tmdbId,
     nextSeasonNumber,
     nextEpisodeNumber,
-    true
+    true,
   );
   await createEpisodeActivityEntry(
     userId,
@@ -205,14 +205,14 @@ export async function markNextEpisodeWatched(
     nextEpisodeNumber,
     true,
     syncedCollaboratorIds,
-    nextEpisodeDetails.name
+    nextEpisodeDetails.name,
   );
   const newStatus = await updateTVShowStatus(
     userId,
     tmdbId,
     nextSeasonNumber,
     nextEpisodeNumber,
-    true
+    true,
   );
   return {
     episode: mapRow(result),
@@ -230,24 +230,24 @@ export async function deleteEpisodeStatuses(
   userId: string,
   tmdbId: number,
   seasonNumber?: number,
-  episodeNumber?: number
+  episodeNumber?: number,
 ): Promise<{ deletedCount: number }> {
   let condition = and(
     eq(episodeWatchStatus.userId, userId),
-    eq(episodeWatchStatus.tmdbId, tmdbId)
+    eq(episodeWatchStatus.tmdbId, tmdbId),
   );
   if (typeof seasonNumber === "number" && typeof episodeNumber === "number") {
     condition = and(
       eq(episodeWatchStatus.userId, userId),
       eq(episodeWatchStatus.tmdbId, tmdbId),
       eq(episodeWatchStatus.seasonNumber, seasonNumber),
-      eq(episodeWatchStatus.episodeNumber, episodeNumber)
+      eq(episodeWatchStatus.episodeNumber, episodeNumber),
     );
   } else if (typeof seasonNumber === "number") {
     condition = and(
       eq(episodeWatchStatus.userId, userId),
       eq(episodeWatchStatus.tmdbId, tmdbId),
-      eq(episodeWatchStatus.seasonNumber, seasonNumber)
+      eq(episodeWatchStatus.seasonNumber, seasonNumber),
     );
   }
   const deleted = await db

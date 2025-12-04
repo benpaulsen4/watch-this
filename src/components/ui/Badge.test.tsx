@@ -12,7 +12,7 @@ describe("Badge", () => {
     const { container } = render(
       <Badge variant="success" className="custom-class">
         Badge
-      </Badge>
+      </Badge>,
     );
     const badge = container.firstChild as HTMLElement;
     expect(badge).toHaveClass("custom-class");

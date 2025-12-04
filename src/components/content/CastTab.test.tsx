@@ -19,7 +19,9 @@ function setupQueryClient() {
 
 function renderWithQuery(ui: React.ReactElement, client?: QueryClient) {
   const queryClient = client ?? setupQueryClient();
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe("CastTab", () => {
@@ -47,13 +49,19 @@ describe("CastTab", () => {
     // Delay credits response to observe loading state
     fetchMock.mockImplementationOnce(async () => {
       return new Promise<Response>((resolve) =>
-        setTimeout(() => resolve({ ok: true, json: async () => ({ cast: [] }) } as Response), 10),
+        setTimeout(
+          () =>
+            resolve({ ok: true, json: async () => ({ cast: [] }) } as Response),
+          10,
+        ),
       );
     });
 
     renderWithQuery(<CastTab contentType="tv" contentId={123} />, client);
     expect(screen.getByText(/Loading cast/i)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/No cast information/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/No cast information/i)).toBeInTheDocument(),
+    );
   });
 
   it("renders cast entries with names and characters", async () => {
@@ -61,8 +69,18 @@ describe("CastTab", () => {
       ok: true,
       json: async () => ({
         cast: [
-          { id: 1, name: "Alice Actor", character: "Hero", profile_path: "/a.jpg" },
-          { id: 2, name: "Bob Player", character: "Villain", profile_path: null },
+          {
+            id: 1,
+            name: "Alice Actor",
+            character: "Hero",
+            profile_path: "/a.jpg",
+          },
+          {
+            id: 2,
+            name: "Bob Player",
+            character: "Villain",
+            profile_path: null,
+          },
         ],
       }),
     } as Response);
@@ -117,4 +135,3 @@ describe("CastTab", () => {
     expect(screen.queryByText("Person 1")).not.toBeInTheDocument();
   });
 });
-

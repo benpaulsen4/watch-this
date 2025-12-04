@@ -36,7 +36,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || typeof tmdbId !== "number") {
       return NextResponse.json(
         { error: "tmdbId is required and must be a number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (
@@ -48,7 +48,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     ) {
       return NextResponse.json(
         { error: "dayOfWeek is required and must be a number between 0-6" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -59,7 +59,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
           error:
             "TV show not found in your library. Add it to your library first.",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
     if (result === "invalidStatus") {
@@ -68,13 +68,13 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
           error:
             "Cannot schedule completed or dropped shows. Only shows that are planning, watching, or paused can be scheduled.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (result === "duplicate") {
       return NextResponse.json(
         { error: "Show is already scheduled for this day" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -94,7 +94,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbIdParam) {
       return NextResponse.json(
         { error: "tmdbId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -105,7 +105,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "notFound") {
       return NextResponse.json(
         { error: "Schedule not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 

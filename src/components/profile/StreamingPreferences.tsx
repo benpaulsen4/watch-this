@@ -66,7 +66,7 @@ export function StreamingPreferences() {
     const providers = providersQuery.data || [];
     if (!providers.length) return [];
     return providers.filter((provider) =>
-      provider.provider_name.toLowerCase().includes(searchTerm.toLowerCase())
+      provider.provider_name.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [providersQuery.data, searchTerm]);
 
@@ -126,7 +126,7 @@ export function StreamingPreferences() {
 
   const selectedCount = useMemo(
     () => Object.values(selected).filter(Boolean).length,
-    [selected]
+    [selected],
   );
 
   const savePreferences = useMutation({
@@ -282,7 +282,7 @@ export function StreamingPreferences() {
                   Showing {(currentPage - 1) * PROVIDERS_PER_PAGE + 1} to{" "}
                   {Math.min(
                     currentPage * PROVIDERS_PER_PAGE,
-                    filteredProviders.length
+                    filteredProviders.length,
                   )}{" "}
                   of {filteredProviders.length} providers
                 </div>

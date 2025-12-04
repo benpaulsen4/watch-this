@@ -39,14 +39,14 @@ describe("useInfiniteScroll", () => {
     unobserveMock = vi.fn();
     disconnectMock = vi.fn();
     capturedCallback = undefined as unknown as (
-      entries: IntersectionObserverEntry[]
+      entries: IntersectionObserverEntry[],
     ) => void;
     capturedOptions = undefined;
 
     IOConstructorMock = vi.fn(
       (
         cb: (entries: IntersectionObserverEntry[]) => void,
-        options?: IntersectionObserverInit
+        options?: IntersectionObserverInit,
       ) => {
         capturedCallback = cb;
         capturedOptions = options;
@@ -55,7 +55,7 @@ describe("useInfiniteScroll", () => {
           unobserve: unobserveMock,
           disconnect: disconnectMock,
         } as unknown as IntersectionObserver;
-      }
+      },
     );
 
     window.IntersectionObserver =
@@ -71,7 +71,7 @@ describe("useInfiniteScroll", () => {
         loading={false}
         threshold={200}
         debounceMs={40}
-      />
+      />,
     );
 
     const sentinel = screen.getByTestId("sentinel");
@@ -97,7 +97,7 @@ describe("useInfiniteScroll", () => {
         loading={false}
         threshold={100}
         debounceMs={40}
-      />
+      />,
     );
 
     // Simulate intersection
@@ -117,7 +117,7 @@ describe("useInfiniteScroll", () => {
         loading={true}
         threshold={100}
         debounceMs={40}
-      />
+      />,
     );
 
     capturedCallback([
@@ -135,7 +135,7 @@ describe("useInfiniteScroll", () => {
         loading={false}
         threshold={100}
         debounceMs={40}
-      />
+      />,
     );
 
     capturedCallback([
@@ -155,7 +155,7 @@ describe("useInfiniteScroll", () => {
         loading={false}
         threshold={100}
         debounceMs={50}
-      />
+      />,
     );
 
     // First intersection at t=100ms (meets initial debounce threshold)

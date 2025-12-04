@@ -88,7 +88,7 @@ vi.mock("../tmdb/client", () => {
         async (_id: number, _s: number, _e: number) => ({
           name: "Ep",
           air_date: "2024-01-01",
-        })
+        }),
       ),
     },
   };
@@ -177,7 +177,7 @@ describe("episodes service", () => {
 
   it("markNextEpisodeWatched returns notFound when show missing", async () => {
     (tmdbClient.getTVShowDetails as any).mockRejectedValueOnce(
-      new Error("404")
+      new Error("404"),
     );
     const result = await markNextEpisodeWatched(userId, 50);
     expect(result).toBe("notFound");
@@ -196,7 +196,7 @@ describe("episodes service", () => {
   it("markNextEpisodeWatched returns noNextEpisode when episode details missing", async () => {
     (db as any).__setMockResults([[]]);
     (tmdbClient.getTVEpisodeDetails as any).mockRejectedValueOnce(
-      new Error("404")
+      new Error("404"),
     );
     const result = await markNextEpisodeWatched(userId, 7);
     expect(result).toBe("noNextEpisode");

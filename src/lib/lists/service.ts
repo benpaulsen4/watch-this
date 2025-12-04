@@ -65,7 +65,7 @@ export async function listLists(userId: string): Promise<ListResponse[]> {
       lists.isPublic,
       lists.ownerId,
       lists.createdAt,
-      lists.updatedAt
+      lists.updatedAt,
     );
 
   // Get poster URLs for each list (up to 4 items)
@@ -77,7 +77,7 @@ export async function listLists(userId: string): Promise<ListResponse[]> {
         })
         .from(listItems)
         .where(
-          and(eq(listItems.listId, list.id), isNotNull(listItems.posterPath))
+          and(eq(listItems.listId, list.id), isNotNull(listItems.posterPath)),
         )
         .orderBy(desc(listItems.createdAt))
         .limit(4);
@@ -86,13 +86,13 @@ export async function listLists(userId: string): Promise<ListResponse[]> {
         ...list,
         posterPaths: posterItems.map((i) => i.posterPath!),
       };
-    })
+    }),
   );
 }
 
 export async function getList(
   userId: string,
-  listId: string
+  listId: string,
 ): Promise<GetListResponse | "notFound"> {
   try {
     // Check if user has access to this list (owner or collaborator)
@@ -119,9 +119,9 @@ export async function getList(
           or(
             eq(lists.ownerId, userId),
             eq(listCollaborators.userId, userId),
-            eq(lists.isPublic, true)
-          )
-        )
+            eq(lists.isPublic, true),
+          ),
+        ),
       )
       .limit(1);
 
@@ -161,11 +161,13 @@ export async function getList(
           listItemId: item.id,
           createdAt: item.createdAt.toISOString(),
         } as unknown as ListItem;
-      })
+      }),
     );
 
     const enrichedItems = (await Promise.all(
-      tmdbItems.map(async (item) => await enrichWithContentStatus(item, userId))
+      tmdbItems.map(
+        async (item) => await enrichWithContentStatus(item, userId),
+      ),
     )) as ListItem[];
 
     return {
@@ -185,7 +187,7 @@ export async function getList(
 
 export async function createList(
   userId: string,
-  input: CreateListInput
+  input: CreateListInput,
 ): Promise<ListResponse> {
   const [newList] = await db
     .insert(lists)
@@ -234,7 +236,7 @@ export async function createList(
 export async function updateList(
   userId: string,
   listId: string,
-  input: UpdateListInput
+  input: UpdateListInput,
 ): Promise<ListResponse | "notFound" | "forbidden"> {
   const [existing] = await db
     .select({ ownerId: lists.ownerId })
@@ -308,7 +310,7 @@ export async function updateList(
 
 export async function deleteList(
   userId: string,
-  listId: string
+  listId: string,
 ): Promise<DeleteResponse | "notFound" | "forbidden"> {
   const [existing] = await db
     .select({
@@ -339,7 +341,7 @@ export async function deleteList(
 export async function createListItem(
   userId: string,
   listId: string,
-  input: CreateListItemInput
+  input: CreateListItemInput,
 ): Promise<ListItemResponse | "notFound" | "conflict" | "invalidType"> {
   const [listData] = await db
     .select({
@@ -352,8 +354,8 @@ export async function createListItem(
     .where(
       and(
         eq(lists.id, listId),
-        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-      )
+        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+      ),
     )
     .limit(1);
   if (!listData) return "notFound";
@@ -375,8 +377,8 @@ export async function createListItem(
       and(
         eq(listItems.listId, listId),
         eq(listItems.tmdbId, input.tmdbId),
-        eq(listItems.contentType, input.contentType)
-      )
+        eq(listItems.contentType, input.contentType),
+      ),
     )
     .limit(1);
   if (existingItem) return "conflict";
@@ -425,7 +427,7 @@ export async function createListItem(
 export async function deleteListItem(
   userId: string,
   listId: string,
-  itemId: string
+  itemId: string,
 ): Promise<DeleteResponse | "notFound"> {
   const [listData] = await db
     .select({ ownerId: lists.ownerId })
@@ -434,8 +436,8 @@ export async function deleteListItem(
     .where(
       and(
         eq(lists.id, listId),
-        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-      )
+        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+      ),
     )
     .limit(1);
   if (!listData) return "notFound";
@@ -477,7 +479,7 @@ export async function deleteListItem(
 
 export async function listListCollaborators(
   userId: string,
-  listId: string
+  listId: string,
 ): Promise<ListCollaboratorsResponse | "notFound" | "forbidden"> {
   const [listData] = await db
     .select({ id: lists.id, ownerId: lists.ownerId })
@@ -515,7 +517,7 @@ export async function listListCollaborators(
 export async function createListCollaborator(
   userId: string,
   listId: string,
-  input: CreateCollaboratorInput
+  input: CreateCollaboratorInput,
 ): Promise<
   | UpdateCollaboratorsResponse
   | "notFound"
@@ -549,8 +551,8 @@ export async function createListCollaborator(
     .where(
       and(
         eq(listCollaborators.listId, listId),
-        eq(listCollaborators.userId, targetUser.id)
-      )
+        eq(listCollaborators.userId, targetUser.id),
+      ),
     )
     .limit(1);
   if (existingCollaborator) return "conflict";
@@ -598,7 +600,7 @@ export async function updateListCollaborator(
   userId: string,
   listId: string,
   collaboratorUserId: string,
-  input: UpdateCollaboratorInput
+  input: UpdateCollaboratorInput,
 ): Promise<UpdateCollaboratorsResponse | "notFound" | "forbidden"> {
   const [existingList] = await db
     .select({ ownerId: lists.ownerId, name: lists.name })
@@ -614,8 +616,8 @@ export async function updateListCollaborator(
     .where(
       and(
         eq(listCollaborators.listId, listId),
-        eq(listCollaborators.userId, collaboratorUserId)
-      )
+        eq(listCollaborators.userId, collaboratorUserId),
+      ),
     )
     .limit(1);
   if (!existingCollaborator) return "notFound";
@@ -648,7 +650,7 @@ export async function updateListCollaborator(
 export async function deleteListCollaborator(
   userId: string,
   listId: string,
-  collaboratorUserId: string
+  collaboratorUserId: string,
 ): Promise<DeleteResponse | "notFound" | "forbidden"> {
   const [existingList] = await db
     .select({ ownerId: lists.ownerId, name: lists.name })
@@ -664,8 +666,8 @@ export async function deleteListCollaborator(
     .where(
       and(
         eq(listCollaborators.listId, listId),
-        eq(listCollaborators.userId, collaboratorUserId)
-      )
+        eq(listCollaborators.userId, collaboratorUserId),
+      ),
     )
     .limit(1);
   if (!existingCollaborator) return "notFound";

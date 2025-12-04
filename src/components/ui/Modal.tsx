@@ -31,7 +31,7 @@ const modalVariants = cva(
       variant: "default",
       size: "lg",
     },
-  }
+  },
 );
 
 export interface ModalProps {

@@ -12,7 +12,7 @@ vi.mock("date-fns", () => ({
 const baseUser = { id: "u1", username: "alice", profilePictureUrl: null };
 
 function makeActivity(
-  overrides: Partial<ActivityItem> & { activityType: string }
+  overrides: Partial<ActivityItem> & { activityType: string },
 ): ActivityItem {
   return {
     id: "a1",
@@ -37,7 +37,7 @@ describe("ActivityEntry", () => {
     render(<ActivityEntry activity={activity} currentUsername={"bob"} />);
     expect(screen.getByText(/Star Wars/)).toBeInTheDocument();
     expect(
-      screen.getByText(/marked "Star Wars" as watched/)
+      screen.getByText(/marked "Star Wars" as watched/),
     ).toBeInTheDocument();
     expect(screen.getByText("just now")).toBeInTheDocument();
   });
@@ -68,7 +68,7 @@ describe("ActivityEntry", () => {
     });
     render(<ActivityEntry activity={activity} currentUsername={"bob"} />);
     expect(
-      screen.getByText(/marked not watched S3E7 of "The Show"/)
+      screen.getByText(/marked not watched S3E7 of "The Show"/),
     ).toBeInTheDocument();
   });
 
@@ -118,7 +118,7 @@ describe("ActivityEntry", () => {
     });
     render(<ActivityEntry activity={activity} currentUsername={"alice"} />);
     expect(
-      screen.getByText(/You, bob, charlie, and 2 others/)
+      screen.getByText(/You, bob, charlie, and 2 others/),
     ).toBeInTheDocument();
   });
 
@@ -135,8 +135,8 @@ describe("ActivityEntry", () => {
     render(<ActivityEntry activity={activity} currentUsername={"bob"} />);
     expect(
       screen.getByText(
-        /imported 2 lists, 1 content status, 3 episode statuses \(1 error\)/
-      )
+        /imported 2 lists, 1 content status, 3 episode statuses \(1 error\)/,
+      ),
     ).toBeInTheDocument();
   });
 });

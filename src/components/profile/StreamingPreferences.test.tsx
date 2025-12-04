@@ -131,7 +131,7 @@ function renderWithProviders(queryClient: QueryClient) {
   return render(
     <QueryClientProvider client={queryClient}>
       <StreamingPreferences />
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -160,8 +160,8 @@ describe("StreamingPreferences", () => {
     // Prompt message
     expect(
       await screen.findByText(
-        /Please select a country to view available streaming providers/i
-      )
+        /Please select a country to view available streaming providers/i,
+      ),
     ).toBeInTheDocument();
 
     fetchMock.mockRestore();
@@ -202,7 +202,7 @@ describe("StreamingPreferences", () => {
 
     // Search input should appear when providers exist
     expect(
-      screen.getByPlaceholderText(/Search providers/i)
+      screen.getByPlaceholderText(/Search providers/i),
     ).toBeInTheDocument();
 
     // Provider buttons present
@@ -289,7 +289,7 @@ describe("StreamingPreferences", () => {
 
     // Click save
     await userEvent.click(
-      screen.getByRole("button", { name: /Save Preferences/i })
+      screen.getByRole("button", { name: /Save Preferences/i }),
     );
 
     // Ensure POST was called with correct payload
@@ -297,7 +297,7 @@ describe("StreamingPreferences", () => {
       const postCall = fetchSpy.mock.calls.find(
         ([url, init]) =>
           String(url).includes("/api/profile/streaming") &&
-          init?.method === "POST"
+          init?.method === "POST",
       );
       expect(postCall).toBeTruthy();
       const [, init] = postCall!;
@@ -316,7 +316,7 @@ describe("StreamingPreferences", () => {
             providerName: "Amazon Prime",
             logoPath: "/prime.png",
           },
-        ])
+        ]),
       );
     });
 
@@ -347,12 +347,12 @@ describe("StreamingPreferences", () => {
     renderWithProviders(qc);
 
     await userEvent.click(
-      screen.getByRole("button", { name: /Save Preferences/i })
+      screen.getByRole("button", { name: /Save Preferences/i }),
     );
 
     // Error message should be shown
     expect(
-      await screen.findByText(/Please select a country before saving/i)
+      await screen.findByText(/Please select a country before saving/i),
     ).toBeInTheDocument();
 
     fetchMock.mockRestore();
@@ -371,7 +371,7 @@ describe("StreamingPreferences", () => {
 
     // Region is preselected from preferences (US)
     expect(
-      await screen.findByText(/No providers available for US/i)
+      await screen.findByText(/No providers available for US/i),
     ).toBeInTheDocument();
 
     fetchMock.mockRestore();
@@ -397,7 +397,7 @@ describe("StreamingPreferences", () => {
     await userEvent.type(search, "zzz");
 
     expect(
-      await screen.findByText(/No providers found matching "zzz"\./i)
+      await screen.findByText(/No providers found matching "zzz"\./i),
     ).toBeInTheDocument();
 
     fetchMock.mockRestore();
@@ -424,7 +424,7 @@ describe("StreamingPreferences", () => {
     // Page 1 of 2 and range 1..20
     expect(await screen.findByText(/Page 1 of 2/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Showing 1 to 20 of 25 providers/i)
+      screen.getByText(/Showing 1 to 20 of 25 providers/i),
     ).toBeInTheDocument();
 
     // Go to next page
@@ -433,7 +433,7 @@ describe("StreamingPreferences", () => {
 
     expect(screen.getByText(/Page 2 of 2/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Showing 21 to 25 of 25 providers/i)
+      screen.getByText(/Showing 21 to 25 of 25 providers/i),
     ).toBeInTheDocument();
 
     // Prev goes back

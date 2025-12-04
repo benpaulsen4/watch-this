@@ -21,7 +21,7 @@ function createQueryClient() {
 function renderWithProviders(ui: React.ReactElement) {
   const client = createQueryClient();
   return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
   );
 }
 
@@ -53,17 +53,17 @@ describe("DataExportImport", () => {
   it("renders export and import sections", () => {
     renderWithProviders(<DataExportImport />);
     expect(
-      screen.getByRole("heading", { name: /export data/i })
+      screen.getByRole("heading", { name: /export data/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /import data/i })
+      screen.getByRole("heading", { name: /import data/i }),
     ).toBeInTheDocument();
     expect(screen.getByText(/important notes/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /export as json/i })
+      screen.getByRole("button", { name: /export as json/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /export as zip \(csv files\)/i })
+      screen.getByRole("button", { name: /export as zip \(csv files\)/i }),
     ).toBeInTheDocument();
   });
 
@@ -76,7 +76,7 @@ describe("DataExportImport", () => {
           filename: "export.json",
           isZip: false,
         }),
-      }
+      },
     );
 
     renderWithProviders(<DataExportImport />);
@@ -85,7 +85,7 @@ describe("DataExportImport", () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        "/api/profile/export?format=json"
+        "/api/profile/export?format=json",
       );
       expect(window.URL.createObjectURL).toHaveBeenCalled();
     });
@@ -101,17 +101,17 @@ describe("DataExportImport", () => {
           filename: "export.zip",
           isZip: true,
         }),
-      }
+      },
     );
 
     renderWithProviders(<DataExportImport />);
     fireEvent.click(
-      screen.getByRole("button", { name: /export as zip \(csv files\)/i })
+      screen.getByRole("button", { name: /export as zip \(csv files\)/i }),
     );
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        "/api/profile/export?format=csv"
+        "/api/profile/export?format=csv",
       );
       expect(window.URL.createObjectURL).toHaveBeenCalled();
     });
@@ -126,7 +126,7 @@ describe("DataExportImport", () => {
     const badFile = new File(["oops"], "data.csv", { type: "text/csv" });
     fireEvent.change(input, { target: { files: [badFile] } });
     expect(global.alert).toHaveBeenCalledWith(
-      "Only JSON files are supported for import."
+      "Only JSON files are supported for import.",
     );
 
     // Valid file
@@ -137,7 +137,7 @@ describe("DataExportImport", () => {
 
     expect(screen.getByText(/data\.json/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /import data/i })
+      screen.getByRole("button", { name: /import data/i }),
     ).toBeInTheDocument();
   });
 
@@ -153,7 +153,7 @@ describe("DataExportImport", () => {
           imported: { lists: 2, contentStatus: 3, episodeStatus: 4 },
           errors: [],
         }),
-      }
+      },
     );
 
     const input = document.getElementById("import-file") as HTMLInputElement;
@@ -167,7 +167,7 @@ describe("DataExportImport", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/profile/import",
-        expect.objectContaining({ method: "POST" })
+        expect.objectContaining({ method: "POST" }),
       );
       expect(screen.getByText(/import completed/i)).toBeInTheDocument();
       expect(screen.getByText(/2 list\(s\)/i)).toBeInTheDocument();
@@ -180,7 +180,7 @@ describe("DataExportImport", () => {
 
   it("shows error on failed import", async () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      { ok: false, json: async () => ({ error: "Failed to import data" }) }
+      { ok: false, json: async () => ({ error: "Failed to import data" }) },
     );
 
     renderWithProviders(<DataExportImport />);
@@ -194,7 +194,7 @@ describe("DataExportImport", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: /import failed/i })
+        screen.getByRole("heading", { name: /import failed/i }),
       ).toBeInTheDocument();
       expect(screen.getByText(/failed to import data/i)).toBeInTheDocument();
     });

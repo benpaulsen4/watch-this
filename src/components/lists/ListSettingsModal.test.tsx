@@ -8,7 +8,9 @@ function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: 0, refetchOnWindowFocus: false } },
   });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
 }
 
 const baseList = {
@@ -60,7 +62,11 @@ describe("ListSettingsModal", () => {
     const onClose = vi.fn();
 
     vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
-      if (typeof input === "string" && input.includes("/api/lists/") && init?.method === "PUT") {
+      if (
+        typeof input === "string" &&
+        input.includes("/api/lists/") &&
+        init?.method === "PUT"
+      ) {
         return {
           ok: true,
           json: async () => ({ ...baseList, name: "Updated" }),
@@ -86,7 +92,9 @@ describe("ListSettingsModal", () => {
     await user.click(screen.getByRole("button", { name: /Save Changes/i }));
 
     expect(await screen.findByText(/My List|Updated/i)).toBeInTheDocument();
-    expect(onListUpdate).toHaveBeenCalledWith(expect.objectContaining({ name: "Updated" }));
+    expect(onListUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Updated" }),
+    );
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -95,7 +103,11 @@ describe("ListSettingsModal", () => {
     const onListDelete = vi.fn();
 
     vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
-      if (typeof input === "string" && input.includes("/api/lists/") && init?.method === "DELETE") {
+      if (
+        typeof input === "string" &&
+        input.includes("/api/lists/") &&
+        init?.method === "DELETE"
+      ) {
         return { ok: true, json: async () => ({}) } as any;
       }
       return { ok: true, json: async () => ({}) } as any;
@@ -123,7 +135,11 @@ describe("ListSettingsModal", () => {
     const onListCreate = vi.fn();
 
     vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
-      if (typeof input === "string" && input.includes("/api/lists") && init?.method === "POST") {
+      if (
+        typeof input === "string" &&
+        input.includes("/api/lists") &&
+        init?.method === "POST"
+      ) {
         return {
           ok: true,
           json: async () => ({
@@ -147,7 +163,13 @@ describe("ListSettingsModal", () => {
     });
 
     renderWithClient(
-      <ListSettingsModal isOpen onClose={() => {}} mode="create" isOwner onListCreate={onListCreate} />,
+      <ListSettingsModal
+        isOpen
+        onClose={() => {}}
+        mode="create"
+        isOwner
+        onListCreate={onListCreate}
+      />,
     );
 
     // Fill name

@@ -23,7 +23,7 @@ function AuthPageContent() {
   const { refreshSession } = useAuth();
   const searchParams = useSearchParams();
   const redirectTo = decodeURIComponent(
-    searchParams.get("redirect") || "/dashboard"
+    searchParams.get("redirect") || "/dashboard",
   );
 
   const [mode, setMode] = useState<AuthMode>("signin");

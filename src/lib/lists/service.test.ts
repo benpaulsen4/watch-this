@@ -180,13 +180,18 @@ describe("lists service", () => {
   });
 
   it("deleteList returns forbidden for non-owner", async () => {
-    (db as any).__setMockResults([[{ ownerId: "other", name: "N", listType: "mixed" }]]);
+    (db as any).__setMockResults([
+      [{ ownerId: "other", name: "N", listType: "mixed" }],
+    ]);
     const result = await deleteList(userId, "list-3");
     expect(result).toBe("forbidden");
   });
 
   it("deleteList returns success for owner", async () => {
-    (db as any).__setMockResults([[{ ownerId: userId, name: "N", listType: "mixed" }], undefined]);
+    (db as any).__setMockResults([
+      [{ ownerId: userId, name: "N", listType: "mixed" }],
+      undefined,
+    ]);
     const result = await deleteList(userId, "list-3");
     if (typeof result === "string") throw new Error("unexpected error");
     expect(result.message).toMatch(/deleted successfully/i);
@@ -354,7 +359,9 @@ describe("lists service", () => {
 
     const inserts = (db as any).__getInsertCalls();
     const activity = inserts.find((c: any) => c.table === activityFeed);
-    expect(activity.payload.activityType).toBe(ActivityType.COLLABORATOR_REMOVED);
+    expect(activity.payload.activityType).toBe(
+      ActivityType.COLLABORATOR_REMOVED,
+    );
     expect(activity.payload.listId).toBe("list-9");
     expect(activity.payload.metadata.collaboratorUsername).toBe("carol");
   });

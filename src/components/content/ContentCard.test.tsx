@@ -30,7 +30,9 @@ function setupQueryClient() {
 
 function renderWithQuery(ui: React.ReactElement, client?: QueryClient) {
   const queryClient = client ?? setupQueryClient();
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe("ContentCard", () => {
@@ -48,16 +50,26 @@ describe("ContentCard", () => {
           ok: true,
           json: async () => ({
             newStatus: "watching",
-            episodeDetails: { seasonNumber: 1, episodeNumber: 1, name: "Pilot" },
+            episodeDetails: {
+              seasonNumber: 1,
+              episodeNumber: 1,
+              name: "Pilot",
+            },
           }),
         } as Response;
       }
       if (url.startsWith("/api/tmdb/details")) {
         // minimal details to satisfy modal
-        return { ok: true, json: async () => ({ runtime: 120, genres: [] }) } as Response;
+        return {
+          ok: true,
+          json: async () => ({ runtime: 120, genres: [] }),
+        } as Response;
       }
       if (url.startsWith("/api/watch/content")) {
-        return { ok: true, json: async () => ({ providers: null }) } as Response;
+        return {
+          ok: true,
+          json: async () => ({ providers: null }),
+        } as Response;
       }
       return { ok: true, json: async () => ({}) } as Response;
     }) as any;
@@ -141,7 +153,9 @@ describe("ContentCard", () => {
     renderWithQuery(<ContentCard content={tv} />);
     await user.click(screen.getByRole("heading", { name: /Show/i }));
     // Modal shows Overview tab heading
-    expect(await screen.findByRole("tab", { name: /Overview/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("tab", { name: /Overview/i }),
+    ).toBeInTheDocument();
   });
 
   it("double click triggers quick-complete overlay and updates status", async () => {
@@ -167,7 +181,9 @@ describe("ContentCard", () => {
     const cardTitle = screen.getByText(/Complete Movie/i);
     await user.dblClick(cardTitle);
     // Overlay message appears
-    expect(await screen.findByText(/Movie marked as watched!/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Movie marked as watched!/i),
+    ).toBeInTheDocument();
     // Status badge should reflect Completed
     expect(screen.getByText(/Completed/i)).toBeInTheDocument();
     // Overlay disappears after timeout

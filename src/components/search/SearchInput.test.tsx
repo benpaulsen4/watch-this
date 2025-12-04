@@ -4,11 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { SearchInput } from "./SearchInput";
 
 describe("SearchInput", () => {
-
   it("renders with placeholder and no clear button initially", () => {
     render(<SearchInput />);
     expect(
-      screen.getByPlaceholderText(/Search movies and TV shows/i)
+      screen.getByPlaceholderText(/Search movies and TV shows/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
@@ -43,15 +42,13 @@ describe("SearchInput", () => {
     render(<SearchInput loading />);
     expect(
       document.querySelector(
-        ".animate-spin.rounded-full.border-2.border-gray-600.border-t-red-500"
-      )
+        ".animate-spin.rounded-full.border-2.border-gray-600.border-t-red-500",
+      ),
     ).toBeTruthy();
   });
 
   it("uses defaultValue for initial state and cleans up timers on unmount", async () => {
-    const { unmount } = render(
-      <SearchInput defaultValue="Init" />
-    );
+    const { unmount } = render(<SearchInput defaultValue="Init" />);
     const input = screen.getByPlaceholderText(/Search movies and TV shows/i);
     expect((input as HTMLInputElement).value).toBe("Init");
     unmount();

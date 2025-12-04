@@ -19,13 +19,17 @@ describe("StatusSegmentedSelector", () => {
       screen.getByRole("radio", { name: "Planning status: Planning to watch" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: "Watching status: Currently watching" }),
+      screen.getByRole("radio", {
+        name: "Watching status: Currently watching",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("radio", { name: "Paused status: Temporarily paused" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: "Completed status: Finished watching" }),
+      screen.getByRole("radio", {
+        name: "Completed status: Finished watching",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("radio", { name: "Dropped status: Stopped watching" }),
@@ -79,7 +83,9 @@ describe("StatusSegmentedSelector", () => {
       />,
     );
     await user.click(
-      screen.getByRole("radio", { name: "Watching status: Currently watching" }),
+      screen.getByRole("radio", {
+        name: "Watching status: Currently watching",
+      }),
     );
     expect(onChange).not.toHaveBeenCalled();
   });

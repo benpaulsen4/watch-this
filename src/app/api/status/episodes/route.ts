@@ -24,7 +24,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId) {
       return NextResponse.json(
         { error: "tmdbId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -32,7 +32,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       userId,
       parseInt(tmdbId),
       seasonNumber ? parseInt(seasonNumber) : undefined,
-      episodeNumber ? parseInt(episodeNumber) : undefined
+      episodeNumber ? parseInt(episodeNumber) : undefined,
     );
     return NextResponse.json(result);
   } catch (error) {
@@ -51,21 +51,21 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || seasonNumber === undefined || episodeNumber === undefined) {
       return NextResponse.json(
         { error: "tmdbId, seasonNumber, and episodeNumber are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (typeof seasonNumber !== "number" || typeof episodeNumber !== "number") {
       return NextResponse.json(
         { error: "seasonNumber and episodeNumber must be numbers" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (seasonNumber < 0 || episodeNumber < 1) {
       return NextResponse.json(
         { error: "Invalid season or episode number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -92,21 +92,21 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !Array.isArray(episodes)) {
       return NextResponse.json(
         { error: "tmdbId and episodes array are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (episodes.length === 0) {
       return NextResponse.json(
         { error: "Episodes array cannot be empty" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (episodes.length > 100) {
       return NextResponse.json(
         { error: "Cannot update more than 100 episodes at once" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -122,7 +122,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
             error:
               "Each episode must have seasonNumber, episodeNumber, and watched properties",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -130,7 +130,7 @@ export const PUT = withAuth(async (request: AuthenticatedRequest) => {
     const result = await batchUpdateEpisodeStatuses(
       userId,
       tmdbId,
-      episodes as BatchUpdateEpisodesInputItem[]
+      episodes as BatchUpdateEpisodesInputItem[],
     );
     return NextResponse.json(result);
   } catch (error) {
@@ -150,7 +150,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId) {
       return NextResponse.json(
         { error: "tmdbId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -158,7 +158,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       userId,
       parseInt(tmdbId),
       seasonNumber ? parseInt(seasonNumber) : undefined,
-      episodeNumber ? parseInt(episodeNumber) : undefined
+      episodeNumber ? parseInt(episodeNumber) : undefined,
     );
     return NextResponse.json({
       message: `Removed ${deletedCount} episode status(es) successfully`,

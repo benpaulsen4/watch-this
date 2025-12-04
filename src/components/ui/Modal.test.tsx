@@ -8,7 +8,7 @@ describe("Modal", () => {
     render(
       <Modal isOpen onClose={() => {}} title="Hello" subtitle="World">
         <div>Content</div>
-      </Modal>
+      </Modal>,
     );
     expect(screen.getByText("Hello")).toBeInTheDocument();
     expect(screen.getByText("World")).toBeInTheDocument();
@@ -21,7 +21,7 @@ describe("Modal", () => {
     render(
       <Modal isOpen onClose={onClose} title="Close me">
         Content
-      </Modal>
+      </Modal>,
     );
     const buttons = screen.getAllByRole("button");
     // Click the visible close button (second one)
@@ -33,7 +33,7 @@ describe("Modal", () => {
     render(
       <Modal isOpen={false} onClose={() => {}}>
         Content
-      </Modal>
+      </Modal>,
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

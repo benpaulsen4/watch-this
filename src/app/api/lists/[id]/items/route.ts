@@ -16,7 +16,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!listId) {
       return NextResponse.json(
         { error: "List ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -26,14 +26,14 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (!tmdbId || !contentType || !title) {
       return NextResponse.json(
         { error: "tmdbId, contentType, and title are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!["movie", "tv"].includes(contentType)) {
       return NextResponse.json(
         { error: 'contentType must be either "movie" or "tv"' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const result = await createListItem(userId, listId, {
@@ -45,19 +45,19 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     if (result === "notFound") {
       return NextResponse.json(
         { error: "List not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     if (result === "invalidType") {
       return NextResponse.json(
         { error: "Invalid content type for list" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (result === "conflict") {
       return NextResponse.json(
         { error: "This item is already in the list" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -66,7 +66,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Error adding item to list:", error);
     return NextResponse.json(
       { error: "Failed to add item to list" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

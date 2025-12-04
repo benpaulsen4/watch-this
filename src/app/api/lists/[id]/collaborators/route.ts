@@ -4,7 +4,10 @@ import { lists, listCollaborators, users } from "@/lib/db/schema";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 import { eq, and } from "drizzle-orm";
 import { PermissionLevel } from "@/lib/db/schema";
-import { listListCollaborators, createListCollaborator } from "@/lib/lists/service";
+import {
+  listListCollaborators,
+  createListCollaborator,
+} from "@/lib/lists/service";
 import { CreateCollaboratorInput } from "@/lib/lists/types";
 
 // GET /api/lists/[id]/collaborators - Get all collaborators for a list
@@ -24,10 +27,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     const result = await listListCollaborators(userId, listId);
     if (result === "notFound") {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "List not found" }, { status: 404 });
     }
     if (result === "forbidden") {
       return NextResponse.json(
@@ -78,7 +78,10 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    const result = await createListCollaborator(userId, listId, { username, permissionLevel });
+    const result = await createListCollaborator(userId, listId, {
+      username,
+      permissionLevel,
+    });
     if (result === "notFound") {
       return NextResponse.json({ error: "List not found" }, { status: 404 });
     }
@@ -89,7 +92,10 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
     if (result === "invalidUser") {
-      return NextResponse.json({ error: "Invalid target user" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid target user" },
+        { status: 400 },
+      );
     }
     if (result === "conflict") {
       return NextResponse.json(

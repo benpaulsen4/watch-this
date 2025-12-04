@@ -9,7 +9,9 @@ function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: 0, refetchOnWindowFocus: false } },
   });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
 }
 
 const listId = "l1";
@@ -18,20 +20,41 @@ describe("CollaborationModal", () => {
   beforeEach(() => {
     vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
       const url = typeof input === "string" ? input : String(input);
-      if (url.endsWith(`/api/lists/${listId}/collaborators`) && (!init || init.method === "GET")) {
+      if (
+        url.endsWith(`/api/lists/${listId}/collaborators`) &&
+        (!init || init.method === "GET")
+      ) {
         return {
           ok: true,
           json: async () => ({ collaborators: [] }),
         } as any;
       }
-      if (url.endsWith(`/api/lists/${listId}/collaborators`) && init?.method === "POST") {
-        return { ok: true, json: async () => ({ message: "Collaborator added" }) } as any;
+      if (
+        url.endsWith(`/api/lists/${listId}/collaborators`) &&
+        init?.method === "POST"
+      ) {
+        return {
+          ok: true,
+          json: async () => ({ message: "Collaborator added" }),
+        } as any;
       }
-      if (url.includes(`/api/lists/${listId}/collaborators/`) && init?.method === "DELETE") {
-        return { ok: true, json: async () => ({ message: "Collaborator removed" }) } as any;
+      if (
+        url.includes(`/api/lists/${listId}/collaborators/`) &&
+        init?.method === "DELETE"
+      ) {
+        return {
+          ok: true,
+          json: async () => ({ message: "Collaborator removed" }),
+        } as any;
       }
-      if (url.includes(`/api/lists/${listId}/collaborators/`) && init?.method === "PUT") {
-        return { ok: true, json: async () => ({ message: "Permission updated" }) } as any;
+      if (
+        url.includes(`/api/lists/${listId}/collaborators/`) &&
+        init?.method === "PUT"
+      ) {
+        return {
+          ok: true,
+          json: async () => ({ message: "Permission updated" }),
+        } as any;
       }
       return { ok: true, json: async () => ({}) } as any;
     });
@@ -84,7 +107,10 @@ describe("CollaborationModal", () => {
     // Return one collaborator on GET
     vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
       const url = typeof input === "string" ? input : String(input);
-      if (url.endsWith(`/api/lists/${listId}/collaborators`) && (!init || init.method === "GET")) {
+      if (
+        url.endsWith(`/api/lists/${listId}/collaborators`) &&
+        (!init || init.method === "GET")
+      ) {
         return {
           ok: true,
           json: async () => ({
@@ -101,8 +127,14 @@ describe("CollaborationModal", () => {
           }),
         } as any;
       }
-      if (url.includes(`/api/lists/${listId}/collaborators/`) && init?.method === "DELETE") {
-        return { ok: true, json: async () => ({ message: "Collaborator removed" }) } as any;
+      if (
+        url.includes(`/api/lists/${listId}/collaborators/`) &&
+        init?.method === "DELETE"
+      ) {
+        return {
+          ok: true,
+          json: async () => ({ message: "Collaborator removed" }),
+        } as any;
       }
       return { ok: true, json: async () => ({}) } as any;
     });
@@ -122,9 +154,13 @@ describe("CollaborationModal", () => {
     );
 
     // Click the single remove collaborator button
-    const removeBtn = await screen.findByRole("button", { name: /Remove collaborator/i });
+    const removeBtn = await screen.findByRole("button", {
+      name: /Remove collaborator/i,
+    });
     await user.click(removeBtn);
-    expect(await screen.findByText(/Collaborator removed/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Collaborator removed/i),
+    ).toBeInTheDocument();
   });
   // Permission update flow is covered at the UI component level in Dropdown tests.
 });

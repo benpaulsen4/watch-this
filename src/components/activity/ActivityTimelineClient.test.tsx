@@ -10,7 +10,9 @@ vi.mock("../providers/AuthProvider", () => ({
 
 // Avoid IntersectionObserver by mocking the hook
 vi.mock("@/hooks/useInfiniteScroll", () => ({
-  useInfiniteScroll: () => ({ targetRef: { current: document.createElement("div") } }),
+  useInfiniteScroll: () => ({
+    targetRef: { current: document.createElement("div") },
+  }),
 }));
 
 function renderWithClient(ui: React.ReactElement) {
@@ -32,9 +34,7 @@ describe("ActivityTimelineClient", () => {
     global.fetch = vi.fn(() => new Promise(() => {}));
     const { ActivityTimelineClient } = await import("./ActivityTimelineClient");
     renderWithClient(<ActivityTimelineClient />);
-    expect(
-      screen.getByText(/Loading activities.../),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Loading activities.../)).toBeInTheDocument();
   });
 
   it("shows error message when fetch fails", async () => {
@@ -42,7 +42,9 @@ describe("ActivityTimelineClient", () => {
     global.fetch = vi.fn(async () => ({ ok: false, json: async () => ({}) }));
     const { ActivityTimelineClient } = await import("./ActivityTimelineClient");
     renderWithClient(<ActivityTimelineClient />);
-    expect(await screen.findByText(/Failed to fetch activities/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Failed to fetch activities/),
+    ).toBeInTheDocument();
     // Retry button is present
     expect(screen.getByText("Try Again")).toBeInTheDocument();
   });
@@ -68,12 +70,30 @@ describe("ActivityTimelineClient", () => {
     renderWithClient(<ActivityTimelineClient />);
 
     // Activity entry appears
-    expect(await screen.findByText(/created list "My List"/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/created list "My List"/),
+    ).toBeInTheDocument();
   });
 
   it("shows 'Loading more...' when fetching next page", async () => {
     const mockUseInfiniteQuery = vi.fn().mockReturnValue({
-      data: { pages: [{ activities: [{ id: "a", activityType: ActivityType.LIST_CREATED, user: { id: "u", username: "alice" }, metadata: { listName: "X" }, isCollaborative: false, collaborators: [], createdAt: new Date().toISOString() }] }] },
+      data: {
+        pages: [
+          {
+            activities: [
+              {
+                id: "a",
+                activityType: ActivityType.LIST_CREATED,
+                user: { id: "u", username: "alice" },
+                metadata: { listName: "X" },
+                isCollaborative: false,
+                collaborators: [],
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          },
+        ],
+      },
       isLoading: false,
       isFetchingNextPage: true,
       error: null,
@@ -83,10 +103,12 @@ describe("ActivityTimelineClient", () => {
 
     vi.resetModules();
     await vi.doMock("@tanstack/react-query", async (importOriginal) => {
-      const mod = await importOriginal<typeof import("@tanstack/react-query")>();
+      const mod =
+        await importOriginal<typeof import("@tanstack/react-query")>();
       return { ...mod, useInfiniteQuery: mockUseInfiniteQuery };
     });
-    const { ActivityTimelineClient: Timeline } = await import("./ActivityTimelineClient");
+    const { ActivityTimelineClient: Timeline } =
+      await import("./ActivityTimelineClient");
     renderWithClient(<Timeline />);
     expect(screen.getByText(/Loading more.../)).toBeInTheDocument();
     vi.resetModules();
@@ -94,7 +116,23 @@ describe("ActivityTimelineClient", () => {
 
   it("shows end-of-feed indicator when no more pages", async () => {
     const mockUseInfiniteQuery = vi.fn().mockReturnValue({
-      data: { pages: [{ activities: [{ id: "a", activityType: ActivityType.LIST_CREATED, user: { id: "u", username: "alice" }, metadata: { listName: "X" }, isCollaborative: false, collaborators: [], createdAt: new Date().toISOString() }] }] },
+      data: {
+        pages: [
+          {
+            activities: [
+              {
+                id: "a",
+                activityType: ActivityType.LIST_CREATED,
+                user: { id: "u", username: "alice" },
+                metadata: { listName: "X" },
+                isCollaborative: false,
+                collaborators: [],
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          },
+        ],
+      },
       isLoading: false,
       isFetchingNextPage: false,
       error: null,
@@ -104,10 +142,12 @@ describe("ActivityTimelineClient", () => {
 
     vi.resetModules();
     await vi.doMock("@tanstack/react-query", async (importOriginal) => {
-      const mod = await importOriginal<typeof import("@tanstack/react-query")>();
+      const mod =
+        await importOriginal<typeof import("@tanstack/react-query")>();
       return { ...mod, useInfiniteQuery: mockUseInfiniteQuery };
     });
-    const { ActivityTimelineClient: Timeline } = await import("./ActivityTimelineClient");
+    const { ActivityTimelineClient: Timeline } =
+      await import("./ActivityTimelineClient");
     renderWithClient(<Timeline />);
     expect(
       screen.getByText(/You\'ve reached the end of your activity timeline\./),

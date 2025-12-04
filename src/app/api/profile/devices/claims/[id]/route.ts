@@ -14,7 +14,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to cancel claim" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

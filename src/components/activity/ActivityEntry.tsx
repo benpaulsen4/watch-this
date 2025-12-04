@@ -60,11 +60,11 @@ export function ActivityEntry({
         if (lists > 0) parts.push(`${lists} list${lists === 1 ? "" : "s"}`);
         if (contentStatus > 0)
           parts.push(
-            `${contentStatus} content status${contentStatus === 1 ? "" : "es"}`
+            `${contentStatus} content status${contentStatus === 1 ? "" : "es"}`,
           );
         if (episodeStatus > 0)
           parts.push(
-            `${episodeStatus} episode status${episodeStatus === 1 ? "" : "es"}`
+            `${episodeStatus} episode status${episodeStatus === 1 ? "" : "es"}`,
           );
 
         let result = `imported ${parts.join(", ")}`;
@@ -117,7 +117,7 @@ export function ActivityEntry({
 
   const getUsernameString = (
     activity: ActivityItem,
-    currentUsername: string
+    currentUsername: string,
   ) => {
     const replaceWithYou = (username: string) =>
       username === currentUsername ? "you" : username;
@@ -133,7 +133,7 @@ export function ActivityEntry({
 
       if (collaborators.length <= 3) {
         const lastCollaborator = replaceWithYou(
-          collaborators[collaborators.length - 1].username
+          collaborators[collaborators.length - 1].username,
         );
         const otherCollaborators = collaborators
           .slice(0, -1)

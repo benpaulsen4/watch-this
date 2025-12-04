@@ -10,7 +10,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     if (res === "minimum") {
       return NextResponse.json(
         { error: "At least one passkey is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (res === "notFound") {
@@ -21,7 +21,7 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     console.error("Delete passkey error:", error);
     return NextResponse.json(
       { error: "Failed to delete passkey" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 });

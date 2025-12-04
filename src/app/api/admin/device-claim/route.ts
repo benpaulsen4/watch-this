@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     if (!username && !userId) {
       return NextResponse.json(
         { error: "username or userId required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     if (res === "maxDevices") {
       return NextResponse.json(
         { error: "Maximum devices reached" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     console.error("Admin device claim error:", error);
     return NextResponse.json(
       { error: "Failed to create device claim" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

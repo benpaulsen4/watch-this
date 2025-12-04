@@ -28,7 +28,7 @@ export function CastTab({ contentType, contentId }: CastTabProps) {
     queryKey: ["tmdb", "credits", contentType, contentId],
     queryFn: async () => {
       const res = await fetch(
-        `/api/tmdb/credits?type=${contentType}&id=${contentId}`
+        `/api/tmdb/credits?type=${contentType}&id=${contentId}`,
       );
       return res.json();
     },
@@ -38,7 +38,7 @@ export function CastTab({ contentType, contentId }: CastTabProps) {
   const totalPages = Math.ceil(castList.length / PER_PAGE) || 1;
   const pageItems = castList.slice(
     (page - 1) * PER_PAGE,
-    (page - 1) * PER_PAGE + PER_PAGE
+    (page - 1) * PER_PAGE + PER_PAGE,
   );
 
   return castQuery.isLoading ? (
