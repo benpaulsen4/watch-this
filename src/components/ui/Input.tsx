@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useId } from "react";
 import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 
@@ -25,12 +25,11 @@ const inputVariants = cva(
       variant: "default",
       size: "default",
     },
-  },
+  }
 );
 
 export interface InputProps
-  extends
-    Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
     VariantProps<typeof inputVariants> {
   error?: string;
   label?: string;
@@ -40,9 +39,10 @@ export interface InputProps
 const Input = forwardRef<HTMLInputElement, InputProps>(
   (
     { className, variant, size, error, label, helperText, id, ...props },
-    ref,
+    ref
   ) => {
-    const inputId = id || `input-${Math.random().toString(36).substring(2)}`;
+    const generatedId = useId();
+    const inputId = id || generatedId;
     const finalVariant = error ? "error" : variant;
 
     return (
@@ -58,7 +58,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           id={inputId}
           className={cn(
-            inputVariants({ variant: finalVariant, size, className }),
+            inputVariants({ variant: finalVariant, size, className })
           )}
           ref={ref}
           {...props}
@@ -72,7 +72,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
       </div>
     );
-  },
+  }
 );
 
 Input.displayName = "Input";
@@ -80,8 +80,7 @@ Input.displayName = "Input";
 export { Input, inputVariants };
 
 export interface TextareaProps
-  extends
-    Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "size">,
+  extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "size">,
     VariantProps<typeof inputVariants> {
   error?: string;
   label?: string;
@@ -91,10 +90,10 @@ export interface TextareaProps
 const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   (
     { className, variant, size, error, label, helperText, id, rows, ...props },
-    ref,
+    ref
   ) => {
-    const textareaId =
-      id || `textarea-${Math.random().toString(36).substring(2)}`;
+    const generatedId = useId();
+    const textareaId = id || generatedId;
     const finalVariant = error ? "error" : variant;
 
     return (
@@ -114,7 +113,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
               variant: finalVariant,
               size: size ?? "textarea",
               className,
-            }),
+            })
           )}
           ref={ref}
           rows={rows ?? 3}
@@ -129,7 +128,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         )}
       </div>
     );
-  },
+  }
 );
 
 Textarea.displayName = "Textarea";

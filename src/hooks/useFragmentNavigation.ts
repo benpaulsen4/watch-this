@@ -16,15 +16,20 @@ export function useFragmentNavigation<T extends string>({
   defaultTab,
   validTabs,
 }: UseFragmentNavigationOptions<T>): UseFragmentNavigationReturn<T> {
-  const [activeTab, setActiveTabState] = useState<T>(defaultTab);
-
-  // Function to get tab from fragment
+   // Function to get tab from fragment
   const getTabFromFragment = useCallback((): T => {
     if (typeof window === "undefined") return defaultTab;
 
     const hash = window.location.hash.slice(1); // Remove the '#'
     return validTabs.includes(hash as T) ? (hash as T) : defaultTab;
   }, [defaultTab, validTabs]);
+
+  const [activeTab, setActiveTabState] = useState<T>(() => {
+    if (typeof window === "undefined") return defaultTab;
+    return getTabFromFragment();
+  });
+
+ 
 
   // Function to update URL fragment without using Next.js router
   const updateFragment = useCallback(
@@ -39,14 +44,8 @@ export function useFragmentNavigation<T extends string>({
       // Use history.replaceState to avoid triggering hashchange
       window.history.replaceState(null, "", newUrl);
     },
-    [defaultTab],
+    [defaultTab]
   );
-
-  // Initialize tab from URL fragment on mount
-  useEffect(() => {
-    const tabFromFragment = getTabFromFragment();
-    setActiveTabState(tabFromFragment);
-  }, [getTabFromFragment]);
 
   // Listen for hash changes (back/forward navigation only)
   useEffect(() => {
@@ -66,7 +65,7 @@ export function useFragmentNavigation<T extends string>({
       setActiveTabState(tab);
       updateFragment(tab);
     },
-    [updateFragment],
+    [updateFragment]
   );
 
   return {

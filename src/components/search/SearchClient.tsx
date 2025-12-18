@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Filter, TrendingUp } from "lucide-react";
 import type { TMDBMovie, TMDBTVShow, TMDBGenre } from "@/lib/tmdb/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -77,10 +77,7 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
     },
   });
 
-  useEffect(() => {
-    // reset page when filters change (discoverQuery refetches automatically)
-    setPage(1);
-  }, [contentType, selectedGenre, selectedYear, sortBy]);
+  const resetPage = () => setPage(1);
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
@@ -154,9 +151,10 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
                   <Dropdown
                     placeholder="All"
                     selectedKey={contentType}
-                    onSelectionChange={(key) =>
-                      setContentType((key as ContentType) || "all")
-                    }
+                    onSelectionChange={(key) => {
+                      setContentType((key as ContentType) || "all");
+                      resetPage();
+                    }}
                     options={[
                       { key: "all", label: "All" },
                       { key: "movie", label: "Movies" },
@@ -172,9 +170,10 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
                   <Dropdown
                     placeholder="All Genres"
                     selectedKey={selectedGenre}
-                    onSelectionChange={(key) =>
-                      setSelectedGenre(String(key ?? ""))
-                    }
+                    onSelectionChange={(key) => {
+                      setSelectedGenre(String(key ?? ""));
+                      resetPage();
+                    }}
                     isDisabled={!!searchQuery}
                     options={[
                       { key: "", label: "All Genres" },
@@ -193,9 +192,10 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
                   <Dropdown
                     placeholder="All Years"
                     selectedKey={selectedYear}
-                    onSelectionChange={(key) =>
-                      setSelectedYear(String(key ?? ""))
-                    }
+                    onSelectionChange={(key) => {
+                      setSelectedYear(String(key ?? ""));
+                      resetPage();
+                    }}
                     isDisabled={!!searchQuery && contentType === "all"}
                     options={[
                       { key: "", label: "All Years" },
@@ -214,9 +214,10 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
                   <Dropdown
                     placeholder="Popularity"
                     selectedKey={sortBy}
-                    onSelectionChange={(key) =>
-                      setSortBy((key as SortBy) || "popularity.desc")
-                    }
+                    onSelectionChange={(key) => {
+                      setSortBy((key as SortBy) || "popularity.desc");
+                      resetPage();
+                    }}
                     isDisabled={!!searchQuery}
                     options={[
                       { key: "popularity.desc", label: "Popularity" },

@@ -43,7 +43,7 @@ export function PasskeyDevicesViewer() {
 
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [claimInfo, setClaimInfo] = useState<ClaimInitiateResponse | null>(
-    null,
+    null
   );
   const [isInitiating, setIsInitiating] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
@@ -71,7 +71,7 @@ export function PasskeyDevicesViewer() {
       clearInterval(timer);
       setIsPolling(false);
     };
-  }, [isClaimModalOpen, refetch, queryClient]);
+  }, [isClaimModalOpen, refetch, queryClient, devicesData?.devices]);
 
   const initiateClaimMutation = useMutation({
     mutationFn: initiatePasskeyClaim,
@@ -86,7 +86,7 @@ export function PasskeyDevicesViewer() {
       setClaimError(
         message.toLowerCase().includes("rate limit")
           ? "Too many Add Passkey attempts in the last hour. Please try again later."
-          : message,
+          : message
       );
     },
   });
@@ -152,7 +152,7 @@ export function PasskeyDevicesViewer() {
     const lastUsed = new Date(lastUsedAt);
     const now = new Date();
     const diffInHours = Math.floor(
-      (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60),
+      (now.getTime() - lastUsed.getTime()) / (1000 * 60 * 60)
     );
 
     if (diffInHours < 1) return "Used recently";
@@ -342,7 +342,7 @@ export function PasskeyDevicesViewer() {
                   try {
                     await fetch(
                       `/api/profile/devices/claims/${claimInfo.claimId}`,
-                      { method: "DELETE" },
+                      { method: "DELETE" }
                     );
                     setIsClaimModalOpen(false);
                     setClaimInfo(null);
