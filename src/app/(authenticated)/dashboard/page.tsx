@@ -1,25 +1,19 @@
 import { ActivityFeed } from "@/components/activity/ActivityFeed";
-import { ContentCard } from "@/components/content/ContentCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ProfileImage } from "@/components/ui/ProfileImage";
 import { List, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { getCurrentUser } from "@/lib/auth/webauthn";
 import { cookies } from "next/headers";
-import { tmdbClient } from "@/lib/tmdb/client";
-import { enrichWithContentStatus } from "@/lib/tmdb/contentUtils";
 import Link from "next/link";
+import { Suspense } from "react";
+import TrendingStrip from "@/components/content/TrendingStrip";
+import { ContentCardSkeleton } from "@/components/content/ContentCardSkeleton";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser((await cookies()).get("session")?.value);
 
-  if (user === null) return null;
-
-  const tmdbTrending = await tmdbClient.getTrending("all", "day");
-  const trendingPromises = tmdbTrending.results
-    .slice(0, 6)
-    .map((t) => enrichWithContentStatus(t, user.id));
-  const trendingContent = await Promise.all(trendingPromises);
+  if (user === null) return "debug message";
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -67,9 +61,13 @@ export default async function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            {trendingContent.map((item) => (
-              <ContentCard key={item.id} content={item} />
-            ))}
+            <Suspense
+              fallback={Array.from({ length: 6 }).map((_, i) => (
+                <ContentCardSkeleton key={i} />
+              ))}
+            >
+              <TrendingStrip items={6} userId={user.id} />
+            </Suspense>
           </div>
         </section>
       </main>

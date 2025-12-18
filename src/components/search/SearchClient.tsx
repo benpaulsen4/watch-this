@@ -21,10 +21,10 @@ type SortBy =
 
 export interface SearchClientProps {
   genres: TMDBGenre[];
-  trendingContent: (TMDBMovie | TMDBTVShow)[];
+  children: React.ReactNode;
 }
 
-export function SearchClient({ genres, trendingContent }: SearchClientProps) {
+export function SearchClient({ genres, children }: SearchClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [contentType, setContentType] = useState<ContentType>("all");
   const [selectedGenre, setSelectedGenre] = useState<string>("");
@@ -286,7 +286,7 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
         </section>
 
         {/* Trending Sidebar */}
-        {!searchQuery && trendingContent.length > 0 && (
+        {!searchQuery && children && (
           <section className="mt-12">
             <div className="flex items-center gap-2 mb-6">
               <TrendingUp className="h-5 w-5 text-red-400" />
@@ -295,9 +295,7 @@ export function SearchClient({ genres, trendingContent }: SearchClientProps) {
               </h3>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-              {trendingContent.map((item) => (
-                <ContentCard key={item.id} content={item} />
-              ))}
+              {children}
             </div>
           </section>
         )}

@@ -5,8 +5,7 @@
 ### 1. Server Components First
 
 - **MUST**: All pages are server components by default
-- **Pattern**: Use "islands of reactivity" - wrap client components in Suspense
-- **Structure**: `page.tsx` (server) → `<Suspense>` → `ClientComponent.tsx`
+- **Pattern**: Use "islands of reactivity" - only use client components where necessary, and use server components for full pages
 
 ### 2. Shared Layouts
 
@@ -61,13 +60,6 @@ src/
 - Define interfaces for all data structures
 - Proper typing for API responses
 
-### Imports Order
-
-1. React/Next.js
-2. Third-party libraries
-3. Internal components/utilities
-4. Type imports (with `type` keyword)
-
 ### Styling
 
 - **MUST**: Use Tailwind CSS exclusively
@@ -81,13 +73,3 @@ src/
 - Consistent loading states with Suspense
 - Drizzle ORM for type-safe database operations
 - Proper error handling with `handleApiError`
-
-## Enforcement Checklist
-
-- [ ] Server components with Suspense boundaries
-- [ ] Client components marked with `'use client'`
-- [ ] API routes use `withAuth` middleware
-- [ ] Consistent error/loading states
-- [ ] Proper TypeScript typing
-- [ ] Shared layout components
-- [ ] Tailwind CSS styling
