@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 export default async function ListsPage() {
   const user = await getCurrentUser((await cookies()).get("session")?.value);
 
-  if (user === null) return null;
+  if (user === null) return "debug message";
 
   const listsWithPosters = await listLists(user.id);
 

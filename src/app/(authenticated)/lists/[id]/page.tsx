@@ -17,7 +17,7 @@ export default async function ListDetailsPage({
 
   const user = await getCurrentUser((await cookies()).get("session")?.value);
 
-  if (user === null) return null;
+  if (user === null) return "debug message";
 
   const list = await getList(user.id, id);
 

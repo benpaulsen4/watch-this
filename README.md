@@ -104,10 +104,11 @@ npm run test:run
 - [x] Cast tab for content details
 - [x] Multi-device passkey management
 - [ ] RSC streaming implementation
-- [ ] \*arr stack integration for when content is not on any configured streaming services
+- [ ] Sorting and filtering inside lists
 - [ ] TMDB cache table to reduce spamming their API when fetching lists
 - [ ] Recommendations of some kind
-- [ ] Sorting and filtering inside lists
+- [ ] Recently returned section
+- [ ] \*arr stack integration for when content is not on any configured streaming services
 - [ ] Statistics page in user profile
 - [ ] Splash page
 - [ ] Docs
