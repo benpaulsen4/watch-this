@@ -25,18 +25,18 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
     // Verify challenge
     const storedChallenge = request.cookies.get(
-      "registration-challenge",
+      "registration-challenge"
     )?.value;
     if (!storedChallenge) {
       return NextResponse.json(
         { error: "Invalid or expired challenge" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     if (!challengePayload) {
       return NextResponse.json(
         { error: "Invalid or expired challenge" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -55,19 +55,19 @@ export async function POST(request: NextRequest) {
       if (typeof timezone !== "string" || timezone.trim().length === 0) {
         return NextResponse.json(
           { error: "Timezone must be a non-empty string" },
-          { status: 400 },
+          { status: 400 }
         );
       }
       try {
         // Validate via Intl API
         new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(
-          new Date(),
+          new Date()
         );
         validatedTimezone = timezone;
       } catch {
         return NextResponse.json(
           { error: "Invalid timezone" },
-          { status: 400 },
+          { status: 400 }
         );
       }
     }
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       registrationResponse as RegistrationResponseJSON,
       challengePayload.challenge,
       deviceName,
-      validatedTimezone,
+      validatedTimezone
     );
 
     // Create session token
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set("session", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: "/",
     });
@@ -120,14 +120,14 @@ export async function POST(request: NextRequest) {
       if (error.message === "Username already exists") {
         return NextResponse.json(
           { error: "Username already exists" },
-          { status: 409 },
+          { status: 409 }
         );
       }
 
       if (error.message === "Registration verification failed") {
         return NextResponse.json(
           { error: "Registration verification failed" },
-          { status: 400 },
+          { status: 400 }
         );
       }
     }
