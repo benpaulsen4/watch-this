@@ -362,7 +362,6 @@ export async function getCurrentUser(
   if (!sessionToken) return null;
 
   const session = await verifySessionToken(sessionToken);
-  console.debug("session for: ", session?.username);
   if (!session) return null;
 
   const userData = await db
