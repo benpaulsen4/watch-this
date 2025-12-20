@@ -24,7 +24,7 @@ const ORIGIN =
     ? `https://${process.env.VERCEL_URL}`
     : process.env.WEBAUTHN_ORIGIN || "http://localhost:3000";
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.WEBAUTHN_SECRET || "fallback-secret",
+  process.env.WEBAUTHN_SECRET || "fallback-secret"
 );
 
 export interface AuthSession {
@@ -68,7 +68,7 @@ export async function verifyPasskeyRegistration(
   registrationResponse: RegistrationResponseJSON,
   expectedChallenge: string,
   deviceName?: string,
-  timezone?: string,
+  timezone?: string
 ) {
   const verification: VerifyRegistrationResponseOpts = {
     response: registrationResponse,
@@ -119,7 +119,7 @@ export async function verifyPasskeyRegistration(
 
 // Generate registration options for adding an additional passkey to an existing user
 export async function generateAdditionalPasskeyRegistrationOptions(
-  userId: string,
+  userId: string
 ) {
   const userData = await db
     .select()
@@ -155,7 +155,7 @@ export async function verifyAdditionalPasskeyRegistration(
   userId: string,
   registrationResponse: RegistrationResponseJSON,
   expectedChallenge: string,
-  deviceName?: string,
+  deviceName?: string
 ) {
   const verification: VerifyRegistrationResponseOpts = {
     response: registrationResponse,
@@ -180,8 +180,8 @@ export async function verifyAdditionalPasskeyRegistration(
     .where(
       and(
         eq(passkeyCredentials.userId, userId),
-        isNull(passkeyCredentials.deletedAt),
-      ),
+        isNull(passkeyCredentials.deletedAt)
+      )
     );
 
   if (activeDevicesRows.length >= 10) {
@@ -205,7 +205,7 @@ export async function verifyAdditionalPasskeyRegistration(
 // Create JWT claim token
 export async function createClaimToken(
   claimId: string,
-  userId: string,
+  userId: string
 ): Promise<string> {
   const payload = { claimId, userId };
 
@@ -218,7 +218,7 @@ export async function createClaimToken(
 
 // Verify JWT claim token
 export async function verifyClaimToken(
-  token: string,
+  token: string
 ): Promise<{ claimId: string; userId: string } | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
@@ -245,7 +245,7 @@ export async function generatePasskeyAuthenticationOptions() {
 // Verify authentication response
 export async function verifyPasskeyAuthentication(
   authenticationResponse: AuthenticationResponseJSON,
-  expectedChallenge: string,
+  expectedChallenge: string
 ) {
   // Get credential and user info
   const credentialData = await db
@@ -258,8 +258,8 @@ export async function verifyPasskeyAuthentication(
     .where(
       and(
         eq(passkeyCredentials.credentialId, authenticationResponse.id),
-        isNull(passkeyCredentials.deletedAt),
-      ),
+        isNull(passkeyCredentials.deletedAt)
+      )
     )
     .limit(1);
 
@@ -315,7 +315,7 @@ export async function createSessionToken(user: User): Promise<string> {
 
 // Verify JWT session token
 export async function verifySessionToken(
-  token: string,
+  token: string
 ): Promise<AuthSession | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
@@ -343,7 +343,7 @@ export async function createChallengeToken(challenge: string): Promise<string> {
 
 // Verify JWT challenge token
 export async function verifyChallengeToken(
-  token: string,
+  token: string
 ): Promise<{ challenge: string } | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
@@ -357,11 +357,12 @@ export async function verifyChallengeToken(
 
 // Get current user from session
 export async function getCurrentUser(
-  sessionToken?: string,
+  sessionToken?: string
 ): Promise<User | null> {
   if (!sessionToken) return null;
 
   const session = await verifySessionToken(sessionToken);
+  console.debug("session for: ", session?.username);
   if (!session) return null;
 
   const userData = await db

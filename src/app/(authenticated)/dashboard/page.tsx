@@ -11,9 +11,13 @@ import TrendingStrip from "@/components/content/TrendingStrip";
 import { ContentCardSkeleton } from "@/components/content/ContentCardSkeleton";
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser((await cookies()).get("session")?.value);
+  const resolvedCookies = await cookies();
+  console.debug("cookies size: ", resolvedCookies.size);
+  const sessionCookie = resolvedCookies.get("session");
+  console.debug("session cookie: ", sessionCookie?.value);
+  const user = await getCurrentUser(sessionCookie?.value);
 
-  if (user === null) return "debug message";
+  if (user === null) return "Refresh if this page does not go away";
 
   return (
     <div className="min-h-screen bg-gray-950">
