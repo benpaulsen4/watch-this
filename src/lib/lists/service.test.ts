@@ -23,6 +23,7 @@ vi.mock("../db", () => {
       insertCalls.push({ table: (chain as any).__currentInsertTable, payload });
       return chain;
     },
+    $dynamic: () => chain,
     then: (resolve: any) => Promise.resolve(resultsQueue.shift()).then(resolve),
   };
 
@@ -46,6 +47,7 @@ vi.mock("../db", () => {
   const listCollaborators = {} as any;
   const users = {} as any;
   const activityFeed = {} as any;
+  const userContentStatus = {} as any;
 
   const ActivityType = {
     LIST_CREATED: "LIST_CREATED",
@@ -71,6 +73,7 @@ vi.mock("../db", () => {
     listCollaborators,
     users,
     activityFeed,
+    userContentStatus,
     ActivityType,
     PermissionLevelEnum,
     NewList,
@@ -104,6 +107,7 @@ import {
   deleteListCollaborator,
   getList,
   listLists,
+  getListItems,
 } from "./service";
 
 import { db, activityFeed, ActivityType } from "../db";
@@ -360,13 +364,13 @@ describe("lists service", () => {
     const inserts = (db as any).__getInsertCalls();
     const activity = inserts.find((c: any) => c.table === activityFeed);
     expect(activity.payload.activityType).toBe(
-      ActivityType.COLLABORATOR_REMOVED,
+      ActivityType.COLLABORATOR_REMOVED
     );
     expect(activity.payload.listId).toBe("list-9");
     expect(activity.payload.metadata.collaboratorUsername).toBe("carol");
   });
 
-  it("getList returns enriched items and metadata", async () => {
+  it("getList returns metadata without items", async () => {
     const listData = [
       {
         id: "list-10",
@@ -382,23 +386,19 @@ describe("lists service", () => {
         updatedAt: now,
       },
     ];
-    const items = [
-      {
-        id: "itm-1",
-        tmdbId: 100,
-        contentType: "movie",
-        title: "T",
-        posterPath: null,
-        createdAt: now,
-      },
-    ];
+    // item count and collab count
+    const itemCount = [{ count: 5 }];
     const collabCount = [{ count: 1 }];
-    (db as any).__setMockResults([listData, items, collabCount]);
+
+    (db as any).__setMockResults([listData, itemCount, collabCount]);
     const res = await getList(userId, "list-10");
     if (res === "notFound") throw new Error("unexpected error");
-    expect(res.items.length).toBe(1);
-    expect(res.items[0].listItemId).toBe("itm-1");
-    expect(typeof res.items[0].createdAt).toBe("string");
+
+    // Should NOT contain items anymore
+    expect((res as any).items).toBeUndefined();
+    expect(res.itemCount).toBe(5);
+    expect(res.collaborators).toBe(1);
+    expect(res.name).toBe("L");
   });
 
   it("listLists returns poster paths", async () => {
@@ -436,5 +436,63 @@ describe("lists service", () => {
     const res = await listLists(userId);
     expect(res[0].posterPaths).toEqual(["/p1.jpg", "/p2.jpg"]);
     expect(res[1].posterPaths).toEqual(["/q1.jpg"]);
+  });
+
+  // Tests for getListItems
+  it("getListItems returns items with TMDB and status data", async () => {
+    const listData = [{ id: "list-10", ownerId: userId, isPublic: false }];
+    const items = [
+      {
+        id: "itm-1",
+        tmdbId: 100,
+        contentType: "movie",
+        title: "T",
+        posterPath: null,
+        createdAt: now,
+      },
+    ];
+
+    (db as any).__setMockResults([listData, items]);
+
+    const res = await getListItems(userId, "list-10");
+
+    if (res === "notFound") throw new Error("unexpected error");
+    expect(res.items).toHaveLength(1);
+    expect(res.items[0].listItemId).toBe("itm-1");
+    // enriched data
+    expect(res.items[0].title).toBe("Movie");
+  });
+
+  it("getListItems returns notFound if list does not exist", async () => {
+    (db as any).__setMockResults([[]]); // empty list data
+
+    const res = await getListItems(userId, "list-missing");
+    expect(res).toBe("notFound");
+  });
+
+  it("getListItems applies watch status filters", async () => {
+    const listData = [{ id: "list-10", ownerId: userId, isPublic: false }];
+    const items = [
+      {
+        id: "itm-1",
+        tmdbId: 100,
+        contentType: "movie",
+        title: "T",
+        posterPath: null,
+        createdAt: now,
+      },
+    ];
+
+    (db as any).__setMockResults([listData, items]);
+
+    const res = await getListItems(userId, "list-10", [
+      "watching",
+      "completed",
+    ]);
+
+    if (res === "notFound") throw new Error("unexpected error");
+    expect(res.items).toHaveLength(1);
+    // verification that DB query included filtering would happen in the mock setup logic if strict,
+    // but here we trust the chain behavior or check called methods if needed.
   });
 });

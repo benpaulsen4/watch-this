@@ -5,23 +5,27 @@ import { getAvailableStatuses, getStatusConfig } from "./StatusBadge";
 import { WatchStatusEnum, ContentTypeEnum } from "@/lib/db/schema";
 
 export interface StatusSegmentedSelectorProps {
-  value: WatchStatusEnum | null;
-  contentType: ContentTypeEnum;
-  onValueChange: (status: WatchStatusEnum) => void;
+  value: WatchStatusEnum | (WatchStatusEnum | "none")[] | null;
+  contentType?: ContentTypeEnum;
+  onValueChange: (status: any) => void;
   disabled?: boolean;
   className?: string;
   size?: "default" | "sm" | "lg";
+  multiple?: boolean;
+  includeNone?: boolean;
 }
 
 /**
  * StatusSegmentedSelector component for selecting watch status with segmented radio button interface
  *
  * @param value - Current selected status
- * @param contentType - Content type (movie/tv) to determine available statuses
+ * @param contentType - Content type (movie/tv) to determine available statuses. If not provided, shows all statuses.
  * @param onValueChange - Callback when status changes
  * @param disabled - Whether the selector is disabled
  * @param className - Additional CSS classes
  * @param size - Size variant
+ * @param multiple - Whether to allow multiple selection
+ * @param includeNone - Whether to include "None" option
  */
 export function StatusSegmentedSelector({
   value,
@@ -30,8 +34,16 @@ export function StatusSegmentedSelector({
   disabled = false,
   className,
   size = "default",
+  multiple = false,
+  includeNone = false,
 }: StatusSegmentedSelectorProps) {
-  const availableStatuses = getAvailableStatuses(contentType);
+  let availableStatuses: (WatchStatusEnum | "none")[] = contentType
+    ? getAvailableStatuses(contentType)
+    : ["planning", "watching", "paused", "completed", "dropped"];
+
+  if (includeNone) {
+    availableStatuses = ["none", ...availableStatuses];
+  }
 
   // Color mapping for status indicators
   const statusColors = {
@@ -40,6 +52,7 @@ export function StatusSegmentedSelector({
     paused: "bg-orange-400",
     completed: "bg-blue-400",
     dropped: "bg-red-400",
+    none: "bg-gray-400",
   } as const;
 
   const sizeClasses = {
@@ -60,15 +73,32 @@ export function StatusSegmentedSelector({
     },
   };
 
-  const handleStatusChange = (status: WatchStatusEnum) => {
-    if (!disabled) {
-      onValueChange(status);
+  const handleStatusChange = (status: WatchStatusEnum | "none") => {
+    if (disabled) return;
+
+    if (multiple) {
+      const currentValues = (Array.isArray(value) ? value : []) as (
+        | WatchStatusEnum
+        | "none"
+      )[];
+      const isSelected = currentValues.includes(status);
+      let newValues;
+      if (isSelected) {
+        newValues = currentValues.filter((v) => v !== status);
+      } else {
+        newValues = [...currentValues, status];
+      }
+      onValueChange(newValues);
+    } else {
+      if (status !== "none") {
+        onValueChange(status as WatchStatusEnum);
+      }
     }
   };
 
   const handleKeyDown = (
     event: React.KeyboardEvent,
-    status: WatchStatusEnum,
+    status: WatchStatusEnum | "none"
   ) => {
     if (disabled) return;
 
@@ -86,14 +116,22 @@ export function StatusSegmentedSelector({
         "justify-center sm:justify-start",
         disabled && "opacity-50 cursor-not-allowed",
         sizeClasses[size].container,
-        className,
+        className
       )}
-      role="radiogroup"
-      aria-label={`Select watch status for ${contentType}`}
+      role={multiple ? "group" : "radiogroup"}
+      aria-label={`Select watch status${
+        contentType ? ` for ${contentType}` : ""
+      }`}
     >
       {availableStatuses.map((status) => {
-        const config = getStatusConfig(status);
-        const isSelected = value === status;
+        const config =
+          status === "none"
+            ? { label: "None", description: "No status", variant: "default" }
+            : getStatusConfig(status as WatchStatusEnum);
+
+        const isSelected = multiple
+          ? Array.isArray(value) && value.includes(status)
+          : value === status;
 
         return (
           <button
@@ -110,18 +148,22 @@ export function StatusSegmentedSelector({
               sizeClasses[size].button,
               isSelected
                 ? "bg-red-600 text-white shadow-sm"
-                : "text-gray-300 hover:text-white hover:bg-gray-700",
+                : "text-gray-300 hover:text-white hover:bg-gray-700"
             )}
-            role="radio"
+            role={multiple ? "checkbox" : "radio"}
             aria-checked={isSelected}
-            aria-label={`${config?.label || status} status${config?.description ? `: ${config.description}` : ""}`}
+            aria-label={`${config?.label || status} status${
+              config?.description ? `: ${config.description}` : ""
+            }`}
           >
             {config && (
               <>
                 <span
                   className={cn(
                     "w-2 h-2 rounded-full flex-shrink-0",
-                    isSelected ? "bg-white" : statusColors[status],
+                    isSelected
+                      ? "bg-white"
+                      : statusColors[status as keyof typeof statusColors]
                   )}
                   aria-hidden="true"
                 />

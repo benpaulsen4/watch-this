@@ -10,29 +10,29 @@ describe("StatusSegmentedSelector", () => {
         value={null}
         contentType="tv"
         onValueChange={() => {}}
-      />,
+      />
     );
     const radios = screen.getAllByRole("radio");
     // tv: planning, watching, paused, completed, dropped
     expect(radios.length).toBe(5);
     expect(
-      screen.getByRole("radio", { name: "Planning status: Planning to watch" }),
+      screen.getByRole("radio", { name: "Planning status: Planning to watch" })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("radio", {
         name: "Watching status: Currently watching",
-      }),
+      })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: "Paused status: Temporarily paused" }),
+      screen.getByRole("radio", { name: "Paused status: Temporarily paused" })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("radio", {
         name: "Completed status: Finished watching",
-      }),
+      })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: "Dropped status: Stopped watching" }),
+      screen.getByRole("radio", { name: "Dropped status: Stopped watching" })
     ).toBeInTheDocument();
   });
 
@@ -44,7 +44,7 @@ describe("StatusSegmentedSelector", () => {
         value={"planning"}
         contentType="movie"
         onValueChange={onChange}
-      />,
+      />
     );
     const completed = screen.getByRole("radio", {
       name: "Completed status: Finished watching",
@@ -61,7 +61,7 @@ describe("StatusSegmentedSelector", () => {
         value={null}
         contentType="movie"
         onValueChange={onChange}
-      />,
+      />
     );
     const planning = screen.getByRole("radio", { name: /planning/i });
     planning.focus();
@@ -80,13 +80,72 @@ describe("StatusSegmentedSelector", () => {
         contentType="tv"
         onValueChange={onChange}
         disabled
-      />,
+      />
     );
     await user.click(
       screen.getByRole("radio", {
         name: "Watching status: Currently watching",
-      }),
+      })
     );
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("supports multiple selection mode", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <StatusSegmentedSelector
+        value={["planning"]}
+        multiple={true}
+        onValueChange={onChange}
+      />
+    );
+
+    // Check role is group instead of radiogroup
+    expect(screen.getByRole("group")).toBeInTheDocument();
+
+    // Check items are checkboxes
+    const watching = screen.getByRole("checkbox", { name: /^watching/i });
+
+    // Select new item
+    await user.click(watching);
+    expect(onChange).toHaveBeenCalledWith(["planning", "watching"]);
+
+    // Deselect existing item
+    const planning = screen.getByRole("checkbox", { name: /^planning/i });
+    await user.click(planning);
+    expect(onChange).toHaveBeenCalledWith([]); // since mock doesn't update prop, we expect what logic would produce from props
+  });
+
+  it("includes 'None' option when configured", () => {
+    render(
+      <StatusSegmentedSelector
+        value={null}
+        includeNone={true}
+        onValueChange={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole("radio", { name: "None status: No status" })
+    ).toBeInTheDocument();
+  });
+
+  it("handles 'None' selection in multiple mode", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <StatusSegmentedSelector
+        value={["planning"]}
+        multiple={true}
+        includeNone={true}
+        onValueChange={onChange}
+      />
+    );
+
+    const noneOption = screen.getByRole("checkbox", { name: /none/i });
+    await user.click(noneOption);
+
+    expect(onChange).toHaveBeenCalledWith(["planning", "none"]);
   });
 });
