@@ -14,21 +14,17 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
-import type { TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
 import CollaborationModal from "./CollaborationModal";
 import ListSettingsModal from "./ListSettingsModal";
 import { useUser } from "../providers/AuthProvider";
 import { PageHeader } from "../ui/PageHeader";
-import { ContentCard } from "../content/ContentCard";
 import { GetListResponse } from "@/lib/lists/types";
 
-interface ListDetailsClientProps {
+interface ListHeaderProps {
   initialList: GetListResponse;
 }
 
-export default function ListDetailsClient({
-  initialList,
-}: ListDetailsClientProps) {
+export default function ListHeader({ initialList }: ListHeaderProps) {
   const router = useRouter();
   const user = useUser();
   const [list, setList] = useState<GetListResponse>(initialList);
@@ -43,21 +39,15 @@ export default function ListDetailsClient({
     syncWatchStatus?: boolean;
   }) => {
     setList((prev) => ({ ...prev, ...updatedList }));
+    router.refresh();
   };
 
   const handleListDelete = () => {
     router.push("/lists");
   };
 
-  const handleContentRemoved = (listItemId: string) => {
-    setList((prev) => ({
-      ...prev,
-      items: prev.items.filter((item) => item.listItemId !== listItemId),
-    }));
-  };
-
   return (
-    <div className="min-h-screen bg-gray-950">
+    <>
       <PageHeader
         title={list.name}
         backLinkHref="/lists"
@@ -96,7 +86,7 @@ export default function ListDetailsClient({
             <span>•</span>
             <div className="flex items-center gap-1">
               <FileStack className="h-3 w-3" />
-              <span>{list.items.length}</span>
+              <span>{list.itemCount}</span>
               <span className="hidden sm:block">items</span>
             </div>
           </div>
@@ -124,53 +114,14 @@ export default function ListDetailsClient({
         </Button>
       </PageHeader>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* List Description */}
-        {list.description && (
-          <Card className="mb-8 bg-gray-900 border-gray-800">
-            <CardContent>
-              <p className="text-gray-300">{list.description}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* List Items */}
-        {list.items.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Plus className="h-8 w-8 text-gray-600" />
-            </div>
-            <h3 className="text-xl font-medium text-gray-300 mb-2">
-              No content yet
-            </h3>
-            <p className="text-gray-500 mb-6">
-              Start building your list by adding movies and TV shows
-            </p>
-            <Button onClick={() => router.push("/search")}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Your First Item
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            {list.items.map((item) => {
-              // The item now contains complete TMDB data merged with list-specific data
-              const { listItemId, createdAt, ...contentData } = item;
-
-              return (
-                <ContentCard
-                  key={listItemId}
-                  content={contentData as TMDBMovie | TMDBTVShow}
-                  addedDate={createdAt}
-                  showAddedDate={true}
-                  currentListId={list.id}
-                  onRemoveFromList={() => handleContentRemoved(listItemId)}
-                />
-              );
-            })}
-          </div>
-        )}
-      </main>
+      {/* List Description */}
+      {list.description && (
+        <Card className="sm:max-w-7xl sm:mx-auto mx-4 mt-6 bg-gray-900 border-gray-800">
+          <CardContent>
+            <p className="text-gray-300">{list.description}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Collaboration Modal */}
       <CollaborationModal
@@ -194,6 +145,6 @@ export default function ListDetailsClient({
           onListDelete={handleListDelete}
         />
       )}
-    </div>
+    </>
   );
 }

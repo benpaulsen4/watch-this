@@ -103,8 +103,8 @@ npm run test:run
 - [x] New List creation shortcut from content details lists tab
 - [x] Cast tab for content details
 - [x] Multi-device passkey management
-- [ ] RSC streaming implementation
-- [ ] Sorting and filtering inside lists
+- [x] RSC streaming implementation
+- [x] Sorting and filtering inside lists
 - [ ] TMDB cache table to reduce spamming their API when fetching lists
 - [ ] Recommendations of some kind
 - [ ] Recently returned section

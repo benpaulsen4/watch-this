@@ -18,8 +18,12 @@ export interface GetListResponse {
   ownerProfilePictureUrl: string | null;
   createdAt: string;
   updatedAt: string;
-  items: ListItem[];
+  itemCount: number;
   collaborators: number;
+}
+
+export interface GetListItemsResponse {
+  items: ListItem[];
 }
 
 export interface ListListsResponse {
