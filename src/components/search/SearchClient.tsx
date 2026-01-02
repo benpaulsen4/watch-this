@@ -11,6 +11,10 @@ import { PageHeader } from "../ui/PageHeader";
 import { ContentCard } from "../content/ContentCard";
 import { ContentCardSkeleton } from "../content/ContentCardSkeleton";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import {
+  TMDBContent,
+  TMDBContentSearchResult,
+} from "@/lib/content-status/types";
 
 type ContentType = "all" | "movie" | "tv";
 type SortBy =
@@ -33,10 +37,7 @@ export function SearchClient({ genres, children }: SearchClientProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
 
-  const discoverQuery = useInfiniteQuery<{
-    results: (TMDBMovie | TMDBTVShow)[];
-    total_pages: number;
-  }>({
+  const discoverQuery = useInfiniteQuery<TMDBContentSearchResult>({
     queryKey: [
       "tmdb",
       "discover",
@@ -58,13 +59,13 @@ export function SearchClient({ genres, children }: SearchClientProps) {
     initialPageParam: 1,
     getNextPageParam: (lastPage, pages) => {
       const currentPage = pages.length;
-      return currentPage < (lastPage.total_pages || 1)
+      return currentPage < (lastPage.totalPages || 1)
         ? currentPage + 1
         : undefined;
     },
   });
 
-  const searchResultsQuery = useQuery<{ results: (TMDBMovie | TMDBTVShow)[] }>({
+  const searchResultsQuery = useQuery<TMDBContentSearchResult>({
     queryKey: ["tmdb", "search", { q: searchQuery, contentType, selectedYear }],
     enabled: !!searchQuery.trim(),
     queryFn: async () => {
@@ -258,7 +259,7 @@ export function SearchClient({ genres, children }: SearchClientProps) {
             <>
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                 {displayContent.map((item) => (
-                  <ContentCard key={item.id} content={item} />
+                  <ContentCard key={item.tmdbId} content={item} />
                 ))}
               </div>
 

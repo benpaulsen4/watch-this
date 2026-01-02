@@ -1,7 +1,7 @@
+import { TMDBContent } from "../content-status/types";
 import { ContentTypeEnum, ListTypeEnum, PermissionLevelEnum } from "../db";
-import { TMDBMovie, TMDBTVShow } from "../tmdb/client";
 
-export interface ListItem extends TMDBMovie, TMDBTVShow {
+export interface ListItem extends TMDBContent {
   listItemId: string;
   createdAt: string;
 }

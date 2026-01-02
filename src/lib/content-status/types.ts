@@ -2,6 +2,7 @@ import type {
   ContentTypeEnum,
   MovieWatchStatusEnum,
   TVWatchStatusEnum,
+  WatchStatusEnum,
 } from "@/lib/db/schema";
 
 export interface ContentStatusItem {
@@ -13,6 +14,31 @@ export interface ContentStatusItem {
   nextEpisodeDate?: string | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface TMDBContent {
+  tmdbId: number;
+  contentType: ContentTypeEnum;
+  title: string;
+  overview: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  releaseDate: string;
+  voteAverage: number;
+  voteCount: number;
+  popularity: number;
+  genreIds: number[];
+  adult: boolean | null;
+
+  watchStatus: WatchStatusEnum | null;
+  statusUpdatedAt: string | null;
+}
+
+export interface TMDBContentSearchResult {
+  page: number;
+  results: TMDBContent[];
+  totalPages: number;
+  totalResults: number;
 }
 
 export interface GetContentStatusResponse {

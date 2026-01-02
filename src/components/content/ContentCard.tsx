@@ -3,27 +3,19 @@
 import { forwardRef, useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { cn, formatVoteAverage } from "@/lib/utils";
-import {
-  getContentTitle,
-  getContentReleaseDate,
-  getContentType,
-  getImageUrl,
-} from "@/lib/tmdb/client";
+import { getImageUrl } from "@/lib/tmdb/client";
 import { StatusBadge } from "./StatusBadge";
 import { ContentDetailsModal } from "./ContentDetailsModal";
 import { Star, Play } from "lucide-react";
-import type { TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
-import type { ContentTypeEnum, WatchStatusEnum } from "@/lib/db/schema";
+import type { WatchStatusEnum } from "@/lib/db/schema";
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/Badge";
 import { useMutation } from "@tanstack/react-query";
 
-export interface ContentCardProps extends Omit<
-  React.HTMLAttributes<HTMLDivElement>,
-  "content"
-> {
-  content: TMDBMovie | TMDBTVShow;
-  onContentClick?: (content: TMDBMovie | TMDBTVShow) => void;
+export interface ContentCardProps
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "content"> {
+  content: TMDBContent;
+  onContentClick?: (content: TMDBContent) => void;
   // List-specific props
   onRemoveFromList?: () => void;
   addedDate?: string;
@@ -46,7 +38,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       onRemoveFromList,
       ...props
     },
-    ref,
+    ref
   ) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
@@ -65,7 +57,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            tmdbId: content.id,
+            tmdbId: content.tmdbId,
             contentType: "movie",
             status: "completed",
           }),
@@ -86,12 +78,12 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
         const response = await fetch("/api/status/episodes/next", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tmdbId: content.id }),
+          body: JSON.stringify({ tmdbId: content.tmdbId }),
         });
         const data = await response.json();
         if (!response.ok)
           throw new Error(
-            data.error || "Failed to mark next episode as watched",
+            data.error || "Failed to mark next episode as watched"
           );
         return data;
       },
@@ -100,7 +92,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
           setWatchStatus(result.newStatus as WatchStatusEnum);
         const episodeDetails = result.episodeDetails;
         setQuickCompleteMessage(
-          `S${episodeDetails.seasonNumber}E${episodeDetails.episodeNumber}: ${episodeDetails.name} marked as watched!`,
+          `S${episodeDetails.seasonNumber}E${episodeDetails.episodeNumber}: ${episodeDetails.name} marked as watched!`
         );
       },
     });
@@ -110,8 +102,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       setIsQuickCompleting(true);
       setShowTickAnimation(true);
       try {
-        const contentType = getContentType(content);
-        if (contentType === "movie") {
+        if (content.contentType === "movie") {
           await completeMovieMutation.mutateAsync();
         } else {
           await completeNextEpisodeMutation.mutateAsync();
@@ -123,7 +114,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       } catch (error) {
         console.error("Quick complete error:", error);
         setQuickCompleteMessage(
-          error instanceof Error ? error.message : "Failed to update status",
+          error instanceof Error ? error.message : "Failed to update status"
         );
         setTimeout(() => {
           setShowTickAnimation(false);
@@ -174,11 +165,8 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       }
     };
 
-    const title = getContentTitle(content);
-    const releaseDate = getContentReleaseDate(content);
-    const contentType = getContentType(content);
-    const posterUrl = getImageUrl(content.poster_path, "w342");
-    const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
+    const posterUrl = getImageUrl(content.posterPath, "w342");
+    const year = new Date(content.releaseDate).getFullYear();
 
     return (
       <>
@@ -195,7 +183,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
             {posterUrl ? (
               <Image
                 src={posterUrl}
-                alt={title}
+                alt={content.title}
                 width={200}
                 height={300}
                 className="w-full h-64 object-cover rounded-lg"
@@ -244,7 +232,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
             <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/70 rounded-lg px-2 py-1">
               <Star className="h-3 w-3 text-yellow-400 fill-current" />
               <span className="text-xs text-white font-medium">
-                {formatVoteAverage(content.vote_average)}
+                {formatVoteAverage(content.voteAverage)}
               </span>
             </div>
 
@@ -253,7 +241,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
               <div className="absolute bottom-2 right-2">
                 <StatusBadge
                   status={watchStatus}
-                  contentType={contentType as ContentTypeEnum}
+                  contentType={content.contentType}
                   size="sm"
                 />
               </div>
@@ -262,7 +250,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
 
           <div className="mt-4">
             <h3 className="font-semibold text-gray-100 truncate group-hover:text-red-400 transition-colors">
-              {title}
+              {content.title}
             </h3>
 
             <div className="flex items-center gap-2 mt-2">
@@ -270,7 +258,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
                 {year || "TBA"}
               </Badge>
               <Badge variant="genre" size="sm">
-                {contentType === "movie" ? "Movie" : "TV Show"}
+                {content.contentType === "movie" ? "Movie" : "TV Show"}
               </Badge>
             </div>
 
@@ -292,11 +280,14 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
         />
       </>
     );
-  },
+  }
 );
 
 ContentCard.displayName = "ContentCard";
 
 export { ContentCard };
-import type { CreateOrUpdateContentStatusResult } from "@/lib/content-status/types";
+import type {
+  CreateOrUpdateContentStatusResult,
+  TMDBContent,
+} from "@/lib/content-status/types";
 import type { MarkNextEpisodeResult } from "@/lib/episodes/types";

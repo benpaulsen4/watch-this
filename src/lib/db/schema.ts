@@ -9,6 +9,7 @@ import {
   bigint,
   unique,
   jsonb,
+  decimal,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -83,7 +84,7 @@ export const listCollaborators = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.listId, table.userId)],
+  (table) => [unique().on(table.listId, table.userId)]
 );
 
 // List items table
@@ -102,7 +103,7 @@ export const listItems = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.listId, table.tmdbId, table.contentType)],
+  (table) => [unique().on(table.listId, table.tmdbId, table.contentType)]
 );
 
 // User content status table
@@ -124,7 +125,7 @@ export const userContentStatus = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.userId, table.tmdbId, table.contentType)],
+  (table) => [unique().on(table.userId, table.tmdbId, table.contentType)]
 );
 
 // Episode watch status table
@@ -152,9 +153,9 @@ export const episodeWatchStatus = pgTable(
       table.userId,
       table.tmdbId,
       table.seasonNumber,
-      table.episodeNumber,
+      table.episodeNumber
     ),
-  ],
+  ]
 );
 
 // Activity feed table
@@ -208,7 +209,7 @@ export const showSchedules = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.userId, table.tmdbId, table.dayOfWeek)],
+  (table) => [unique().on(table.userId, table.tmdbId, table.dayOfWeek)]
 );
 
 // User streaming providers table
@@ -227,7 +228,34 @@ export const userStreamingProviders = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [unique().on(table.userId, table.providerId, table.region)],
+  (table) => [unique().on(table.userId, table.providerId, table.region)]
+);
+
+// TMDB Cache table
+export const tmdbCache = pgTable(
+  "tmdb_cache",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tmdbId: integer("tmdb_id").notNull(),
+    contentType: varchar("content_type", { length: 10 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    overview: text("overview").notNull(),
+    posterPath: varchar("poster_path", { length: 255 }),
+    backdropPath: varchar("backdrop_path", { length: 255 }),
+    releaseDate: timestamp("release_date", { withTimezone: true }).notNull(),
+    voteAverage: decimal("vote_average", { precision: 3, scale: 1 }).notNull(),
+    voteCount: integer("vote_count").notNull(),
+    popularity: decimal("popularity", { precision: 6, scale: 2 }).notNull(),
+    genreIds: integer("genre_ids").array().notNull(),
+    adult: boolean("adult"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [unique().on(table.tmdbId, table.contentType)]
 );
 
 // Relations
@@ -250,7 +278,7 @@ export const passkeyCredentialsRelations = relations(
       fields: [passkeyCredentials.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
@@ -274,7 +302,7 @@ export const listCollaboratorsRelations = relations(
       fields: [listCollaborators.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 export const listItemsRelations = relations(listItems, ({ one }) => ({
@@ -291,7 +319,7 @@ export const userContentStatusRelations = relations(
       fields: [userContentStatus.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 export const episodeWatchStatusRelations = relations(
@@ -301,7 +329,7 @@ export const episodeWatchStatusRelations = relations(
       fields: [episodeWatchStatus.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 export const activityFeedRelations = relations(activityFeed, ({ one }) => ({
@@ -336,7 +364,7 @@ export const userStreamingProvidersRelations = relations(
       fields: [userStreamingProviders.userId],
       references: [users.id],
     }),
-  }),
+  })
 );
 
 // Types

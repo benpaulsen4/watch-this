@@ -83,9 +83,9 @@ export function ListFilters({ listType }: ListFiltersProps) {
           {currentSortOrder === "ascending" ? "Oldest first" : "Newest first"}
         </span>
         {currentSortOrder === "ascending" ? (
-          <ArrowDown className="h-4 w-4" />
-        ) : (
           <ArrowUp className="h-4 w-4" />
+        ) : (
+          <ArrowDown className="h-4 w-4" />
         )}
       </Button>
     </div>

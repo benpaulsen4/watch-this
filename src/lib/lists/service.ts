@@ -25,7 +25,6 @@ import {
   WatchStatusEnum,
 } from "../db";
 import { tmdbClient } from "../tmdb/client";
-import { enrichWithContentStatus } from "../tmdb/contentUtils";
 import {
   ListItem,
   GetListResponse,
@@ -43,6 +42,7 @@ import {
   UpdateCollaboratorsResponse,
 } from "./types";
 import { v4 as uuidv4 } from "uuid";
+import { mapWithContentStatus } from "../content-status/service";
 
 export async function listLists(userId: string): Promise<ListResponse[]> {
   // Get lists with counts in a single optimized query
@@ -265,12 +265,12 @@ export async function getListItems(
           // Override with list-specific data
           listItemId: item.id,
           createdAt: item.createdAt.toISOString(),
-        } as unknown as ListItem;
+        };
       })
     );
 
     const enrichedItems = (await Promise.all(
-      tmdbItems.map(async (item) => await enrichWithContentStatus(item, userId))
+      tmdbItems.map(async (item) => await mapWithContentStatus(item, userId))
     )) as ListItem[];
 
     return {

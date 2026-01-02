@@ -64,7 +64,7 @@ export default async function ListItems({
         return (
           <ListItemWrapper
             key={listItemId}
-            content={contentData as TMDBMovie | TMDBTVShow}
+            content={contentData}
             addedDate={createdAt}
             showAddedDate={true}
             currentListId={listId}

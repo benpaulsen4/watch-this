@@ -7,9 +7,18 @@ import {
   showSchedules,
   MovieWatchStatus,
   TVWatchStatus,
+  ContentTypeEnum,
+  WatchStatusEnum,
+  WatchStatus,
+  episodeWatchStatus,
 } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
-import { tmdbClient, TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
+import {
+  tmdbClient,
+  TMDBMovie,
+  TMDBSearchItem,
+  TMDBTVShow,
+} from "@/lib/tmdb/client";
 import { syncStatusToCollaborators } from "@/lib/activity/activityUtils";
 import type {
   ContentStatusItem,
@@ -19,6 +28,7 @@ import type {
   UpdateContentStatusInput,
   UpdateContentStatusResult,
   DeleteContentStatusResult,
+  TMDBContent,
 } from "./types";
 
 function mapRow(row: any): ContentStatusItem {
@@ -29,13 +39,13 @@ function mapRow(row: any): ContentStatusItem {
     contentType: row.contentType,
     status: row.status,
     nextEpisodeDate: row.nextEpisodeDate
-      ? (row.nextEpisodeDate.toISOString?.() ?? row.nextEpisodeDate)
+      ? row.nextEpisodeDate.toISOString?.() ?? row.nextEpisodeDate
       : null,
     createdAt: row.createdAt
-      ? (row.createdAt.toISOString?.() ?? row.createdAt)
+      ? row.createdAt.toISOString?.() ?? row.createdAt
       : undefined,
     updatedAt: row.updatedAt
-      ? (row.updatedAt.toISOString?.() ?? row.updatedAt)
+      ? row.updatedAt.toISOString?.() ?? row.updatedAt
       : undefined,
   };
 }
@@ -43,7 +53,7 @@ function mapRow(row: any): ContentStatusItem {
 export async function getContentStatus(
   userId: string,
   tmdbId: number,
-  contentType: string,
+  contentType: string
 ): Promise<GetContentStatusResponse> {
   const status = await db
     .select()
@@ -52,8 +62,8 @@ export async function getContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType),
-      ),
+        eq(userContentStatus.contentType, contentType)
+      )
     )
     .limit(1);
   return { status: status[0] ? mapRow(status[0]) : null };
@@ -61,7 +71,7 @@ export async function getContentStatus(
 
 export async function createOrUpdateContentStatus(
   userId: string,
-  input: CreateOrUpdateContentStatusInput,
+  input: CreateOrUpdateContentStatusInput
 ): Promise<CreateOrUpdateContentStatusResult> {
   const { tmdbId, contentType, status } = input;
   try {
@@ -76,8 +86,8 @@ export async function createOrUpdateContentStatus(
         and(
           eq(userContentStatus.userId, userId),
           eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, contentType),
-        ),
+          eq(userContentStatus.contentType, contentType)
+        )
       )
       .limit(1);
     let result;
@@ -89,8 +99,8 @@ export async function createOrUpdateContentStatus(
           and(
             eq(userContentStatus.userId, userId),
             eq(userContentStatus.tmdbId, tmdbId),
-            eq(userContentStatus.contentType, contentType),
-          ),
+            eq(userContentStatus.contentType, contentType)
+          )
         )
         .returning();
     } else {
@@ -109,8 +119,8 @@ export async function createOrUpdateContentStatus(
           .where(
             and(
               eq(showSchedules.userId, userId),
-              eq(showSchedules.tmdbId, tmdbId),
-            ),
+              eq(showSchedules.tmdbId, tmdbId)
+            )
           );
       } catch {}
     }
@@ -118,7 +128,7 @@ export async function createOrUpdateContentStatus(
       userId,
       tmdbId,
       contentType,
-      status,
+      status
     );
     try {
       await db.insert(activityFeed).values({
@@ -147,7 +157,7 @@ export async function createOrUpdateContentStatus(
 
 export async function updateContentStatus(
   userId: string,
-  input: UpdateContentStatusInput,
+  input: UpdateContentStatusInput
 ): Promise<UpdateContentStatusResult> {
   const { tmdbId, contentType, status } = input;
   const existing = await db
@@ -157,8 +167,8 @@ export async function updateContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType),
-      ),
+        eq(userContentStatus.contentType, contentType)
+      )
     )
     .limit(1);
   if (existing.length === 0) return "notFound";
@@ -171,8 +181,8 @@ export async function updateContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType),
-      ),
+        eq(userContentStatus.contentType, contentType)
+      )
     )
     .returning();
   if (
@@ -186,15 +196,15 @@ export async function updateContentStatus(
         .where(
           and(
             eq(showSchedules.userId, userId),
-            eq(showSchedules.tmdbId, tmdbId),
-          ),
+            eq(showSchedules.tmdbId, tmdbId)
+          )
         );
     } catch {}
     const syncedCollaboratorIds = await syncStatusToCollaborators(
       userId,
       tmdbId,
       contentType,
-      status,
+      status
     );
     try {
       const contentDetails = await tmdbClient.getTVShowDetails(tmdbId);
@@ -219,7 +229,7 @@ export async function updateContentStatus(
 export async function deleteContentStatus(
   userId: string,
   tmdbId: number,
-  contentType: string,
+  contentType: string
 ): Promise<DeleteContentStatusResult | "notFound"> {
   const existing = await db
     .select()
@@ -228,8 +238,8 @@ export async function deleteContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType),
-      ),
+        eq(userContentStatus.contentType, contentType)
+      )
     )
     .limit(1);
   if (existing.length === 0) return "notFound";
@@ -239,8 +249,127 @@ export async function deleteContentStatus(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType),
-      ),
+        eq(userContentStatus.contentType, contentType)
+      )
     );
   return { message: "Content status removed successfully" };
+}
+
+export async function mapWithContentStatus(
+  content: TMDBMovie | TMDBTVShow | TMDBSearchItem,
+  userId: string
+): Promise<TMDBContent> {
+  const contentType =
+    "media_type" in content
+      ? content.media_type
+      : "title" in content
+      ? "movie"
+      : "tv";
+  let [statusData] = await db
+    .select({
+      status: userContentStatus.status,
+      nextEpisodeDate: userContentStatus.nextEpisodeDate,
+      updatedAt: userContentStatus.updatedAt,
+    })
+    .from(userContentStatus)
+    .where(
+      and(
+        eq(userContentStatus.userId, userId),
+        eq(userContentStatus.tmdbId, content.id),
+        eq(userContentStatus.contentType, contentType)
+      )
+    )
+    .limit(1);
+
+  if (!statusData) {
+    return mapContentToDomainModel(content, contentType, null, null);
+  }
+
+  if (
+    contentType === ContentType.TV &&
+    statusData.status === WatchStatus.COMPLETED &&
+    statusData.nextEpisodeDate &&
+    statusData.nextEpisodeDate < new Date()
+  ) {
+    // Need to check if a new episode is available
+    const showDetails = await tmdbClient.getTVShowDetails(content.id);
+
+    if (showDetails.last_episode_to_air) {
+      const [episodeStatus] = await db
+        .select({
+          watched: episodeWatchStatus.watched,
+        })
+        .from(episodeWatchStatus)
+        .where(
+          and(
+            eq(episodeWatchStatus.userId, userId),
+            eq(episodeWatchStatus.tmdbId, content.id),
+            eq(
+              episodeWatchStatus.seasonNumber,
+              showDetails.last_episode_to_air.season_number
+            ),
+            eq(
+              episodeWatchStatus.episodeNumber,
+              showDetails.last_episode_to_air.episode_number
+            )
+          )
+        )
+        .limit(1);
+
+      if (!episodeStatus?.watched) {
+        // A new episode has been released since the show was completed
+        [statusData] = await db
+          .update(userContentStatus)
+          .set({
+            status: WatchStatus.WATCHING,
+            nextEpisodeDate: null,
+          })
+          .where(
+            and(
+              eq(userContentStatus.userId, userId),
+              eq(userContentStatus.tmdbId, content.id),
+              eq(userContentStatus.contentType, contentType)
+            )
+          )
+          .returning({
+            status: userContentStatus.status,
+            nextEpisodeDate: userContentStatus.nextEpisodeDate,
+            updatedAt: userContentStatus.updatedAt,
+          });
+      }
+    }
+  }
+
+  return mapContentToDomainModel(
+    content,
+    contentType,
+    statusData.status as WatchStatusEnum,
+    statusData.updatedAt
+  );
+}
+
+export function mapContentToDomainModel(
+  content: TMDBMovie | TMDBTVShow | TMDBSearchItem,
+  contentType: ContentTypeEnum,
+  watchStatus: WatchStatusEnum | null,
+  statusUpdatedAt: Date | null
+): TMDBContent {
+  return {
+    tmdbId: content.id,
+    contentType,
+    title: "title" in content ? content.title : content.name,
+    overview: content.overview,
+    posterPath: content.poster_path,
+    backdropPath: content.backdrop_path,
+    releaseDate:
+      "release_date" in content ? content.release_date : content.first_air_date,
+    voteAverage: content.vote_average,
+    voteCount: content.vote_count,
+    popularity: content.popularity,
+    genreIds: content.genre_ids || [],
+    adult: "adult" in content ? content.adult : null,
+
+    watchStatus,
+    statusUpdatedAt: statusUpdatedAt?.toISOString() ?? null,
+  };
 }
