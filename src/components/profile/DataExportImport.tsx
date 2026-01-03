@@ -14,19 +14,16 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useMutation } from "@tanstack/react-query";
-import type { ImportResult } from "@/lib/profile/data/types";
+import type { ExportResponse, ImportResult } from "@/lib/profile/data/types";
 
 type ExportFormat = "json" | "csv";
 type ImportStatus = "idle" | "uploading" | "success" | "error";
-
-// ImportResult type is shared from lib
 
 export function DataExportImport() {
   const [exportLoading, setExportLoading] = useState(false);
   const [importStatus, setImportStatus] = useState<ImportStatus>("idle");
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  // Import is now JSON-only, no format selection needed
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const exportMutation = useMutation({
@@ -35,19 +32,10 @@ export function DataExportImport() {
       const responseData = await response.json();
       if (!response.ok)
         throw new Error(responseData.error || "Failed to export data");
-      return responseData as { data: string; filename: string; isZip: boolean };
+      return responseData as ExportResponse;
     },
-    onSuccess: ({ data, filename, isZip }) => {
-      let blob: Blob;
-      if (isZip) {
-        const binaryString = atob(data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++)
-          bytes[i] = binaryString.charCodeAt(i);
-        blob = new Blob([bytes], { type: "application/zip" });
-      } else {
-        blob = new Blob([data], { type: "application/json" });
-      }
+    onSuccess: ({ data, filename, mimetype }) => {
+      const blob = new Blob([data], { type: mimetype });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -113,7 +101,13 @@ export function DataExportImport() {
       console.error("Import failed:", error);
       setImportResult({
         success: false,
-        imported: { lists: 0, contentStatus: 0, episodeStatus: 0 },
+        imported: {
+          lists: 0,
+          listItems: 0,
+          contentStatus: 0,
+          episodeStatus: 0,
+          tvShowSchedules: 0,
+        },
         errors: [
           error instanceof Error ? error.message : "Failed to import data",
         ],

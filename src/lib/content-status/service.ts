@@ -140,8 +140,9 @@ export async function createOrUpdateContentStatus(
         metadata: {
           status,
           title:
-            (contentDetails as TMDBMovie)?.title ??
-            (contentDetails as TMDBTVShow)?.name,
+            "title" in contentDetails
+              ? contentDetails.title
+              : contentDetails.name,
           posterPath: contentDetails.poster_path,
         },
         collaborators: syncedCollaboratorIds,
@@ -216,7 +217,7 @@ export async function updateContentStatus(
         contentType,
         metadata: {
           status,
-          title: (contentDetails as TMDBTVShow)?.name,
+          title: contentDetails.name,
           posterPath: contentDetails.poster_path,
         },
         collaborators: syncedCollaboratorIds,
