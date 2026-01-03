@@ -97,8 +97,6 @@ export const listItems = pgTable(
       .references(() => lists.id, { onDelete: "cascade" }),
     tmdbId: integer("tmdb_id").notNull(),
     contentType: varchar("content_type", { length: 10 }).notNull(),
-    title: varchar("title", { length: 255 }).notNull(),
-    posterPath: varchar("poster_path", { length: 255 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -400,6 +398,9 @@ export type NewShowSchedule = typeof showSchedules.$inferInsert;
 export type UserStreamingProvider = typeof userStreamingProviders.$inferSelect;
 export type NewUserStreamingProvider =
   typeof userStreamingProviders.$inferInsert;
+
+export type TMDBCache = typeof tmdbCache.$inferSelect;
+export type NewTMDBCache = typeof tmdbCache.$inferInsert;
 
 // Enums for type safety
 export const ListType = {

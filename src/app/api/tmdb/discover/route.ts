@@ -6,7 +6,10 @@ import {
   validatePagination,
   AuthenticatedRequest,
 } from "@/lib/auth/api-middleware";
-import { mapWithContentStatus } from "@/lib/content-status/service";
+import {
+  mapAllWithContentStatus,
+  mapWithContentStatus,
+} from "@/lib/content-status/service";
 import {
   TMDBContent,
   TMDBContentSearchResult,
@@ -110,13 +113,10 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     // Enrich results with watch status
     if (intermediateResults.results && intermediateResults.results.length > 0) {
-      const enrichedResults = await Promise.all(
-        intermediateResults.results.map(async (item) => {
-          return await mapWithContentStatus(item, request.user.id);
-        })
+      finalResults.results = await mapAllWithContentStatus(
+        intermediateResults.results,
+        request.user.id
       );
-
-      finalResults.results = enrichedResults;
     }
 
     return NextResponse.json(finalResults);

@@ -64,8 +64,6 @@ export interface DeleteResponse {
 export interface CreateListItemInput {
   tmdbId: number;
   contentType: ContentTypeEnum;
-  title: string;
-  posterPath?: string | null;
 }
 
 export interface ListItemRow {
@@ -73,8 +71,6 @@ export interface ListItemRow {
   listId: string;
   tmdbId: number;
   contentType: ContentTypeEnum;
-  title: string;
-  posterPath?: string | null;
   createdAt: string;
 }
 

@@ -68,11 +68,11 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     }
 
     const body = (await request.json()) as CreateListItemInput;
-    const { tmdbId, contentType, title, posterPath } = body;
+    const { tmdbId, contentType } = body;
 
-    if (!tmdbId || !contentType || !title) {
+    if (!tmdbId || !contentType) {
       return NextResponse.json(
-        { error: "tmdbId, contentType, and title are required" },
+        { error: "tmdbId and contentType are required" },
         { status: 400 }
       );
     }
@@ -86,8 +86,6 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     const result = await createListItem(userId, listId, {
       tmdbId,
       contentType,
-      title,
-      posterPath,
     });
     if (result === "notFound") {
       return NextResponse.json(

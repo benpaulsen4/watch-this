@@ -6,16 +6,17 @@ import {
   episodeWatchStatus,
   activityFeed,
   ActivityType,
-  type NewUserStreamingProvider,
 } from "@/lib/db/schema";
 import { asc, eq } from "drizzle-orm";
 import JSZip from "jszip";
 import type { ExportFormat, ExportResponse, ImportResult } from "./types";
 
+// TODO Rewrite import and export from first principles
+
 export async function exportUserData(
   userId: string,
   username: string,
-  format: ExportFormat,
+  format: ExportFormat
 ): Promise<ExportResponse | "zipFailed"> {
   const timestamp = new Date().toISOString().split("T")[0];
 
@@ -30,8 +31,6 @@ export async function exportUserData(
       itemId: listItems.id,
       tmdbId: listItems.tmdbId,
       contentType: listItems.contentType,
-      title: listItems.title,
-      posterPath: listItems.posterPath,
       createdAt: listItems.createdAt,
     })
     .from(lists)
@@ -99,13 +98,11 @@ export async function exportUserData(
           items: [],
         };
       }
-      if (row.itemId && row.contentType && row.title) {
+      if (row.itemId && row.contentType) {
         acc[listId].items.push({
           id: row.itemId,
           tmdbId: row.tmdbId,
           contentType: row.contentType,
-          title: row.title,
-          posterPath: row.posterPath,
           createdAt: row.createdAt,
         });
       }
@@ -124,12 +121,10 @@ export async function exportUserData(
           id: string;
           tmdbId: number | null;
           contentType: string;
-          title: string;
-          posterPath: string | null;
           createdAt: Date | null;
         }[];
       }
-    >,
+    >
   );
 
   const listsArray = Object.values(listsData);
@@ -149,8 +144,7 @@ export async function exportUserData(
           id: item.id,
           tmdbId: item.tmdbId,
           contentType: item.contentType,
-          title: item.title,
-          posterPath: item.posterPath,
+
           createdAt: item.createdAt ? item.createdAt.toISOString() : null,
         })),
       })),
@@ -191,7 +185,7 @@ export async function exportUserData(
               ? `"${fieldStr.replace(/"/g, '""')}"`
               : fieldStr;
           })
-          .join(","),
+          .join(",")
       )
       .join("\n");
 
@@ -202,13 +196,9 @@ export async function exportUserData(
     "List Type",
     "List Is Public",
     "List Created At",
-    "Item Title",
     "Item TMDB ID",
     "Item Content Type",
-    "Item Poster Path",
-    "Item Notes",
-    "Item Added At",
-    "Item Sort Order",
+    "Item Created At",
   ]);
 
   for (const list of listsArray) {
@@ -222,10 +212,6 @@ export async function exportUserData(
         "",
         "",
         "",
-        "",
-        "",
-        "",
-        "",
       ]);
     } else {
       for (const item of list.items) {
@@ -235,10 +221,8 @@ export async function exportUserData(
           list.type,
           list.isPublic.toString(),
           list.createdAt.toISOString(),
-          item.title,
           item.tmdbId?.toString() || "",
           item.contentType,
-          item.posterPath || "",
           item.createdAt?.toISOString() || "",
         ]);
       }
@@ -307,7 +291,7 @@ export async function exportUserData(
 export async function importUserData(
   userId: string,
   fileContent: string,
-  format: "json",
+  format: "json"
 ): Promise<ImportResult | "parseError"> {
   let importedListsCount = 0;
   let importedContentStatusCount = 0;
@@ -341,13 +325,9 @@ export async function importUserData(
         if (listData.items && Array.isArray(listData.items)) {
           for (const itemData of listData.items) {
             try {
-              if (
-                !itemData.title ||
-                !itemData.tmdbId ||
-                !itemData.contentType
-              ) {
+              if (!itemData.tmdbId || !itemData.contentType) {
                 errors.push(
-                  `Skipped item in list '${listData.name}': title, tmdbId, and contentType are required`,
+                  `Skipped item in list '${listData.name}': tmdbId, and contentType are required`
                 );
                 continue;
               }
@@ -355,12 +335,10 @@ export async function importUserData(
                 listId: newList.id,
                 tmdbId: itemData.tmdbId,
                 contentType: itemData.contentType,
-                title: itemData.title,
-                posterPath: itemData.posterPath || null,
               });
             } catch (itemError) {
               errors.push(
-                `Failed to import item '${itemData.title}' in list '${listData.name}': ${itemError}`,
+                `Failed to import item with TMDB ID ${itemData.tmdbId} in list '${listData.name}': ${itemError}`
               );
             }
           }
@@ -381,7 +359,7 @@ export async function importUserData(
           !statusData.status
         ) {
           errors.push(
-            `Skipped content status: tmdbId, contentType, and status are required`,
+            `Skipped content status: tmdbId, contentType, and status are required`
           );
           continue;
         }
@@ -394,14 +372,14 @@ export async function importUserData(
         ];
         if (!validStatuses.includes(statusData.status)) {
           errors.push(
-            `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid status '${statusData.status}'`,
+            `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid status '${statusData.status}'`
           );
           continue;
         }
         const validContentTypes = ["movie", "tv"];
         if (!validContentTypes.includes(statusData.contentType)) {
           errors.push(
-            `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid content type '${statusData.contentType}'`,
+            `Skipped content status for TMDB ID ${statusData.tmdbId}: invalid content type '${statusData.contentType}'`
           );
           continue;
         }
@@ -435,14 +413,14 @@ export async function importUserData(
           errors.push(
             `Failed to import content status for TMDB ID ${
               statusData.tmdbId
-            }: ${error instanceof Error ? error.message : "Unknown error"}`,
+            }: ${error instanceof Error ? error.message : "Unknown error"}`
           );
           continue;
         }
         importedContentStatusCount++;
       } catch (statusError) {
         errors.push(
-          `Failed to import content status for TMDB ID ${statusData.tmdbId}: ${statusError}`,
+          `Failed to import content status for TMDB ID ${statusData.tmdbId}: ${statusError}`
         );
       }
     }
@@ -457,7 +435,7 @@ export async function importUserData(
           episodeData.episodeNumber === undefined
         ) {
           errors.push(
-            `Skipped episode status: tmdbId, seasonNumber, and episodeNumber are required`,
+            `Skipped episode status: tmdbId, seasonNumber, and episodeNumber are required`
           );
           continue;
         }
@@ -465,13 +443,13 @@ export async function importUserData(
         const episodeNum = parseInt(episodeData.episodeNumber);
         if (isNaN(seasonNum) || seasonNum < 0) {
           errors.push(
-            `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid season number '${episodeData.seasonNumber}'`,
+            `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid season number '${episodeData.seasonNumber}'`
           );
           continue;
         }
         if (isNaN(episodeNum) || episodeNum < 1) {
           errors.push(
-            `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid episode number '${episodeData.episodeNumber}'`,
+            `Skipped episode status for TMDB ID ${episodeData.tmdbId}: invalid episode number '${episodeData.episodeNumber}'`
           );
           continue;
         }
@@ -509,14 +487,14 @@ export async function importUserData(
               episodeData.tmdbId
             } S${seasonNum}E${episodeNum}: ${
               error instanceof Error ? error.message : "Unknown error"
-            }`,
+            }`
           );
           continue;
         }
         importedEpisodeStatusCount++;
       } catch (episodeError) {
         errors.push(
-          `Failed to import episode status for TMDB ID ${episodeData.tmdbId} S${episodeData.seasonNumber}E${episodeData.episodeNumber}: ${episodeError}`,
+          `Failed to import episode status for TMDB ID ${episodeData.tmdbId} S${episodeData.seasonNumber}E${episodeData.episodeNumber}: ${episodeError}`
         );
       }
     }

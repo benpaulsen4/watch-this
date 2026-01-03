@@ -23,6 +23,7 @@ import {
   NewList,
   userContentStatus,
   WatchStatusEnum,
+  ContentTypeEnum,
 } from "../db";
 import { tmdbClient } from "../tmdb/client";
 import {
@@ -41,8 +42,12 @@ import {
   ListCollaboratorsResponse,
   UpdateCollaboratorsResponse,
 } from "./types";
-import { v4 as uuidv4 } from "uuid";
 import { mapWithContentStatus } from "../content-status/service";
+import {
+  addToCache,
+  getAllCachedContent,
+  getCachedContent,
+} from "../tmdb/cache-utils";
 
 export async function listLists(userId: string): Promise<ListResponse[]> {
   // Get lists with counts in a single optimized query
@@ -87,18 +92,25 @@ export async function listLists(userId: string): Promise<ListResponse[]> {
     userListsWithCounts.map(async (list) => {
       const posterItems = await db
         .select({
-          posterPath: listItems.posterPath,
+          tmdbId: listItems.tmdbId,
+          contentType: listItems.contentType,
         })
         .from(listItems)
-        .where(
-          and(eq(listItems.listId, list.id), isNotNull(listItems.posterPath))
-        )
+        .where(and(eq(listItems.listId, list.id)))
         .orderBy(desc(listItems.createdAt))
-        .limit(4);
+        .limit(6);
+
+      const contentDetails = await getAllCachedContent(
+        posterItems as { tmdbId: number; contentType: ContentTypeEnum }[],
+        userId
+      );
 
       return {
         ...list,
-        posterPaths: posterItems.map((i) => i.posterPath!),
+        posterPaths: contentDetails
+          .filter((i) => !!i.posterPath)
+          .slice(0, 4)
+          .map((i) => i.posterPath!),
       };
     })
   );
@@ -229,8 +241,6 @@ export async function getListItems(
         id: listItems.id,
         tmdbId: listItems.tmdbId,
         contentType: listItems.contentType,
-        title: listItems.title,
-        posterPath: listItems.posterPath,
         createdAt: listItems.createdAt,
       })
       .from(listItems)
@@ -254,27 +264,24 @@ export async function getListItems(
 
     const basicItems = await query;
 
-    const tmdbItems = await Promise.all(
-      basicItems.map(async (item) => {
-        const tmdbData =
-          item.contentType === "movie"
-            ? await tmdbClient.getMovieDetails(item.tmdbId)
-            : await tmdbClient.getTVShowDetails(item.tmdbId);
-        return {
-          ...tmdbData,
-          // Override with list-specific data
-          listItemId: item.id,
-          createdAt: item.createdAt.toISOString(),
-        };
-      })
-    );
-
-    const enrichedItems = (await Promise.all(
-      tmdbItems.map(async (item) => await mapWithContentStatus(item, userId))
-    )) as ListItem[];
+    const completeItems = (
+      await getAllCachedContent(
+        basicItems as { tmdbId: number; contentType: ContentTypeEnum }[],
+        userId
+      )
+    ).map((item) => {
+      const original = basicItems.find(
+        (i) => i.tmdbId === item.tmdbId && i.contentType === item.contentType
+      );
+      return {
+        ...item,
+        listItemId: original!.id,
+        createdAt: original!.createdAt.toISOString(),
+      };
+    });
 
     return {
-      items: enrichedItems || [],
+      items: completeItems,
     };
   } catch (error) {
     console.error("Error in getListItems:", error);
@@ -480,15 +487,14 @@ export async function createListItem(
     .limit(1);
   if (existingItem) return "conflict";
 
+  const contentDetails = await addToCache(input.tmdbId, input.contentType);
+
   const [newItem] = await db
     .insert(listItems)
     .values({
-      id: uuidv4(),
       listId,
       tmdbId: Number(input.tmdbId),
       contentType: input.contentType,
-      title: input.title.trim(),
-      posterPath: input.posterPath || null,
     })
     .returning();
 
@@ -500,9 +506,9 @@ export async function createListItem(
       contentType: input.contentType,
       listId,
       metadata: {
-        title: input.title,
+        title: contentDetails!.title,
         listName: listData?.name || "",
-        posterPath: input.posterPath || null,
+        posterPath: contentDetails!.posterPath,
       },
       createdAt: new Date(),
     });
@@ -515,8 +521,6 @@ export async function createListItem(
     listId: listId,
     tmdbId: newItem.tmdbId,
     contentType: newItem.contentType as "movie" | "tv",
-    title: newItem.title,
-    posterPath: newItem.posterPath ?? null,
     createdAt: newItem.createdAt.toISOString(),
   };
 }
@@ -544,8 +548,6 @@ export async function deleteListItem(
       id: listItems.id,
       tmdbId: listItems.tmdbId,
       contentType: listItems.contentType,
-      title: listItems.title,
-      posterPath: listItems.posterPath,
     })
     .from(listItems)
     .where(and(eq(listItems.id, itemId), eq(listItems.listId, listId)))
@@ -553,6 +555,12 @@ export async function deleteListItem(
   if (!existingItem) return "notFound";
 
   await db.delete(listItems).where(eq(listItems.id, itemId));
+
+  const contentDetails = await getCachedContent(
+    existingItem.tmdbId,
+    existingItem.contentType as ContentTypeEnum,
+    userId
+  );
 
   try {
     await db.insert(activityFeed).values({
@@ -562,8 +570,8 @@ export async function deleteListItem(
       contentType: existingItem.contentType,
       listId,
       metadata: {
-        title: existingItem.title,
-        posterPath: existingItem.posterPath,
+        title: contentDetails!.title,
+        posterPath: contentDetails!.posterPath,
       },
       createdAt: new Date(),
     });

@@ -11,8 +11,9 @@ import {
   WatchStatusEnum,
   WatchStatus,
   episodeWatchStatus,
+  UserContentStatus,
 } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import {
   tmdbClient,
   TMDBMovie,
@@ -291,61 +292,365 @@ export async function mapWithContentStatus(
     statusData.nextEpisodeDate &&
     statusData.nextEpisodeDate < new Date()
   ) {
-    // Need to check if a new episode is available
-    const showDetails = await tmdbClient.getTVShowDetails(content.id);
-
-    if (showDetails.last_episode_to_air) {
-      const [episodeStatus] = await db
-        .select({
-          watched: episodeWatchStatus.watched,
-        })
-        .from(episodeWatchStatus)
-        .where(
-          and(
-            eq(episodeWatchStatus.userId, userId),
-            eq(episodeWatchStatus.tmdbId, content.id),
-            eq(
-              episodeWatchStatus.seasonNumber,
-              showDetails.last_episode_to_air.season_number
-            ),
-            eq(
-              episodeWatchStatus.episodeNumber,
-              showDetails.last_episode_to_air.episode_number
-            )
-          )
-        )
-        .limit(1);
-
-      if (!episodeStatus?.watched) {
-        // A new episode has been released since the show was completed
-        [statusData] = await db
-          .update(userContentStatus)
-          .set({
-            status: WatchStatus.WATCHING,
-            nextEpisodeDate: null,
-          })
-          .where(
-            and(
-              eq(userContentStatus.userId, userId),
-              eq(userContentStatus.tmdbId, content.id),
-              eq(userContentStatus.contentType, contentType)
-            )
-          )
-          .returning({
-            status: userContentStatus.status,
-            nextEpisodeDate: userContentStatus.nextEpisodeDate,
-            updatedAt: userContentStatus.updatedAt,
-          });
-      }
-    }
+    return mapTVShowWithNewEpisode(
+      content as TMDBTVShow,
+      userId,
+      statusData.updatedAt
+    );
   }
-
   return mapContentToDomainModel(
     content,
     contentType,
     statusData.status as WatchStatusEnum,
     statusData.updatedAt
   );
+}
+
+export async function mapAllWithContentStatus(
+  contents: (TMDBMovie | TMDBTVShow | TMDBSearchItem)[],
+  userId: string
+): Promise<TMDBContent[]> {
+  if (!contents.length) return [];
+
+  const contentsWithType = contents.map((content) => {
+    const contentType =
+      "media_type" in content
+        ? content.media_type
+        : "title" in content
+        ? "movie"
+        : "tv";
+    return { content, contentType };
+  });
+
+  const movieIds = contentsWithType
+    .filter((c) => c.contentType === "movie")
+    .map((c) => c.content.id);
+  const tvIds = contentsWithType
+    .filter((c) => c.contentType === "tv")
+    .map((c) => c.content.id);
+
+  const conditions = [];
+  if (movieIds.length > 0) {
+    conditions.push(
+      and(
+        eq(userContentStatus.userId, userId),
+        eq(userContentStatus.contentType, "movie"),
+        inArray(userContentStatus.tmdbId, movieIds)
+      )
+    );
+  }
+  if (tvIds.length > 0) {
+    conditions.push(
+      and(
+        eq(userContentStatus.userId, userId),
+        eq(userContentStatus.contentType, "tv"),
+        inArray(userContentStatus.tmdbId, tvIds)
+      )
+    );
+  }
+
+  let statuses: UserContentStatus[] = [];
+
+  if (conditions.length > 0) {
+    statuses = await db
+      .select()
+      .from(userContentStatus)
+      .where(or(...conditions));
+  }
+
+  const statusMap = new Map<string, UserContentStatus>();
+  for (const status of statuses) {
+    statusMap.set(`${status.tmdbId}-${status.contentType}`, status);
+  }
+
+  return Promise.all(
+    contentsWithType.map(async ({ content, contentType }) => {
+      const statusData = statusMap.get(`${content.id}-${contentType}`);
+
+      if (!statusData) {
+        return mapContentToDomainModel(
+          content,
+          contentType as ContentTypeEnum,
+          null,
+          null
+        );
+      }
+
+      if (
+        contentType === ContentType.TV &&
+        statusData.status === WatchStatus.COMPLETED &&
+        statusData.nextEpisodeDate &&
+        new Date(statusData.nextEpisodeDate) < new Date()
+      ) {
+        return mapTVShowWithNewEpisode(
+          content as TMDBTVShow,
+          userId,
+          statusData.updatedAt
+        );
+      }
+
+      return mapContentToDomainModel(
+        content,
+        contentType as ContentTypeEnum,
+        statusData.status as WatchStatusEnum,
+        statusData.updatedAt
+      );
+    })
+  );
+}
+
+export async function enrichWithContentStatus(
+  content: TMDBContent,
+  userId: string
+): Promise<TMDBContent> {
+  let [statusData] = await db
+    .select({
+      status: userContentStatus.status,
+      nextEpisodeDate: userContentStatus.nextEpisodeDate,
+      updatedAt: userContentStatus.updatedAt,
+    })
+    .from(userContentStatus)
+    .where(
+      and(
+        eq(userContentStatus.userId, userId),
+        eq(userContentStatus.tmdbId, content.tmdbId),
+        eq(userContentStatus.contentType, content.contentType)
+      )
+    )
+    .limit(1);
+
+  if (!statusData) {
+    return content;
+  }
+
+  if (
+    content.contentType === ContentType.TV &&
+    statusData.status === WatchStatus.COMPLETED &&
+    statusData.nextEpisodeDate &&
+    statusData.nextEpisodeDate < new Date()
+  ) {
+    return enrichTVShowWithNewEpisode(content, userId, statusData.updatedAt);
+  }
+  return {
+    ...content,
+    watchStatus: statusData.status as WatchStatusEnum,
+    statusUpdatedAt: statusData.updatedAt?.toISOString(),
+  };
+}
+
+export async function enrichAllWithContentStatus(
+  contents: TMDBContent[],
+  userId: string
+): Promise<TMDBContent[]> {
+  if (!contents.length) return [];
+
+  const movieIds = contents
+    .filter((c) => c.contentType === "movie")
+    .map((c) => c.tmdbId);
+  const tvIds = contents
+    .filter((c) => c.contentType === "tv")
+    .map((c) => c.tmdbId);
+
+  const conditions = [];
+  if (movieIds.length > 0) {
+    conditions.push(
+      and(
+        eq(userContentStatus.userId, userId),
+        eq(userContentStatus.contentType, "movie"),
+        inArray(userContentStatus.tmdbId, movieIds)
+      )
+    );
+  }
+  if (tvIds.length > 0) {
+    conditions.push(
+      and(
+        eq(userContentStatus.userId, userId),
+        eq(userContentStatus.contentType, "tv"),
+        inArray(userContentStatus.tmdbId, tvIds)
+      )
+    );
+  }
+
+  let statuses: UserContentStatus[] = [];
+
+  if (conditions.length > 0) {
+    statuses = await db
+      .select()
+      .from(userContentStatus)
+      .where(or(...conditions));
+  }
+
+  const statusMap = new Map<string, UserContentStatus>();
+  for (const status of statuses) {
+    statusMap.set(`${status.tmdbId}-${status.contentType}`, status);
+  }
+
+  return Promise.all(
+    contents.map(async (content) => {
+      const statusData = statusMap.get(
+        `${content.tmdbId}-${content.contentType}`
+      );
+
+      if (!statusData) {
+        return content;
+      }
+
+      if (
+        content.contentType === ContentType.TV &&
+        statusData.status === WatchStatus.COMPLETED &&
+        statusData.nextEpisodeDate &&
+        new Date(statusData.nextEpisodeDate) < new Date()
+      ) {
+        return enrichTVShowWithNewEpisode(
+          content,
+          userId,
+          statusData.updatedAt
+        );
+      }
+
+      return {
+        ...content,
+        watchStatus: statusData.status as WatchStatusEnum,
+        statusUpdatedAt: statusData.updatedAt?.toISOString(),
+      };
+    })
+  );
+}
+
+async function mapTVShowWithNewEpisode(
+  content: TMDBTVShow,
+  userId: string,
+  statusUpdateDate: Date
+): Promise<TMDBContent> {
+  // Need to check if a new episode is available
+  const showDetails = await tmdbClient.getTVShowDetails(content.id);
+
+  if (showDetails.last_episode_to_air) {
+    const [episodeStatus] = await db
+      .select({
+        watched: episodeWatchStatus.watched,
+      })
+      .from(episodeWatchStatus)
+      .where(
+        and(
+          eq(episodeWatchStatus.userId, userId),
+          eq(episodeWatchStatus.tmdbId, content.id),
+          eq(
+            episodeWatchStatus.seasonNumber,
+            showDetails.last_episode_to_air.season_number
+          ),
+          eq(
+            episodeWatchStatus.episodeNumber,
+            showDetails.last_episode_to_air.episode_number
+          )
+        )
+      )
+      .limit(1);
+
+    if (!episodeStatus?.watched) {
+      // A new episode has been released since the show was completed
+      const [statusData] = await db
+        .update(userContentStatus)
+        .set({
+          status: WatchStatus.WATCHING,
+          nextEpisodeDate: null,
+        })
+        .where(
+          and(
+            eq(userContentStatus.userId, userId),
+            eq(userContentStatus.tmdbId, content.id),
+            eq(userContentStatus.contentType, ContentType.TV)
+          )
+        )
+        .returning({
+          status: userContentStatus.status,
+          nextEpisodeDate: userContentStatus.nextEpisodeDate,
+          updatedAt: userContentStatus.updatedAt,
+        });
+
+      return mapContentToDomainModel(
+        content,
+        ContentType.TV,
+        statusData.status as WatchStatusEnum,
+        statusData.updatedAt
+      );
+    }
+  }
+
+  // No new episode released, keep status as completed
+  return mapContentToDomainModel(
+    content,
+    ContentType.TV,
+    WatchStatus.COMPLETED,
+    statusUpdateDate
+  );
+}
+
+async function enrichTVShowWithNewEpisode(
+  content: TMDBContent,
+  userId: string,
+  statusUpdateDate: Date
+): Promise<TMDBContent> {
+  // Need to check if a new episode is available
+  const showDetails = await tmdbClient.getTVShowDetails(content.tmdbId);
+
+  if (showDetails.last_episode_to_air) {
+    const [episodeStatus] = await db
+      .select({
+        watched: episodeWatchStatus.watched,
+      })
+      .from(episodeWatchStatus)
+      .where(
+        and(
+          eq(episodeWatchStatus.userId, userId),
+          eq(episodeWatchStatus.tmdbId, content.tmdbId),
+          eq(
+            episodeWatchStatus.seasonNumber,
+            showDetails.last_episode_to_air.season_number
+          ),
+          eq(
+            episodeWatchStatus.episodeNumber,
+            showDetails.last_episode_to_air.episode_number
+          )
+        )
+      )
+      .limit(1);
+
+    if (!episodeStatus?.watched) {
+      // A new episode has been released since the show was completed
+      const [statusData] = await db
+        .update(userContentStatus)
+        .set({
+          status: WatchStatus.WATCHING,
+          nextEpisodeDate: null,
+        })
+        .where(
+          and(
+            eq(userContentStatus.userId, userId),
+            eq(userContentStatus.tmdbId, content.tmdbId),
+            eq(userContentStatus.contentType, ContentType.TV)
+          )
+        )
+        .returning({
+          status: userContentStatus.status,
+          nextEpisodeDate: userContentStatus.nextEpisodeDate,
+          updatedAt: userContentStatus.updatedAt,
+        });
+
+      return {
+        ...content,
+        watchStatus: statusData.status as WatchStatusEnum,
+        statusUpdatedAt: statusData.updatedAt?.toISOString(),
+      };
+    }
+  }
+
+  // No new episode released, keep status as completed
+  return {
+    ...content,
+    watchStatus: WatchStatus.COMPLETED,
+    statusUpdatedAt: statusUpdateDate.toISOString(),
+  };
 }
 
 export function mapContentToDomainModel(
