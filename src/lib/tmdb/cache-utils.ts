@@ -39,12 +39,29 @@ export async function addToCache(
       voteAverage: contentDetails!.vote_average.toString(),
       voteCount: contentDetails!.vote_count,
       popularity: contentDetails!.popularity.toString(),
-      genreIds: contentDetails!.genre_ids,
+      genreIds: contentDetails!.genres.map((g) => g.id),
       adult: "adult" in contentDetails! ? contentDetails.adult : null,
     })
+    .onConflictDoNothing()
     .returning();
 
-  return mapToContent(data);
+  if (data) {
+    return mapToContent(data);
+  }
+
+  // Handle race condition where insert failed due to conflict
+  const [existingData] = await db
+    .select()
+    .from(tmdbCache)
+    .where(
+      and(eq(tmdbCache.tmdbId, tmdbId), eq(tmdbCache.contentType, contentType))
+    );
+
+  if (!existingData) {
+    throw new Error(`Failed to cache content: ${tmdbId} ${contentType}`);
+  }
+
+  return mapToContent(existingData);
 }
 
 export async function updateCache(
@@ -79,7 +96,7 @@ export async function updateCache(
       voteAverage: contentDetails!.vote_average.toString(),
       voteCount: contentDetails!.vote_count,
       popularity: contentDetails!.popularity.toString(),
-      genreIds: contentDetails!.genre_ids,
+      genreIds: contentDetails!.genres.map((g) => g.id),
       adult: "adult" in contentDetails! ? contentDetails.adult : null,
       updatedAt: new Date(),
     })

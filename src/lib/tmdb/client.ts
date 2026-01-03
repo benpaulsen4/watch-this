@@ -62,12 +62,12 @@ export interface TMDBGenre {
   name: string;
 }
 
-export interface TMDBMovieDetails extends TMDBMovie {
+export interface TMDBMovieDetails extends Omit<TMDBMovie, "genre_ids"> {
   genres: TMDBGenre[];
   runtime: number;
 }
 
-export interface TMDBTVShowDetails extends TMDBTVShow {
+export interface TMDBTVShowDetails extends Omit<TMDBTVShow, "genre_ids"> {
   genres: TMDBGenre[];
   last_episode_to_air: {
     air_date: string;
@@ -182,6 +182,8 @@ class TMDBClient {
       url.searchParams.set(key, value);
     });
 
+    const preStart = new Date();
+
     const response = await fetch(url.toString(), {
       headers: {
         Accept: "application/json",
@@ -190,6 +192,12 @@ class TMDBClient {
         revalidate: 36000, // Cache for 10 hours
       },
     });
+
+    console.info(
+      `[TMDB API] Request to ${endpoint} completed in ${
+        new Date().getTime() - preStart.getTime()
+      }ms`
+    );
 
     if (!response.ok) {
       throw new Error(

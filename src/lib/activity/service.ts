@@ -7,6 +7,7 @@ import {
   showSchedules,
   userContentStatus,
   episodeWatchStatus,
+  ContentType,
 } from "../db";
 import type { WatchStatusEnum } from "../db";
 import {
@@ -27,6 +28,7 @@ import type {
   UpcomingActivity,
 } from "./types";
 import { mapContentToDomainModel } from "../content-status/service";
+import { getCachedContent } from "../tmdb/cache-utils";
 
 export async function listActivityTimeline(
   userId: string,
@@ -215,14 +217,13 @@ export async function listActivityTimeline(
       );
     if (watchedToday.length > 0) continue;
     try {
-      const details = await tmdbClient.getTVShowDetails(row.tmdbId);
+      const details = await getCachedContent(
+        row.tmdbId,
+        ContentType.TV,
+        userId
+      );
       upcoming.push({
-        ...mapContentToDomainModel(
-          details,
-          "tv",
-          row.status as WatchStatusEnum,
-          row.statusUpdatedAt
-        ),
+        ...details,
         scheduleId: row.scheduleId,
       });
     } catch {}

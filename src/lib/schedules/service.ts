@@ -8,7 +8,7 @@ import {
   ScheduleItem,
   SchedulesByDay,
 } from "./types";
-import { getAllCachedContent } from "../tmdb/cache-utils";
+import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 
 export async function listSchedules(
   userId: string,
@@ -99,17 +99,13 @@ export async function createSchedule(
     .values({ userId, tmdbId, dayOfWeek })
     .returning();
 
-  let title: string | null = null;
-  try {
-    const details = await tmdbClient.getTVShowDetails(tmdbId);
-    title = details?.name ?? null;
-  } catch {}
+  const details = await getCachedContent(tmdbId, ContentType.TV, userId);
 
   return {
     id: created.id,
     tmdbId: created.tmdbId,
     createdAt: created.createdAt.toISOString(),
-    title,
+    title: details.title,
   };
 }
 
