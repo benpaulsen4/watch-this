@@ -40,6 +40,7 @@ vi.mock("@/lib/db/schema", () => {
     episodeWatchStatus: createMockTable("episodeWatchStatus"),
     showSchedules: createMockTable("showSchedules"),
     tmdbCache: createMockTable("tmdbCache"),
+    activityFeed: createMockTable("activityFeed"),
     ListType: { MOVIE: "movies", TV: "tv", MIXED: "mixed" },
     ContentType: { MOVIE: "movie", TV: "tv" },
     WatchStatus: {
@@ -48,6 +49,9 @@ vi.mock("@/lib/db/schema", () => {
       PAUSED: "paused",
       COMPLETED: "completed",
       DROPPED: "dropped",
+    },
+    ActivityType: {
+      PROFILE_IMPORT: "profile_import",
     },
   };
 });
@@ -196,9 +200,7 @@ describe("Profile Data Service", () => {
       expect(result.mimetype).toBe("application/json");
       expect(result.filename).toContain(".json");
 
-      const decodedData = JSON.parse(
-        Buffer.from(result.data, "base64").toString("utf-8")
-      );
+      const decodedData = JSON.parse(result.data);
 
       expect(decodedData.lists).toHaveLength(1);
       expect(decodedData.lists[0].items).toHaveLength(1);
@@ -246,9 +248,7 @@ describe("Profile Data Service", () => {
         .mockResolvedValueOnce([]); // schedules
 
       const result = await exportUserData(userId, "json");
-      const decodedData = JSON.parse(
-        Buffer.from(result.data, "base64").toString("utf-8")
-      );
+      const decodedData = JSON.parse(result.data);
 
       expect(decodedData.lists).toEqual([]);
       expect(decodedData.contentStatus).toEqual([]);
@@ -310,9 +310,7 @@ describe("Profile Data Service", () => {
       ],
     };
 
-    const base64Data = Buffer.from(JSON.stringify(importData)).toString(
-      "base64"
-    );
+    const jsonData = JSON.stringify(importData);
 
     const setupImportMocks = () => {
       const valuesMock = vi.fn();
@@ -335,7 +333,7 @@ describe("Profile Data Service", () => {
       setupImportMocks();
       (addToCache as any).mockResolvedValue({});
 
-      const result = await importUserData(userId, base64Data);
+      const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
       if (result === "parseError") return;
@@ -349,7 +347,7 @@ describe("Profile Data Service", () => {
       expect(result.errors).toHaveLength(0);
 
       // Verify db calls
-      expect(mockedDb.insert).toHaveBeenCalledTimes(5); // 1 list + 1 item + 1 content + 1 episode + 1 schedule
+      expect(mockedDb.insert).toHaveBeenCalledTimes(6);
       expect(addToCache).toHaveBeenCalledWith(101, "movie");
     });
 
@@ -362,7 +360,7 @@ describe("Profile Data Service", () => {
       setupImportMocks();
       (addToCache as any).mockRejectedValue(new Error("Cache failed"));
 
-      const result = await importUserData(userId, base64Data);
+      const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
       if (result === "parseError") return;
@@ -382,7 +380,7 @@ describe("Profile Data Service", () => {
         onConflictDoUpdate: vi.fn().mockRejectedValue(new Error("DB Error")),
       });
 
-      const result = await importUserData(userId, base64Data);
+      const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
       if (result === "parseError") return;

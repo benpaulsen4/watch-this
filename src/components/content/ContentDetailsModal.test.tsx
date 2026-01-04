@@ -3,7 +3,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ContentDetailsModal } from "./ContentDetailsModal";
-import type { TMDBTVShow, TMDBTVShowDetails } from "@/lib/tmdb/client";
+import type { TMDBTVShowDetails } from "@/lib/tmdb/client";
+import type { TMDBContent } from "@/lib/content-status/types";
 
 // Mock next/image to a simple img for jsdom
 vi.mock("next/image", () => ({
@@ -93,21 +94,21 @@ describe("ContentDetailsModal", () => {
   });
 
   it("renders tabs for TV content when open", async () => {
-    const tv: TMDBTVShow = {
-      id: 2,
-      name: "Test Show",
+    const tv: TMDBContent = {
+      tmdbId: 2,
+      contentType: "tv",
+      title: "Test Show",
       overview: "Overview",
-      poster_path: null,
-      backdrop_path: null,
-      first_air_date: "2023-01-01",
-      vote_average: 7.2,
-      vote_count: 500,
-      genre_ids: [],
-      origin_country: ["US"],
-      original_language: "en",
-      original_name: "Test Show",
+      posterPath: null,
+      backdropPath: null,
+      releaseDate: "2023-01-01",
+      voteAverage: 7.2,
+      voteCount: 500,
+      genreIds: [],
       popularity: 0,
+      adult: null,
       watchStatus: "watching",
+      statusUpdatedAt: null,
     };
 
     renderWithQuery(
@@ -129,21 +130,21 @@ describe("ContentDetailsModal", () => {
 
   it("updates watch status via segmented selector", async () => {
     const user = userEvent.setup();
-    const tv: TMDBTVShow = {
-      id: 3,
-      name: "Another Show",
+    const tv: TMDBContent = {
+      tmdbId: 3,
+      contentType: "tv",
+      title: "Another Show",
       overview: "Overview",
-      poster_path: null,
-      backdrop_path: null,
-      first_air_date: "2023-01-01",
-      vote_average: 8.1,
-      vote_count: 100,
-      genre_ids: [],
-      origin_country: ["US"],
-      original_language: "en",
-      original_name: "Another Show",
+      posterPath: null,
+      backdropPath: null,
+      releaseDate: "2023-01-01",
+      voteAverage: 8.1,
+      voteCount: 100,
+      genreIds: [],
       popularity: 0,
+      adult: null,
       watchStatus: "planning",
+      statusUpdatedAt: null,
     };
     const onChanged = vi.fn();
 

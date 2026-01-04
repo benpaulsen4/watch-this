@@ -13,6 +13,11 @@ export default async function TrendingStrip({
   userId: string;
 }) {
   const tmdbTrending = await tmdbClient.getTrending("all", "day");
+
+  if (!tmdbTrending.results || tmdbTrending.results.length === 0) {
+    return null;
+  }
+
   // Enrich results with watch status
   const trendingContent = await mapAllWithContentStatus(
     tmdbTrending.results.slice(0, items),

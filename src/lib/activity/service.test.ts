@@ -15,9 +15,18 @@ vi.mock("../db", () => {
     groupBy: () => chain,
     set: () => chain,
     values: () => chain,
-    limit: () => Promise.resolve(resultsQueue.shift()),
-    returning: () => Promise.resolve(resultsQueue.shift()),
-    then: (resolve: any) => Promise.resolve(resultsQueue.shift()).then(resolve),
+    limit: () => {
+      const v = resultsQueue.shift();
+      return Promise.resolve(v);
+    },
+    returning: () => {
+      const v = resultsQueue.shift();
+      return Promise.resolve(v);
+    },
+    then: (resolve: any) => {
+      const v = resultsQueue.shift();
+      return Promise.resolve(v).then(resolve);
+    },
   };
   const db: any = {
     select: vi.fn(() => chain),
@@ -34,6 +43,7 @@ vi.mock("../db", () => {
   const userContentStatus = {} as any;
   const episodeWatchStatus = {} as any;
   const activityFeed = {} as any;
+  const ContentType = { TV: "tv" } as any;
 
   return {
     db,
@@ -44,6 +54,7 @@ vi.mock("../db", () => {
     userContentStatus,
     episodeWatchStatus,
     activityFeed,
+    ContentType,
   };
 });
 
@@ -89,9 +100,33 @@ vi.mock("../tmdb/client", () => {
   };
 });
 
+vi.mock("../tmdb/cache-utils", async () => {
+  return {
+    getCachedContent: vi.fn((tmdbId: number) => {
+      return {
+        tmdbId,
+        contentType: "tv",
+        title: "Some show",
+        overview: "",
+        posterPath: null,
+        backdropPath: null,
+        releaseDate: "2020-01-01T00:00:00.000Z",
+        voteAverage: 8,
+        voteCount: 100,
+        popularity: 10,
+        genreIds: [],
+        adult: null,
+        watchStatus: "planning",
+        statusUpdatedAt: null,
+      } as any;
+    }),
+  };
+});
+
 import { listActivityTimeline } from "./service";
 import { db } from "../db";
 import { tmdbClient } from "../tmdb/client";
+import { getCachedContent } from "../tmdb/cache-utils";
 
 describe("activity service", () => {
   const userId = "u1";
@@ -197,9 +232,10 @@ describe("activity service", () => {
     const res = await listActivityTimeline(userId, tz, { limit: 10 });
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.upcoming.length).toBe(1);
-    expect(res.upcoming[0].id).toBe(400);
+    expect(res.upcoming[0].tmdbId).toBe(400);
     expect(res.upcoming[0].scheduleId).toBe("s2");
     expect(res.upcoming[0].watchStatus).toBe("planning");
-    expect(tmdbClient.getTVShowDetails as any).toHaveBeenCalledTimes(1);
+    expect(getCachedContent as any).toHaveBeenCalledTimes(1);
+    expect((getCachedContent as any).mock.calls[0][0]).toBe(400);
   });
 });

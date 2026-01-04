@@ -71,7 +71,7 @@ describe("ActivityFeed", () => {
           createdAt: new Date().toISOString(),
         },
       ],
-      upcoming: [{ id: 101, name: "The Show", poster_path: "/poster.jpg" }],
+      upcoming: [{ tmdbId: 101, title: "The Show", posterPath: "/poster.jpg" }],
       hasMore: false,
     };
     // @ts-expect-error allow assigning to global

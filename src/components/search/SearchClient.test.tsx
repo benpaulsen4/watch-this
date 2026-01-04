@@ -90,7 +90,7 @@ describe("SearchClient", () => {
             };
         return {
           ok: true,
-          json: async () => ({ results: [result], total_pages: 2 }),
+          json: async () => ({ results: [result], totalPages: 2 }),
         } as any;
       }
       if (url.startsWith("/api/tmdb/search")) {
