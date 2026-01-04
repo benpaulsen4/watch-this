@@ -137,7 +137,7 @@ export async function exportUserData(
     updatedAt: s.updatedAt.toISOString(),
   }));
 
-  // 6a. For JSON format, compile data into `JSONExportModel`, stringify, and return base64 encoded
+  // 6a. For JSON format, compile data into `JSONExportModel` and stringify it
   if (format === "json") {
     const exportModel: JSONExportModel = {
       lists: listRows.map((l) => ({
@@ -150,10 +150,9 @@ export async function exportUserData(
     };
 
     const jsonString = JSON.stringify(exportModel, null, 2);
-    const base64Data = Buffer.from(jsonString).toString("base64");
 
     return {
-      data: base64Data,
+      data: jsonString,
       filename: `watch-this-export-${
         new Date().toISOString().split("T")[0]
       }.json`,
@@ -212,11 +211,10 @@ export async function importUserData(
   userId: string,
   fileContent: string
 ): Promise<ImportResult | "parseError"> {
-  // 1. Parse base64 encoded JSON to `JSONImportModel` (or return 'parseError')
+  // 1. Parse JSON to `JSONImportModel` (or return 'parseError')
   let importModel: JSONImportModel;
   try {
-    const jsonString = Buffer.from(fileContent, "base64").toString("utf-8");
-    importModel = JSON.parse(jsonString);
+    importModel = JSON.parse(fileContent);
   } catch (e) {
     return "parseError";
   }

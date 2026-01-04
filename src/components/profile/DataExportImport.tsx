@@ -35,7 +35,21 @@ export function DataExportImport() {
       return responseData as ExportResponse;
     },
     onSuccess: ({ data, filename, mimetype }) => {
-      const blob = new Blob([data], { type: mimetype });
+      let blob: Blob;
+
+      if (mimetype.includes("json") || mimetype.includes("text")) {
+        blob = new Blob([data], { type: mimetype });
+      } else {
+        // Read base64 encoded string as a byte array
+        const byteCharacters = atob(data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        blob = new Blob([byteArray], { type: mimetype });
+      }
+
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

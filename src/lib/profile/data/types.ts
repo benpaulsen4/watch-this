@@ -3,7 +3,6 @@ import { ContentTypeEnum, ListTypeEnum, WatchStatusEnum } from "@/lib/db";
 export type ExportFormat = "json" | "csv";
 
 export interface ExportResponse {
-  /** Base64 encoded file */
   data: string;
   filename: string;
   mimetype: string;
