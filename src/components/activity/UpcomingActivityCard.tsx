@@ -29,7 +29,7 @@ export function UpcomingActivityCard({
       const response = await fetch("/api/status/episodes/next", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tmdbId: upcoming.id }),
+        body: JSON.stringify({ tmdbId: upcoming.tmdbId }),
       });
       const data = await response.json();
       if (!response.ok)
@@ -45,7 +45,7 @@ export function UpcomingActivityCard({
     await markWatchedMutation.mutateAsync();
   };
 
-  const posterUrl = getImageUrl(upcoming.poster_path, "w342");
+  const posterUrl = getImageUrl(upcoming.posterPath, "w342");
 
   const today = DAYS_OF_WEEK[new Date().getDay()];
 
@@ -58,7 +58,7 @@ export function UpcomingActivityCard({
             {posterUrl ? (
               <Image
                 src={posterUrl}
-                alt={upcoming.name}
+                alt={upcoming.title}
                 width={300}
                 height={450}
                 className="w-24 h-36 sm:w-28 sm:h-40 md:w-32 md:h-48 object-cover rounded-md"
@@ -79,7 +79,7 @@ export function UpcomingActivityCard({
                 It&apos;s {today}! Have you watched this today?
               </p>
               <h3 className="text-gray-100 font-semibold text-xl mb-4">
-                {upcoming.name}
+                {upcoming.title}
               </h3>
               <div>
                 <Button onClick={handleMarkWatched} loading={isWatching}>

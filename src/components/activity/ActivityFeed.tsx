@@ -107,7 +107,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {(activitiesData?.upcoming || []).map((upcoming, index) => (
             <UpcomingActivityCard
-              key={`${upcoming.id}-${index}`}
+              key={`${upcoming.tmdbId}-${index}`}
               upcoming={upcoming}
               onEpisodeWatched={() => refetch()}
             />

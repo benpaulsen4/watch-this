@@ -7,6 +7,7 @@ import {
   showSchedules,
   userContentStatus,
   episodeWatchStatus,
+  ContentType,
 } from "../db";
 import type { WatchStatusEnum } from "../db";
 import {
@@ -26,11 +27,13 @@ import type {
   ActivityItem,
   UpcomingActivity,
 } from "./types";
+import { mapContentToDomainModel } from "../content-status/service";
+import { getCachedContent } from "../tmdb/cache-utils";
 
 export async function listActivityTimeline(
   userId: string,
   userTimezone: string,
-  input: ListActivityInput,
+  input: ListActivityInput
 ): Promise<ActivityTimelineResponse | "invalidCursor"> {
   const limit = Math.max(1, input.limit || 10);
   let cursorDate: Date | undefined;
@@ -47,31 +50,31 @@ export async function listActivityTimeline(
     whereConditions = and(
       or(
         eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId]),
+        arrayContains(activityFeed.collaborators, [userId])
       ),
       lt(activityFeed.createdAt, cursorDate),
-      eq(activityFeed.activityType, input.type),
+      eq(activityFeed.activityType, input.type)
     );
   } else if (cursorDate) {
     whereConditions = and(
       or(
         eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId]),
+        arrayContains(activityFeed.collaborators, [userId])
       ),
-      lt(activityFeed.createdAt, cursorDate),
+      lt(activityFeed.createdAt, cursorDate)
     );
   } else if (input.type) {
     whereConditions = and(
       or(
         eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId]),
+        arrayContains(activityFeed.collaborators, [userId])
       ),
-      eq(activityFeed.activityType, input.type),
+      eq(activityFeed.activityType, input.type)
     );
   } else {
     whereConditions = or(
       eq(activityFeed.userId, userId),
-      arrayContains(activityFeed.collaborators, [userId]),
+      arrayContains(activityFeed.collaborators, [userId])
     );
   }
 
@@ -86,18 +89,18 @@ export async function listActivityTimeline(
   if (collaborativeListIds.length > 0) {
     let collaborativeConditions = and(
       inArray(activityFeed.listId, collaborativeListIds),
-      eq(activityFeed.isCollaborative, true),
+      eq(activityFeed.isCollaborative, true)
     );
     if (cursorDate) {
       collaborativeConditions = and(
         collaborativeConditions,
-        lt(activityFeed.createdAt, cursorDate),
+        lt(activityFeed.createdAt, cursorDate)
       );
     }
     if (input.type) {
       collaborativeConditions = and(
         collaborativeConditions,
-        eq(activityFeed.activityType, input.type),
+        eq(activityFeed.activityType, input.type)
       );
     }
     whereConditions = or(whereConditions, collaborativeConditions);
@@ -184,6 +187,7 @@ export async function listActivityTimeline(
       tmdbId: showSchedules.tmdbId,
       scheduleId: showSchedules.id,
       status: userContentStatus.status,
+      statusUpdatedAt: userContentStatus.updatedAt,
     })
     .from(showSchedules)
     .innerJoin(
@@ -191,11 +195,11 @@ export async function listActivityTimeline(
       and(
         eq(showSchedules.userId, userContentStatus.userId),
         eq(showSchedules.tmdbId, userContentStatus.tmdbId),
-        eq(userContentStatus.contentType, "tv"),
-      ),
+        eq(userContentStatus.contentType, "tv")
+      )
     )
     .where(
-      and(eq(showSchedules.userId, userId), eq(showSchedules.dayOfWeek, today)),
+      and(eq(showSchedules.userId, userId), eq(showSchedules.dayOfWeek, today))
     );
 
   const upcoming: UpcomingActivity[] = [];
@@ -208,16 +212,19 @@ export async function listActivityTimeline(
           eq(episodeWatchStatus.userId, userId),
           eq(episodeWatchStatus.tmdbId, row.tmdbId),
           eq(episodeWatchStatus.watched, true),
-          sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`,
-        ),
+          sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`
+        )
       );
     if (watchedToday.length > 0) continue;
     try {
-      const details = await tmdbClient.getTVShowDetails(row.tmdbId);
+      const details = await getCachedContent(
+        row.tmdbId,
+        ContentType.TV,
+        userId
+      );
       upcoming.push({
-        ...(details as UpcomingActivity),
+        ...details,
         scheduleId: row.scheduleId,
-        watchStatus: row.status as WatchStatusEnum,
       });
     } catch {}
   }

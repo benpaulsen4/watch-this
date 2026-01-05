@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ContentCard } from "./ContentCard";
-import type { TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
+import type { TMDBContent } from "@/lib/content-status/types";
 
 // Mock next/image to a simple img for jsdom
 vi.mock("next/image", () => ({
@@ -81,22 +81,21 @@ describe("ContentCard", () => {
   });
 
   it("renders movie card with title, badges, and rating", () => {
-    const movie: TMDBMovie = {
-      id: 1,
+    const movie: TMDBContent = {
+      tmdbId: 1,
+      contentType: "movie",
       title: "Test Movie",
       overview: "A great movie",
-      poster_path: "/poster.jpg",
-      backdrop_path: null,
-      release_date: "2024-01-01",
-      vote_average: 8.3,
-      vote_count: 1200,
-      genre_ids: [],
-      adult: false,
-      original_language: "en",
-      original_title: "Test Movie",
+      posterPath: "/poster.jpg",
+      backdropPath: null,
+      releaseDate: "2024-01-01",
+      voteAverage: 8.3,
+      voteCount: 1200,
+      genreIds: [],
       popularity: 0,
-      video: false,
+      adult: false,
       watchStatus: "planning",
+      statusUpdatedAt: null,
     };
 
     renderWithQuery(<ContentCard content={movie} />);
@@ -109,22 +108,21 @@ describe("ContentCard", () => {
 
   it("single click calls onContentClick when provided", async () => {
     const user = userEvent.setup();
-    const movie: TMDBMovie = {
-      id: 11,
+    const movie: TMDBContent = {
+      tmdbId: 11,
+      contentType: "movie",
       title: "Clickable Movie",
       overview: "Overview",
-      poster_path: null,
-      backdrop_path: null,
-      release_date: "2024-01-01",
-      vote_average: 6.5,
-      vote_count: 100,
-      genre_ids: [],
-      adult: false,
-      original_language: "en",
-      original_title: "Clickable Movie",
+      posterPath: null,
+      backdropPath: null,
+      releaseDate: "2024-01-01",
+      voteAverage: 6.5,
+      voteCount: 100,
+      genreIds: [],
       popularity: 0,
-      video: false,
+      adult: false,
       watchStatus: "planning",
+      statusUpdatedAt: null,
     };
     const onClick = vi.fn();
     renderWithQuery(<ContentCard content={movie} onContentClick={onClick} />);
@@ -134,21 +132,21 @@ describe("ContentCard", () => {
 
   it("single click opens details modal when no onContentClick", async () => {
     const user = userEvent.setup();
-    const tv: TMDBTVShow = {
-      id: 22,
-      name: "Show",
+    const tv: TMDBContent = {
+      tmdbId: 22,
+      contentType: "tv",
+      title: "Show",
       overview: "Overview",
-      poster_path: null,
-      backdrop_path: null,
-      first_air_date: "2023-01-01",
-      vote_average: 7.1,
-      vote_count: 200,
-      genre_ids: [],
-      origin_country: ["US"],
-      original_language: "en",
-      original_name: "Show",
+      posterPath: null,
+      backdropPath: null,
+      releaseDate: "2023-01-01",
+      voteAverage: 7.1,
+      voteCount: 200,
+      genreIds: [],
       popularity: 0,
+      adult: null,
       watchStatus: "watching",
+      statusUpdatedAt: null,
     };
     renderWithQuery(<ContentCard content={tv} />);
     await user.click(screen.getByRole("heading", { name: /Show/i }));
@@ -160,22 +158,21 @@ describe("ContentCard", () => {
 
   it("double click triggers quick-complete overlay and updates status", async () => {
     const user = userEvent.setup();
-    const movie: TMDBMovie = {
-      id: 33,
+    const movie: TMDBContent = {
+      tmdbId: 33,
+      contentType: "movie",
       title: "Complete Movie",
       overview: "Overview",
-      poster_path: null,
-      backdrop_path: null,
-      release_date: "2024-01-01",
-      vote_average: 7.0,
-      vote_count: 300,
-      genre_ids: [],
-      adult: false,
-      original_language: "en",
-      original_title: "Complete Movie",
+      posterPath: null,
+      backdropPath: null,
+      releaseDate: "2024-01-01",
+      voteAverage: 7.0,
+      voteCount: 300,
+      genreIds: [],
       popularity: 0,
-      video: false,
+      adult: false,
       watchStatus: "planning",
+      statusUpdatedAt: null,
     };
     renderWithQuery(<ContentCard content={movie} />);
     const cardTitle = screen.getByText(/Complete Movie/i);

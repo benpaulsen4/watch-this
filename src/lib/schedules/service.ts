@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { db, showSchedules, userContentStatus } from "../db";
+import { ContentType, db, showSchedules, userContentStatus } from "../db";
 import { tmdbClient } from "../tmdb/client";
 import {
   CreateScheduleInput,
@@ -8,11 +8,12 @@ import {
   ScheduleItem,
   SchedulesByDay,
 } from "./types";
+import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 
 export async function listSchedules(
   userId: string,
   tmdbId?: number,
-  dayOfWeek?: number,
+  dayOfWeek?: number
 ): Promise<GetSchedulesResponse> {
   const where = [eq(showSchedules.userId, userId)];
   if (tmdbId !== undefined) where.push(eq(showSchedules.tmdbId, tmdbId));
@@ -35,15 +36,12 @@ export async function listSchedules(
     6: [],
   };
 
-  const titleResults = await Promise.all(
-    schedules.map(async (s) => {
-      try {
-        const details = await tmdbClient.getTVShowDetails(s.tmdbId);
-        return { tmdbId: s.tmdbId, title: details?.name ?? null } as const;
-      } catch {
-        return { tmdbId: s.tmdbId, title: null } as const;
-      }
-    }),
+  const titleResults = await getAllCachedContent(
+    schedules.map((s) => ({
+      tmdbId: s.tmdbId,
+      contentType: ContentType.TV,
+    })),
+    userId
   );
   const titleMap = new Map<number, string | null>();
   titleResults.forEach((r) => titleMap.set(r.tmdbId, r.title));
@@ -63,7 +61,7 @@ export async function listSchedules(
 
 export async function createSchedule(
   userId: string,
-  input: CreateScheduleInput,
+  input: CreateScheduleInput
 ): Promise<ScheduleItem | "notFound" | "invalidStatus" | "duplicate"> {
   const { tmdbId, dayOfWeek } = input;
 
@@ -74,8 +72,8 @@ export async function createSchedule(
       and(
         eq(userContentStatus.userId, userId),
         eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, "tv"),
-      ),
+        eq(userContentStatus.contentType, "tv")
+      )
     )
     .limit(1);
   if (contentStatus.length === 0) return "notFound";
@@ -90,8 +88,8 @@ export async function createSchedule(
       and(
         eq(showSchedules.userId, userId),
         eq(showSchedules.tmdbId, tmdbId),
-        eq(showSchedules.dayOfWeek, dayOfWeek),
-      ),
+        eq(showSchedules.dayOfWeek, dayOfWeek)
+      )
     )
     .limit(1);
   if (existing.length > 0) return "duplicate";
@@ -101,28 +99,24 @@ export async function createSchedule(
     .values({ userId, tmdbId, dayOfWeek })
     .returning();
 
-  let title: string | null = null;
-  try {
-    const details = await tmdbClient.getTVShowDetails(tmdbId);
-    title = details?.name ?? null;
-  } catch {}
+  const details = await getCachedContent(tmdbId, ContentType.TV, userId);
 
   return {
     id: created.id,
     tmdbId: created.tmdbId,
     createdAt: created.createdAt.toISOString(),
-    title,
+    title: details.title,
   };
 }
 
 export async function deleteSchedules(
   userId: string,
   tmdbId: number,
-  dayOfWeek?: number,
+  dayOfWeek?: number
 ): Promise<DeleteSchedulesResponse | "notFound"> {
   let where = and(
     eq(showSchedules.userId, userId),
-    eq(showSchedules.tmdbId, tmdbId),
+    eq(showSchedules.tmdbId, tmdbId)
   );
   if (dayOfWeek !== undefined) {
     where = and(where, eq(showSchedules.dayOfWeek, dayOfWeek));

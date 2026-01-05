@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
-import { tmdbClient } from "@/lib/tmdb/client";
+import { tmdbClient, TMDBSearchResult } from "@/lib/tmdb/client";
 import {
   withAuth,
   handleApiError,
   validatePagination,
   AuthenticatedRequest,
 } from "@/lib/auth/api-middleware";
-import { enrichWithContentStatus } from "@/lib/tmdb/contentUtils";
+import {
+  mapAllWithContentStatus,
+  mapWithContentStatus,
+} from "@/lib/content-status/service";
+import {
+  TMDBContent,
+  TMDBContentSearchResult,
+} from "@/lib/content-status/types";
 
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
@@ -19,12 +26,12 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (type && !["movie", "tv"].includes(type)) {
       return NextResponse.json(
         { error: 'Type must be either "movie" or "tv"' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
     const { page: validatedPage, error: pageError } = validatePagination(
-      searchParams.get("page"),
+      searchParams.get("page")
     );
     if (pageError) {
       return pageError;
@@ -74,22 +81,22 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       }
     }
 
-    let results;
+    let intermediateResults: TMDBSearchResult;
 
     if (type === "movie") {
-      results = await tmdbClient.discoverMovies(params);
+      intermediateResults = await tmdbClient.discoverMovies(params);
     } else if (type === "tv") {
-      results = await tmdbClient.discoverTVShows(params);
+      intermediateResults = await tmdbClient.discoverTVShows(params);
     } else {
       const [movies, tvShows] = await Promise.all([
         tmdbClient.discoverMovies(params),
         tmdbClient.discoverTVShows(params),
       ]);
       const combinedDiscover = [...movies.results, ...tvShows.results].sort(
-        (a, b) => b.popularity - a.popularity,
+        (a, b) => b.popularity - a.popularity
       );
 
-      results = {
+      intermediateResults = {
         page: validatedPage,
         results: combinedDiscover,
         total_pages: movies.total_pages + tvShows.total_pages,
@@ -97,18 +104,22 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       };
     }
 
-    // Enrich results with watch status
-    if (results.results && results.results.length > 0) {
-      const enrichedResults = await Promise.all(
-        results.results.map(async (item) => {
-          return await enrichWithContentStatus(item, request.user.id);
-        }),
-      );
+    const finalResults: TMDBContentSearchResult = {
+      page: intermediateResults.page,
+      results: [],
+      totalPages: intermediateResults.total_pages,
+      totalResults: intermediateResults.total_results,
+    };
 
-      results.results = enrichedResults;
+    // Enrich results with watch status
+    if (intermediateResults.results && intermediateResults.results.length > 0) {
+      finalResults.results = await mapAllWithContentStatus(
+        intermediateResults.results,
+        request.user.id
+      );
     }
 
-    return NextResponse.json(results);
+    return NextResponse.json(finalResults);
   } catch (error) {
     return handleApiError(error, "TMDB discover");
   }

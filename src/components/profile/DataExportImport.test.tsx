@@ -74,6 +74,7 @@ describe("DataExportImport", () => {
         json: async () => ({
           data: '{"hello":"world"}',
           filename: "export.json",
+          mimetype: "application/json",
           isZip: false,
         }),
       },
@@ -99,6 +100,7 @@ describe("DataExportImport", () => {
         json: async () => ({
           data: zipData,
           filename: "export.zip",
+          mimetype: "application/zip",
           isZip: true,
         }),
       },

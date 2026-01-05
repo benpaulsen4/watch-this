@@ -15,12 +15,7 @@ import {
 } from "react-aria-components";
 import { X, Star, Calendar, Clock, Play, Tv } from "lucide-react";
 import { cn, formatVoteAverage } from "@/lib/utils";
-import {
-  getContentTitle,
-  getContentReleaseDate,
-  getContentType,
-  getImageUrl,
-} from "@/lib/tmdb/client";
+import { getImageUrl } from "@/lib/tmdb/client";
 import { ListSelector } from "./ListSelector";
 import { StatusSegmentedSelector } from "./StatusSegmentedSelector";
 import { EpisodeTracker } from "./EpisodeTracker";
@@ -28,7 +23,6 @@ import { ScheduleManager } from "./ScheduleManager";
 import { useStreamingPreferences } from "../providers/AuthProvider";
 import type {
   TMDBMovie,
-  TMDBTVShow,
   TMDBMovieDetails,
   TMDBTVShowDetails,
   UserStreamingProvider,
@@ -38,10 +32,13 @@ import { Badge } from "../ui/Badge";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CastTab } from "./CastTab";
-import type { CreateOrUpdateContentStatusResult } from "@/lib/content-status/types";
+import type {
+  CreateOrUpdateContentStatusResult,
+  TMDBContent,
+} from "@/lib/content-status/types";
 
 export interface ContentDetailsModalProps {
-  content: TMDBMovie | TMDBTVShow;
+  content: TMDBContent;
   isOpen: boolean;
   onClose: () => void;
   onRemove?: () => void;
@@ -58,27 +55,24 @@ export function ContentDetailsModal({
   currentListId,
 }: ContentDetailsModalProps) {
   const [watchStatus, setWatchStatus] = useState<WatchStatusEnum | null>(
-    content.watchStatus ?? null,
+    content.watchStatus ?? null
   );
   const [selectedTab, setSelectedTab] = useState<string>("overview");
 
   // Use streaming preferences from context
   const { streamingPreferences } = useStreamingPreferences();
 
-  const title = getContentTitle(content);
-  const releaseDate = getContentReleaseDate(content);
-  const contentType = getContentType(content);
-  const posterUrl = getImageUrl(content.poster_path, "w342");
-  const backdropUrl = getImageUrl(content.backdrop_path, "w780");
-  const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
+  const posterUrl = getImageUrl(content.posterPath, "w342");
+  const backdropUrl = getImageUrl(content.backdropPath, "w780");
+  const year = new Date(content.releaseDate).getFullYear();
 
   // Type-specific data from detailed content
   const detailsQuery = useQuery<TMDBMovieDetails | TMDBTVShowDetails>({
-    queryKey: ["tmdb", "details", contentType, content.id],
+    queryKey: ["tmdb", "details", content.contentType, content.tmdbId],
     enabled: isOpen,
     queryFn: async () => {
       const res = await fetch(
-        `/api/tmdb/details?type=${contentType}&id=${content.id}`,
+        `/api/tmdb/details?type=${content.contentType}&id=${content.tmdbId}`
       );
       return res.json();
     },
@@ -125,15 +119,15 @@ export function ContentDetailsModal({
     queryKey: [
       "watch",
       "content",
-      contentType,
-      content.id,
+      content.contentType,
+      content.tmdbId,
       streamingPreferences?.country?.toUpperCase() ?? null,
     ],
     enabled: isOpen && !!streamingPreferences?.country,
     queryFn: async () => {
       const region = streamingPreferences!.country!.toUpperCase();
       const providersRes = await fetch(
-        `/api/watch/content?type=${contentType}&id=${content.id}&region=${region}`,
+        `/api/watch/content?type=${content.contentType}&id=${content.tmdbId}&region=${region}`
       );
       return providersRes.json();
     },
@@ -143,14 +137,14 @@ export function ContentDetailsModal({
 
   const updateStatusMutation = useMutation({
     mutationFn: async (
-      newStatus: WatchStatusEnum,
+      newStatus: WatchStatusEnum
     ): Promise<CreateOrUpdateContentStatusResult> => {
       const response = await fetch("/api/status/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tmdbId: content.id,
-          contentType,
+          tmdbId: content.tmdbId,
+          contentType: content.contentType,
           status: newStatus,
         }),
       });
@@ -188,7 +182,7 @@ export function ContentDetailsModal({
             <div className="relative h-64 w-full">
               <Image
                 src={backdropUrl}
-                alt={title}
+                alt={content.title}
                 fill
                 sizes="(max-width: 896px) 100vw, 896px"
                 className="object-cover"
@@ -201,7 +195,7 @@ export function ContentDetailsModal({
           <div
             className={cn(
               "p-4 sm:p-6",
-              backdropUrl ? "-mt-32 relative z-10" : "",
+              backdropUrl ? "-mt-32 relative z-10" : ""
             )}
           >
             <div className="flex flex-col lg:flex-row gap-6">
@@ -210,7 +204,7 @@ export function ContentDetailsModal({
                 {posterUrl ? (
                   <Image
                     src={posterUrl}
-                    alt={title}
+                    alt={content.title}
                     width={200}
                     height={300}
                     className="rounded-lg shadow-lg w-32 h-48 sm:w-48 sm:h-72 object-cover"
@@ -225,7 +219,7 @@ export function ContentDetailsModal({
               {/* Details */}
               <div className="flex-1 min-w-0">
                 <Heading className="text-2xl sm:text-3xl font-bold text-gray-100 mb-2">
-                  {title}
+                  {content.title}
                 </Heading>
 
                 {/* Badges */}
@@ -234,9 +228,9 @@ export function ContentDetailsModal({
                     {year || "TBA"}
                   </Badge>
                   <Badge variant="genre" size="sm">
-                    {contentType === "movie" ? "Movie" : "TV Show"}
+                    {content.contentType === "movie" ? "Movie" : "TV Show"}
                   </Badge>
-                  {contentType === "movie" && (content as TMDBMovie).adult && (
+                  {content.contentType === "movie" && content.adult && (
                     <Badge variant="watching" size="sm">
                       18+
                     </Badge>
@@ -248,18 +242,18 @@ export function ContentDetailsModal({
                   <div className="flex items-center gap-1">
                     <Star className="h-4 w-4 text-yellow-400 fill-current" />
                     <span className="text-gray-100 font-medium">
-                      {formatVoteAverage(content.vote_average)}
+                      {formatVoteAverage(content.voteAverage)}
                     </span>
                     <span className="text-gray-400 text-xs sm:text-sm">
-                      ({content.vote_count?.toLocaleString()} votes)
+                      ({content.voteCount.toLocaleString()} votes)
                     </span>
                   </div>
 
-                  {releaseDate && (
+                  {content.releaseDate && (
                     <div className="flex items-center gap-1 text-gray-400">
                       <Calendar className="h-4 w-4" />
                       <span className="text-xs sm:text-sm">
-                        {new Date(releaseDate).toLocaleDateString()}
+                        {new Date(content.releaseDate).toLocaleDateString()}
                       </span>
                     </div>
                   )}
@@ -286,7 +280,7 @@ export function ContentDetailsModal({
                 <div className="mb-3">
                   <StatusSegmentedSelector
                     value={watchStatus}
-                    contentType={contentType as ContentTypeEnum}
+                    contentType={content.contentType}
                     onValueChange={(newStatus) =>
                       updateStatusMutation.mutate(newStatus as WatchStatusEnum)
                     }
@@ -307,13 +301,13 @@ export function ContentDetailsModal({
                           "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                           isSelected
                             ? "text-red-400 border-red-500"
-                            : "hover:text-gray-100 hover:border-gray-500",
+                            : "hover:text-gray-100 hover:border-gray-500"
                         )
                       }
                     >
                       Overview
                     </Tab>
-                    {contentType === "tv" && (
+                    {content.contentType === "tv" && (
                       <Tab
                         id="episodes"
                         className={({ isSelected }) =>
@@ -321,7 +315,7 @@ export function ContentDetailsModal({
                             "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                             isSelected
                               ? "text-red-400 border-red-500"
-                              : "hover:text-gray-100 hover:border-gray-500",
+                              : "hover:text-gray-100 hover:border-gray-500"
                           )
                         }
                       >
@@ -335,7 +329,7 @@ export function ContentDetailsModal({
                           "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                           isSelected
                             ? "text-red-400 border-red-500"
-                            : "hover:text-gray-100 hover:border-gray-500",
+                            : "hover:text-gray-100 hover:border-gray-500"
                         )
                       }
                     >
@@ -348,13 +342,13 @@ export function ContentDetailsModal({
                           "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                           isSelected
                             ? "text-red-400 border-red-500"
-                            : "hover:text-gray-100 hover:border-gray-500",
+                            : "hover:text-gray-100 hover:border-gray-500"
                         )
                       }
                     >
                       Lists
                     </Tab>
-                    {contentType === "tv" && !!watchStatus && (
+                    {content.contentType === "tv" && !!watchStatus && (
                       <Tab
                         id="schedule"
                         className={({ isSelected }) =>
@@ -362,7 +356,7 @@ export function ContentDetailsModal({
                             "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                             isSelected
                               ? "text-red-400 border-red-500"
-                              : "hover:text-gray-100 hover:border-gray-500",
+                              : "hover:text-gray-100 hover:border-gray-500"
                           )
                         }
                       >
@@ -440,11 +434,11 @@ export function ContentDetailsModal({
                                 .filter(
                                   (provider: UserStreamingProvider) =>
                                     provider.region ===
-                                    streamingPreferences.country?.toUpperCase(),
+                                    streamingPreferences.country?.toUpperCase()
                                 )
                                 .map(
                                   (provider: UserStreamingProvider) =>
-                                    provider.id,
+                                    provider.id
                                 );
 
                               // Combine and deduplicate providers
@@ -459,8 +453,8 @@ export function ContentDetailsModal({
                                   index ===
                                   self.findIndex(
                                     (p) =>
-                                      p.provider_id === provider.provider_id,
-                                  ),
+                                      p.provider_id === provider.provider_id
+                                  )
                               );
 
                               // Sort providers: subscribed first, then others
@@ -475,7 +469,7 @@ export function ContentDetailsModal({
                                     return -1;
                                   if (!aIsSubscribed && bIsSubscribed) return 1;
                                   return 0;
-                                },
+                                }
                               );
 
                               return sortedProviders.map((p) => {
@@ -535,16 +529,19 @@ export function ContentDetailsModal({
                   </TabPanel>
 
                   <TabPanel id="cast" className="focus:outline-none">
-                    <CastTab contentType={contentType} contentId={content.id} />
+                    <CastTab
+                      contentType={content.contentType}
+                      contentId={content.tmdbId}
+                    />
                   </TabPanel>
 
-                  {contentType === "tv" && (
+                  {content.contentType === "tv" && (
                     <TabPanel id="episodes" className="focus:outline-none">
                       {!detailedContent ? (
                         <LoadingSpinner text="Loading show details..." />
                       ) : (
                         <EpisodeTracker
-                          tvShowId={content.id}
+                          tvShowId={content.tmdbId}
                           tvShowDetails={detailedContent as TMDBTVShowDetails}
                           onShowStatusChanged={(status) => {
                             setWatchStatus(status);
@@ -555,10 +552,10 @@ export function ContentDetailsModal({
                     </TabPanel>
                   )}
 
-                  {contentType === "tv" && !!watchStatus && (
+                  {content.contentType === "tv" && !!watchStatus && (
                     <TabPanel id="schedule" className="focus:outline-none">
                       <ScheduleManager
-                        tmdbId={content.id}
+                        tmdbId={content.tmdbId}
                         watchStatus={watchStatus}
                       />
                     </TabPanel>
@@ -566,10 +563,10 @@ export function ContentDetailsModal({
 
                   <TabPanel id="lists" className="focus:outline-none">
                     <ListSelector
-                      contentType={contentType}
-                      contentId={content.id}
-                      title={title}
-                      posterPath={content.poster_path}
+                      contentType={content.contentType}
+                      contentId={content.tmdbId}
+                      title={content.title}
+                      posterPath={content.posterPath}
                       currentListId={currentListId}
                       onRemove={onRemove}
                     />

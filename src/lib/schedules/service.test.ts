@@ -40,11 +40,13 @@ vi.mock("../db", () => {
 
   const showSchedules = {} as any;
   const userContentStatus = {} as any;
+  const ContentType = { MOVIE: "movie", TV: "tv" } as const;
 
   return {
     db,
     showSchedules,
     userContentStatus,
+    ContentType,
   };
 });
 
@@ -56,6 +58,35 @@ vi.mock("../tmdb/client", () => {
         return { id, name: `Show-${id}` };
       }),
     },
+  };
+});
+
+// Mock cache-utils to avoid relying on tmdbCache table and complex DB chains
+vi.mock("../tmdb/cache-utils", async () => {
+  const { tmdbClient } = await import("../tmdb/client");
+  return {
+    getAllCachedContent: vi.fn(
+      async (toFetch: Array<{ tmdbId: number }>, _userId: string) => {
+        const results: any[] = [];
+        for (const item of toFetch) {
+          try {
+            const details = await tmdbClient.getTVShowDetails(item.tmdbId);
+            results.push({ tmdbId: item.tmdbId, title: details.name });
+          } catch {
+            results.push({ tmdbId: item.tmdbId, title: null });
+          }
+        }
+        return results;
+      }
+    ),
+    getCachedContent: vi.fn(async (tmdbId: number) => {
+      try {
+        const details = await tmdbClient.getTVShowDetails(tmdbId);
+        return { tmdbId, title: details.name } as any;
+      } catch {
+        return { tmdbId, title: null } as any;
+      }
+    }),
   };
 });
 

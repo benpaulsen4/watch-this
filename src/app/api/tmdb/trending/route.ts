@@ -5,7 +5,11 @@ import {
   handleApiError,
   AuthenticatedRequest,
 } from "@/lib/auth/api-middleware";
-import { enrichWithContentStatus } from "@/lib/tmdb/contentUtils";
+import {
+  mapAllWithContentStatus,
+  mapWithContentStatus,
+} from "@/lib/content-status/service";
+import { TMDBContentSearchResult } from "@/lib/content-status/types";
 
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
@@ -23,34 +27,38 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     if (mediaType && !validMediaTypes.includes(mediaType)) {
       return NextResponse.json(
         { error: 'Media type must be "all", "movie", or "tv"' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
     if (timeWindow && !validTimeWindows.includes(timeWindow)) {
       return NextResponse.json(
         { error: 'Time window must be "day" or "week"' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    const results = await tmdbClient.getTrending(
+    const intermediateResults = await tmdbClient.getTrending(
       mediaType || "all",
-      timeWindow || "week",
+      timeWindow || "week"
     );
 
-    // Enrich results with watch status
-    if (results.results && results.results.length > 0) {
-      const enrichedResults = await Promise.all(
-        results.results.map(async (item) => {
-          return await enrichWithContentStatus(item, request.user.id);
-        }),
-      );
+    const finalResults: TMDBContentSearchResult = {
+      page: intermediateResults.page,
+      results: [],
+      totalPages: intermediateResults.total_pages,
+      totalResults: intermediateResults.total_results,
+    };
 
-      results.results = enrichedResults as TMDBSearchItem[];
+    // Enrich results with watch status
+    if (intermediateResults.results && intermediateResults.results.length > 0) {
+      finalResults.results = await mapAllWithContentStatus(
+        intermediateResults.results,
+        request.user.id
+      );
     }
 
-    return NextResponse.json(results);
+    return NextResponse.json(finalResults);
   } catch (error) {
     return handleApiError(error, "TMDB trending");
   }

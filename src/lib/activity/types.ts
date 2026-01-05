@@ -1,5 +1,4 @@
-import type { TMDBTVShowDetails } from "../tmdb/client";
-import type { WatchStatusEnum } from "../db";
+import { TMDBContent } from "../content-status/types";
 
 export interface ActivityUser {
   id: string;
@@ -20,9 +19,8 @@ export interface ActivityItem {
   createdAt: string;
 }
 
-export interface UpcomingActivity extends TMDBTVShowDetails {
+export interface UpcomingActivity extends TMDBContent {
   scheduleId: string;
-  watchStatus: WatchStatusEnum;
 }
 
 export interface ActivityTimelineResponse {

@@ -34,7 +34,11 @@ beforeEach(() => {
 
 describe("UpcomingActivityCard", () => {
   it("renders poster image and opens modal when clicked", async () => {
-    const upcoming = { id: 101, name: "The Show", poster_path: "/poster.jpg" };
+    const upcoming = {
+      tmdbId: 101,
+      title: "The Show",
+      posterPath: "/poster.jpg",
+    };
     renderWithClient(
       <UpcomingActivityCard
         upcoming={upcoming as any}
@@ -54,7 +58,11 @@ describe("UpcomingActivityCard", () => {
   });
 
   it("calls mutation and onEpisodeWatched when clicking button", async () => {
-    const upcoming = { id: 202, name: "Another Show", poster_path: "/x.jpg" };
+    const upcoming = {
+      tmdbId: 202,
+      title: "Another Show",
+      posterPath: "/x.jpg",
+    };
     const onEpisodeWatched = vi.fn();
     // Successful mutation
     // @ts-expect-error assign to global

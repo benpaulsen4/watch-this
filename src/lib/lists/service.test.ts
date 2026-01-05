@@ -89,6 +89,74 @@ vi.mock("../tmdb/client", () => {
   };
 });
 
+// Mock cache-utils used by getListItems and listLists
+vi.mock("../tmdb/cache-utils", () => {
+  return {
+    getAllCachedContent: vi.fn(
+      async (
+        items: Array<{ tmdbId: number; contentType: string }>,
+        _userId: string
+      ) => {
+        return items.map((item) => {
+          const title =
+            item.contentType === "movie" ? "Movie" : `Show-${item.tmdbId}`;
+          // Provide deterministic posterPath values for specific tmdbIds used in tests
+          let posterPath: string | null = null;
+          if (item.tmdbId === 1) posterPath = "/p1.jpg";
+          else if (item.tmdbId === 2) posterPath = "/p2.jpg";
+          else if (item.tmdbId === 3) posterPath = "/q1.jpg";
+          return {
+            tmdbId: item.tmdbId,
+            contentType: item.contentType,
+            title,
+            posterPath,
+            releaseDate: new Date("2025-01-01T00:00:00Z").toISOString(),
+            voteAverage: 0,
+            voteCount: 0,
+            popularity: 0,
+            genreIds: [],
+            adult: null,
+            watchStatus: null,
+            statusUpdatedAt: null,
+          };
+        });
+      }
+    ),
+    addToCache: vi.fn(async (tmdbId: number, contentType: string) => {
+      return {
+        tmdbId,
+        contentType,
+        title: contentType === "movie" ? "Movie" : `Show-${tmdbId}`,
+        posterPath: null,
+        releaseDate: new Date("2025-01-01T00:00:00Z").toISOString(),
+        voteAverage: 0,
+        voteCount: 0,
+        popularity: 0,
+        genreIds: [],
+        adult: null,
+        watchStatus: null,
+        statusUpdatedAt: null,
+      };
+    }),
+    getCachedContent: vi.fn(async (tmdbId: number, contentType: string) => {
+      return {
+        tmdbId,
+        contentType,
+        title: contentType === "movie" ? "Movie" : `Show-${tmdbId}`,
+        posterPath: null,
+        releaseDate: new Date("2025-01-01T00:00:00Z").toISOString(),
+        voteAverage: 0,
+        voteCount: 0,
+        popularity: 0,
+        genreIds: [],
+        adult: null,
+        watchStatus: null,
+        statusUpdatedAt: null,
+      };
+    }),
+  };
+});
+
 vi.mock("../tmdb/contentUtils", () => {
   return {
     enrichWithContentStatus: vi.fn(async (item: any) => item),
@@ -212,7 +280,6 @@ describe("lists service", () => {
     const res = await createListItem(userId, "list-4", {
       tmdbId: 1,
       contentType: "tv",
-      title: "S",
     });
     expect(res).toBe("invalidType");
   });
@@ -224,7 +291,6 @@ describe("lists service", () => {
     const res = await createListItem(userId, "list-4", {
       tmdbId: 1,
       contentType: "movie",
-      title: "S",
     });
     expect(res).toBe("conflict");
   });
@@ -246,7 +312,6 @@ describe("lists service", () => {
     const res = await createListItem(userId, "list-4", {
       tmdbId: 10,
       contentType: "movie",
-      title: "Title",
     });
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.id).toBe("item-2");
@@ -430,8 +495,13 @@ describe("lists service", () => {
         collaborators: 0,
       },
     ];
-    const posters1 = [{ posterPath: "/p1.jpg" }, { posterPath: "/p2.jpg" }];
-    const posters2 = [{ posterPath: "/q1.jpg" }];
+    const posters1 = [
+      { tmdbId: 1, contentType: "movie", posterPath: "/p1.jpg" },
+      { tmdbId: 2, contentType: "movie", posterPath: "/p2.jpg" },
+    ];
+    const posters2 = [
+      { tmdbId: 3, contentType: "movie", posterPath: "/q1.jpg" },
+    ];
     (db as any).__setMockResults([base, posters1, posters2]);
     const res = await listLists(userId);
     expect(res[0].posterPaths).toEqual(["/p1.jpg", "/p2.jpg"]);

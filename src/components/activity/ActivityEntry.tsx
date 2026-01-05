@@ -48,23 +48,35 @@ export function ActivityEntry({
         }"`;
       case ActivityType.PROFILE_IMPORT:
         const lists = metadata.lists ? parseInt(metadata.lists) : 0;
+        const listItems = metadata.listItems ? parseInt(metadata.listItems) : 0;
         const contentStatus = metadata.contentStatus
           ? parseInt(metadata.contentStatus)
           : 0;
         const episodeStatus = metadata.episodeStatus
           ? parseInt(metadata.episodeStatus)
           : 0;
+        const tvShowSchedules = metadata.tvShowSchedules
+          ? parseInt(metadata.tvShowSchedules)
+          : 0;
         const errors = metadata.errors ? parseInt(metadata.errors) : 0;
 
         const parts = [];
         if (lists > 0) parts.push(`${lists} list${lists === 1 ? "" : "s"}`);
+        if (listItems > 0)
+          parts.push(`${listItems} list item${listItems === 1 ? "" : "s"}`);
         if (contentStatus > 0)
           parts.push(
-            `${contentStatus} content status${contentStatus === 1 ? "" : "es"}`,
+            `${contentStatus} content status${contentStatus === 1 ? "" : "es"}`
           );
         if (episodeStatus > 0)
           parts.push(
-            `${episodeStatus} episode status${episodeStatus === 1 ? "" : "es"}`,
+            `${episodeStatus} episode status${episodeStatus === 1 ? "" : "es"}`
+          );
+        if (tvShowSchedules > 0)
+          parts.push(
+            `${tvShowSchedules} TV show schedule${
+              tvShowSchedules === 1 ? "" : "s"
+            }`
           );
 
         let result = `imported ${parts.join(", ")}`;
@@ -117,7 +129,7 @@ export function ActivityEntry({
 
   const getUsernameString = (
     activity: ActivityItem,
-    currentUsername: string,
+    currentUsername: string
   ) => {
     const replaceWithYou = (username: string) =>
       username === currentUsername ? "you" : username;
@@ -133,7 +145,7 @@ export function ActivityEntry({
 
       if (collaborators.length <= 3) {
         const lastCollaborator = replaceWithYou(
-          collaborators[collaborators.length - 1].username,
+          collaborators[collaborators.length - 1].username
         );
         const otherCollaborators = collaborators
           .slice(0, -1)

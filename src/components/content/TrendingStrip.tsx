@@ -1,6 +1,9 @@
 import { tmdbClient } from "@/lib/tmdb/client";
-import { enrichWithContentStatus } from "@/lib/tmdb/contentUtils";
 import { ContentCard } from "./ContentCard";
+import {
+  mapAllWithContentStatus,
+  mapWithContentStatus,
+} from "@/lib/content-status/service";
 
 export default async function TrendingStrip({
   items,
@@ -10,15 +13,21 @@ export default async function TrendingStrip({
   userId: string;
 }) {
   const tmdbTrending = await tmdbClient.getTrending("all", "day");
-  const trendingPromises = tmdbTrending.results
-    .slice(0, items)
-    .map((t) => enrichWithContentStatus(t, userId));
-  const trendingContent = await Promise.all(trendingPromises);
+
+  if (!tmdbTrending.results || tmdbTrending.results.length === 0) {
+    return null;
+  }
+
+  // Enrich results with watch status
+  const trendingContent = await mapAllWithContentStatus(
+    tmdbTrending.results.slice(0, items),
+    userId
+  );
 
   return (
     <>
       {trendingContent.map((item) => (
-        <ContentCard key={item.id} content={item} />
+        <ContentCard key={item.tmdbId} content={item} />
       ))}
     </>
   );
