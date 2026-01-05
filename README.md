@@ -105,7 +105,7 @@ npm run test:run
 - [x] Multi-device passkey management
 - [x] RSC streaming implementation
 - [x] Sorting and filtering inside lists
-- [ ] TMDB cache table to reduce spamming their API when fetching lists
+- [x] TMDB cache table to reduce spamming their API when fetching lists
 - [ ] Recommendations section for each list
 - [ ] Recently returned section & home page recommendations
 - [ ] \*arr stack integration for when content is not on any configured streaming services
