@@ -9,7 +9,7 @@ function renderWithClient(ui: React.ReactElement) {
     defaultOptions: { queries: { retry: 0, refetchOnWindowFocus: false } },
   });
   return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
   );
 }
 
@@ -47,7 +47,7 @@ describe("ListSettingsModal", () => {
         isOwner
         onListUpdate={() => {}}
         onListDelete={() => {}}
-      />,
+      />
     );
 
     const nameInput = screen.getByLabelText(/List Name/i);
@@ -83,7 +83,7 @@ describe("ListSettingsModal", () => {
         isOwner
         onListUpdate={onListUpdate}
         onListDelete={() => {}}
-      />,
+      />
     );
 
     const nameInput = screen.getByLabelText(/List Name/i);
@@ -93,7 +93,7 @@ describe("ListSettingsModal", () => {
 
     expect(await screen.findByText(/My List|Updated/i)).toBeInTheDocument();
     expect(onListUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Updated" }),
+      expect.objectContaining({ name: "Updated" })
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -121,13 +121,72 @@ describe("ListSettingsModal", () => {
         isOwner
         onListUpdate={() => {}}
         onListDelete={onListDelete}
-      />,
+      />
     );
 
     await user.click(screen.getByRole("button", { name: /Delete List/i }));
     // Confirm view shows "Delete" button
     await user.click(screen.getByRole("button", { name: /^Delete$/i }));
     expect(onListDelete).toHaveBeenCalled();
+  });
+
+  it("toggles archive status", async () => {
+    const user = userEvent.setup();
+    const onListUpdate = vi.fn();
+
+    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+      if (
+        typeof input === "string" &&
+        input.includes("/api/lists/") &&
+        init?.method === "PUT"
+      ) {
+        const body = JSON.parse(init?.body as string);
+        return {
+          ok: true,
+          json: async () => ({ ...baseList, isArchived: body.isArchived }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    renderWithClient(
+      <ListSettingsModal
+        isOpen
+        onClose={() => {}}
+        list={baseList}
+        isOwner
+        onListUpdate={onListUpdate}
+        onListDelete={() => {}}
+      />
+    );
+
+    // Initial state: Not archived, so button says "Archive List"
+    const archiveBtn = screen.getByRole("button", { name: /Archive List/i });
+    await user.click(archiveBtn);
+
+    expect(onListUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ isArchived: true })
+    );
+  });
+
+  it("disables sync toggle when list is archived", async () => {
+    const archivedList = { ...baseList, isArchived: true };
+    renderWithClient(
+      <ListSettingsModal
+        isOpen
+        onClose={() => {}}
+        list={archivedList}
+        isOwner
+        onListUpdate={() => {}}
+        onListDelete={() => {}}
+      />
+    );
+
+    const syncSwitch = screen.getByRole("switch", {
+      name: /Sync watch status with collaborators/i,
+    });
+
+    expect(syncSwitch).toBeDisabled();
   });
 
   it("creates a list in create mode and calls onListCreate", async () => {
@@ -169,7 +228,7 @@ describe("ListSettingsModal", () => {
         mode="create"
         isOwner
         onListCreate={onListCreate}
-      />,
+      />
     );
 
     // Fill name
@@ -177,7 +236,7 @@ describe("ListSettingsModal", () => {
     await user.click(screen.getByRole("button", { name: /^Create$/i }));
 
     expect(onListCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "l-created", name: "Created Name" }),
+      expect.objectContaining({ id: "l-created", name: "Created Name" })
     );
   });
 });

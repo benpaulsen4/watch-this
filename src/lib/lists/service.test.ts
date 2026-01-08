@@ -176,6 +176,7 @@ import {
   getList,
   listLists,
   getListItems,
+  listArchivedLists,
 } from "./service";
 
 import { db, activityFeed, ActivityType } from "../db";
@@ -474,6 +475,7 @@ describe("lists service", () => {
         description: null,
         listType: "mixed",
         isPublic: false,
+        isArchived: false,
         syncWatchStatus: false,
         ownerId: userId,
         createdAt: now,
@@ -487,6 +489,7 @@ describe("lists service", () => {
         description: null,
         listType: "movies",
         isPublic: false,
+        isArchived: false,
         syncWatchStatus: false,
         ownerId: userId,
         createdAt: now,
@@ -506,6 +509,36 @@ describe("lists service", () => {
     const res = await listLists(userId);
     expect(res[0].posterPaths).toEqual(["/p1.jpg", "/p2.jpg"]);
     expect(res[1].posterPaths).toEqual(["/q1.jpg"]);
+  });
+
+  it("listArchivedLists returns archived lists", async () => {
+    const archived = [
+      {
+        id: "l3",
+        name: "Archived List",
+        description: null,
+        listType: "mixed",
+        isPublic: false,
+        isArchived: true,
+        syncWatchStatus: false,
+        ownerId: userId,
+        createdAt: now,
+        updatedAt: now,
+        itemCount: 0,
+        collaborators: 0,
+      },
+    ];
+    const posters = [{ tmdbId: 1, contentType: "movie", posterPath: "/p1.jpg" }];
+    
+    // The implementation of fetchLists calls db.select(...).where(..., eq(lists.isArchived, isArchived))
+    // Our mock setup for db just returns the next result in the queue for the main query.
+    // So we just need to provide the expected result.
+    (db as any).__setMockResults([archived, posters]);
+
+    const res = await listArchivedLists(userId);
+    expect(res).toHaveLength(1);
+    expect(res[0].isArchived).toBe(true);
+    expect(res[0].name).toBe("Archived List");
   });
 
   // Tests for getListItems

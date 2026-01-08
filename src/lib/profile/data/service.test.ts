@@ -100,6 +100,7 @@ describe("Profile Data Service", () => {
         description: "Desc",
         listType: "mixed",
         isPublic: false,
+        isArchived: true,
         syncWatchStatus: false,
         createdAt: mockDate,
         updatedAt: mockDate,
@@ -203,6 +204,7 @@ describe("Profile Data Service", () => {
       const decodedData = JSON.parse(result.data);
 
       expect(decodedData.lists).toHaveLength(1);
+      expect(decodedData.lists[0].isArchived).toBe(true);
       expect(decodedData.lists[0].items).toHaveLength(1);
       expect(decodedData.contentStatus).toHaveLength(1);
       expect(decodedData.episodeStatus).toHaveLength(1);
@@ -392,6 +394,37 @@ describe("Profile Data Service", () => {
       expect(result.imported.listItems).toBe(0);
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors[0]).toContain("Failed to import list");
+    });
+
+    it("should import an archived list correctly", async () => {
+      const archivedImportData = {
+        lists: [
+          {
+            id: "list-archived",
+            name: "Archived List",
+            description: "Desc",
+            listType: "mixed",
+            isPublic: false,
+            isArchived: true,
+            syncWatchStatus: false,
+            createdAt: mockDate.toISOString(),
+            updatedAt: mockDate.toISOString(),
+            items: [],
+          },
+        ],
+      };
+
+      const { valuesMock } = setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      await importUserData(userId, JSON.stringify(archivedImportData));
+
+      expect(valuesMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "list-archived",
+          isArchived: true,
+        })
+      );
     });
   });
 });

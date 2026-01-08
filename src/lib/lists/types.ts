@@ -12,6 +12,7 @@ export interface GetListResponse {
   description: string | null;
   listType: ListTypeEnum;
   isPublic: boolean;
+  isArchived: boolean;
   syncWatchStatus: boolean;
   ownerId: string;
   ownerUsername: string;
@@ -32,6 +33,7 @@ export interface ListListsResponse {
   description: string | null;
   listType: string;
   isPublic: boolean;
+  isArchived: boolean;
   syncWatchStatus: boolean;
   ownerId: string;
   createdAt: Date;
@@ -54,6 +56,7 @@ export interface UpdateListInput {
   description?: string | null;
   listType?: ListTypeEnum;
   isPublic?: boolean;
+  isArchived?: boolean;
   syncWatchStatus?: boolean;
 }
 

@@ -49,7 +49,10 @@ import {
   getCachedContent,
 } from "../tmdb/cache-utils";
 
-export async function listLists(userId: string): Promise<ListResponse[]> {
+async function fetchLists(
+  userId: string,
+  isArchived: boolean
+): Promise<ListResponse[]> {
   // Get lists with counts in a single optimized query
   const userListsWithCounts = await db
     .select({
@@ -58,6 +61,7 @@ export async function listLists(userId: string): Promise<ListResponse[]> {
       description: lists.description,
       listType: lists.listType,
       isPublic: lists.isPublic,
+      isArchived: lists.isArchived,
       syncWatchStatus: lists.syncWatchStatus,
       ownerId: lists.ownerId,
       createdAt: lists.createdAt,
@@ -75,13 +79,19 @@ export async function listLists(userId: string): Promise<ListResponse[]> {
     })
     .from(lists)
     .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
-    .where(or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)))
+    .where(
+      and(
+        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+        eq(lists.isArchived, isArchived)
+      )
+    )
     .groupBy(
       lists.id,
       lists.name,
       lists.description,
       lists.listType,
       lists.isPublic,
+      lists.isArchived,
       lists.ownerId,
       lists.createdAt,
       lists.updatedAt
@@ -116,6 +126,16 @@ export async function listLists(userId: string): Promise<ListResponse[]> {
   );
 }
 
+export async function listLists(userId: string): Promise<ListResponse[]> {
+  return fetchLists(userId, false);
+}
+
+export async function listArchivedLists(
+  userId: string
+): Promise<ListResponse[]> {
+  return fetchLists(userId, true);
+}
+
 export async function getList(
   userId: string,
   listId: string
@@ -129,6 +149,7 @@ export async function getList(
         description: lists.description,
         listType: lists.listType,
         isPublic: lists.isPublic,
+        isArchived: lists.isArchived,
         syncWatchStatus: lists.syncWatchStatus,
         ownerId: lists.ownerId,
         ownerUsername: users.username,
@@ -325,8 +346,9 @@ export async function createList(
     id: newList.id,
     name: newList.name,
     description: newList.description ?? null,
-    listType: newList.listType,
+    listType: newList.listType as ListTypeEnum,
     isPublic: newList.isPublic,
+    isArchived: newList.isArchived,
     syncWatchStatus: newList.syncWatchStatus,
     ownerId: newList.ownerId,
     createdAt: newList.createdAt,
@@ -360,6 +382,12 @@ export async function updateList(
   if (input.listType !== undefined) updateData.listType = input.listType;
   if (input.isPublic !== undefined)
     updateData.isPublic = Boolean(input.isPublic);
+  if (input.isArchived !== undefined) {
+    updateData.isArchived = Boolean(input.isArchived);
+    if (updateData.isArchived) {
+      updateData.syncWatchStatus = false;
+    }
+  }
   if (input.syncWatchStatus !== undefined)
     updateData.syncWatchStatus = Boolean(input.syncWatchStatus);
 
@@ -402,6 +430,7 @@ export async function updateList(
     description: updated.description ?? null,
     listType: updated.listType,
     isPublic: updated.isPublic,
+    isArchived: updated.isArchived,
     syncWatchStatus: updated.syncWatchStatus,
     ownerId: updated.ownerId,
     createdAt: updated.createdAt,

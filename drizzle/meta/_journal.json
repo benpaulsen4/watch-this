@@ -43,6 +43,13 @@
       "when": 1767422277617,
       "tag": "0005_quick_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767869628776,
+      "tag": "0006_neat_praxagora",
+      "breakpoints": true
     }
   ]
 }

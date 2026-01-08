@@ -22,7 +22,7 @@ function renderWithClient(ui: React.ReactElement) {
     defaultOptions: { queries: { retry: 0, refetchOnWindowFocus: false } },
   });
   return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>
   );
 }
 
@@ -32,6 +32,7 @@ const initialList: ListListsResponse = {
   description: null as any,
   listType: "mixed" as any,
   isPublic: true,
+  isArchived: false,
   syncWatchStatus: false,
   ownerId: "u1",
   createdAt: "2024-01-01" as any,
@@ -125,5 +126,34 @@ describe("ListsClient", () => {
   it("renders empty state when no lists", () => {
     renderWithClient(<ListsClient initialLists={[]} />);
     expect(screen.getByText(/No lists yet/i)).toBeInTheDocument();
+  });
+
+  it("renders empty state for archived view", () => {
+    renderWithClient(<ListsClient initialLists={[]} isArchivedView />);
+    expect(screen.getByText(/No archived lists yet/i)).toBeInTheDocument();
+    // Should NOT show "Create Your First List" button in archived view
+    expect(
+      screen.queryByRole("button", { name: /Create Your First List/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders back link correctly in archived view", () => {
+    renderWithClient(<ListsClient initialLists={[]} isArchivedView />);
+
+    // PageHeader renders a back button with an arrow icon.
+    // The link inside should point to /lists
+    const backLink = screen
+      .getAllByRole("link")
+      .find((link) => link.getAttribute("href") === "/lists");
+    expect(backLink).toBeInTheDocument();
+  });
+
+  it("renders back link correctly in normal view", () => {
+    renderWithClient(<ListsClient initialLists={[]} />);
+
+    const backLink = screen
+      .getAllByRole("link")
+      .find((link) => link.getAttribute("href") === "/dashboard");
+    expect(backLink).toBeInTheDocument();
   });
 });
