@@ -48,9 +48,9 @@ export default function ListSettingsModal({
   onListCreate,
   allowedListTypes,
 }: ListSettingsModalProps) {
-  const [formData, setFormData] = useState<UpdateListInput>({
+  const [formData, setFormData] = useState<UpdateListInput & { name: string }>({
     name: list?.name ?? "",
-    description: list?.description ?? "",
+    description: list?.description,
     listType: list?.listType ?? "mixed",
     isPublic: list?.isPublic ?? false,
     syncWatchStatus: list?.syncWatchStatus ?? false,
@@ -67,7 +67,7 @@ export default function ListSettingsModal({
   };
 
   const validateForm = () => {
-    if (!formData.name?.trim()) {
+    if (!formData.name.trim()) {
       setError("List name is required");
       return false;
     }
