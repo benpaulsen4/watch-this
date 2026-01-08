@@ -105,6 +105,13 @@ describe("ListHeader", () => {
     expect(mockRouter.push).toHaveBeenCalledWith("/search");
   });
 
+  it("renders archived badge when list is archived", () => {
+    const archivedList = { ...initialList, isArchived: true };
+    render(<ListHeader initialList={archivedList as any} />);
+
+    expect(screen.getByText("Archived")).toBeInTheDocument();
+  });
+
   it("handles list updates from settings modal", async () => {
     const user = userEvent.setup();
     render(<ListHeader initialList={initialList as any} />);
