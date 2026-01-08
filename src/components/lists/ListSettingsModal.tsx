@@ -92,7 +92,7 @@ export default function ListSettingsModal({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: (formData.name ?? "").trim(),
+          name: formData.name.trim(),
           description: (formData.description ?? "").trim() || null,
           listType: formData.listType,
           isPublic: formData.isPublic,
@@ -151,7 +151,7 @@ export default function ListSettingsModal({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: (formData.name ?? "").trim(),
+          name: formData.name.trim(),
           description: (formData.description ?? "").trim() || null,
           listType: formData.listType,
           isPublic: formData.isPublic,
@@ -228,7 +228,7 @@ export default function ListSettingsModal({
             <Input
               label="List Name * "
               type="text"
-              value={formData.name ?? ""}
+              value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
               disabled={(mode === "edit" && !isOwner) || isLoading}
               placeholder="Enter list name"

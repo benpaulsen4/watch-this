@@ -106,7 +106,7 @@ npm run test:run
 - [x] RSC streaming implementation
 - [x] Sorting and filtering inside lists
 - [x] TMDB cache table to reduce spamming their API when fetching lists
-- [ ] List archiving
+- [x] List archiving
 - [ ] Sync schedules as well as content status in shared lists
 - [ ] Recommendations section for each list
 - [ ] Recently returned section & home page recommendations
