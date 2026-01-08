@@ -57,6 +57,7 @@ export const lists = pgTable("lists", {
   description: text("description"),
   listType: varchar("list_type", { length: 20 }).default("mixed").notNull(),
   isPublic: boolean("is_public").default(false).notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
   syncWatchStatus: boolean("sync_watch_status").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

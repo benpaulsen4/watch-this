@@ -69,13 +69,10 @@ export function ListSelector({
   const lists = (listsData?.lists || []) as ListListsResponse[];
   const listsWithContent = useMemo(() => {
     const data = listsWithContentData || [];
-    return data.reduce(
-      (acc, list) => {
-        acc[list.listId] = list.itemId;
-        return acc;
-      },
-      {} as Record<string, string>,
-    );
+    return data.reduce((acc, list) => {
+      acc[list.listId] = list.itemId;
+      return acc;
+    }, {} as Record<string, string>);
   }, [listsWithContentData]);
 
   // Filter lists based on content type
@@ -166,20 +163,18 @@ export function ListSelector({
     );
   }
 
-  if (filteredLists.length === 0) {
-    return (
-      <div className={cn("bg-gray-800 rounded-lg p-4", className)}>
-        <div className="text-gray-300 text-sm mb-2">
-          No compatible lists found. Create a{" "}
-          {contentType === "movie" ? "movie" : "TV show"} or mixed list first.
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={cn("space-y-4", className)}>
       <h3 className="text-lg font-semibold text-gray-100">Manage Lists</h3>
+
+      {filteredLists.length === 0 && (
+        <div className={cn("bg-gray-800 rounded-lg p-4", className)}>
+          <div className="text-gray-300 text-sm">
+            No compatible lists found. Create a{" "}
+            {contentType === "movie" ? "movie" : "TV show"} or mixed list first.
+          </div>
+        </div>
+      )}
 
       {filteredLists.map((list) => {
         const isCurrentList = currentListId === list.id;
@@ -199,8 +194,8 @@ export function ListSelector({
                     {list.listType === "mixed"
                       ? "Mixed"
                       : list.listType === "movies"
-                        ? "Movies"
-                        : "TV Shows"}
+                      ? "Movies"
+                      : "TV Shows"}
                     <span>&nbsp;•&nbsp;</span>
                     {list.isPublic ? (
                       <>

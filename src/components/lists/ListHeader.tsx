@@ -11,6 +11,7 @@ import {
   Settings,
   FileStack,
   RefreshCw,
+  Archive,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -36,6 +37,7 @@ export default function ListHeader({ initialList }: ListHeaderProps) {
     description?: string | null;
     listType?: "mixed" | "movies" | "tv";
     isPublic?: boolean;
+    isArchived?: boolean;
     syncWatchStatus?: boolean;
   }) => {
     setList((prev) => ({ ...prev, ...updatedList }));
@@ -53,6 +55,13 @@ export default function ListHeader({ initialList }: ListHeaderProps) {
         backLinkHref="/lists"
         subheaderSlot={
           <div className="flex items-center gap-2 text-sm text-gray-400">
+            {list.isArchived && (
+              <>
+                <Archive className="h-3 w-3" />
+                <span className="hidden sm:block">Archived</span>
+                <span>•</span>
+              </>
+            )}
             {list.isPublic ? (
               <>
                 <Globe className="h-3 w-3" />

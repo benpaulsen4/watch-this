@@ -15,6 +15,7 @@ export interface ListExportRow {
   description: string | null;
   listType: ListTypeEnum;
   isPublic: boolean;
+  isArchived: boolean;
   syncWatchStatus: boolean;
   createdAt: string;
   updatedAt: string;

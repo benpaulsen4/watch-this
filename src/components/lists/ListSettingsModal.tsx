@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Save, AlertTriangle } from "lucide-react";
+import {
+  Trash2,
+  Save,
+  AlertTriangle,
+  Archive,
+  RefreshCcw,
+  ArchiveRestore,
+} from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import Modal from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +21,7 @@ import {
   ListListsResponse,
   GetListResponse,
 } from "@/lib/lists/types";
+import { Focusable, Tooltip, TooltipTrigger } from "react-aria-components";
 
 type Mode = "edit" | "create";
 
@@ -40,12 +48,13 @@ export default function ListSettingsModal({
   onListCreate,
   allowedListTypes,
 }: ListSettingsModalProps) {
-  const [formData, setFormData] = useState<CreateListInput>({
+  const [formData, setFormData] = useState<UpdateListInput>({
     name: list?.name ?? "",
     description: list?.description ?? "",
     listType: list?.listType ?? "mixed",
     isPublic: list?.isPublic ?? false,
     syncWatchStatus: list?.syncWatchStatus ?? false,
+    isArchived: list?.isArchived ?? false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -58,7 +67,7 @@ export default function ListSettingsModal({
   };
 
   const validateForm = () => {
-    if (!formData.name.trim()) {
+    if (!formData.name?.trim()) {
       setError("List name is required");
       return false;
     }
@@ -83,10 +92,11 @@ export default function ListSettingsModal({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formData.name.trim(),
+          name: (formData.name ?? "").trim(),
           description: (formData.description ?? "").trim() || null,
           listType: formData.listType,
           isPublic: formData.isPublic,
+          isArchived: formData.isArchived,
           syncWatchStatus: formData.syncWatchStatus,
         }),
       });
@@ -103,6 +113,7 @@ export default function ListSettingsModal({
         description: updated.description,
         listType: updated.listType as any,
         isPublic: updated.isPublic,
+        isArchived: updated.isArchived,
         syncWatchStatus: updated.syncWatchStatus,
       });
       onClose();
@@ -120,6 +131,19 @@ export default function ListSettingsModal({
     await updateListMutation.mutateAsync();
   };
 
+  const handleArchiveToggle = async () => {
+    if (!validateForm()) return;
+    setIsLoading(true);
+    setError("");
+    setFormData((prev) => ({
+      ...prev,
+      isArchived: !prev.isArchived,
+      syncWatchStatus: !prev.isArchived ? false : prev.syncWatchStatus,
+    }));
+
+    await updateListMutation.mutateAsync();
+  };
+
   const createListMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch(`/api/lists`, {
@@ -127,7 +151,7 @@ export default function ListSettingsModal({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: formData.name.trim(),
+          name: (formData.name ?? "").trim(),
           description: (formData.description ?? "").trim() || null,
           listType: formData.listType,
           isPublic: formData.isPublic,
@@ -204,12 +228,12 @@ export default function ListSettingsModal({
             <Input
               label="List Name * "
               type="text"
-              value={formData.name}
+              value={formData.name ?? ""}
               onChange={(e) => handleInputChange("name", e.target.value)}
               disabled={(mode === "edit" && !isOwner) || isLoading}
               placeholder="Enter list name"
               maxLength={100}
-              helperText={`${formData.name.length}/100 characters`}
+              helperText={`${formData.name?.length ?? 0}/100 characters`}
             />
 
             {/* Description */}
@@ -235,7 +259,7 @@ export default function ListSettingsModal({
                 onSelectionChange={(key) =>
                   handleInputChange(
                     "listType",
-                    String(key || formData.listType),
+                    String(key || formData.listType)
                   )
                 }
                 isDisabled={(mode === "edit" && !isOwner) || isLoading}
@@ -244,8 +268,8 @@ export default function ListSettingsModal({
                     key === "mixed"
                       ? { key: "mixed", label: "Mixed (Movies & TV Shows)" }
                       : key === "movies"
-                        ? { key: "movies", label: "Movies Only" }
-                        : { key: "tv", label: "TV Shows Only" },
+                      ? { key: "movies", label: "Movies Only" }
+                      : { key: "tv", label: "TV Shows Only" }
                 )}
               />
             </div>
@@ -269,7 +293,11 @@ export default function ListSettingsModal({
                 onChange={(selected) =>
                   handleInputChange("syncWatchStatus", selected)
                 }
-                isDisabled={(mode === "edit" && !isOwner) || isLoading}
+                isDisabled={
+                  (mode === "edit" && !isOwner) ||
+                  isLoading ||
+                  formData.isArchived
+                }
                 helperText="When enabled, watch status updates will be synchronized across all collaborators"
               />
             </div>
@@ -282,14 +310,37 @@ export default function ListSettingsModal({
                     <Save className="w-4 h-4 mr-2" />
                     Save Changes
                   </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    disabled={isLoading}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete List
-                  </Button>
+
+                  <div className="flex gap-2 pt-3 border-t border-gray-800">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={handleArchiveToggle}
+                      loading={isLoading}
+                    >
+                      {formData.isArchived ? (
+                        <>
+                          <ArchiveRestore className="w-4 h-4 mr-2" />
+                          Unarchive List
+                        </>
+                      ) : (
+                        <>
+                          <Archive className="w-4 h-4 mr-2" />
+                          Archive List
+                        </>
+                      )}
+                    </Button>
+
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      disabled={isLoading}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete List
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3">

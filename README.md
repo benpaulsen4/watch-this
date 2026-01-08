@@ -106,10 +106,11 @@ npm run test:run
 - [x] RSC streaming implementation
 - [x] Sorting and filtering inside lists
 - [x] TMDB cache table to reduce spamming their API when fetching lists
+- [ ] List archiving
+- [ ] Sync schedules as well as content status in shared lists
 - [ ] Recommendations section for each list
 - [ ] Recently returned section & home page recommendations
 - [ ] \*arr stack integration for when content is not on any configured streaming services
-- [ ] My lists sorting/filtering
 - [ ] Trial accounts with no initial passkeys (usable for 7 days)
 - [ ] Statistics page in user profile
 - [ ] Splash page

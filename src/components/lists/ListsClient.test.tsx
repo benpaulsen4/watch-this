@@ -32,6 +32,7 @@ const initialList: ListListsResponse = {
   description: null as any,
   listType: "mixed" as any,
   isPublic: true,
+  isArchived: false,
   syncWatchStatus: false,
   ownerId: "u1",
   createdAt: "2024-01-01" as any,
