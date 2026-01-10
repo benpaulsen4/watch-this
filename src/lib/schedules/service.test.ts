@@ -11,6 +11,8 @@ vi.mock("../db", () => {
 
   const chain: any = {
     from: () => chain,
+    innerJoin: () => chain,
+    leftJoin: () => chain,
     where: () => chain,
     orderBy: () => chain,
     limit: () => Promise.resolve(resultsQueue.shift()),
@@ -40,12 +42,18 @@ vi.mock("../db", () => {
 
   const showSchedules = {} as any;
   const userContentStatus = {} as any;
+  const lists = {} as any;
+  const listItems = {} as any;
+  const listCollaborators = {} as any;
   const ContentType = { MOVIE: "movie", TV: "tv" } as const;
 
   return {
     db,
     showSchedules,
     userContentStatus,
+    lists,
+    listItems,
+    listCollaborators,
     ContentType,
   };
 });
@@ -92,7 +100,7 @@ vi.mock("../tmdb/cache-utils", async () => {
 
 import { db } from "../db";
 import { tmdbClient } from "../tmdb/client";
-import { createSchedule, deleteSchedules,listSchedules } from "./service";
+import { createSchedule, deleteSchedules, listSchedules } from "./service";
 
 describe("schedules service", () => {
   const userId = "user-1";
@@ -149,7 +157,7 @@ describe("schedules service", () => {
     const inserted = [
       { id: "sch-1", userId, tmdbId: 10, dayOfWeek: 3, createdAt: now },
     ];
-    (db as any).__setMockResults([contentStatus, none, inserted]);
+    (db as any).__setMockResults([contentStatus, none, inserted, []]);
     const res = await createSchedule(userId, { tmdbId: 10, dayOfWeek: 3 });
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.id).toBe("sch-1");
@@ -171,7 +179,7 @@ describe("schedules service", () => {
       { id: "x", userId, tmdbId: 10, dayOfWeek: 3, createdAt: now },
       { id: "y", userId, tmdbId: 10, dayOfWeek: 4, createdAt: now },
     ];
-    (db as any).__setMockResults([deleted]);
+    (db as any).__setMockResults([deleted, []]);
     const res = await deleteSchedules(userId, 10);
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.message).toMatch(/Removed 2 schedule/);

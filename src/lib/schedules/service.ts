@@ -1,6 +1,14 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 
-import { ContentType, db, showSchedules, userContentStatus } from "../db";
+import {
+  ContentType,
+  db,
+  listCollaborators,
+  listItems,
+  lists,
+  showSchedules,
+  userContentStatus,
+} from "../db";
 import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 import {
   CreateScheduleInput,
@@ -9,6 +17,181 @@ import {
   ScheduleItem,
   SchedulesByDay,
 } from "./types";
+
+async function syncScheduleCreateToCollaborators(
+  userId: string,
+  tmdbId: number,
+  dayOfWeek: number
+) {
+  try {
+    const syncEnabledListsRaw = await db
+      .select({
+        listId: lists.id,
+        ownerId: lists.ownerId,
+      })
+      .from(lists)
+      .innerJoin(listItems, eq(listItems.listId, lists.id))
+      .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
+      .where(
+        and(
+          eq(lists.syncWatchStatus, true),
+          eq(listItems.tmdbId, tmdbId),
+          eq(listItems.contentType, ContentType.TV),
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
+        )
+      );
+
+    const syncEnabledLists = new Map<
+      string,
+      { listId: string; ownerId: string }
+    >();
+    for (const row of syncEnabledListsRaw) {
+      if (!syncEnabledLists.has(row.listId)) {
+        syncEnabledLists.set(row.listId, {
+          listId: row.listId,
+          ownerId: row.ownerId,
+        });
+      }
+    }
+
+    for (const list of syncEnabledLists.values()) {
+      const collaborators = await db
+        .select({ userId: listCollaborators.userId })
+        .from(listCollaborators)
+        .where(eq(listCollaborators.listId, list.listId));
+
+      const allUsers = [
+        ...collaborators.map((c) => c.userId),
+        list.ownerId,
+      ].filter((id) => id !== userId);
+
+      for (const collaboratorId of allUsers) {
+        let statusRow = await db
+          .select({ status: userContentStatus.status })
+          .from(userContentStatus)
+          .where(
+            and(
+              eq(userContentStatus.userId, collaboratorId),
+              eq(userContentStatus.tmdbId, tmdbId),
+              eq(userContentStatus.contentType, ContentType.TV)
+            )
+          )
+          .limit(1);
+
+        if (statusRow.length === 0) {
+          try {
+            await db.insert(userContentStatus).values({
+              userId: collaboratorId,
+              tmdbId,
+              contentType: ContentType.TV,
+            });
+          } catch (error) {
+            void error;
+          }
+
+          statusRow = await db
+            .select({ status: userContentStatus.status })
+            .from(userContentStatus)
+            .where(
+              and(
+                eq(userContentStatus.userId, collaboratorId),
+                eq(userContentStatus.tmdbId, tmdbId),
+                eq(userContentStatus.contentType, ContentType.TV)
+              )
+            )
+            .limit(1);
+        }
+
+        const status = statusRow[0]?.status;
+        if (status === "completed" || status === "dropped") continue;
+
+        const existing = await db
+          .select({ id: showSchedules.id })
+          .from(showSchedules)
+          .where(
+            and(
+              eq(showSchedules.userId, collaboratorId),
+              eq(showSchedules.tmdbId, tmdbId),
+              eq(showSchedules.dayOfWeek, dayOfWeek)
+            )
+          )
+          .limit(1);
+
+        if (existing.length > 0) continue;
+
+        await db.insert(showSchedules).values({
+          userId: collaboratorId,
+          tmdbId,
+          dayOfWeek,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error syncing schedules to collaborators:", error);
+  }
+}
+
+async function syncScheduleDeleteToCollaborators(
+  userId: string,
+  tmdbId: number,
+  dayOfWeek?: number
+) {
+  try {
+    const syncEnabledListsRaw = await db
+      .select({
+        listId: lists.id,
+        ownerId: lists.ownerId,
+      })
+      .from(lists)
+      .innerJoin(listItems, eq(listItems.listId, lists.id))
+      .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
+      .where(
+        and(
+          eq(lists.syncWatchStatus, true),
+          eq(listItems.tmdbId, tmdbId),
+          eq(listItems.contentType, ContentType.TV),
+          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
+        )
+      );
+
+    const syncEnabledLists = new Map<
+      string,
+      { listId: string; ownerId: string }
+    >();
+    for (const row of syncEnabledListsRaw) {
+      if (!syncEnabledLists.has(row.listId)) {
+        syncEnabledLists.set(row.listId, {
+          listId: row.listId,
+          ownerId: row.ownerId,
+        });
+      }
+    }
+
+    for (const list of syncEnabledLists.values()) {
+      const collaborators = await db
+        .select({ userId: listCollaborators.userId })
+        .from(listCollaborators)
+        .where(eq(listCollaborators.listId, list.listId));
+
+      const allUsers = [
+        ...collaborators.map((c) => c.userId),
+        list.ownerId,
+      ].filter((id) => id !== userId);
+
+      for (const collaboratorId of allUsers) {
+        const where = [
+          eq(showSchedules.userId, collaboratorId),
+          eq(showSchedules.tmdbId, tmdbId),
+        ];
+        if (dayOfWeek !== undefined)
+          where.push(eq(showSchedules.dayOfWeek, dayOfWeek));
+        await db.delete(showSchedules).where(and(...where));
+      }
+    }
+  } catch (error) {
+    console.error("Error syncing schedule deletions to collaborators:", error);
+  }
+}
 
 export async function listSchedules(
   userId: string,
@@ -99,6 +282,8 @@ export async function createSchedule(
     .values({ userId, tmdbId, dayOfWeek })
     .returning();
 
+  await syncScheduleCreateToCollaborators(userId, tmdbId, dayOfWeek);
+
   const details = await getCachedContent(tmdbId, ContentType.TV, userId);
 
   return {
@@ -124,6 +309,8 @@ export async function deleteSchedules(
 
   const deleted = await db.delete(showSchedules).where(where).returning();
   if (deleted.length === 0) return "notFound";
+
+  await syncScheduleDeleteToCollaborators(userId, tmdbId, dayOfWeek);
 
   return {
     message: `Removed ${deleted.length} schedule(s)`,
