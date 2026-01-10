@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../db", () => {
   const resultsQueue: any[] = [];
@@ -123,10 +123,9 @@ vi.mock("../tmdb/cache-utils", async () => {
   };
 });
 
-import { listActivityTimeline } from "./service";
 import { db } from "../db";
-import { tmdbClient } from "../tmdb/client";
 import { getCachedContent } from "../tmdb/cache-utils";
+import { listActivityTimeline } from "./service";
 
 describe("activity service", () => {
   const userId = "u1";

@@ -1,15 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  fireEvent,
   render,
   screen,
   waitFor,
-  fireEvent,
-  act,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PasskeyDevicesViewer } from "./PasskeyDevicesViewer";
+import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
 import { initiatePasskeyClaim } from "@/lib/auth/client";
+
+import { PasskeyDevicesViewer } from "./PasskeyDevicesViewer";
 
 vi.mock("@/lib/auth/client", () => ({
   initiatePasskeyClaim: vi.fn(),

@@ -1,19 +1,20 @@
 "use client";
 
+import { type VariantProps } from "class-variance-authority";
 import { ChevronDown } from "lucide-react";
 import {
-  Select,
-  Label,
   Button as AriaButton,
-  Popover,
+  type Key,
+  Label,
   ListBox,
   ListBoxItem,
+  Popover,
+  Select,
   SelectValue,
-  type Key,
 } from "react-aria-components";
-import { type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+
 import { inputVariants } from "@/components/ui/Input";
+import { cn } from "@/lib/utils";
 
 export type DropdownOption = {
   key: Key;

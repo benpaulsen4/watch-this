@@ -1,4 +1,20 @@
 import { NextResponse } from "next/server";
+
+import {
+  AuthenticatedRequest,
+  handleApiError,
+  withAuth,
+} from "@/lib/auth/api-middleware";
+import {
+  createOrUpdateContentStatus,
+  deleteContentStatus,
+  getContentStatus,
+  updateContentStatus,
+} from "@/lib/content-status/service";
+import type {
+  CreateOrUpdateContentStatusInput,
+  UpdateContentStatusInput,
+} from "@/lib/content-status/types";
 import {
   ContentType,
   ContentTypeEnum,
@@ -7,21 +23,6 @@ import {
   TVWatchStatus,
   TVWatchStatusEnum,
 } from "@/lib/db/schema";
-import {
-  withAuth,
-  AuthenticatedRequest,
-  handleApiError,
-} from "@/lib/auth/api-middleware";
-import {
-  getContentStatus,
-  createOrUpdateContentStatus,
-  updateContentStatus,
-  deleteContentStatus,
-} from "@/lib/content-status/service";
-import type {
-  CreateOrUpdateContentStatusInput,
-  UpdateContentStatusInput,
-} from "@/lib/content-status/types";
 
 // GET /api/status/content - Get content watch status for authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {

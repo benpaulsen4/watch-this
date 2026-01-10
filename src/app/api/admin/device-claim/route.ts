@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+
+import { db , users } from "@/lib/db";
 import { initiateClaim } from "@/lib/profile/devices/service";
 
 export async function POST(request: NextRequest) {

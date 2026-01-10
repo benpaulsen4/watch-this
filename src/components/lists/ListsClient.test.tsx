@@ -1,9 +1,11 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
-import ListsClient from "./ListsClient";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
+
 import { ListListsResponse } from "@/lib/lists/types";
+
+import ListsClient from "./ListsClient";
 // Mock Next.js router to avoid app router invariant
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),

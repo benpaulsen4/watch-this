@@ -1,8 +1,9 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import ListSettingsModal from "./ListSettingsModal";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 function renderWithClient(ui: React.ReactElement) {
   const client = new QueryClient({
@@ -28,7 +29,7 @@ const baseList = {
 
 describe("ListSettingsModal", () => {
   beforeEach(() => {
-    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+    vi.spyOn(global, "fetch").mockImplementation(async (_input, _init) => {
       // Default noop success
       return { ok: true, json: async () => ({}) } as any;
     });

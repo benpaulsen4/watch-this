@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { tmdbClient } from "@/lib/tmdb/client";
+
 import {
-  withAuth,
   AuthenticatedRequest,
   handleApiError,
+  withAuth,
 } from "@/lib/auth/api-middleware";
+import { tmdbClient } from "@/lib/tmdb/client";
 
 // GET /api/tmdb/episodes/[id] - Get TV show season or episode details
 export const GET = withAuth(async (request: AuthenticatedRequest) => {

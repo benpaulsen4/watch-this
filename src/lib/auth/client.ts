@@ -1,12 +1,13 @@
 "use client";
 
 import {
-  startRegistration,
-  startAuthentication,
   type PublicKeyCredentialCreationOptionsJSON,
   type PublicKeyCredentialRequestOptionsJSON,
+  startAuthentication,
+  startRegistration,
 } from "@simplewebauthn/browser";
 import { UAParser } from "ua-parser-js";
+
 import type { ClaimInitiateResponse } from "@/lib/profile/devices/types";
 
 export interface RegistrationOptions {

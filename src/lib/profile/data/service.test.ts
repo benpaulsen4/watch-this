@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { exportUserData, importUserData } from "./service";
-import { addToCache } from "@/lib/tmdb/cache-utils";
 import JSZip from "jszip";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { addToCache } from "@/lib/tmdb/cache-utils";
+
+import { exportUserData, importUserData } from "./service";
 
 // Define mock DB using vi.hoisted to share between mock factory and tests
 const { mockedDb } = vi.hoisted(() => ({
@@ -169,9 +171,9 @@ describe("Profile Data Service", () => {
       // Chain for others
       // db.select().from(...).where(...)
 
-      (mockedDb.select as any).mockImplementation((selection: any) => {
+      (mockedDb.select as any).mockImplementation((_selection: any) => {
         return {
-          from: fromMock.mockImplementation((table) => {
+          from: fromMock.mockImplementation((_table) => {
             return {
               where: whereMock,
               leftJoin: leftJoinMock.mockReturnValue({ where: whereMock }),

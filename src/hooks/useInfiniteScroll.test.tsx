@@ -1,7 +1,8 @@
-import React from "react";
 import { render, screen } from "@testing-library/react";
+import React from "react";
+import { beforeEach, describe, expect,test, vi } from "vitest";
+
 import { useInfiniteScroll } from "./useInfiniteScroll";
-import { describe, vi, beforeEach, test, expect } from "vitest";
 
 function InfiniteScrollTest({
   onLoadMore,

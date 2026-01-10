@@ -1,8 +1,10 @@
-import { forwardRef, useState, useEffect, useRef } from "react";
-import { cn } from "@/lib/utils";
-import { Input } from "../ui/Input";
-import { Button } from "../ui/Button";
 import { Search, X } from "lucide-react";
+import { forwardRef, useEffect, useRef,useState } from "react";
+
+import { cn } from "@/lib/utils";
+
+import { Button } from "../ui/Button";
+import { Input } from "../ui/Input";
 
 export interface SearchInputProps extends Omit<
   React.InputHTMLAttributes<HTMLInputElement>,

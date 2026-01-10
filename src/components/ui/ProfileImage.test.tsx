@@ -1,6 +1,7 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent,render, screen } from "@testing-library/react";
+import { describe, expect,it } from "vitest";
+
 import { ProfileImage } from "@/components/ui/ProfileImage";
-import { describe, it, expect } from "vitest";
 
 describe("ProfileImage", () => {
   it("renders fallback letter when no src", () => {

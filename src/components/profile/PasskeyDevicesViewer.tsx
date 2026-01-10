@@ -1,27 +1,28 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertCircle,
+  Check as CheckIcon,
+  Copy as CopyIcon,
+  Monitor,
+  RefreshCw,
   Shield,
   Smartphone,
-  Monitor,
-  AlertCircle,
-  RefreshCw,
-  Copy as CopyIcon,
-  Check as CheckIcon,
 } from "lucide-react";
+import { useEffect,useState } from "react";
+
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Input } from "@/components/ui/Input";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import Modal from "@/components/ui/Modal";
+import QRCode from "@/components/ui/QRCode";
+import { initiatePasskeyClaim } from "@/lib/auth/client";
 import type {
   ClaimInitiateResponse,
   PasskeyDevice,
 } from "@/lib/profile/devices/types";
-import { useState, useEffect } from "react";
-import Modal from "@/components/ui/Modal";
-import { initiatePasskeyClaim } from "@/lib/auth/client";
-import QRCode from "@/components/ui/QRCode";
 
 export function PasskeyDevicesViewer() {
   const {

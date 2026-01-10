@@ -1,12 +1,13 @@
-import { cookies } from "next/headers";
-import { getCurrentUser } from "@/lib/auth/webauthn";
-import { getListItems } from "@/lib/lists/service";
-import { WatchStatusEnum } from "@/lib/db/schema";
 import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { cookies } from "next/headers";
 import Link from "next/link";
+
+import { Button } from "@/components/ui/Button";
+import { getCurrentUser } from "@/lib/auth/webauthn";
+import { WatchStatusEnum } from "@/lib/db/schema";
+import { getListItems } from "@/lib/lists/service";
+
 import { ListItemWrapper } from "./ListItemWrapper";
-import { TMDBMovie, TMDBTVShow } from "@/lib/tmdb/client";
 
 interface ListItemsProps {
   listId: string;

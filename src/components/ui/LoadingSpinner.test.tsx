@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import { describe, expect,it } from "vitest";
+
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { describe, it, expect } from "vitest";
 
 describe("LoadingSpinner", () => {
   it("renders default spinner with status role", () => {

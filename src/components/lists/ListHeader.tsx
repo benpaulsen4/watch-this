@@ -1,25 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  Plus,
-  Users,
-  Lock,
-  Globe,
-  Share,
-  Settings,
-  FileStack,
-  RefreshCw,
   Archive,
+  FileStack,
+  Globe,
+  Lock,
+  Plus,
+  RefreshCw,
+  Settings,
+  Share,
+  Users,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
-import CollaborationModal from "./CollaborationModal";
-import ListSettingsModal from "./ListSettingsModal";
+import { GetListResponse } from "@/lib/lists/types";
+
 import { useUser } from "../providers/AuthProvider";
 import { PageHeader } from "../ui/PageHeader";
-import { GetListResponse } from "@/lib/lists/types";
+import CollaborationModal from "./CollaborationModal";
+import ListSettingsModal from "./ListSettingsModal";
 
 interface ListHeaderProps {
   initialList: GetListResponse;

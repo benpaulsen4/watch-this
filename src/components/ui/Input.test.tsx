@@ -1,6 +1,7 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent,render, screen } from "@testing-library/react";
+import { describe, expect,it } from "vitest";
+
 import { Input, Textarea } from "@/components/ui/Input";
-import { describe, it, expect } from "vitest";
 
 describe("Input", () => {
   it("renders label and associates with input id", () => {

@@ -1,35 +1,36 @@
+import { and, eq, inArray, or } from "drizzle-orm";
+
+import { syncStatusToCollaborators } from "@/lib/activity/activityUtils";
 import { db } from "@/lib/db";
 import {
-  userContentStatus,
-  ContentType,
   activityFeed,
   ActivityType,
-  showSchedules,
-  MovieWatchStatus,
-  TVWatchStatus,
+  ContentType,
   ContentTypeEnum,
-  WatchStatusEnum,
-  WatchStatus,
   episodeWatchStatus,
+  showSchedules,
+  TVWatchStatus,
   UserContentStatus,
+  userContentStatus,
+  WatchStatus,
+  WatchStatusEnum,
 } from "@/lib/db/schema";
-import { and, eq, inArray, or } from "drizzle-orm";
 import {
   tmdbClient,
   TMDBMovie,
   TMDBSearchItem,
   TMDBTVShow,
 } from "@/lib/tmdb/client";
-import { syncStatusToCollaborators } from "@/lib/activity/activityUtils";
+
 import type {
   ContentStatusItem,
   CreateOrUpdateContentStatusInput,
   CreateOrUpdateContentStatusResult,
+  DeleteContentStatusResult,
   GetContentStatusResponse,
+  TMDBContent,
   UpdateContentStatusInput,
   UpdateContentStatusResult,
-  DeleteContentStatusResult,
-  TMDBContent,
 } from "./types";
 
 function mapRow(row: any): ContentStatusItem {

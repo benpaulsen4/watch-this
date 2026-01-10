@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 import { tmdbClient } from "@/lib/tmdb/client";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
 
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {

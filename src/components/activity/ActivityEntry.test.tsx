@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
-import { ActivityEntry } from "./ActivityEntry";
-import { ActivityType } from "@/lib/db/schema";
+import { describe, expect, it, vi } from "vitest";
+
 import type { ActivityItem } from "@/lib/activity/types";
+import { ActivityType } from "@/lib/db/schema";
+
+import { ActivityEntry } from "./ActivityEntry";
 
 // Make relative time deterministic
 vi.mock("date-fns", () => ({

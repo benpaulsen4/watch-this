@@ -1,34 +1,32 @@
 import {
-  db,
-  activityFeed,
-  users,
-  lists,
-  listCollaborators,
-  showSchedules,
-  userContentStatus,
-  episodeWatchStatus,
-  ContentType,
-} from "../db";
-import type { WatchStatusEnum } from "../db";
-import {
-  eq,
-  desc,
   and,
-  or,
+  arrayContains,
+  desc,
+  eq,
   inArray,
   lt,
-  arrayContains,
+  or,
   sql,
 } from "drizzle-orm";
-import { tmdbClient } from "../tmdb/client";
+
+import {
+  activityFeed,
+  ContentType,
+  db,
+  episodeWatchStatus,
+  listCollaborators,
+  lists,
+  showSchedules,
+  userContentStatus,
+  users,
+} from "../db";
+import { getCachedContent } from "../tmdb/cache-utils";
 import type {
+  ActivityItem,
   ActivityTimelineResponse,
   ListActivityInput,
-  ActivityItem,
   UpcomingActivity,
 } from "./types";
-import { mapContentToDomainModel } from "../content-status/service";
-import { getCachedContent } from "../tmdb/cache-utils";
 
 export async function listActivityTimeline(
   userId: string,

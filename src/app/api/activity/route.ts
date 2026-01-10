@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
+
 import { listActivityTimeline } from "@/lib/activity/service";
 import type { ActivityTimelineResponse } from "@/lib/activity/types";
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 
 // GET /api/activity - Get paginated activity timeline
 export const GET = withAuth(async (request: AuthenticatedRequest) => {

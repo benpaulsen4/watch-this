@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
+
 import {
-  withAuth,
   AuthenticatedRequest,
   handleApiError,
+  withAuth,
 } from "@/lib/auth/api-middleware";
 import {
   batchUpdateEpisodeStatuses,
+  deleteEpisodeStatuses,
   listEpisodeStatuses,
   updateEpisodeStatus,
-  deleteEpisodeStatuses,
 } from "@/lib/episodes/service";
 import type { BatchUpdateEpisodesInputItem } from "@/lib/episodes/types";
 

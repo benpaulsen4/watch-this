@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { tmdbClient } from "@/lib/tmdb/client";
+
 import {
-  withAuth,
-  handleApiError,
   type AuthenticatedRequest,
+  handleApiError,
+  withAuth,
 } from "@/lib/auth/api-middleware";
+import { tmdbClient } from "@/lib/tmdb/client";
 
 async function handler(request: AuthenticatedRequest) {
   try {

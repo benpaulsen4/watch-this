@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { listDevices } from "@/lib/profile/devices/service";
-import { initiateClaim } from "@/lib/profile/devices/service";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
+import { initiateClaim,listDevices  } from "@/lib/profile/devices/service";
 
 // GET /api/profile/devices - Get all passkey devices for the authenticated user
 export const GET = withAuth(async (request: AuthenticatedRequest) => {

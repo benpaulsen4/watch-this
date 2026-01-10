@@ -1,7 +1,8 @@
+import { cookies } from "next/headers";
+
 import ListsClient from "@/components/lists/ListsClient";
 import { getCurrentUser } from "@/lib/auth/webauthn";
 import { listArchivedLists } from "@/lib/lists/service";
-import { cookies } from "next/headers";
 
 export default async function ArchivedListsPage() {
   const resolvedCookies = await cookies();

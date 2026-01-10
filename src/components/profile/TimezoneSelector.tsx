@@ -1,10 +1,11 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
+import { AlertCircle, Check, Edit3,Globe, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Globe, Check, X, AlertCircle, Edit3 } from "lucide-react";
+
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
-import { useMutation } from "@tanstack/react-query";
 
 type Props = {
   user: { timezone?: string };

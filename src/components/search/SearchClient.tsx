@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Filter, TrendingUp } from "lucide-react";
-import type { TMDBMovie, TMDBTVShow, TMDBGenre } from "@/lib/tmdb/client";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+import { useCallback, useMemo,useState } from "react";
+
 import { SearchInput } from "@/components/search/SearchInput";
 import { Button } from "@/components/ui/Button";
+import { Card, CardContent,CardHeader, CardTitle } from "@/components/ui/Card";
 import Dropdown from "@/components/ui/Dropdown";
-import { PageHeader } from "../ui/PageHeader";
-import { ContentCard } from "../content/ContentCard";
-import { ContentCardSkeleton } from "../content/ContentCardSkeleton";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
-  TMDBContent,
   TMDBContentSearchResult,
 } from "@/lib/content-status/types";
+import type { TMDBGenre } from "@/lib/tmdb/client";
+
+import { ContentCard } from "../content/ContentCard";
+import { ContentCardSkeleton } from "../content/ContentCardSkeleton";
+import { PageHeader } from "../ui/PageHeader";
 
 type ContentType = "all" | "movie" | "tv";
 type SortBy =

@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
 import Dropdown, { type DropdownOption } from "@/components/ui/Dropdown";
-import { describe, it, expect, vi } from "vitest";
 
 const options: DropdownOption[] = [
   { key: "a", label: "Apple" },

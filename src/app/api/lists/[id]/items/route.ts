@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { createListItem, getListItems } from "@/lib/lists/service";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 import { WatchStatusEnum } from "@/lib/db/schema";
+import { createListItem, getListItems } from "@/lib/lists/service";
 import { CreateListItemInput } from "@/lib/lists/types";
 
 export const GET = withAuth(async (request: AuthenticatedRequest) => {

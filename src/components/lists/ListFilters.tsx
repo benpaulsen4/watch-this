@@ -1,11 +1,12 @@
 "use client";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback } from "react";
+
 import { StatusSegmentedSelector } from "@/components/content/StatusSegmentedSelector";
-import { WatchStatusEnum, ListTypeEnum } from "@/lib/db/schema";
+import { Button } from "@/components/ui/Button";
+import { ListTypeEnum,WatchStatusEnum } from "@/lib/db/schema";
 
 interface ListFiltersProps {
   listType: ListTypeEnum;

@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
+
 import { ContentType, db, showSchedules, userContentStatus } from "../db";
-import { tmdbClient } from "../tmdb/client";
+import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 import {
   CreateScheduleInput,
   DeleteSchedulesResponse,
@@ -8,7 +9,6 @@ import {
   ScheduleItem,
   SchedulesByDay,
 } from "./types";
-import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 
 export async function listSchedules(
   userId: string,

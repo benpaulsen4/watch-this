@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 import { exportUserData } from "@/lib/profile/data/service";
 
 // GET /api/profile/export?format=csv|json - Export user's lists data

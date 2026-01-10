@@ -1,12 +1,13 @@
-import { db } from "@/lib/db";
-import { passkeyCredentials, passkeyClaims, activityFeed } from "@/lib/db";
-import { desc, eq, isNull, and, gt } from "drizzle-orm";
+import { and, desc, eq, gt,isNull } from "drizzle-orm";
+
+import { createClaimToken } from "@/lib/auth/webauthn";
+import { activityFeed,db , passkeyClaims, passkeyCredentials } from "@/lib/db";
+
 import type {
-  PasskeyDevice,
   ClaimInitiateResponse,
   ClaimInitiator,
+  PasskeyDevice,
 } from "./types";
-import { createClaimToken } from "@/lib/auth/webauthn";
 
 export async function listDevices(userId: string): Promise<PasskeyDevice[]> {
   const rows = await db

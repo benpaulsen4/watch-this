@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ListItemWrapper } from "./ListItemWrapper";
 import { useRouter } from "next/navigation";
+import { describe, expect, it, vi } from "vitest";
+
+import { ListItemWrapper } from "./ListItemWrapper";
 
 // Mock useRouter
 vi.mock("next/navigation", () => ({

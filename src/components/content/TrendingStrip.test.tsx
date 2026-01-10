@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import TrendingStrip from "./TrendingStrip";
-import { tmdbClient } from "@/lib/tmdb/client";
+import { beforeEach,describe, expect, it, vi } from "vitest";
+
 import { mapAllWithContentStatus } from "@/lib/content-status/service";
+import { tmdbClient } from "@/lib/tmdb/client";
+
+import TrendingStrip from "./TrendingStrip";
 
 // Mock dependencies
 vi.mock("@/lib/tmdb/client", () => ({

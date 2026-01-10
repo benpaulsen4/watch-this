@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+
 import {
-  withAuth,
-  handleApiError,
   type AuthenticatedRequest,
+  handleApiError,
+  withAuth,
 } from "@/lib/auth/api-middleware";
 import {
   getStreamingPreferences,

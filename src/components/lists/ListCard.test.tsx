@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
-import { ListCard } from "./ListCard";
+import { describe, expect, it, vi } from "vitest";
+
 import type { ListListsResponse } from "@/lib/lists/types";
+
+import { ListCard } from "./ListCard";
 
 // Mock next/image to a plain img for test environment
 vi.mock("next/image", () => ({

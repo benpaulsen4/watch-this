@@ -1,10 +1,12 @@
+import { and, eq } from "drizzle-orm";
+
 import { db } from "@/lib/db";
 import {
+  type NewUserStreamingProvider,
   users,
   userStreamingProviders,
-  type NewUserStreamingProvider,
 } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+
 import type {
   SaveStreamingPreferencesRequest,
   StreamingPreferences,

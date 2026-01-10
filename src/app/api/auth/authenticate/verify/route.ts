@@ -1,10 +1,11 @@
+import { AuthenticationResponseJSON } from "@simplewebauthn/browser";
 import { NextRequest, NextResponse } from "next/server";
+
 import {
-  verifyPasskeyAuthentication,
   createSessionToken,
   verifyChallengeToken,
+  verifyPasskeyAuthentication,
 } from "@/lib/auth/webauthn";
-import { AuthenticationResponseJSON } from "@simplewebauthn/browser";
 
 interface RequestBody {
   authenticationResponse: unknown;

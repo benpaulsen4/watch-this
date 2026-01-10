@@ -1,12 +1,14 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+
 import { getImageUrl } from "@/lib/tmdb/client";
-import { LoadingSpinner } from "../ui/LoadingSpinner";
+
 import { Button } from "../ui/Button";
-import { ChevronLeft, ChevronRight, User } from "lucide-react";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
 
 interface CastTabProps {
   contentType: "movie" | "tv";

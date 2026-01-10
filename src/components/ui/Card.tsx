@@ -1,6 +1,7 @@
-import { forwardRef } from "react";
-import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
+import { forwardRef } from "react";
+
+import { cn } from "@/lib/utils";
 
 const cardVariants = cva(
   "rounded-xl border bg-card text-card-foreground transition-all",
@@ -112,10 +113,10 @@ CardFooter.displayName = "CardFooter";
 
 export {
   Card,
-  CardHeader,
-  CardFooter,
-  CardTitle,
-  CardDescription,
   CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
   cardVariants,
 };

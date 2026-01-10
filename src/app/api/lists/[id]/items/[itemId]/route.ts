@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { lists, listItems, listCollaborators } from "@/lib/db/schema";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { eq, and, or } from "drizzle-orm";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 import { deleteListItem } from "@/lib/lists/service";
 
 // DELETE /api/lists/[id]/items/[itemId] - Remove item from list

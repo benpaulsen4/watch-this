@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { CastTab } from "./CastTab";
 
 vi.mock("next/image", () => ({
@@ -20,7 +21,7 @@ function setupQueryClient() {
 function renderWithQuery(ui: React.ReactElement, client?: QueryClient) {
   const queryClient = client ?? setupQueryClient();
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
   );
 }
 
@@ -44,7 +45,6 @@ describe("CastTab", () => {
 
   it("shows loading initially and then renders cast heading", async () => {
     const client = setupQueryClient();
-    const user = userEvent.setup();
 
     // Delay credits response to observe loading state
     fetchMock.mockImplementationOnce(async () => {
@@ -52,15 +52,15 @@ describe("CastTab", () => {
         setTimeout(
           () =>
             resolve({ ok: true, json: async () => ({ cast: [] }) } as Response),
-          10,
-        ),
+          10
+        )
       );
     });
 
     renderWithQuery(<CastTab contentType="tv" contentId={123} />, client);
     expect(screen.getByText(/Loading cast/i)).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.getByText(/No cast information/i)).toBeInTheDocument(),
+      expect(screen.getByText(/No cast information/i)).toBeInTheDocument()
     );
   });
 

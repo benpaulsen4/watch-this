@@ -1,16 +1,18 @@
 "use client";
 
-import { forwardRef, useState, useRef, useEffect } from "react";
-import Image from "next/image";
-import { cn, formatVoteAverage } from "@/lib/utils";
-import { getImageUrl } from "@/lib/tmdb/client";
-import { StatusBadge } from "./StatusBadge";
-import { ContentDetailsModal } from "./ContentDetailsModal";
-import { Star, Play } from "lucide-react";
-import type { WatchStatusEnum } from "@/lib/db/schema";
-import { Card } from "../ui/Card";
-import { Badge } from "../ui/Badge";
 import { useMutation } from "@tanstack/react-query";
+import { Play,Star } from "lucide-react";
+import Image from "next/image";
+import { forwardRef, useEffect,useRef, useState } from "react";
+
+import type { WatchStatusEnum } from "@/lib/db/schema";
+import { getImageUrl } from "@/lib/tmdb/client";
+import { cn, formatVoteAverage } from "@/lib/utils";
+
+import { Badge } from "../ui/Badge";
+import { Card } from "../ui/Card";
+import { ContentDetailsModal } from "./ContentDetailsModal";
+import { StatusBadge } from "./StatusBadge";
 
 export interface ContentCardProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "content"> {

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { getCurrentUser } from "@/lib/auth/webauthn";
+
 import { User } from "../db";
 
 export interface AuthenticatedRequest extends NextRequest {

@@ -1,33 +1,35 @@
+import { and, eq, inArray } from "drizzle-orm";
+import JSZip from "jszip";
+
 import { db } from "@/lib/db";
 import {
-  lists,
-  listItems,
-  userContentStatus,
-  episodeWatchStatus,
-  showSchedules,
-  tmdbCache,
-  ListTypeEnum,
-  ContentTypeEnum,
-  WatchStatusEnum,
   activityFeed,
   ActivityType,
+  ContentTypeEnum,
+  episodeWatchStatus,
+  listItems,
+  lists,
+  ListTypeEnum,
+  showSchedules,
+  tmdbCache,
+  userContentStatus,
+  WatchStatusEnum,
 } from "@/lib/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
-import JSZip from "jszip";
+import { addToCache } from "@/lib/tmdb/cache-utils";
+
 import type {
+  ContentStatusExportRow,
+  CSVExportModel,
+  EpisodeStatusExportRow,
   ExportFormat,
   ExportResponse,
   ImportResult,
   JSONExportModel,
-  CSVExportModel,
+  JSONImportModel,
   ListExportRow,
   ListItemExportRow,
-  ContentStatusExportRow,
-  EpisodeStatusExportRow,
   TVShowSchedules,
-  JSONImportModel,
 } from "./types";
-import { addToCache } from "@/lib/tmdb/cache-utils";
 
 export async function exportUserData(
   userId: string,
@@ -216,7 +218,7 @@ export async function importUserData(
   let importModel: JSONImportModel;
   try {
     importModel = JSON.parse(fileContent);
-  } catch (e) {
+  } catch {
     return "parseError";
   }
 

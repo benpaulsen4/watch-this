@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ActivityEntry } from "./ActivityEntry";
-import { UpcomingActivityCard } from "./UpcomingActivityCard";
-import { Button } from "@/components/ui/Button";
+import { useQuery } from "@tanstack/react-query";
 import { Activity as ActivityIcon } from "lucide-react";
 import Link from "next/link";
-import type { ActivityTimelineResponse } from "@/lib/activity/types";
 import { useRouter } from "next/navigation";
-import { LoadingSpinner } from "../ui/LoadingSpinner";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect,useState } from "react";
+
 import ListSettingsModal from "@/components/lists/ListSettingsModal";
+import { Button } from "@/components/ui/Button";
+import type { ActivityTimelineResponse } from "@/lib/activity/types";
+
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { ActivityEntry } from "./ActivityEntry";
+import { UpcomingActivityCard } from "./UpcomingActivityCard";
 
 interface ActivityFeedProps {
   currentUsername: string;

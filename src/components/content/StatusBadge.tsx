@@ -1,10 +1,11 @@
 import {
-  WatchStatusEnum,
+  ContentTypeEnum,
   MovieWatchStatusEnum,
   TVWatchStatusEnum,
-  ContentTypeEnum,
+  WatchStatusEnum,
 } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+
 import { Badge } from "../ui/Badge";
 
 interface StatusBadgeProps {

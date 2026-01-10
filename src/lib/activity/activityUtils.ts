@@ -1,11 +1,12 @@
+import { and, eq, or } from "drizzle-orm";
+
 import { db } from "@/lib/db";
 import {
-  userContentStatus,
-  lists,
   listCollaborators,
   listItems,
+  lists,
+  userContentStatus,
 } from "@/lib/db/schema";
-import { eq, and, or } from "drizzle-orm";
 
 // Helper function to sync status updates to collaborators, returning a list of synced collaborator IDs
 export async function syncStatusToCollaborators(

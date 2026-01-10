@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
+
+import { AuthenticatedRequest, withAuth } from "@/lib/auth/api-middleware";
 import { cancelClaim } from "@/lib/profile/devices/service";
 
 export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
@@ -12,9 +13,10 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
     }
     return NextResponse.json(res);
   } catch (error) {
+    console.error("Error canceling claim:", error);
     return NextResponse.json(
       { error: "Failed to cancel claim" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 });

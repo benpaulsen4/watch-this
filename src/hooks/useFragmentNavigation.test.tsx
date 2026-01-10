@@ -1,9 +1,9 @@
-import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { act } from "react";
+import React, { act } from "react";
+import { beforeEach, describe, expect,test } from "vitest";
+
 import { useFragmentNavigation } from "./useFragmentNavigation";
-import { describe, beforeEach, test, expect } from "vitest";
 
 type Tab = "profile" | "security" | "data" | "streaming";
 

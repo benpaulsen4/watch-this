@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
+import { useMutation } from "@tanstack/react-query";
 import { Play } from "lucide-react";
+import Image from "next/image";
+import { useState } from "react";
+
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import type { UpcomingActivity } from "@/lib/activity/types";
-import { getImageUrl } from "@/lib/tmdb/client";
-import { DAYS_OF_WEEK } from "../content/ScheduleManager";
-import { ContentDetailsModal } from "../content/ContentDetailsModal";
-import { useMutation } from "@tanstack/react-query";
 import type { MarkNextEpisodeResult } from "@/lib/episodes/types";
+import { getImageUrl } from "@/lib/tmdb/client";
+
+import { ContentDetailsModal } from "../content/ContentDetailsModal";
+import { DAYS_OF_WEEK } from "../content/ScheduleManager";
 
 interface UpcomingActivityCardProps {
   upcoming: UpcomingActivity;

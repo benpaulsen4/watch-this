@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { passkeyClaims } from "@/lib/db";
 import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+
 import {
-  verifyClaimToken,
   createChallengeToken,
   generateAdditionalPasskeyRegistrationOptions,
+  verifyClaimToken,
 } from "@/lib/auth/webauthn";
+import { db , passkeyClaims } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { Archive,Plus } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Archive } from "lucide-react";
+import { useState } from "react";
+
+import ListSettingsModal from "@/components/lists/ListSettingsModal";
 import { Button } from "@/components/ui/Button";
-import { List } from "@/lib/db";
+import { ListListsResponse } from "@/lib/lists/types";
+
 import { PageHeader } from "../ui/PageHeader";
 import { ListCard } from "./ListCard";
-import ListSettingsModal from "@/components/lists/ListSettingsModal";
-import { ListListsResponse } from "@/lib/lists/types";
-import Link from "next/link";
 
 export default function ListsClient({
   initialLists,

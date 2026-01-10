@@ -1,27 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
-  Trash2,
-  Save,
   AlertTriangle,
   Archive,
-  RefreshCcw,
   ArchiveRestore,
+  Save,
+  Trash2,
 } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import Modal from "@/components/ui/Modal";
+import { useState } from "react";
+
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
-import { Switch } from "@/components/ui/Switch";
 import { Input, Textarea } from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
+import { Switch } from "@/components/ui/Switch";
 import {
-  CreateListInput,
-  UpdateListInput,
-  ListListsResponse,
   GetListResponse,
+  ListListsResponse,
+  UpdateListInput,
 } from "@/lib/lists/types";
-import { Focusable, Tooltip, TooltipTrigger } from "react-aria-components";
 
 type Mode = "edit" | "create";
 

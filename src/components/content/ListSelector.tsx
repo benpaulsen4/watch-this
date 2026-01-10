@@ -1,22 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Globe,
+  Lock,
   Minus,
   Plus,
-  RotateCcw,
-  Lock,
-  Users,
   RefreshCw,
+  RotateCcw,
+  Users,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { ListListsResponse } from "@/lib/lists/types";
-import { LoadingSpinner } from "../ui/LoadingSpinner";
-import { Button } from "../ui/Button";
-import { Badge } from "../ui/Badge";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+
 import ListSettingsModal from "@/components/lists/ListSettingsModal";
+import type { ListListsResponse } from "@/lib/lists/types";
+import { cn } from "@/lib/utils";
+
+import { Badge } from "../ui/Badge";
+import { Button } from "../ui/Button";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
 
 export interface ListSelectorProps {
   contentType: "movie" | "tv";

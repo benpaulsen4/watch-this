@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight,Save, Search } from "lucide-react";
 import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
+
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
-import { getImageUrl } from "@/lib/tmdb/client";
-import { LoadingSpinner } from "../ui/LoadingSpinner";
-import { useStreamingPreferences } from "../providers/AuthProvider";
 import type { StreamingPreferences as StreamingPreferencesType } from "@/lib/profile/streaming/types";
-import { Save, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getImageUrl } from "@/lib/tmdb/client";
+
+import { useStreamingPreferences } from "../providers/AuthProvider";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
 
 interface Region {
   iso_3166_1: string;

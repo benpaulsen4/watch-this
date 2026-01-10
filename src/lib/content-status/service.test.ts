@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/db", () => {
   const resultsQueue: any[] = [];
@@ -89,15 +89,16 @@ vi.mock("@/lib/db/schema", () => {
   };
 });
 
-import {
-  getContentStatus,
-  createOrUpdateContentStatus,
-  updateContentStatus,
-  deleteContentStatus,
-} from "./service";
 import { db } from "@/lib/db";
 import { activityFeed } from "@/lib/db/schema";
 import { tmdbClient } from "@/lib/tmdb/client";
+
+import {
+  createOrUpdateContentStatus,
+  deleteContentStatus,
+  getContentStatus,
+  updateContentStatus,
+} from "./service";
 
 describe("content-status service", () => {
   const userId = "u1";

@@ -1,10 +1,11 @@
+import { cookies } from "next/headers";
+import { Suspense } from "react";
+
 import { ContentCardSkeleton } from "@/components/content/ContentCardSkeleton";
 import TrendingStrip from "@/components/content/TrendingStrip";
 import { SearchClient } from "@/components/search/SearchClient";
 import { getCurrentUser } from "@/lib/auth/webauthn";
 import { tmdbClient } from "@/lib/tmdb/client";
-import { cookies } from "next/headers";
-import { Suspense } from "react";
 
 export default async function SearchPage() {
   const user = await getCurrentUser((await cookies()).get("session")?.value);

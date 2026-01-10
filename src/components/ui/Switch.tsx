@@ -1,10 +1,11 @@
-import { forwardRef } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+import { forwardRef } from "react";
 import {
   Switch as RASwitch,
   type SwitchProps as RASwitchProps,
 } from "react-aria-components";
+
+import { cn } from "@/lib/utils";
 
 const switchRootVariants = cva("group inline-flex items-center gap-3", {
   variants: {

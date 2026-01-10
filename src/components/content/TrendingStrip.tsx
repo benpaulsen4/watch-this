@@ -1,9 +1,9 @@
-import { tmdbClient } from "@/lib/tmdb/client";
-import { ContentCard } from "./ContentCard";
 import {
   mapAllWithContentStatus,
-  mapWithContentStatus,
 } from "@/lib/content-status/service";
+import { tmdbClient } from "@/lib/tmdb/client";
+
+import { ContentCard } from "./ContentCard";
 
 export default async function TrendingStrip({
   items,

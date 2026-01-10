@@ -1,7 +1,9 @@
-import { db } from "@/lib/db";
 import { and, desc, eq } from "drizzle-orm";
+
+import { db } from "@/lib/db";
 import { episodeWatchStatus } from "@/lib/db/schema";
 import { tmdbClient } from "@/lib/tmdb/client";
+
 import {
   batchUpdateEpisodes as batchUpdate,
   completeEpisodeUpdate,

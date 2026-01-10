@@ -1,41 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Calendar, Clock, Play, Star, Tv,X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 import {
+  Button as AriaButton,
+  Heading,
   Modal,
   ModalOverlay,
-  Heading,
-  Button as AriaButton,
-  Tabs,
-  TabList,
   Tab,
+  TabList,
   TabPanel,
+  Tabs,
 } from "react-aria-components";
-import { X, Star, Calendar, Clock, Play, Tv } from "lucide-react";
-import { cn, formatVoteAverage } from "@/lib/utils";
-import { getImageUrl } from "@/lib/tmdb/client";
-import { ListSelector } from "./ListSelector";
-import { StatusSegmentedSelector } from "./StatusSegmentedSelector";
-import { EpisodeTracker } from "./EpisodeTracker";
-import { ScheduleManager } from "./ScheduleManager";
-import { useStreamingPreferences } from "../providers/AuthProvider";
-import type {
-  TMDBMovie,
-  TMDBMovieDetails,
-  TMDBTVShowDetails,
-  UserStreamingProvider,
-} from "@/lib/tmdb/client";
-import type { WatchStatusEnum, ContentTypeEnum } from "@/lib/db/schema";
-import { Badge } from "../ui/Badge";
-import { LoadingSpinner } from "../ui/LoadingSpinner";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { CastTab } from "./CastTab";
+
 import type {
   CreateOrUpdateContentStatusResult,
   TMDBContent,
 } from "@/lib/content-status/types";
+import type {WatchStatusEnum } from "@/lib/db/schema";
+import type {
+  TMDBMovieDetails,
+  TMDBTVShowDetails,
+  UserStreamingProvider,
+} from "@/lib/tmdb/client";
+import { getImageUrl } from "@/lib/tmdb/client";
+import { cn, formatVoteAverage } from "@/lib/utils";
+
+import { useStreamingPreferences } from "../providers/AuthProvider";
+import { Badge } from "../ui/Badge";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
+import { CastTab } from "./CastTab";
+import { EpisodeTracker } from "./EpisodeTracker";
+import { ListSelector } from "./ListSelector";
+import { ScheduleManager } from "./ScheduleManager";
+import { StatusSegmentedSelector } from "./StatusSegmentedSelector";
 
 export interface ContentDetailsModalProps {
   content: TMDBContent;

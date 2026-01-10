@@ -1,5 +1,5 @@
-import { defineConfig } from "drizzle-kit";
 import { config } from "dotenv";
+import { defineConfig } from "drizzle-kit";
 
 // Load environment variables from .env.local if not defined
 if (!process.env.DATABASE_URL) config({ path: ".env.local" });

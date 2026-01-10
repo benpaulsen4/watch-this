@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import QRCode from "./QRCode";
 import QRCodeLib from "qrcode";
+import { beforeEach,describe, expect, it, vi } from "vitest";
+
+import QRCode from "./QRCode";
 type ToDataURL = (text: string, opts?: any) => Promise<string>;
 vi.mock("qrcode", () => ({ default: { toDataURL: vi.fn<ToDataURL>() } }));
 

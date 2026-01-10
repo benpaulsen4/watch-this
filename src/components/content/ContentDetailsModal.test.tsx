@@ -1,10 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ContentDetailsModal } from "./ContentDetailsModal";
-import type { TMDBTVShowDetails } from "@/lib/tmdb/client";
+import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { TMDBContent } from "@/lib/content-status/types";
+import type { TMDBTVShowDetails } from "@/lib/tmdb/client";
+
+import { ContentDetailsModal } from "./ContentDetailsModal";
 
 // Mock next/image to a simple img for jsdom
 vi.mock("next/image", () => ({

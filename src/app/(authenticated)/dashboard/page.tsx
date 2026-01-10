@@ -1,14 +1,15 @@
-import { ActivityFeed } from "@/components/activity/ActivityFeed";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { ProfileImage } from "@/components/ui/ProfileImage";
 import { List, Search } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { getCurrentUser } from "@/lib/auth/webauthn";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
-import TrendingStrip from "@/components/content/TrendingStrip";
+
+import { ActivityFeed } from "@/components/activity/ActivityFeed";
 import { ContentCardSkeleton } from "@/components/content/ContentCardSkeleton";
+import TrendingStrip from "@/components/content/TrendingStrip";
+import { Button } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { ProfileImage } from "@/components/ui/ProfileImage";
+import { getCurrentUser } from "@/lib/auth/webauthn";
 
 export default async function DashboardPage() {
   const resolvedCookies = await cookies();

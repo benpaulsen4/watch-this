@@ -1,18 +1,19 @@
 import {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
-  generateAuthenticationOptions,
-  verifyAuthenticationResponse,
-  type GenerateRegistrationOptionsOpts,
-  type GenerateAuthenticationOptionsOpts,
-  type VerifyRegistrationResponseOpts,
-  type RegistrationResponseJSON,
   type AuthenticationResponseJSON,
+  generateAuthenticationOptions,
+  type GenerateAuthenticationOptionsOpts,
+  generateRegistrationOptions,
+  type GenerateRegistrationOptionsOpts,
+  type RegistrationResponseJSON,
+  verifyAuthenticationResponse,
+  verifyRegistrationResponse,
+  type VerifyRegistrationResponseOpts,
 } from "@simplewebauthn/server";
+import { and, eq, isNull } from "drizzle-orm";
+import { jwtVerify,SignJWT } from "jose";
+
+import { passkeyCredentials, type User,users } from "../db";
 import { db } from "../db/index";
-import { users, passkeyCredentials, passkeyClaims, type User } from "../db";
-import { eq, and, isNull } from "drizzle-orm";
-import { SignJWT, jwtVerify } from "jose";
 
 const RP_NAME = process.env.WEBAUTHN_RP_NAME || "WatchThis";
 const RP_ID =

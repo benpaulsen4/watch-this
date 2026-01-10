@@ -1,10 +1,11 @@
+import { RegistrationResponseJSON } from "@simplewebauthn/server";
 import { NextRequest, NextResponse } from "next/server";
+
 import {
-  verifyPasskeyRegistration,
   createSessionToken,
   verifyChallengeToken,
+  verifyPasskeyRegistration,
 } from "@/lib/auth/webauthn";
-import { RegistrationResponseJSON } from "@simplewebauthn/server";
 
 interface RequestBody {
   username: string;

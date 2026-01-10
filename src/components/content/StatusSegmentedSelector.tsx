@@ -1,8 +1,9 @@
 "use client";
 
+import { ContentTypeEnum,WatchStatusEnum } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
+
 import { getAvailableStatuses, getStatusConfig } from "./StatusBadge";
-import { WatchStatusEnum, ContentTypeEnum } from "@/lib/db/schema";
 
 export interface StatusSegmentedSelectorProps {
   value: WatchStatusEnum | (WatchStatusEnum | "none")[] | null;

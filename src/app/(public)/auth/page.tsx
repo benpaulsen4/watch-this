@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { Fingerprint, Shield,Smartphone } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense,useEffect, useState } from "react";
+import { UAParser } from "ua-parser-js";
+
+import { useAuth } from "@/components/providers/AuthProvider";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent,CardHeader, CardTitle } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import {
-  registerPasskey,
   authenticatePasskey,
   isPasskeySupported,
   isPlatformAuthenticatorAvailable,
+  registerPasskey,
 } from "@/lib/auth/client";
-import { Fingerprint, Smartphone, Shield } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { UAParser } from "ua-parser-js";
-import { useAuth } from "@/components/providers/AuthProvider";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 type AuthMode = "signin" | "register";
 

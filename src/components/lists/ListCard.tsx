@@ -1,18 +1,20 @@
-import { forwardRef } from "react";
-import type { ListListsResponse } from "@/lib/lists/types";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/Card";
-import { getImageUrl } from "@/lib/tmdb/client";
 import {
+  FileStack,
   Globe,
+  Lock,
+  Popcorn,
   RefreshCw,
   Users,
-  Lock,
-  FileStack,
-  Popcorn,
 } from "lucide-react";
-import { Badge } from "../ui/Badge";
 import Image from "next/image";
+import { forwardRef } from "react";
+
+import type { ListListsResponse } from "@/lib/lists/types";
+import { getImageUrl } from "@/lib/tmdb/client";
 import { cn } from "@/lib/utils";
+
+import { Badge } from "../ui/Badge";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/Card";
 
 export interface ListCardProps {
   list: ListListsResponse;

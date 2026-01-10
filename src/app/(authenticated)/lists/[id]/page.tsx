@@ -1,13 +1,14 @@
-import ListHeader from "@/components/lists/ListHeader";
-import ListItems from "@/components/lists/ListItems";
-import { ListFilters } from "@/components/lists/ListFilters";
-import { getCurrentUser } from "@/lib/auth/webauthn";
 import { cookies } from "next/headers";
-import { getList } from "@/lib/lists/service";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+
 import { ContentCardSkeleton } from "@/components/content/ContentCardSkeleton";
+import { ListFilters } from "@/components/lists/ListFilters";
+import ListHeader from "@/components/lists/ListHeader";
+import ListItems from "@/components/lists/ListItems";
+import { getCurrentUser } from "@/lib/auth/webauthn";
 import { WatchStatusEnum } from "@/lib/db/schema";
+import { getList } from "@/lib/lists/service";
 
 interface ListDetailsPageProps {
   params: Promise<{

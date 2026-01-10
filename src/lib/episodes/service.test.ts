@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../db", () => {
   const resultsQueue: any[] = [];
@@ -94,15 +94,14 @@ vi.mock("../tmdb/client", () => {
   };
 });
 
-import {
-  listEpisodeStatuses,
-  updateEpisodeStatus,
-  batchUpdateEpisodeStatuses,
-  markNextEpisodeWatched,
-} from "./service";
-import { db, episodeWatchStatus } from "../db";
+import { db } from "../db";
 import { tmdbClient } from "../tmdb/client";
-import * as episodeUtils from "./episodeUtils";
+import {
+  batchUpdateEpisodeStatuses,
+  listEpisodeStatuses,
+  markNextEpisodeWatched,
+  updateEpisodeStatus,
+} from "./service";
 
 describe("episodes service", () => {
   const userId = "u1";

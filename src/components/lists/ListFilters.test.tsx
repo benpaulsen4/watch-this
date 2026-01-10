@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ListFilters } from "./ListFilters";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
@@ -13,12 +14,7 @@ vi.mock("next/navigation", () => ({
 
 // Mock StatusSegmentedSelector
 vi.mock("@/components/content/StatusSegmentedSelector", () => ({
-  StatusSegmentedSelector: ({
-    value,
-    onValueChange,
-    multiple,
-    includeNone,
-  }: any) => (
+  StatusSegmentedSelector: ({ value, onValueChange }: any) => (
     <div data-testid="status-selector">
       <span data-testid="status-value">{JSON.stringify(value)}</span>
       <button

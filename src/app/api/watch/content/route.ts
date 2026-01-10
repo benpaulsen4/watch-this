@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { tmdbClient } from "@/lib/tmdb/client";
+
 import {
-  withAuth,
-  handleApiError,
   type AuthenticatedRequest,
+  handleApiError,
+  withAuth,
 } from "@/lib/auth/api-middleware";
+import { tmdbClient } from "@/lib/tmdb/client";
 
 // GET /api/watch/content?type=movie|tv&id=123&region=US
 async function handler(request: AuthenticatedRequest) {

@@ -1,18 +1,20 @@
 "use client";
 
+import { LogOut, Settings, Shield, Tv,User as UserIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { User as UserIcon, Settings, Shield, LogOut, Tv } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+
 import { Button } from "@/components/ui/Button";
-import { ProfilePictureManager } from "./ProfilePictureManager";
-import { UsernameChanger } from "./UsernameChanger";
-import { PasskeyDevicesViewer } from "./PasskeyDevicesViewer";
-import { DataExportImport } from "./DataExportImport";
-import { TimezoneSelector } from "./TimezoneSelector";
-import { PageHeader } from "../ui/PageHeader";
-import { useAuth } from "../providers/AuthProvider";
-import { StreamingPreferences } from "./StreamingPreferences";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useFragmentNavigation } from "@/hooks/useFragmentNavigation";
+
+import { useAuth } from "../providers/AuthProvider";
+import { PageHeader } from "../ui/PageHeader";
+import { DataExportImport } from "./DataExportImport";
+import { PasskeyDevicesViewer } from "./PasskeyDevicesViewer";
+import { ProfilePictureManager } from "./ProfilePictureManager";
+import { StreamingPreferences } from "./StreamingPreferences";
+import { TimezoneSelector } from "./TimezoneSelector";
+import { UsernameChanger } from "./UsernameChanger";
 
 type ProfileTab = "profile" | "security" | "data" | "streaming";
 

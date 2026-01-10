@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import { describe, expect,it } from "vitest";
+
 import { PageHeader } from "@/components/ui/PageHeader";
-import { describe, it, expect } from "vitest";
 
 describe("PageHeader", () => {
   it("renders title and subheader slot", () => {

@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { startRegistration } from "@simplewebauthn/browser";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter,useSearchParams } from "next/navigation";
+import { Suspense,useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent,CardHeader, CardTitle } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import {
   beginClaimRegistration,
   verifyClaimRegistration,
 } from "@/lib/auth/client";
-import { useMutation } from "@tanstack/react-query";
-import { startRegistration } from "@simplewebauthn/browser";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
 
 export function ClaimPageContent() {
   const searchParams = useSearchParams();

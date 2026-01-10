@@ -1,19 +1,21 @@
+import { and, eq, or } from "drizzle-orm";
+
 import { db } from "@/lib/db";
 import {
+  activityFeed,
+  ActivityType,
+  ContentType,
   episodeWatchStatus,
-  userContentStatus,
-  lists,
   listCollaborators,
   listItems,
-  activityFeed,
-  ContentType,
-  WatchStatus,
-  ActivityType,
-  WatchStatusEnum,
+  lists,
   showSchedules,
+  userContentStatus,
+  WatchStatus,
+  WatchStatusEnum,
 } from "@/lib/db/schema";
-import { eq, and, or } from "drizzle-orm";
 import { tmdbClient } from "@/lib/tmdb/client";
+
 import { syncStatusToCollaborators } from "../activity/activityUtils";
 
 /**

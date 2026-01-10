@@ -1,9 +1,11 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ActivityFeed } from "./ActivityFeed";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { beforeEach,describe, expect, it, vi } from "vitest";
+
 import { ActivityType } from "@/lib/db/schema";
+
+import { ActivityFeed } from "./ActivityFeed";
 
 // Mock router
 vi.mock("next/navigation", () => ({

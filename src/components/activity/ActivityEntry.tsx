@@ -1,9 +1,10 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+
 import { ProfileImage } from "@/components/ui/ProfileImage";
-import { ActivityType } from "@/lib/db/schema";
 import type { ActivityItem } from "@/lib/activity/types";
+import { ActivityType } from "@/lib/db/schema";
 
 interface ActivityEntryProps {
   activity: ActivityItem;

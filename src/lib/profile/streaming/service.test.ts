@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { users, userStreamingProviders } from "@/lib/db/schema";
 
 let userCountry: string | null = null;
@@ -9,7 +10,7 @@ let throwDb = false;
 vi.mock("@/lib/db", () => {
   return {
     db: {
-      select: (sel?: any) => {
+      select: (_sel?: any) => {
         if (throwDb) throw new Error("db error");
         const chain: any = {
           _table: undefined as any,
@@ -40,7 +41,7 @@ vi.mock("@/lib/db", () => {
         };
         return chain;
       },
-      delete: (table: any) => {
+      delete: (_table: any) => {
         const chain: any = {
           where() {
             savedProviders = savedProviders.filter(() => false);

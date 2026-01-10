@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { tmdbClient, TMDBSearchItem } from "@/lib/tmdb/client";
+
 import {
-  withAuth,
-  handleApiError,
   AuthenticatedRequest,
+  handleApiError,
+  withAuth,
 } from "@/lib/auth/api-middleware";
 import {
   mapAllWithContentStatus,
-  mapWithContentStatus,
 } from "@/lib/content-status/service";
 import { TMDBContentSearchResult } from "@/lib/content-status/types";
+import { tmdbClient } from "@/lib/tmdb/client";
 
 export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {

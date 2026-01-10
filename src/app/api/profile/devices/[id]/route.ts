@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 import { deletePasskey } from "@/lib/profile/devices/service";
 
 export const DELETE = withAuth(async (request: AuthenticatedRequest) => {

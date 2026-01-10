@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { listLists, createList } from "@/lib/lists/service";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
+import { createList,listLists } from "@/lib/lists/service";
 import { CreateListInput } from "@/lib/lists/types";
 
 // GET /api/lists - Get all lists for the authenticated user

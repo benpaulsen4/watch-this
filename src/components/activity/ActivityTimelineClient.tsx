@@ -1,17 +1,18 @@
 "use client";
 
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
-import { ActivityEntry } from "./ActivityEntry";
+
 import { Button } from "@/components/ui/Button";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import type {
   ActivityItem,
-  UpcomingActivity,
   ActivityTimelineResponse,
 } from "@/lib/activity/types";
+
 import { useUser } from "../providers/AuthProvider";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { ActivityEntry } from "./ActivityEntry";
 
 export function ActivityTimelineClient() {
   const user = useUser();

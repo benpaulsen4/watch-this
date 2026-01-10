@@ -1,9 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ContentCard } from "./ContentCard";
+import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { TMDBContent } from "@/lib/content-status/types";
+
+import { ContentCard } from "./ContentCard";
 
 // Mock next/image to a simple img for jsdom
 vi.mock("next/image", () => ({

@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
 import Modal from "@/components/ui/Modal";
-import { describe, it, expect, vi } from "vitest";
 
 describe("Modal", () => {
   it("renders when open and shows title, subtitle, and content", () => {

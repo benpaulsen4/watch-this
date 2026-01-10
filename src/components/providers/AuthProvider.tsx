@@ -1,14 +1,15 @@
 "use client";
 
-import { getCurrentSession, User } from "@/lib/auth/client";
-import { StreamingPreferences } from "@/lib/profile/streaming/types";
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
-  useCallback,
 } from "react";
+
+import { getCurrentSession, User } from "@/lib/auth/client";
+import { StreamingPreferences } from "@/lib/profile/streaming/types";
 
 interface AuthState {
   user: User | null;

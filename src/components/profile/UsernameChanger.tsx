@@ -1,11 +1,12 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
+import { AlertCircle, Check, Edit3, User as UserIcon,X } from "lucide-react";
 import { useState } from "react";
-import { Edit3, Check, X, AlertCircle, User as UserIcon } from "lucide-react";
+
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { User } from "@/lib/auth/client";
-import { useMutation } from "@tanstack/react-query";
 
 interface UsernameChangerProps {
   user: User;

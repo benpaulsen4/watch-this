@@ -1,8 +1,9 @@
+import { and, eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 import { db } from "@/lib/db";
-import { lists, listItems, listCollaborators } from "@/lib/db/schema";
-import { eq, and, or } from "drizzle-orm";
+import { listCollaborators,listItems, lists } from "@/lib/db/schema";
 
 async function handler(request: AuthenticatedRequest) {
   try {

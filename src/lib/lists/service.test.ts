@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../db", () => {
   const resultsQueue: any[] = [];
@@ -163,23 +163,22 @@ vi.mock("../tmdb/contentUtils", () => {
   };
 });
 
+import { activityFeed, ActivityType,db } from "../db";
 import {
   createList,
-  updateList,
-  deleteList,
-  createListItem,
-  deleteListItem,
-  listListCollaborators,
   createListCollaborator,
-  updateListCollaborator,
+  createListItem,
+  deleteList,
   deleteListCollaborator,
+  deleteListItem,
   getList,
-  listLists,
   getListItems,
   listArchivedLists,
+  listListCollaborators,
+  listLists,
+  updateList,
+  updateListCollaborator,
 } from "./service";
-
-import { db, activityFeed, ActivityType } from "../db";
 
 describe("lists service", () => {
   const userId = "user-1";

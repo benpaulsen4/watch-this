@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 import { listArchivedLists } from "@/lib/lists/service";
 
 // GET /api/lists/archived - Get all archived lists for the authenticated user

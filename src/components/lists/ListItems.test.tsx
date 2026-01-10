@@ -1,9 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import ListItems from "./ListItems";
 import { cookies } from "next/headers";
+import { beforeEach,describe, expect, it, vi } from "vitest";
+
 import { getCurrentUser } from "@/lib/auth/webauthn";
 import { getListItems } from "@/lib/lists/service";
+
+import ListItems from "./ListItems";
 
 // Mock dependencies
 vi.mock("next/headers", () => ({

@@ -1,11 +1,12 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
+import { AlertCircle,Camera, Check, X } from "lucide-react";
 import { useState } from "react";
-import { Camera, Check, X, AlertCircle } from "lucide-react";
+
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { User } from "@/lib/auth/client";
-import { useMutation } from "@tanstack/react-query";
 
 interface ProfilePictureManagerProps {
   user: User;

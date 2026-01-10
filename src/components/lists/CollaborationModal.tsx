@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { UserPlus, Trash2, Users } from "lucide-react";
-import { PermissionLevel, type PermissionLevelEnum } from "@/lib/db/schema";
-import { ProfileImage } from "../ui/ProfileImage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Modal from "@/components/ui/Modal";
+import { Trash2, UserPlus, Users } from "lucide-react";
+import { useState } from "react";
+
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import Dropdown from "@/components/ui/Dropdown";
+import { Input } from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
+import { PermissionLevel, type PermissionLevelEnum } from "@/lib/db/schema";
 import {
   Collaborator,
   CreateCollaboratorInput,
-  UpdateCollaboratorInput,
 } from "@/lib/lists/types";
+
+import { ProfileImage } from "../ui/ProfileImage";
 
 interface CollaborationModalProps {
   isOpen: boolean;

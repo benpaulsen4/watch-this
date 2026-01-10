@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import QRCodeLib from "qrcode";
+import { useEffect, useState } from "react";
 
 interface QRCodeProps {
   value: string;

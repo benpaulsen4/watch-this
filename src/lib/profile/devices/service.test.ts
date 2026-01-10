@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
-  listDevices,
-  countActiveDevices,
-  initiateClaim,
   cancelClaim,
+  countActiveDevices,
   deletePasskey,
+  initiateClaim,
+  listDevices,
 } from "./service";
 
 // Mock DB module with minimal drizzle-like chaining and helpers

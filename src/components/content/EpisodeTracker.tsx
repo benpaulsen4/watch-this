@@ -1,26 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Calendar,
   Check,
   ChevronDown,
   ChevronRight,
-  Calendar,
   Clock,
-  RotateCcw,
   Eye,
+  RotateCcw,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { TMDBSeason, TMDBTVShowDetails } from "@/lib/tmdb/client";
+import { useState } from "react";
+
 import { WatchStatusEnum } from "@/lib/db";
-import { LoadingSpinner } from "../ui/LoadingSpinner";
-import { Button } from "../ui/Button";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  BatchUpdateEpisodesResult,
   EpisodeStatusItem,
   UpdateEpisodeStatusResult,
-  BatchUpdateEpisodesResult,
 } from "@/lib/episodes/types";
+import type { TMDBSeason, TMDBTVShowDetails } from "@/lib/tmdb/client";
+import { cn } from "@/lib/utils";
+
+import { Button } from "../ui/Button";
+import { LoadingSpinner } from "../ui/LoadingSpinner";
 
 export type EpisodeWatchStatus = EpisodeStatusItem;
 

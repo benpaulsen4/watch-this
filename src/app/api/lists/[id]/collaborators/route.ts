@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { lists, listCollaborators, users } from "@/lib/db/schema";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
-import { eq, and } from "drizzle-orm";
-import { PermissionLevel } from "@/lib/db/schema";
+
+import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
+import {  PermissionLevel } from "@/lib/db/schema";
 import {
-  listListCollaborators,
   createListCollaborator,
+  listListCollaborators,
 } from "@/lib/lists/service";
 import { CreateCollaboratorInput } from "@/lib/lists/types";
 

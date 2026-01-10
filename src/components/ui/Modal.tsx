@@ -1,15 +1,16 @@
 "use client";
 
+import { cva, type VariantProps } from "class-variance-authority";
+import { X } from "lucide-react";
 import React from "react";
 import {
+  Button as AriaButton,
+  Heading,
   Modal as AriaModal,
   ModalOverlay,
-  Heading,
-  Button as AriaButton,
 } from "react-aria-components";
-import { X } from "lucide-react";
+
 import { cn } from "@/lib/utils";
-import { cva, type VariantProps } from "class-variance-authority";
 
 const modalVariants = cva(
   "relative w-full rounded-xl shadow-2xl max-h-[90vh]",
