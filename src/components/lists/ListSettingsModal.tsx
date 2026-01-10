@@ -286,7 +286,7 @@ export default function ListSettingsModal({
             {/* Sync Watch Status */}
             <div>
               <Switch
-                label="Sync watch status with collaborators"
+                label="Sync watch status & TV schedules with collaborators"
                 isSelected={formData.syncWatchStatus}
                 onChange={(selected) =>
                   handleInputChange("syncWatchStatus", selected)
@@ -296,7 +296,7 @@ export default function ListSettingsModal({
                   isLoading ||
                   formData.isArchived
                 }
-                helperText="When enabled, watch status updates will be synchronized across all collaborators"
+                helperText="When enabled, watch status updates and TV show schedules will be synchronized across all collaborators"
               />
             </div>
 

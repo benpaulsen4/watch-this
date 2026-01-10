@@ -184,7 +184,7 @@ describe("ListSettingsModal", () => {
     );
 
     const syncSwitch = screen.getByRole("switch", {
-      name: /Sync watch status with collaborators/i,
+      name: /Sync watch status & TV schedules with collaborators/i,
     });
 
     expect(syncSwitch).toBeDisabled();

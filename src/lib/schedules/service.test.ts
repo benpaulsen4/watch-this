@@ -11,6 +11,8 @@ vi.mock("../db", () => {
 
   const chain: any = {
     from: () => chain,
+    innerJoin: () => chain,
+    leftJoin: () => chain,
     where: () => chain,
     orderBy: () => chain,
     limit: () => Promise.resolve(resultsQueue.shift()),
@@ -40,12 +42,18 @@ vi.mock("../db", () => {
 
   const showSchedules = {} as any;
   const userContentStatus = {} as any;
+  const lists = {} as any;
+  const listItems = {} as any;
+  const listCollaborators = {} as any;
   const ContentType = { MOVIE: "movie", TV: "tv" } as const;
 
   return {
     db,
     showSchedules,
     userContentStatus,
+    lists,
+    listItems,
+    listCollaborators,
     ContentType,
   };
 });
@@ -92,7 +100,7 @@ vi.mock("../tmdb/cache-utils", async () => {
 
 import { db } from "../db";
 import { tmdbClient } from "../tmdb/client";
-import { createSchedule, deleteSchedules,listSchedules } from "./service";
+import { createSchedule, deleteSchedules, listSchedules } from "./service";
 
 describe("schedules service", () => {
   const userId = "user-1";
@@ -149,7 +157,7 @@ describe("schedules service", () => {
     const inserted = [
       { id: "sch-1", userId, tmdbId: 10, dayOfWeek: 3, createdAt: now },
     ];
-    (db as any).__setMockResults([contentStatus, none, inserted]);
+    (db as any).__setMockResults([contentStatus, none, inserted, []]);
     const res = await createSchedule(userId, { tmdbId: 10, dayOfWeek: 3 });
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.id).toBe("sch-1");
@@ -157,6 +165,166 @@ describe("schedules service", () => {
     expect(typeof res.createdAt).toBe("string");
     expect(res.title).toBe("Show-10");
     expect((tmdbClient.getTVShowDetails as any).mock.calls.length).toBe(1);
+  });
+
+  it("createSchedule syncs schedule to collaborators on sync-enabled lists", async () => {
+    const contentStatus = [{ status: "watching" }];
+    const none: any[] = [];
+    const inserted = [
+      { id: "sch-1", userId, tmdbId: 10, dayOfWeek: 3, createdAt: now },
+    ];
+
+    const syncEnabledLists = [{ listId: "list-1", ownerId: "owner-1" }];
+    const collaborators = [{ userId: "collab-1" }];
+
+    const collabStatus = [{ status: "watching" }];
+    const ownerStatus = [{ status: "planning" }];
+
+    (db as any).__setMockResults([
+      contentStatus,
+      none,
+      inserted,
+      syncEnabledLists,
+      collaborators,
+      collabStatus,
+      none,
+      undefined,
+      ownerStatus,
+      none,
+      undefined,
+    ]);
+
+    const res = await createSchedule(userId, { tmdbId: 10, dayOfWeek: 3 });
+    if (typeof res === "string") throw new Error("unexpected error");
+
+    const insertCalls = (db as any).__getInsertCalls() as Array<{
+      table: any;
+      payload: any;
+    }>;
+
+    const { showSchedules } = await import("../db");
+    const showSchedulePayloads = insertCalls
+      .filter((c) => c.table === showSchedules)
+      .map((c) => c.payload);
+
+    expect(showSchedulePayloads).toEqual(
+      expect.arrayContaining([
+        { userId, tmdbId: 10, dayOfWeek: 3 },
+        { userId: "collab-1", tmdbId: 10, dayOfWeek: 3 },
+        { userId: "owner-1", tmdbId: 10, dayOfWeek: 3 },
+      ])
+    );
+  });
+
+  it("createSchedule does not sync schedule to completed/dropped collaborators", async () => {
+    const contentStatus = [{ status: "watching" }];
+    const none: any[] = [];
+    const inserted = [
+      { id: "sch-1", userId, tmdbId: 10, dayOfWeek: 3, createdAt: now },
+    ];
+
+    const syncEnabledLists = [{ listId: "list-1", ownerId: "owner-1" }];
+    const collaborators = [{ userId: "collab-1" }];
+
+    const collabStatus = [{ status: "completed" }];
+    const ownerStatus = [{ status: "watching" }];
+
+    (db as any).__setMockResults([
+      contentStatus,
+      none,
+      inserted,
+      syncEnabledLists,
+      collaborators,
+      collabStatus,
+      ownerStatus,
+      none,
+      undefined,
+    ]);
+
+    const res = await createSchedule(userId, { tmdbId: 10, dayOfWeek: 3 });
+    if (typeof res === "string") throw new Error("unexpected error");
+
+    const insertCalls = (db as any).__getInsertCalls() as Array<{
+      table: any;
+      payload: any;
+    }>;
+
+    const { showSchedules } = await import("../db");
+    const showSchedulePayloads = insertCalls
+      .filter((c) => c.table === showSchedules)
+      .map((c) => c.payload);
+
+    expect(showSchedulePayloads).toEqual(
+      expect.arrayContaining([
+        { userId, tmdbId: 10, dayOfWeek: 3 },
+        { userId: "owner-1", tmdbId: 10, dayOfWeek: 3 },
+      ])
+    );
+    expect(showSchedulePayloads).not.toContainEqual({
+      userId: "collab-1",
+      tmdbId: 10,
+      dayOfWeek: 3,
+    });
+  });
+
+  it("createSchedule creates missing collaborator status before syncing schedule", async () => {
+    const contentStatus = [{ status: "watching" }];
+    const none: any[] = [];
+    const inserted = [
+      { id: "sch-1", userId, tmdbId: 10, dayOfWeek: 3, createdAt: now },
+    ];
+
+    const syncEnabledLists = [{ listId: "list-1", ownerId: "owner-1" }];
+    const collaborators = [{ userId: "collab-1" }];
+
+    const missingStatus: any[] = [];
+    const createdStatus = [{ status: "planning" }];
+    const ownerStatus = [{ status: "watching" }];
+
+    (db as any).__setMockResults([
+      contentStatus,
+      none,
+      inserted,
+      syncEnabledLists,
+      collaborators,
+      missingStatus,
+      undefined,
+      createdStatus,
+      none,
+      undefined,
+      ownerStatus,
+      none,
+      undefined,
+    ]);
+
+    const res = await createSchedule(userId, { tmdbId: 10, dayOfWeek: 3 });
+    if (typeof res === "string") throw new Error("unexpected error");
+
+    const insertCalls = (db as any).__getInsertCalls() as Array<{
+      table: any;
+      payload: any;
+    }>;
+
+    const { showSchedules, userContentStatus } = await import("../db");
+    expect(
+      insertCalls.some(
+        (c) =>
+          c.table === userContentStatus &&
+          c.payload.userId === "collab-1" &&
+          c.payload.tmdbId === 10 &&
+          c.payload.contentType === "tv"
+      )
+    ).toBe(true);
+
+    expect(
+      insertCalls.some(
+        (c) =>
+          c.table === showSchedules &&
+          c.payload.userId === "collab-1" &&
+          c.payload.tmdbId === 10 &&
+          c.payload.dayOfWeek === 3
+      )
+    ).toBe(true);
   });
 
   it("deleteSchedules returns notFound when none deleted", async () => {
@@ -171,11 +339,32 @@ describe("schedules service", () => {
       { id: "x", userId, tmdbId: 10, dayOfWeek: 3, createdAt: now },
       { id: "y", userId, tmdbId: 10, dayOfWeek: 4, createdAt: now },
     ];
-    (db as any).__setMockResults([deleted]);
+    (db as any).__setMockResults([deleted, []]);
     const res = await deleteSchedules(userId, 10);
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.message).toMatch(/Removed 2 schedule/);
     expect(res.deletedSchedules[0].id).toBe("x");
     expect(typeof res.deletedSchedules[0].createdAt).toBe("string");
+  });
+
+  it("deleteSchedules syncs deletions to collaborators on sync-enabled lists", async () => {
+    const deleted = [
+      { id: "x", userId, tmdbId: 10, dayOfWeek: 3, createdAt: now },
+    ];
+    const syncEnabledLists = [{ listId: "list-1", ownerId: "owner-1" }];
+    const collaborators = [{ userId: "collab-1" }];
+
+    (db as any).__setMockResults([
+      deleted,
+      syncEnabledLists,
+      collaborators,
+      undefined,
+      undefined,
+    ]);
+
+    const res = await deleteSchedules(userId, 10, 3);
+    if (typeof res === "string") throw new Error("unexpected error");
+
+    expect((db as any).delete.mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 });
