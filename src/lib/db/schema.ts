@@ -245,7 +245,9 @@ export const tmdbCache = pgTable(
     voteAverage: decimal("vote_average", { precision: 3, scale: 1 }).notNull(),
     voteCount: integer("vote_count").notNull(),
     popularity: decimal("popularity", { precision: 6, scale: 2 }).notNull(),
-    genreIds: integer("genre_ids").array().notNull(),
+    genreIds: integer("genre_ids").array().notNull().default([]),
+    castIds: integer("cast_ids").array().notNull().default([]),
+    keywordIds: integer("keyword_ids").array().notNull().default([]),
     adult: boolean("adult"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

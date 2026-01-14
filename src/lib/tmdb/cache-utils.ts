@@ -6,18 +6,36 @@ import {
 } from "../content-status/service";
 import { TMDBContent } from "../content-status/types";
 import { ContentType, ContentTypeEnum, db, TMDBCache, tmdbCache } from "../db";
-import { tmdbClient, TMDBMovieDetails, TMDBTVShowDetails } from "./client";
+import {
+  ExtendedTMDBMovieDetails,
+  ExtendedTMDBTVShowDetails,
+  tmdbClient,
+} from "./client";
 
 export async function addToCache(
   tmdbId: number,
   contentType: ContentTypeEnum
 ): Promise<TMDBContent> {
-  let contentDetails: TMDBMovieDetails | TMDBTVShowDetails;
+  let contentDetails: ExtendedTMDBMovieDetails | ExtendedTMDBTVShowDetails;
+  let castIds: number[] = [];
+  let keywordIds: number[] = [];
 
   if (contentType === ContentType.MOVIE) {
-    contentDetails = await tmdbClient.getMovieDetails(tmdbId);
+    contentDetails = await tmdbClient.getExtendedMovieDetails(tmdbId);
+    castIds = Array.from(
+      new Set(contentDetails.credits.cast.map((c) => c.id))
+    ).slice(0, 50);
+    keywordIds = Array.from(
+      new Set(contentDetails.keywords.keywords.map((k) => k.id))
+    );
   } else if (contentType === ContentType.TV) {
-    contentDetails = await tmdbClient.getTVShowDetails(tmdbId);
+    contentDetails = await tmdbClient.getExtendedTVShowDetails(tmdbId);
+    castIds = Array.from(
+      new Set(contentDetails.aggregate_credits.cast.map((c) => c.id))
+    ).slice(0, 50);
+    keywordIds = Array.from(
+      new Set(contentDetails.keywords.results.map((k) => k.id))
+    );
   }
 
   const [data] = await db
@@ -40,6 +58,8 @@ export async function addToCache(
       voteCount: contentDetails!.vote_count,
       popularity: contentDetails!.popularity.toString(),
       genreIds: contentDetails!.genres.map((g) => g.id),
+      castIds,
+      keywordIds,
       adult: "adult" in contentDetails! ? contentDetails.adult : null,
     })
     .onConflictDoNothing()
@@ -69,12 +89,26 @@ export async function updateCache(
   contentType: ContentTypeEnum,
   cacheId: string
 ): Promise<TMDBContent> {
-  let contentDetails: TMDBMovieDetails | TMDBTVShowDetails;
+  let contentDetails: ExtendedTMDBMovieDetails | ExtendedTMDBTVShowDetails;
+  let castIds: number[] = [];
+  let keywordIds: number[] = [];
 
   if (contentType === ContentType.MOVIE) {
-    contentDetails = await tmdbClient.getMovieDetails(tmdbId);
+    contentDetails = await tmdbClient.getExtendedMovieDetails(tmdbId);
+    castIds = Array.from(
+      new Set(contentDetails.credits.cast.map((c) => c.id))
+    ).slice(0, 50);
+    keywordIds = Array.from(
+      new Set(contentDetails.keywords.keywords.map((k) => k.id))
+    );
   } else if (contentType === ContentType.TV) {
-    contentDetails = await tmdbClient.getTVShowDetails(tmdbId);
+    contentDetails = await tmdbClient.getExtendedTVShowDetails(tmdbId);
+    castIds = Array.from(
+      new Set(contentDetails.aggregate_credits.cast.map((c) => c.id))
+    ).slice(0, 50);
+    keywordIds = Array.from(
+      new Set(contentDetails.keywords.results.map((k) => k.id))
+    );
   }
 
   const [data] = await db
@@ -97,6 +131,8 @@ export async function updateCache(
       voteCount: contentDetails!.vote_count,
       popularity: contentDetails!.popularity.toString(),
       genreIds: contentDetails!.genres.map((g) => g.id),
+      castIds,
+      keywordIds,
       adult: "adult" in contentDetails! ? contentDetails.adult : null,
       updatedAt: new Date(),
     })
@@ -230,7 +266,7 @@ export async function getAllCachedContent(
   return enrichAllWithContentStatus(allItemsInOrder, userId);
 }
 
-function mapToContent(cacheData: TMDBCache): TMDBContent {
+export function mapToContent(cacheData: TMDBCache): TMDBContent {
   return {
     tmdbId: cacheData.tmdbId,
     contentType: cacheData.contentType as ContentTypeEnum,

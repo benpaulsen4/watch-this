@@ -6,6 +6,7 @@ import { ContentCardSkeleton } from "@/components/content/ContentCardSkeleton";
 import { ListFilters } from "@/components/lists/ListFilters";
 import ListHeader from "@/components/lists/ListHeader";
 import ListItems from "@/components/lists/ListItems";
+import ListRecommendations from "@/components/lists/ListRecommendations";
 import { getCurrentUser } from "@/lib/auth/webauthn";
 import { WatchStatusEnum } from "@/lib/db/schema";
 import { getList } from "@/lib/lists/service";
@@ -81,6 +82,21 @@ export default async function ListDetailsPage({
             watchStatus={watchStatus}
             sortOrder={sortOrder}
           />
+        </Suspense>
+
+        <Suspense
+          fallback={
+            <div className="mt-12">
+              <div className="h-6 w-40 bg-gray-800 rounded mb-6" />
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <ContentCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          }
+        >
+          <ListRecommendations listId={id} />
         </Suspense>
       </main>
     </div>

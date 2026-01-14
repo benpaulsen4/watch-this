@@ -67,6 +67,11 @@ export interface TMDBMovieDetails extends Omit<TMDBMovie, "genre_ids"> {
   runtime: number;
 }
 
+export interface ExtendedTMDBMovieDetails extends TMDBMovieDetails {
+  credits: TMDBMovieCredits;
+  keywords: { keywords: TMDBKeyword[] };
+}
+
 export interface TMDBTVShowDetails extends Omit<TMDBTVShow, "genre_ids"> {
   genres: TMDBGenre[];
   last_episode_to_air: {
@@ -96,6 +101,11 @@ export interface TMDBTVShowDetails extends Omit<TMDBTVShow, "genre_ids"> {
   number_of_episodes: number;
   number_of_seasons: number;
   status: string;
+}
+
+export interface ExtendedTMDBTVShowDetails extends TMDBTVShowDetails {
+  aggregate_credits: TMDBTVAggregateCredits;
+  keywords: { results: TMDBKeyword[] };
 }
 
 export interface TMDBEpisode {
@@ -155,6 +165,11 @@ export interface TMDBTVAggregateCastMember {
 
 export interface TMDBTVAggregateCredits {
   cast: TMDBTVAggregateCastMember[];
+}
+
+export interface TMDBKeyword {
+  id: number;
+  name: string;
 }
 
 export interface TMDBSeason {
@@ -291,9 +306,27 @@ class TMDBClient {
     return this.request<TMDBMovieDetails>(`/movie/${movieId}`);
   }
 
+  // Get extended movie details for caching
+  async getExtendedMovieDetails(
+    movieId: number
+  ): Promise<ExtendedTMDBMovieDetails> {
+    return this.request<ExtendedTMDBMovieDetails>(
+      `/movie/${movieId}?append_to_response=credits,keywords`
+    );
+  }
+
   // Get TV show details
   async getTVShowDetails(tvId: number): Promise<TMDBTVShowDetails> {
     return this.request<TMDBTVShowDetails>(`/tv/${tvId}`);
+  }
+
+  // Get extended TV show details for caching
+  async getExtendedTVShowDetails(
+    tvId: number
+  ): Promise<ExtendedTMDBTVShowDetails> {
+    return this.request<ExtendedTMDBTVShowDetails>(
+      `/tv/${tvId}?append_to_response=aggregate_credits,keywords`
+    );
   }
 
   // Get trending content
@@ -344,6 +377,9 @@ class TMDBClient {
       genre?: number;
       year?: number;
       sortBy?: string;
+      withCast?: number[];
+      withGenres?: number[];
+      withKeywords?: number[];
     } = {}
   ): Promise<TMDBSearchResult> {
     const queryParams: Record<string, string> = {
@@ -353,6 +389,18 @@ class TMDBClient {
 
     if (params.genre) {
       queryParams.with_genres = params.genre.toString();
+    }
+
+    if (params.withCast?.length) {
+      queryParams.with_cast = params.withCast.join(",");
+    }
+
+    if (params.withGenres?.length) {
+      queryParams.with_genres = params.withGenres.join(",");
+    }
+
+    if (params.withKeywords?.length) {
+      queryParams.with_keywords = params.withKeywords.join(",");
     }
 
     if (params.year) {
@@ -369,6 +417,8 @@ class TMDBClient {
       genre?: number;
       year?: number;
       sortBy?: string;
+      withGenres?: number[];
+      withKeywords?: number[];
     } = {}
   ): Promise<TMDBSearchResult> {
     const queryParams: Record<string, string> = {
@@ -378,6 +428,14 @@ class TMDBClient {
 
     if (params.genre) {
       queryParams.with_genres = params.genre.toString();
+    }
+
+    if (params.withGenres?.length) {
+      queryParams.with_genres = params.withGenres.join(",");
+    }
+
+    if (params.withKeywords?.length) {
+      queryParams.with_keywords = params.withKeywords.join(",");
     }
 
     if (params.year) {
