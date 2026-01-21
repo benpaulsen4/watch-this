@@ -13,9 +13,9 @@ export function ListItemWrapper(props: ContentCardProps) {
   return (
     <ContentCard
       {...props}
-      onRemoveFromList={() => {
+      onListInclusionChanged={() => {
         router.refresh();
-        props.onRemoveFromList?.();
+        props.onListInclusionChanged?.();
       }}
     />
   );

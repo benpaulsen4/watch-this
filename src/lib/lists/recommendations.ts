@@ -1,21 +1,22 @@
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 
-import { mapToContent } from "@/lib/tmdb/cache-utils";
+import { getAllCachedContent } from "@/lib/tmdb/cache-utils";
 import { tmdbClient } from "@/lib/tmdb/client";
 
-import { enrichAllWithContentStatus } from "../content-status/service";
 import type { TMDBCache } from "../db";
 import {
   ContentType,
   ContentTypeEnum,
   db,
   listItems,
+  listRecommendationsCache,
   ListType,
   tmdbCache,
 } from "../db";
 import { getList } from "./service";
 
 type CacheEquivalent = Omit<TMDBCache, "id" | "createdAt" | "updatedAt">;
+type RecommendationKey = { tmdbId: number; contentType: ContentTypeEnum };
 
 function pickTopIdsByCount(tally: Map<number, number>): number[] {
   const sorted = Array.from(tally.entries())
@@ -29,7 +30,7 @@ function pickTopIdsByCount(tally: Map<number, number>): number[] {
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
-  fn: (item: T) => Promise<R>
+  fn: (item: T) => Promise<R>,
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let nextIndex = 0;
@@ -44,8 +45,8 @@ async function mapWithConcurrency<T, R>(
 
   await Promise.all(
     Array.from({ length: Math.min(concurrency, items.length) }).map(() =>
-      worker()
-    )
+      worker(),
+    ),
   );
 
   return results;
@@ -57,8 +58,73 @@ function getYearCutoffDate(years: number): Date {
   return d;
 }
 
+async function upsertTMDBCacheRows(items: CacheEquivalent[]): Promise<void> {
+  for (const item of items) {
+    await db
+      .insert(tmdbCache)
+      .values({
+        tmdbId: item.tmdbId,
+        contentType: item.contentType,
+        title: item.title,
+        overview: item.overview,
+        posterPath: item.posterPath,
+        backdropPath: item.backdropPath,
+        releaseDate: item.releaseDate,
+        voteAverage: item.voteAverage,
+        voteCount: item.voteCount ?? 0,
+        popularity: item.popularity,
+        genreIds: item.genreIds ?? [],
+        castIds: item.castIds ?? [],
+        keywordIds: item.keywordIds ?? [],
+        adult: item.adult ?? null,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [tmdbCache.tmdbId, tmdbCache.contentType],
+        set: {
+          title: item.title,
+          overview: item.overview,
+          posterPath: item.posterPath,
+          backdropPath: item.backdropPath,
+          releaseDate: item.releaseDate,
+          voteAverage: item.voteAverage,
+          voteCount: item.voteCount ?? 0,
+          popularity: item.popularity,
+          genreIds: item.genreIds ?? [],
+          castIds: item.castIds ?? [],
+          keywordIds: item.keywordIds ?? [],
+          adult: item.adult ?? null,
+          updatedAt: new Date(),
+        },
+      });
+  }
+}
+
+async function saveRecommendationsCache(
+  listId: string,
+  recommendations: RecommendationKey[],
+  itemsUpdatedAt: Date,
+): Promise<void> {
+  await db
+    .insert(listRecommendationsCache)
+    .values({
+      listId,
+      recommendations,
+      itemsUpdatedAt,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: listRecommendationsCache.listId,
+      set: {
+        recommendations,
+        itemsUpdatedAt,
+        updatedAt: new Date(),
+      },
+    });
+}
+
 async function fetchCacheRowsByIds(
-  toFetch: { tmdbId: number; contentType: ContentTypeEnum }[]
+  toFetch: { tmdbId: number; contentType: ContentTypeEnum }[],
 ): Promise<TMDBCache[]> {
   const movieIds = toFetch
     .filter((c) => c.contentType === ContentType.MOVIE)
@@ -72,16 +138,16 @@ async function fetchCacheRowsByIds(
     conditions.push(
       and(
         eq(tmdbCache.contentType, ContentType.MOVIE),
-        inArray(tmdbCache.tmdbId, movieIds)
-      )
+        inArray(tmdbCache.tmdbId, movieIds),
+      ),
     );
   }
   if (tvIds.length) {
     conditions.push(
       and(
         eq(tmdbCache.contentType, ContentType.TV),
-        inArray(tmdbCache.tmdbId, tvIds)
-      )
+        inArray(tmdbCache.tmdbId, tvIds),
+      ),
     );
   }
 
@@ -99,7 +165,7 @@ function scoreCandidate(
     cast: Map<number, number>;
     genres: Map<number, number>;
     keywords: Map<number, number>;
-  }
+  },
 ): number {
   let score = 0;
 
@@ -115,7 +181,7 @@ function scoreCandidate(
 
   for (const castId of candidate.castIds ?? []) {
     const count = tallies.cast.get(castId);
-    if (count) score += 1 * count;
+    if (count) score += 0.5 * count;
   }
 
   const voteAverage = Number(candidate.voteAverage);
@@ -136,6 +202,37 @@ export async function getListRecommendations(userId: string, listId: string) {
   const list = await getList(userId, listId);
   if (list === "notFound") return "notFound" as const;
 
+  const [itemAgg] = await db
+    .select({
+      latestCreatedAt: sql<string | null>`max(${listItems.createdAt})`.as(
+        "latest_created_at",
+      ),
+    })
+    .from(listItems)
+    .where(eq(listItems.listId, listId));
+  const latestItemCreatedAt = itemAgg?.latestCreatedAt
+    ? new Date(itemAgg.latestCreatedAt)
+    : new Date(0);
+
+  const [cachedRecommendations] = await db
+    .select()
+    .from(listRecommendationsCache)
+    .where(eq(listRecommendationsCache.listId, listId))
+    .limit(1);
+
+  const cacheCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+  // Cache is fresh if it was updated within the last 14 days
+  // and the list has not had items change since then
+  const cacheStillFresh =
+    cachedRecommendations?.updatedAt &&
+    cachedRecommendations.updatedAt >= cacheCutoff &&
+    cachedRecommendations.itemsUpdatedAt >= latestItemCreatedAt;
+
+  if (cachedRecommendations && cacheStillFresh) {
+    return getAllCachedContent(cachedRecommendations.recommendations, userId);
+  }
+
   const rawListItems = await db
     .select({
       tmdbId: listItems.tmdbId,
@@ -147,7 +244,7 @@ export async function getListRecommendations(userId: string, listId: string) {
   if (rawListItems.length === 0) return [];
 
   const listKeys = new Set(
-    rawListItems.map((i) => `${i.contentType}:${i.tmdbId}`)
+    rawListItems.map((i) => `${i.contentType}:${i.tmdbId}`),
   );
 
   const listToFetch = rawListItems.map((i) => ({
@@ -197,9 +294,6 @@ export async function getListRecommendations(userId: string, listId: string) {
     keywords: pickTopIdsByCount(tvTallies.keywords),
   };
 
-  console.log("movie top", movieTop);
-  console.log("tv top", tvTop);
-
   const discoverPromises: Promise<
     { tmdbId: number; contentType: ContentTypeEnum }[]
   >[] = [];
@@ -218,8 +312,8 @@ export async function getListRecommendations(userId: string, listId: string) {
               r.results.map((m) => ({
                 tmdbId: m.id,
                 contentType: ContentType.MOVIE,
-              }))
-            )
+              })),
+            ),
         );
       });
     }
@@ -237,8 +331,8 @@ export async function getListRecommendations(userId: string, listId: string) {
               r.results.map((m) => ({
                 tmdbId: m.id,
                 contentType: ContentType.MOVIE,
-              }))
-            )
+              })),
+            ),
         );
       });
     }
@@ -256,8 +350,8 @@ export async function getListRecommendations(userId: string, listId: string) {
               r.results.map((m) => ({
                 tmdbId: m.id,
                 contentType: ContentType.MOVIE,
-              }))
-            )
+              })),
+            ),
         );
       });
     }
@@ -277,8 +371,8 @@ export async function getListRecommendations(userId: string, listId: string) {
               r.results.map((t) => ({
                 tmdbId: t.id,
                 contentType: ContentType.TV,
-              }))
-            )
+              })),
+            ),
         );
       });
     }
@@ -296,14 +390,17 @@ export async function getListRecommendations(userId: string, listId: string) {
               r.results.map((t) => ({
                 tmdbId: t.id,
                 contentType: ContentType.TV,
-              }))
-            )
+              })),
+            ),
         );
       });
     }
   }
 
-  if (!discoverPromises.length) return [];
+  if (!discoverPromises.length) {
+    await saveRecommendationsCache(listId, [], latestItemCreatedAt);
+    return [];
+  }
 
   const discovered = (await Promise.all(discoverPromises)).flat();
   const discoveredUnique = new Map<
@@ -316,10 +413,13 @@ export async function getListRecommendations(userId: string, listId: string) {
   }
 
   const candidates = Array.from(discoveredUnique.values()).filter(
-    (c) => !listKeys.has(`${c.contentType}:${c.tmdbId}`)
+    (c) => !listKeys.has(`${c.contentType}:${c.tmdbId}`),
   );
 
-  if (!candidates.length) return [];
+  if (!candidates.length) {
+    await saveRecommendationsCache(listId, [], latestItemCreatedAt);
+    return [];
+  }
 
   const movieIds = candidates
     .filter((c) => c.contentType === ContentType.MOVIE)
@@ -330,10 +430,10 @@ export async function getListRecommendations(userId: string, listId: string) {
 
   const [movieDetails, tvDetails] = await Promise.all([
     mapWithConcurrency(movieIds, 3, (id) =>
-      tmdbClient.getExtendedMovieDetails(id)
+      tmdbClient.getExtendedMovieDetails(id),
     ),
     mapWithConcurrency(tvIds, 3, (id) =>
-      tmdbClient.getExtendedTVShowDetails(id)
+      tmdbClient.getExtendedTVShowDetails(id),
     ),
   ]);
 
@@ -387,15 +487,15 @@ export async function getListRecommendations(userId: string, listId: string) {
     })
     .sort((a, b) => b.score - a.score);
 
-  console.log(
-    "scored",
-    scored.map((s) => ({ title: s.content.title, score: s.score }))
-  );
-
   const take = Math.min(12, Math.max(6, scored.length));
-  const top = scored
-    .slice(0, take)
-    .map((s) => mapToContent(s.content as TMDBCache));
+  const topCandidates = scored.slice(0, take).map((s) => s.content);
+  const recommendations: RecommendationKey[] = topCandidates.map((c) => ({
+    tmdbId: c.tmdbId,
+    contentType: c.contentType as ContentTypeEnum,
+  }));
 
-  return enrichAllWithContentStatus(top, userId);
+  await upsertTMDBCacheRows(topCandidates);
+  await saveRecommendationsCache(listId, recommendations, latestItemCreatedAt);
+
+  return getAllCachedContent(recommendations, userId);
 }

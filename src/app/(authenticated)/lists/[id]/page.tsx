@@ -52,7 +52,7 @@ export default async function ListDetailsPage({
     ? watchStatusParam
     : [watchStatusParam];
   const watchStatus = rawStatuses.filter(
-    (s) => s && validStatuses.includes(s)
+    (s) => s && validStatuses.includes(s),
   ) as (WatchStatusEnum | "none")[];
 
   const sortOrder =
@@ -87,7 +87,9 @@ export default async function ListDetailsPage({
         <Suspense
           fallback={
             <div className="mt-12">
-              <div className="h-6 w-40 bg-gray-800 rounded mb-6" />
+              <h2 className="text-xl font-semibold text-gray-100 mb-6">
+                Recommended
+              </h2>
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <ContentCardSkeleton key={i} />

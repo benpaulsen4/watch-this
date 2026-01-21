@@ -1,9 +1,9 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { Play,Star } from "lucide-react";
+import { Play, Star } from "lucide-react";
 import Image from "next/image";
-import { forwardRef, useEffect,useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 
 import type { WatchStatusEnum } from "@/lib/db/schema";
 import { getImageUrl } from "@/lib/tmdb/client";
@@ -14,12 +14,14 @@ import { Card } from "../ui/Card";
 import { ContentDetailsModal } from "./ContentDetailsModal";
 import { StatusBadge } from "./StatusBadge";
 
-export interface ContentCardProps
-  extends Omit<React.HTMLAttributes<HTMLDivElement>, "content"> {
+export interface ContentCardProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "content"
+> {
   content: TMDBContent;
   onContentClick?: (content: TMDBContent) => void;
   // List-specific props
-  onRemoveFromList?: () => void;
+  onListInclusionChanged?: () => void;
   addedDate?: string;
   showAddedDate?: boolean;
   currentListId?: string;
@@ -37,13 +39,13 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       currentListId,
       showWatchStatus = true,
       className,
-      onRemoveFromList,
+      onListInclusionChanged,
       ...props
     },
-    ref
+    ref,
   ) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isRemoving, setIsRemoving] = useState(false);
+    const [isInclusionChanging, setIsInclusionChanging] = useState(false);
     const [watchStatus, setWatchStatus] = useState(content.watchStatus);
     const [isQuickCompleting, setIsQuickCompleting] = useState(false);
     const [showTickAnimation, setShowTickAnimation] = useState(false);
@@ -85,7 +87,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
         const data = await response.json();
         if (!response.ok)
           throw new Error(
-            data.error || "Failed to mark next episode as watched"
+            data.error || "Failed to mark next episode as watched",
           );
         return data;
       },
@@ -94,7 +96,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
           setWatchStatus(result.newStatus as WatchStatusEnum);
         const episodeDetails = result.episodeDetails;
         setQuickCompleteMessage(
-          `S${episodeDetails.seasonNumber}E${episodeDetails.episodeNumber}: ${episodeDetails.name} marked as watched!`
+          `S${episodeDetails.seasonNumber}E${episodeDetails.episodeNumber}: ${episodeDetails.name} marked as watched!`,
         );
       },
     });
@@ -116,7 +118,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       } catch (error) {
         console.error("Quick complete error:", error);
         setQuickCompleteMessage(
-          error instanceof Error ? error.message : "Failed to update status"
+          error instanceof Error ? error.message : "Failed to update status",
         );
         setTimeout(() => {
           setShowTickAnimation(false);
@@ -162,8 +164,8 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
 
     const onClose = () => {
       setIsModalOpen(false);
-      if (isRemoving) {
-        onRemoveFromList?.();
+      if (isInclusionChanging) {
+        onListInclusionChanged?.();
       }
     };
 
@@ -277,12 +279,12 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
           isOpen={isModalOpen}
           onClose={onClose}
           currentListId={currentListId}
-          onRemove={() => setIsRemoving(true)}
+          onInclusionChange={() => setIsInclusionChanging(true)}
           onShowStatusChanged={(status) => setWatchStatus(status)}
         />
       </>
     );
-  }
+  },
 );
 
 ContentCard.displayName = "ContentCard";
