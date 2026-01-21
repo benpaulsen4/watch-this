@@ -84,22 +84,24 @@ export default async function ListDetailsPage({
           />
         </Suspense>
 
-        <Suspense
-          fallback={
-            <div className="mt-12">
-              <h2 className="text-xl font-semibold text-gray-100 mb-6">
-                Recommended
-              </h2>
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <ContentCardSkeleton key={i} />
-                ))}
+        {list.isArchived == false && (
+          <Suspense
+            fallback={
+              <div className="mt-12">
+                <h2 className="text-xl font-semibold text-gray-100 mb-6">
+                  Recommended
+                </h2>
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <ContentCardSkeleton key={i} />
+                  ))}
+                </div>
               </div>
-            </div>
-          }
-        >
-          <ListRecommendations listId={id} />
-        </Suspense>
+            }
+          >
+            <ListRecommendations listId={id} />
+          </Suspense>
+        )}
       </main>
     </div>
   );
