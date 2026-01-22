@@ -14,7 +14,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/content/ContentCard", () => ({
   ContentCard: (props: any) => (
     <div data-testid="content-card">
-      <button onClick={props.onRemoveFromList} data-testid="remove-btn">
+      <button
+        onClick={props.onListInclusionChanged}
+        data-testid="inclusion-btn"
+      >
         Remove
       </button>
     </div>
@@ -37,40 +40,40 @@ describe("ListItemWrapper", () => {
     expect(screen.getByTestId("content-card")).toBeInTheDocument();
   });
 
-  it("calls router.refresh() and original onRemoveFromList when removed", async () => {
+  it("calls router.refresh() and original onListInclusionChanged when invoked", async () => {
     const user = userEvent.setup();
     const refresh = vi.fn();
     (useRouter as any).mockReturnValue({ refresh });
-    const onRemoveFromList = vi.fn();
+    const onListInclusionChanged = vi.fn();
 
     const props: any = {
       content: { id: 1, title: "Test Movie" },
-      onRemoveFromList,
+      onListInclusionChanged,
     };
 
     render(<ListItemWrapper {...props} />);
 
-    const removeBtn = screen.getByTestId("remove-btn");
-    await user.click(removeBtn);
+    const inclusionBtn = screen.getByTestId("inclusion-btn");
+    await user.click(inclusionBtn);
 
     expect(refresh).toHaveBeenCalled();
-    expect(onRemoveFromList).toHaveBeenCalled();
+    expect(onListInclusionChanged).toHaveBeenCalled();
   });
 
-  it("handles missing onRemoveFromList prop safely", async () => {
+  it("handles missing onListInclusionChanged prop safely", async () => {
     const user = userEvent.setup();
     const refresh = vi.fn();
     (useRouter as any).mockReturnValue({ refresh });
 
     const props: any = {
       content: { id: 1, title: "Test Movie" },
-      // no onRemoveFromList
+      // no onListInclusionChanged
     };
 
     render(<ListItemWrapper {...props} />);
 
-    const removeBtn = screen.getByTestId("remove-btn");
-    await user.click(removeBtn);
+    const inclusionBtn = screen.getByTestId("inclusion-btn");
+    await user.click(inclusionBtn);
 
     expect(refresh).toHaveBeenCalled();
   });
