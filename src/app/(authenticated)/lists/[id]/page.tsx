@@ -6,6 +6,7 @@ import { ContentCardSkeleton } from "@/components/content/ContentCardSkeleton";
 import { ListFilters } from "@/components/lists/ListFilters";
 import ListHeader from "@/components/lists/ListHeader";
 import ListItems from "@/components/lists/ListItems";
+import ListRecommendations from "@/components/lists/ListRecommendations";
 import { getCurrentUser } from "@/lib/auth/webauthn";
 import { WatchStatusEnum } from "@/lib/db/schema";
 import { getList } from "@/lib/lists/service";
@@ -51,7 +52,7 @@ export default async function ListDetailsPage({
     ? watchStatusParam
     : [watchStatusParam];
   const watchStatus = rawStatuses.filter(
-    (s) => s && validStatuses.includes(s)
+    (s) => s && validStatuses.includes(s),
   ) as (WatchStatusEnum | "none")[];
 
   const sortOrder =
@@ -82,6 +83,25 @@ export default async function ListDetailsPage({
             sortOrder={sortOrder}
           />
         </Suspense>
+
+        {list.isArchived == false && (
+          <Suspense
+            fallback={
+              <div className="mt-12">
+                <h2 className="text-xl font-semibold text-gray-100 mb-6">
+                  Recommended
+                </h2>
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <ContentCardSkeleton key={i} />
+                  ))}
+                </div>
+              </div>
+            }
+          >
+            <ListRecommendations listId={id} />
+          </Suspense>
+        )}
       </main>
     </div>
   );

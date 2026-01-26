@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Calendar, Clock, Play, Star, Tv,X } from "lucide-react";
+import { Calendar, Clock, Play, Star, Tv, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -20,7 +20,7 @@ import type {
   CreateOrUpdateContentStatusResult,
   TMDBContent,
 } from "@/lib/content-status/types";
-import type {WatchStatusEnum } from "@/lib/db/schema";
+import type { WatchStatusEnum } from "@/lib/db/schema";
 import type {
   TMDBMovieDetails,
   TMDBTVShowDetails,
@@ -42,7 +42,7 @@ export interface ContentDetailsModalProps {
   content: TMDBContent;
   isOpen: boolean;
   onClose: () => void;
-  onRemove?: () => void;
+  onInclusionChange?: () => void;
   onShowStatusChanged?: (status: WatchStatusEnum) => void;
   currentListId?: string;
 }
@@ -51,12 +51,12 @@ export function ContentDetailsModal({
   content,
   isOpen,
   onClose,
-  onRemove,
+  onInclusionChange,
   onShowStatusChanged,
   currentListId,
 }: ContentDetailsModalProps) {
   const [watchStatus, setWatchStatus] = useState<WatchStatusEnum | null>(
-    content.watchStatus ?? null
+    content.watchStatus ?? null,
   );
   const [selectedTab, setSelectedTab] = useState<string>("overview");
 
@@ -73,7 +73,7 @@ export function ContentDetailsModal({
     enabled: isOpen,
     queryFn: async () => {
       const res = await fetch(
-        `/api/tmdb/details?type=${content.contentType}&id=${content.tmdbId}`
+        `/api/tmdb/details?type=${content.contentType}&id=${content.tmdbId}`,
       );
       return res.json();
     },
@@ -128,7 +128,7 @@ export function ContentDetailsModal({
     queryFn: async () => {
       const region = streamingPreferences!.country!.toUpperCase();
       const providersRes = await fetch(
-        `/api/watch/content?type=${content.contentType}&id=${content.tmdbId}&region=${region}`
+        `/api/watch/content?type=${content.contentType}&id=${content.tmdbId}&region=${region}`,
       );
       return providersRes.json();
     },
@@ -138,7 +138,7 @@ export function ContentDetailsModal({
 
   const updateStatusMutation = useMutation({
     mutationFn: async (
-      newStatus: WatchStatusEnum
+      newStatus: WatchStatusEnum,
     ): Promise<CreateOrUpdateContentStatusResult> => {
       const response = await fetch("/api/status/content", {
         method: "POST",
@@ -196,7 +196,7 @@ export function ContentDetailsModal({
           <div
             className={cn(
               "p-4 sm:p-6",
-              backdropUrl ? "-mt-32 relative z-10" : ""
+              backdropUrl ? "-mt-32 relative z-10" : "",
             )}
           >
             <div className="flex flex-col lg:flex-row gap-6">
@@ -302,7 +302,7 @@ export function ContentDetailsModal({
                           "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                           isSelected
                             ? "text-red-400 border-red-500"
-                            : "hover:text-gray-100 hover:border-gray-500"
+                            : "hover:text-gray-100 hover:border-gray-500",
                         )
                       }
                     >
@@ -316,7 +316,7 @@ export function ContentDetailsModal({
                             "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                             isSelected
                               ? "text-red-400 border-red-500"
-                              : "hover:text-gray-100 hover:border-gray-500"
+                              : "hover:text-gray-100 hover:border-gray-500",
                           )
                         }
                       >
@@ -330,7 +330,7 @@ export function ContentDetailsModal({
                           "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                           isSelected
                             ? "text-red-400 border-red-500"
-                            : "hover:text-gray-100 hover:border-gray-500"
+                            : "hover:text-gray-100 hover:border-gray-500",
                         )
                       }
                     >
@@ -343,7 +343,7 @@ export function ContentDetailsModal({
                           "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                           isSelected
                             ? "text-red-400 border-red-500"
-                            : "hover:text-gray-100 hover:border-gray-500"
+                            : "hover:text-gray-100 hover:border-gray-500",
                         )
                       }
                     >
@@ -357,7 +357,7 @@ export function ContentDetailsModal({
                             "px-4 py-2 text-sm text-gray-300 font-medium transition-colors border-b-2 border-transparent flex-shrink-0",
                             isSelected
                               ? "text-red-400 border-red-500"
-                              : "hover:text-gray-100 hover:border-gray-500"
+                              : "hover:text-gray-100 hover:border-gray-500",
                           )
                         }
                       >
@@ -435,11 +435,11 @@ export function ContentDetailsModal({
                                 .filter(
                                   (provider: UserStreamingProvider) =>
                                     provider.region ===
-                                    streamingPreferences.country?.toUpperCase()
+                                    streamingPreferences.country?.toUpperCase(),
                                 )
                                 .map(
                                   (provider: UserStreamingProvider) =>
-                                    provider.id
+                                    provider.id,
                                 );
 
                               // Combine and deduplicate providers
@@ -454,8 +454,8 @@ export function ContentDetailsModal({
                                   index ===
                                   self.findIndex(
                                     (p) =>
-                                      p.provider_id === provider.provider_id
-                                  )
+                                      p.provider_id === provider.provider_id,
+                                  ),
                               );
 
                               // Sort providers: subscribed first, then others
@@ -470,7 +470,7 @@ export function ContentDetailsModal({
                                     return -1;
                                   if (!aIsSubscribed && bIsSubscribed) return 1;
                                   return 0;
-                                }
+                                },
                               );
 
                               return sortedProviders.map((p) => {
@@ -569,7 +569,7 @@ export function ContentDetailsModal({
                       title={content.title}
                       posterPath={content.posterPath}
                       currentListId={currentListId}
-                      onRemove={onRemove}
+                      onInclusionChange={onInclusionChange}
                     />
                   </TabPanel>
                 </Tabs>

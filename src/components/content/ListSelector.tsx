@@ -26,7 +26,7 @@ export interface ListSelectorProps {
   title: string;
   posterPath?: string | null;
   currentListId?: string;
-  onRemove?: () => void;
+  onInclusionChange?: () => void;
   className?: string;
 }
 
@@ -36,7 +36,7 @@ export function ListSelector({
   title,
   posterPath,
   currentListId,
-  onRemove,
+  onInclusionChange,
   className,
 }: ListSelectorProps) {
   const queryClient = useQueryClient();
@@ -71,10 +71,13 @@ export function ListSelector({
   const lists = (listsData?.lists || []) as ListListsResponse[];
   const listsWithContent = useMemo(() => {
     const data = listsWithContentData || [];
-    return data.reduce((acc, list) => {
-      acc[list.listId] = list.itemId;
-      return acc;
-    }, {} as Record<string, string>);
+    return data.reduce(
+      (acc, list) => {
+        acc[list.listId] = list.itemId;
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
   }, [listsWithContentData]);
 
   // Filter lists based on content type
@@ -110,6 +113,7 @@ export function ListSelector({
       await queryClient.invalidateQueries({
         queryKey: ["content", contentId, "lists"],
       });
+      if (listId === currentListId) onInclusionChange?.();
     },
   });
 
@@ -137,7 +141,7 @@ export function ListSelector({
       await queryClient.invalidateQueries({
         queryKey: ["content", contentId, "lists"],
       });
-      if (listId === currentListId) onRemove?.();
+      if (listId === currentListId) onInclusionChange?.();
     },
   });
 
@@ -196,8 +200,8 @@ export function ListSelector({
                     {list.listType === "mixed"
                       ? "Mixed"
                       : list.listType === "movies"
-                      ? "Movies"
-                      : "TV Shows"}
+                        ? "Movies"
+                        : "TV Shows"}
                     <span>&nbsp;•&nbsp;</span>
                     {list.isPublic ? (
                       <>

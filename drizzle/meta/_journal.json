@@ -50,6 +50,20 @@
       "when": 1767869628776,
       "tag": "0006_neat_praxagora",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1768391807128,
+      "tag": "0007_stiff_wiccan",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1768909772439,
+      "tag": "0008_colorful_obadiah_stane",
+      "breakpoints": true
     }
   ]
 }
