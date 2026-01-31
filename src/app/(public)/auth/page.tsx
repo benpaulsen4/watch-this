@@ -1,13 +1,14 @@
 "use client";
 
-import { Fingerprint, Shield,Smartphone } from "lucide-react";
+import { Fingerprint, Shield, Smartphone } from "lucide-react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense,useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { UAParser } from "ua-parser-js";
 
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent,CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import {
@@ -131,10 +132,13 @@ function AuthPageContent() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
-            WatchThis
-          </h1>
+        <div className="flex flex-col items-center">
+          <Image
+            src="/logo-master.svg"
+            alt="WatchThis"
+            width={359}
+            height={100}
+          />
           <p className="text-gray-400 mt-2">
             Your collaborative movie & TV tracking app
           </p>

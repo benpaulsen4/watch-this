@@ -109,9 +109,9 @@ npm run test:run
 - [x] List archiving
 - [x] Sync schedules as well as content status in shared lists
 - [x] Recommendations section for each list
-- [ ] Recently returned section & home page recommendations
-- [ ] \*arr stack integration for when content is not on any configured streaming services
 - [ ] Trial accounts with no initial passkeys (usable for 7 days)
-- [ ] Statistics page in user profile
 - [ ] Splash page
 - [ ] Docs
+- [ ] Recently returned section & home page recommendations
+- [ ] "Wrapped" style statistics drops for seasons/years
+- [ ] \*arr stack integration for when content is not on any configured streaming services

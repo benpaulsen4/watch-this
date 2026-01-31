@@ -19,6 +19,14 @@ type CacheEquivalent = Omit<TMDBCache, "id" | "createdAt" | "updatedAt">;
 type RecommendationKey = { tmdbId: number; contentType: ContentTypeEnum };
 
 function pickTopIdsByCount(tally: Map<number, number>): number[] {
+  /* Suggested improvements:
+ - Be smarter about the "top matches" than just picking the best 3
+ - Ideally, look for matches which are _above_ the rest
+ - That may mean picking only 2 if the 3rd best and beyond all have relatively low tallies
+ - Or it may mean picking the top 5 if they're all above the average
+ - Also, it makes sense to scale this based on the "commonality" of the input factor (ie only return 2 or 3 genres but maybe return 5+ keywords or cast members where matches are common)
+ */
+
   const sorted = Array.from(tally.entries())
     .sort((a, b) => b[1] - a[1])
     .map(([id]) => id);
@@ -169,15 +177,26 @@ function scoreCandidate(
 ): number {
   let score = 0;
 
+  /* Suggested improvements:
+  - Rebalance core factors below based on number of typical matches
+  - Scale "bonus score" elements based on the average base score so they don't get washed out
+  */
+
+  // highest sampled genre count: 9 (3.39 avg)
+
   for (const genreId of candidate.genreIds ?? []) {
     const count = tallies.genres.get(genreId);
     if (count) score += 3 * count;
   }
 
+  // highest sampled keyword count: 35 (14.09 avg)
+
   for (const keywordId of candidate.keywordIds ?? []) {
     const count = tallies.keywords.get(keywordId);
     if (count) score += 2 * count;
   }
+
+  // highest sampled cast count: 50 (max - 37.35 avg)
 
   for (const castId of candidate.castIds ?? []) {
     const count = tallies.cast.get(castId);

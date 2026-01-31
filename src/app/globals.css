@@ -1,5 +1,10 @@
 @import "tailwindcss";
 /* Custom animation for drawing check mark */
+
+body {
+  font-family: var(--font-geist-sans);
+}
+
 @keyframes draw {
   from {
     stroke-dashoffset: 24;
