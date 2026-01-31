@@ -76,7 +76,7 @@ Open http://localhost:3000
 
 ## Configuration
 
-See [.env.example](file:///d:/watch-this/.env.example) for the full list. Common variables:
+See [.env.example](.env.example) for the full list. Common variables:
 
 | Variable          | Purpose                                                     |
 | ----------------- | ----------------------------------------------------------- |

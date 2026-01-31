@@ -314,7 +314,7 @@ export async function updateTVShowStatus(
           .returning();
 
         if (deletedSchedules.length > 0) {
-          console.log(
+          console.info(
             `Automatically removed ${deletedSchedules.length} schedule(s) for completed show ${tmdbId}`,
           );
         }

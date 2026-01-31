@@ -168,7 +168,6 @@ export function ActivityEntry({
     }
   };
 
-  // TODO make this consistent with other usages
   const timeAgo = formatDistanceToNow(new Date(activity.createdAt), {
     addSuffix: true,
   });
