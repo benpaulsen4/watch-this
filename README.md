@@ -1,117 +1,127 @@
-# WatchThis - Movie & TV show watchlist app for you and your friends
+# WatchThis
 
-## 🛠️ Tech Stack
+Movie and TV watchlists for you and your friends, with passkey security, shared lists, and activity tracking.
 
-- **Frontend**: Next.js 15 with App Router, React 19, TypeScript
-- **Styling**: Tailwind CSS 4
-- **UI Components**: React ARIA Components for accessibility
-- **Database**: PostgreSQL with Drizzle ORM
-- **Testing**: Vitest with React Testing Library
+## Features
 
-## 📋 Prerequisites
+- Shared lists with optional watch-status sync
+- Activity feed to see what friends watched and added
+- TV show scheduling and episode tracking
+- Import/export for watch status
+- Streaming-provider discovery via JustWatch (per-user configuration)
+- TMDB-powered search, details, cast, and recommendations
+
+## Tech stack
+
+- Next.js 16 (App Router), React 19, TypeScript
+- Tailwind CSS 4, React Aria Components, TanStack Query
+- PostgreSQL + Drizzle ORM
+- WebAuthn / passkeys via SimpleWebAuthn
+- Vitest + React Testing Library
+
+## Prerequisites
 
 - Node.js 18+
-- PostgreSQL database
+- PostgreSQL
+- TMDB API key
 
-## 🚀 Getting Started
+## Quick start
 
-### 1. Install Dependencies
+1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Environment Setup
+2. Create your environment file
 
-Copy the example environment file and configure your variables:
+macOS / Linux:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Update `.env.local` with your configuration:
+Windows (PowerShell):
 
-```env
-# Database
-DATABASE_URL="postgresql://username:password@localhost:5432/watchthis"
+```powershell
+Copy-Item .env.example .env.local
 ```
 
-### 3. Database Setup
+3. Update `.env.local`
 
-Generate and run database migrations:
+At minimum, set `DATABASE_URL` and `TMDB_API_KEY`.
+
+4. Set up the database
+
+For development, the simplest approach is to push the schema:
 
 ```bash
-# Generate migration files
-npm run db:generate
-
-# Apply migrations to your database
-npm run db:migrate
-
-# Or push schema directly (for development)
 npm run db:push
 ```
 
-### 4. Start Development Server
+If you want migrations instead:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+5. Run the app
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open http://localhost:3000
 
-## 📝 Available Scripts
+## Configuration
 
-- `npm run dev` - Start development server with Turbopack
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run test` - Run tests with Vitest
-- `npm run test:ui` - Run tests with Vitest UI
-- `npm run test:run` - Run tests once
-- `npm run db:generate` - Generate Drizzle migrations
-- `npm run db:migrate` - Run database migrations
-- `npm run db:push` - Push schema to database
-- `npm run db:studio` - Open Drizzle Studio
+See [.env.example](file:///d:/watch-this/.env.example) for the full list. Common variables:
 
-## 🧪 Testing
+| Variable          | Purpose                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| `DATABASE_URL`    | PostgreSQL connection string                                |
+| `TMDB_API_KEY`    | TMDB API key used for search/details/recommendations        |
+| `APP_URL`         | Public base URL of the app (local: `http://localhost:3000`) |
+| `WEBAUTHN_RP_ID`  | Relying Party ID (domain), e.g. `localhost`                 |
+| `WEBAUTHN_ORIGIN` | WebAuthn origin, e.g. `http://localhost:3000`               |
+| `WEBAUTHN_SECRET` | Secret for session/signing (do not commit)                  |
 
-The project uses Vitest for testing with React Testing Library:
+## Scripts
 
-```bash
-# Run tests
-npm run test
+| Command               | Description                  |
+| --------------------- | ---------------------------- |
+| `npm run dev`         | Start dev server (Turbopack) |
+| `npm run build`       | Build for production         |
+| `npm run start`       | Start production server      |
+| `npm run lint`        | Run ESLint                   |
+| `npm run test`        | Run tests once (CI-friendly) |
+| `npm run test:watch`  | Run tests in watch mode      |
+| `npm run test:ui`     | Run tests with Vitest UI     |
+| `npm run db:generate` | Generate Drizzle migrations  |
+| `npm run db:migrate`  | Apply Drizzle migrations     |
+| `npm run db:push`     | Push schema directly (dev)   |
+| `npm run db:studio`   | Open Drizzle Studio          |
 
-# Run tests with UI
-npm run test:ui
+## Data sources & attribution
 
-# Run tests once (CI mode)
-npm run test:run
-```
+- TMDB: This product uses the TMDB API but is not endorsed or certified by TMDB.
+- JustWatch: Used for provider availability and discovery.
 
-## 🛣️ Roadmap
+## Roadmap
 
-- [x] TV show scheduling
-- [x] Watch status sync option for shared lists
-- [x] Activity feed to see you and your friends recent activity on lists and watch status
-- [x] Quick complete action from content card
-- [x] Improved import and export for watch status
-- [x] JustWatch integration with per-user streaming service configuration
-- [x] Server-side component refactoring
-- [x] React query drop-in
-- [x] UI component standardization
-- [x] Test writing
-- [x] New List creation shortcut from content details lists tab
-- [x] Cast tab for content details
-- [x] Multi-device passkey management
-- [x] RSC streaming implementation
-- [x] Sorting and filtering inside lists
-- [x] TMDB cache table to reduce spamming their API when fetching lists
-- [x] List archiving
-- [x] Sync schedules as well as content status in shared lists
-- [x] Recommendations section for each list
-- [ ] Trial accounts with no initial passkeys (usable for 7 days)
-- [ ] Splash page
-- [ ] Docs
-- [ ] Recently returned section & home page recommendations
-- [ ] "Wrapped" style statistics drops for seasons/years
-- [ ] \*arr stack integration for when content is not on any configured streaming services
+Completed highlights:
+
+- TV show scheduling, episode tracking, and watch status
+- Shared lists, watch-status sync, and list archiving
+- Activity feed and recommendations
+- JustWatch integration + per-user streaming preferences
+- Import/export of user data for easy transfer
+
+Planned:
+
+- Trial accounts with no initial passkeys (7-day window)
+- Public splash page
+- Recently-returned section & home page recommendations
+- “Wrapped”-style stats for seasons/years
+- Optional \*arr stack integration when content is unavailable
