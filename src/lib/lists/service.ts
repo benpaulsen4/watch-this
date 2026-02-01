@@ -480,15 +480,26 @@ export async function createListItem(
       name: lists.name,
     })
     .from(lists)
-    .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
-    .where(
-      and(
-        eq(lists.id, listId),
-        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-      )
-    )
+    .where(eq(lists.id, listId))
     .limit(1);
   if (!listData) return "notFound";
+
+  if (listData.ownerId !== userId) {
+    const [collaborator] = await db
+      .select({ permissionLevel: listCollaborators.permissionLevel })
+      .from(listCollaborators)
+      .where(
+        and(
+          eq(listCollaborators.listId, listId),
+          eq(listCollaborators.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (!collaborator) return "notFound";
+    if (collaborator.permissionLevel !== PermissionLevelEnum.COLLABORATOR)
+      return "notFound";
+  }
 
   if (
     listData.listType !== "mixed" &&
@@ -559,15 +570,26 @@ export async function deleteListItem(
   const [listData] = await db
     .select({ ownerId: lists.ownerId })
     .from(lists)
-    .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
-    .where(
-      and(
-        eq(lists.id, listId),
-        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
-      )
-    )
+    .where(eq(lists.id, listId))
     .limit(1);
   if (!listData) return "notFound";
+
+  if (listData.ownerId !== userId) {
+    const [collaborator] = await db
+      .select({ permissionLevel: listCollaborators.permissionLevel })
+      .from(listCollaborators)
+      .where(
+        and(
+          eq(listCollaborators.listId, listId),
+          eq(listCollaborators.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (!collaborator) return "notFound";
+    if (collaborator.permissionLevel !== PermissionLevelEnum.COLLABORATOR)
+      return "notFound";
+  }
 
   const [existingItem] = await db
     .select({
