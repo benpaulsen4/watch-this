@@ -74,6 +74,11 @@ npm run dev
 
 Open http://localhost:3000
 
+## Technical documentation
+
+- Technical docs: [docs/README.md](docs/README.md)
+- OpenAPI schema: [openapi.yaml](docs/api/openapi.yaml)
+
 ## Configuration
 
 See [.env.example](.env.example) for the full list. Common variables:
