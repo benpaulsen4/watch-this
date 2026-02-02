@@ -63,6 +63,7 @@ vi.mock("../db", () => {
     COLLABORATOR: "collaborator",
     VIEWER: "viewer",
   } as const;
+  const PermissionLevel = PermissionLevelEnum;
 
   const NewList = {} as any;
 
@@ -75,6 +76,7 @@ vi.mock("../db", () => {
     activityFeed,
     userContentStatus,
     ActivityType,
+    PermissionLevel,
     PermissionLevelEnum,
     NewList,
   };

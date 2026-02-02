@@ -10,20 +10,23 @@ import {
   sql,
 } from "drizzle-orm";
 
+import type {
+  ContentTypeEnum,
+  ListTypeEnum,
+  NewList,
+  PermissionLevelEnum,
+  WatchStatusEnum,
+} from "../db";
 import {
   activityFeed,
   ActivityType,
-  ContentTypeEnum,
   db,
   listCollaborators,
   listItems,
   lists,
-  ListTypeEnum,
-  NewList,
-  PermissionLevelEnum,
+  PermissionLevel,
   userContentStatus,
   users,
-  WatchStatusEnum,
 } from "../db";
 import {
   addToCache,
@@ -497,7 +500,7 @@ export async function createListItem(
       .limit(1);
 
     if (!collaborator) return "notFound";
-    if (collaborator.permissionLevel !== PermissionLevelEnum.COLLABORATOR)
+    if (collaborator.permissionLevel !== PermissionLevel.COLLABORATOR)
       return "notFound";
   }
 
@@ -587,7 +590,7 @@ export async function deleteListItem(
       .limit(1);
 
     if (!collaborator) return "notFound";
-    if (collaborator.permissionLevel !== PermissionLevelEnum.COLLABORATOR)
+    if (collaborator.permissionLevel !== PermissionLevel.COLLABORATOR)
       return "notFound";
   }
 
