@@ -1,12 +1,12 @@
 ---
 title: Collaboration
-description: Share lists, invite collaborators, and understand sync behavior.
-order: 40
-lastUpdated: 2026-02-02
+description: Share lists with friends and control permissions and syncing.
+order: 4
+lastUpdated: 2026-02-04
 ---
 
-## Share a List with Collaborators
+Share a list with collaborators, decide who can edit, and optionally sync watch progress.
 
-## Manage Collaborator Permissions
-
-## How Watch Status Sync Works in Shared Lists
+- [Share a List with Collaborators](/help/collaboration/Share%20a%20List%20with%20Collaborators)
+- [Manage Collaborator Permissions](/help/collaboration/Manage%20Collaborator%20Permissions)
+- [How Sync Works in Shared Lists](/help/collaboration/How%20Sync%20Works%20in%20Shared%20Lists)

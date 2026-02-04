@@ -1,14 +1,13 @@
 ---
-title: Watch Status & Tracking
-description: Track movies, TV shows, episodes, and your weekly plan.
-order: 50
-lastUpdated: 2026-02-02
+title: "Watch Status & Tracking"
+description: Track watch status, episode progress, and weekly schedules for TV.
+order: 5
+lastUpdated: 2026-02-04
 ---
 
-## Watch Status Explained (Movies vs TV)
+Use tracking to keep your progress accurate and stay consistent with TV shows.
 
-## Track TV Episodes: Mark Watched/Unwatched
-
-## Mark the Next Episode Watched
-
-## Weekly TV Schedule: Plan What to Watch
+- [Watch Status Explained (Movies vs TV)](/help/tracking/Watch%20Status%20Explained)
+- [Track TV Episodes: Mark Watched/Unwatched](/help/tracking/Track%20TV%20Episodes)
+- [Mark the Next Episode Watched](/help/tracking/Mark%20the%20Next%20Episode%20Watched)
+- [Weekly TV Schedule: Plan What to Watch](/help/tracking/Weekly%20TV%20Schedule)

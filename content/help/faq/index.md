@@ -1,16 +1,14 @@
 ---
-title: FAQs & Troubleshooting
-description: Common questions and fixes for frequent issues.
-order: 70
-lastUpdated: 2026-02-02
+title: "FAQs & Troubleshooting"
+description: Answers to common questions and fixes for common issues.
+order: 7
+lastUpdated: 2026-02-04
 ---
 
-## FAQ: Why Passkeys?
+Quick answers and troubleshooting guides.
 
-## Troubleshooting: Passkey Prompts Not Showing
-
-## Troubleshooting: Region/Provider Results Look Wrong
-
-## FAQ: Why a Show Disappeared from My Schedule
-
-## FAQ: How Recommendations Are Generated
+- [Why Passkeys?](/help/faq/Why%20Passkeys)
+- [Troubleshooting: Passkey Prompts Not Showing](/help/faq/Passkey%20Prompts%20Not%20Showing)
+- [Troubleshooting: Region/Provider Results Look Wrong](/help/faq/Region%20Provider%20Results%20Look%20Wrong)
+- [Why did a Show Dissapear from My Schedule?](/help/faq/Why%20did%20a%20Show%20Dissapear%20from%20My%20Schedule)
+- [How are Recommendations Generated?](/help/faq/How%20are%20Recommendations%20Generated)
