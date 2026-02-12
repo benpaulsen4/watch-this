@@ -46,9 +46,6 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  icons: {
-    icon: [{ url: "/logo-master.svg", type: "image/svg+xml" }],
-  },
 };
 
 export const viewport: Viewport = {
