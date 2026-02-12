@@ -1,276 +1,39 @@
-"use client";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-import { Fingerprint, Shield,Smartphone } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense,useEffect, useState } from "react";
-import { UAParser } from "ua-parser-js";
+import AuthPageClient from "@/components/auth/AuthPageClient";
+import { getCurrentUser } from "@/lib/auth/webauthn";
 
-import { useAuth } from "@/components/providers/AuthProvider";
-import { Button } from "@/components/ui/Button";
-import { Card, CardContent,CardHeader, CardTitle } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import {
-  authenticatePasskey,
-  isPasskeySupported,
-  isPlatformAuthenticatorAvailable,
-  registerPasskey,
-} from "@/lib/auth/client";
-
-type AuthMode = "signin" | "register";
-
-function AuthPageContent() {
-  const router = useRouter();
-  const { refreshSession } = useAuth();
-  const searchParams = useSearchParams();
-  const redirectTo = decodeURIComponent(
-    searchParams.get("redirect") || "/dashboard",
-  );
-
-  const [mode, setMode] = useState<AuthMode>("signin");
-  const [username, setUsername] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [passkeySupported, setPasskeySupported] = useState(false);
-  const [platformAuthAvailable, setPlatformAuthAvailable] = useState(false);
-
-  useEffect(() => {
-    // Check passkey support
-    const checkSupport = async () => {
-      const supported = isPasskeySupported();
-      setPasskeySupported(supported);
-
-      if (supported) {
-        const available = await isPlatformAuthenticatorAvailable();
-        setPlatformAuthAvailable(available);
-      }
-      setLoading(false);
-    };
-
-    checkSupport();
-  }, []);
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!username.trim()) {
-      setError("Username is required");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const { browser, os } = UAParser(navigator.userAgent);
-      await registerPasskey({
-        username: username.trim(),
-        deviceName: `${browser.name ?? "Unknown Browser"} on ${
-          os.name ?? "Unknown OS"
-        } ${os.version}`,
-      });
-      await refreshSession();
-
-      // Redirect to dashboard on success
-      router.push(redirectTo);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setLoading(true);
-    setError("");
-
-    try {
-      await authenticatePasskey();
-      await refreshSession();
-
-      // Redirect to dashboard on success
-      router.push(redirectTo);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!loading && !passkeySupported) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <Card variant="entertainment" className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-600/20">
-              <Shield className="h-6 w-6 text-red-400" />
-            </div>
-            <CardTitle className="text-xl">Passkeys Not Supported</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-gray-400 mb-4">
-              Your browser doesn&apos;t support passkeys. Please use a modern
-              browser like Chrome, Safari, or Firefox.
-            </p>
-            <Button
-              onClick={() => window.location.reload()}
-              variant="outline"
-              className="w-full"
-            >
-              Refresh Page
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+function safeRedirectTarget(value: unknown) {
+  const raw =
+    typeof value === "string"
+      ? value
+      : Array.isArray(value)
+        ? value[0]
+        : undefined;
+  if (!raw) return "/dashboard";
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    decoded = raw;
   }
-
-  return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
-            WatchThis
-          </h1>
-          <p className="text-gray-400 mt-2">
-            Your collaborative movie & TV tracking app
-          </p>
-        </div>
-
-        {/* Auth Card */}
-        <Card variant="entertainment">
-          <CardHeader>
-            <div className="flex items-center justify-center mb-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-red-600 to-orange-500">
-                <Fingerprint className="h-6 w-6 text-white" />
-              </div>
-            </div>
-            <CardTitle className="text-center">
-              {mode === "register" ? "Create Account" : "Welcome Back"}
-            </CardTitle>
-            <p className="text-center text-gray-400 text-sm">
-              {mode === "register"
-                ? "Sign up with your passkey for secure access"
-                : "Sign in with your passkey"}
-            </p>
-          </CardHeader>
-
-          <CardContent>
-            <form
-              onSubmit={mode === "register" ? handleRegister : handleSignIn}
-              className="space-y-4"
-            >
-              {mode === "register" && (
-                <Input
-                  label="Username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
-                  required={true}
-                  error={
-                    error && error.includes("username") ? error : undefined
-                  }
-                />
-              )}
-
-              {/* Error Message */}
-              {error && !error.includes("username") && (
-                <div className="p-3 rounded-lg bg-red-600/20 border border-red-500/30">
-                  <p className="text-red-400 text-sm">{error}</p>
-                </div>
-              )}
-
-              {/* Platform Auth Warning */}
-              {!loading && !platformAuthAvailable && (
-                <div className="p-3 rounded-lg bg-yellow-600/20 border border-yellow-500/30">
-                  <div className="flex items-start gap-2">
-                    <Smartphone className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-yellow-400 text-sm font-medium">
-                        Limited Passkey Support
-                      </p>
-                      <p className="text-yellow-300 text-xs mt-1">
-                        Your device may not support platform authenticators. You
-                        can still use security keys.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                variant="entertainment"
-                size="lg"
-                className="w-full"
-                loading={loading}
-              >
-                {loading ? (
-                  mode === "register" ? (
-                    "Creating Account..."
-                  ) : (
-                    "Signing In..."
-                  )
-                ) : (
-                  <>
-                    <Fingerprint className="mr-2 h-4 w-4" />
-                    {mode === "register"
-                      ? "Create Account with Passkey"
-                      : "Sign In with Passkey"}
-                  </>
-                )}
-              </Button>
-            </form>
-
-            {/* Mode Toggle */}
-            <div className="mt-6 text-center">
-              <p className="text-gray-400 text-sm">
-                {mode === "register"
-                  ? "Already have an account?"
-                  : "Don't have an account?"}
-              </p>
-              <Button
-                type="button"
-                variant="link"
-                onClick={() => {
-                  setMode(mode === "register" ? "signin" : "register");
-                  setError("");
-                  setUsername("");
-                }}
-                className="mt-1"
-              >
-                {mode === "register" ? "Sign In" : "Create Account"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Info */}
-        <div className="text-center">
-          <p className="text-gray-500 text-xs">
-            Secured with passkeys - no passwords needed
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  if (!decoded.startsWith("/") || decoded.startsWith("//")) return "/dashboard";
+  return decoded;
 }
 
-export default function AuthPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-          <LoadingSpinner variant="primary" size="xl" />
-        </div>
-      }
-    >
-      <AuthPageContent />
-    </Suspense>
-  );
+export default async function AuthPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const session = (await cookies()).get("session")?.value;
+  const user = await getCurrentUser(session);
+
+  if (user !== null) {
+    const target = safeRedirectTarget((await searchParams)?.redirect);
+    return redirect(target);
+  }
+
+  return <AuthPageClient />;
 }

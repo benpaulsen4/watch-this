@@ -63,6 +63,7 @@ vi.mock("../db", () => {
     COLLABORATOR: "collaborator",
     VIEWER: "viewer",
   } as const;
+  const PermissionLevel = PermissionLevelEnum;
 
   const NewList = {} as any;
 
@@ -75,6 +76,7 @@ vi.mock("../db", () => {
     activityFeed,
     userContentStatus,
     ActivityType,
+    PermissionLevel,
     PermissionLevelEnum,
     NewList,
   };
@@ -284,6 +286,17 @@ describe("lists service", () => {
     expect(res).toBe("invalidType");
   });
 
+  it("createListItem denies viewer collaborators", async () => {
+    const listData = [{ ownerId: "owner-2", listType: "mixed", name: "L" }];
+    const collaborator = [{ permissionLevel: "viewer" }];
+    (db as any).__setMockResults([listData, collaborator]);
+    const res = await createListItem(userId, "list-4", {
+      tmdbId: 1,
+      contentType: "movie",
+    });
+    expect(res).toBe("notFound");
+  });
+
   it("createListItem returns conflict when item exists", async () => {
     const listData = [{ ownerId: userId, listType: "mixed", name: "L" }];
     const existingItem = [{ id: "item-1" }];
@@ -330,6 +343,14 @@ describe("lists service", () => {
     const notFound: any[] = [];
     (db as any).__setMockResults([access, notFound]);
     const res = await deleteListItem(userId, "list-5", "missing");
+    expect(res).toBe("notFound");
+  });
+
+  it("deleteListItem denies viewer collaborators", async () => {
+    const access = [{ ownerId: "owner-2" }];
+    const collaborator = [{ permissionLevel: "viewer" }];
+    (db as any).__setMockResults([access, collaborator]);
+    const res = await deleteListItem(userId, "list-5", "item-3");
     expect(res).toBe("notFound");
   });
 

@@ -1,12 +1,11 @@
 import { ArrowLeft } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
-  title: string;
-  titleClassName?: string;
+  title?: string;
   backLinkHref?: string;
   subheaderSlot?: React.ReactNode;
   children?: React.ReactNode;
@@ -14,7 +13,6 @@ interface PageHeaderProps {
 
 export function PageHeader({
   title,
-  titleClassName,
   backLinkHref,
   subheaderSlot,
   children,
@@ -32,14 +30,16 @@ export function PageHeader({
               </Button>
             )}
             <div className="flex flex-col gap-1">
-              <h1
-                className={cn(
-                  "text-xl font-bold text-gray-100",
-                  titleClassName,
-                )}
-              >
-                {title}
-              </h1>
+              {title ? (
+                <h1 className="text-xl font-bold text-gray-100">{title}</h1>
+              ) : (
+                <Image
+                  src="/logo-master.svg"
+                  alt="WatchThis"
+                  width={179}
+                  height={50}
+                />
+              )}
               {subheaderSlot}
             </div>
           </div>

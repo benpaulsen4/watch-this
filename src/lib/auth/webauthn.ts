@@ -10,9 +10,9 @@ import {
   type VerifyRegistrationResponseOpts,
 } from "@simplewebauthn/server";
 import { and, eq, isNull } from "drizzle-orm";
-import { jwtVerify,SignJWT } from "jose";
+import { jwtVerify, SignJWT } from "jose";
 
-import { passkeyCredentials, type User,users } from "../db";
+import { passkeyCredentials, type User, users } from "../db";
 import { db } from "../db/index";
 
 const RP_NAME = process.env.WEBAUTHN_RP_NAME || "WatchThis";
@@ -24,9 +24,18 @@ const ORIGIN =
   process.env.VERCEL_ENV === "preview"
     ? `https://${process.env.VERCEL_URL}`
     : process.env.WEBAUTHN_ORIGIN || "http://localhost:3000";
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.WEBAUTHN_SECRET || "fallback-secret"
-);
+let jwtSecretCache: Uint8Array | null = null;
+function getJwtSecret(): Uint8Array {
+  if (jwtSecretCache) return jwtSecretCache;
+
+  const secret = process.env.WEBAUTHN_SECRET;
+  if (!secret) {
+    throw new Error("WEBAUTHN_SECRET environment variable is required");
+  }
+
+  jwtSecretCache = new TextEncoder().encode(secret);
+  return jwtSecretCache;
+}
 
 export interface AuthSession {
   userId: string;
@@ -214,7 +223,7 @@ export async function createClaimToken(
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("10m")
-    .sign(JWT_SECRET);
+    .sign(getJwtSecret());
 }
 
 // Verify JWT claim token
@@ -222,7 +231,7 @@ export async function verifyClaimToken(
   token: string
 ): Promise<{ claimId: string; userId: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecret());
     return {
       claimId: payload.claimId as string,
       userId: payload.userId as string,
@@ -311,7 +320,7 @@ export async function createSessionToken(user: User): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(JWT_SECRET);
+    .sign(getJwtSecret());
 }
 
 // Verify JWT session token
@@ -319,7 +328,7 @@ export async function verifySessionToken(
   token: string
 ): Promise<AuthSession | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecret());
     return {
       userId: payload.userId as string,
       username: payload.username as string,
@@ -339,7 +348,7 @@ export async function createChallengeToken(challenge: string): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("10m")
-    .sign(JWT_SECRET);
+    .sign(getJwtSecret());
 }
 
 // Verify JWT challenge token
@@ -347,7 +356,7 @@ export async function verifyChallengeToken(
   token: string
 ): Promise<{ challenge: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getJwtSecret());
     return {
       challenge: payload.challenge as string,
     };

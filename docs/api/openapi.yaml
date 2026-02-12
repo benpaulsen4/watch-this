@@ -1,0 +1,3099 @@
+openapi: 3.1.0
+info:
+  title: WatchThis API
+  version: 0.1.0
+  description: |
+    OpenAPI schema for the WatchThis Next.js API routes under /api.
+
+    Authentication is cookie-based for most routes. Clients must include the httpOnly `session` cookie.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+security:
+  - cookieAuth: []
+tags:
+  - name: Auth
+  - name: Lists
+  - name: Activity
+  - name: Status
+  - name: Schedules
+  - name: Profile
+  - name: TMDB
+  - name: Watch
+  - name: Admin
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Session JWT stored in an httpOnly cookie.
+    adminSecret:
+      type: apiKey
+      in: header
+      name: x-admin-secret
+      description: Shared secret for admin-only endpoints.
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    DeleteResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+    StringSuccessResponse:
+      type: string
+      enum: [success]
+    UserSummary:
+      type: object
+      required: [id, username, createdAt]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        profilePictureUrl:
+          type: [string, "null"]
+        timezone:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    SessionGetResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserSummary"
+    SessionPutRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        username:
+          type: string
+        profilePictureUrl:
+          type: [string, "null"]
+        timezone:
+          type: string
+    SessionPutResponse:
+      type: object
+      required: [success, user]
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/UserSummary"
+    PasskeyCredentialSummary:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        deviceName:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        lastUsed:
+          type: [string, "null"]
+          format: date-time
+    WebAuthnBeginResponse:
+      type: object
+      required: [options]
+      properties:
+        options:
+          type: object
+          additionalProperties: true
+    RegisterBeginRequest:
+      type: object
+      required: [username]
+      additionalProperties: false
+      properties:
+        username:
+          type: string
+    RegisterVerifyRequest:
+      type: object
+      required: [username, registrationResponse]
+      additionalProperties: true
+      properties:
+        username:
+          type: string
+        registrationResponse:
+          type: object
+          additionalProperties: true
+        deviceName:
+          type: string
+        timezone:
+          type: string
+    AuthenticateVerifyRequest:
+      type: object
+      required: [authenticationResponse]
+      additionalProperties: true
+      properties:
+        authenticationResponse:
+          type: object
+          additionalProperties: true
+    AuthVerifyResponse:
+      type: object
+      required: [success, user, credential, token]
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/UserSummary"
+        credential:
+          type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+            deviceName:
+              type: [string, "null"]
+            createdAt:
+              type: string
+              format: date-time
+            lastUsed:
+              type: [string, "null"]
+              format: date-time
+        token:
+          type: string
+    ClaimBeginResponse:
+      type: object
+      required: [options, challengeToken]
+      properties:
+        options:
+          type: object
+          additionalProperties: true
+        challengeToken:
+          type: string
+    ClaimVerifyRequest:
+      type: object
+      required: [token, challengeToken, registrationResponse]
+      additionalProperties: true
+      properties:
+        token:
+          type: string
+        challengeToken:
+          type: string
+        registrationResponse:
+          type: object
+          additionalProperties: true
+        deviceName:
+          type: string
+    SignoutResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+    ListSummary:
+      type: object
+      required:
+        [
+          id,
+          name,
+          listType,
+          isPublic,
+          isArchived,
+          syncWatchStatus,
+          ownerId,
+          createdAt,
+          updatedAt,
+          itemCount,
+          collaborators,
+          posterPaths,
+        ]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: [string, "null"]
+        listType:
+          type: string
+          enum: [movies, tv, mixed]
+        isPublic:
+          type: boolean
+        isArchived:
+          type: boolean
+        syncWatchStatus:
+          type: boolean
+        ownerId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        itemCount:
+          type: integer
+        collaborators:
+          type: integer
+        posterPaths:
+          type: array
+          items:
+            type: string
+    ListCollectionResponse:
+      type: object
+      required: [lists]
+      properties:
+        lists:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListSummary"
+    ListCreateRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        description:
+          type: [string, "null"]
+        listType:
+          type: string
+          enum: [movies, tv, mixed]
+        isPublic:
+          type: boolean
+        syncWatchStatus:
+          type: boolean
+    ListUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        description:
+          type: [string, "null"]
+        listType:
+          type: string
+          enum: [movies, tv, mixed]
+        isPublic:
+          type: boolean
+        isArchived:
+          type: boolean
+        syncWatchStatus:
+          type: boolean
+    ListCreateResponse:
+      type: object
+      required: [list]
+      properties:
+        list:
+          type: object
+          additionalProperties: true
+    ListGetResponse:
+      type: object
+      additionalProperties: true
+    ListUpdateResponse:
+      type: object
+      required: [list]
+      properties:
+        list:
+          type: object
+          additionalProperties: true
+    ContentType:
+      type: string
+      enum: [movie, tv]
+    WatchStatus:
+      type: string
+      enum: [planning, watching, paused, completed, dropped]
+    MovieWatchStatus:
+      type: string
+      enum: [planning, completed]
+    TVWatchStatus:
+      type: string
+      enum: [planning, watching, paused, completed, dropped]
+    TMDBContent:
+      type: object
+      required:
+        [
+          tmdbId,
+          contentType,
+          title,
+          overview,
+          posterPath,
+          backdropPath,
+          releaseDate,
+          voteAverage,
+          voteCount,
+          popularity,
+          genreIds,
+          adult,
+          watchStatus,
+          statusUpdatedAt,
+        ]
+      properties:
+        tmdbId:
+          type: integer
+        contentType:
+          $ref: "#/components/schemas/ContentType"
+        title:
+          type: string
+        overview:
+          type: string
+        posterPath:
+          type: [string, "null"]
+        backdropPath:
+          type: [string, "null"]
+        releaseDate:
+          type: string
+        voteAverage:
+          type: number
+        voteCount:
+          type: integer
+        popularity:
+          type: number
+        genreIds:
+          type: array
+          items:
+            type: integer
+        adult:
+          type: [boolean, "null"]
+        watchStatus:
+          type: [string, "null"]
+        statusUpdatedAt:
+          type: [string, "null"]
+    TMDBContentSearchResult:
+      type: object
+      required: [page, results, totalPages, totalResults]
+      properties:
+        page:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/TMDBContent"
+        totalPages:
+          type: integer
+        totalResults:
+          type: integer
+    ActivityTimelineResponse:
+      type: object
+      required: [activities, upcoming, hasMore, nextCursor]
+      properties:
+        activities:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        upcoming:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        hasMore:
+          type: boolean
+        nextCursor:
+          type: [string, "null"]
+    ContentStatusItem:
+      type: object
+      required: [id, userId, tmdbId, contentType, status]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        tmdbId:
+          type: integer
+        contentType:
+          $ref: "#/components/schemas/ContentType"
+        status:
+          $ref: "#/components/schemas/WatchStatus"
+        nextEpisodeDate:
+          type: [string, "null"]
+    GetContentStatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          anyOf:
+            - $ref: "#/components/schemas/ContentStatusItem"
+            - type: "null"
+    UpsertContentStatusRequest:
+      oneOf:
+        - type: object
+          required: [tmdbId, contentType, status]
+          additionalProperties: false
+          properties:
+            tmdbId:
+              type: integer
+            contentType:
+              const: movie
+            status:
+              $ref: "#/components/schemas/MovieWatchStatus"
+        - type: object
+          required: [tmdbId, contentType, status]
+          additionalProperties: false
+          properties:
+            tmdbId:
+              type: integer
+            contentType:
+              const: tv
+            status:
+              $ref: "#/components/schemas/TVWatchStatus"
+    UpdateContentStatusRequest:
+      oneOf:
+        - type: object
+          required: [tmdbId, contentType]
+          additionalProperties: false
+          properties:
+            tmdbId:
+              type: integer
+            contentType:
+              const: movie
+            status:
+              $ref: "#/components/schemas/MovieWatchStatus"
+        - type: object
+          required: [tmdbId, contentType]
+          additionalProperties: false
+          properties:
+            tmdbId:
+              type: integer
+            contentType:
+              const: tv
+            status:
+              $ref: "#/components/schemas/TVWatchStatus"
+    ContentStatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/ContentStatusItem"
+    EpisodeStatusItem:
+      type: object
+      required: [id, userId, tmdbId, seasonNumber, episodeNumber, watched, watchedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        tmdbId:
+          type: integer
+        seasonNumber:
+          type: integer
+        episodeNumber:
+          type: integer
+        watched:
+          type: boolean
+        watchedAt:
+          type: [string, "null"]
+    EpisodeStatusListResponse:
+      type: object
+      required: [episodes]
+      properties:
+        episodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EpisodeStatusItem"
+    UpdateEpisodeStatusRequest:
+      type: object
+      required: [tmdbId, seasonNumber, episodeNumber]
+      properties:
+        tmdbId:
+          type: integer
+        seasonNumber:
+          type: integer
+        episodeNumber:
+          type: integer
+        watched:
+          type: boolean
+    UpdateEpisodeStatusResponse:
+      type: object
+      required: [episode, newStatus]
+      properties:
+        episode:
+          $ref: "#/components/schemas/EpisodeStatusItem"
+        newStatus:
+          type: [string, "null"]
+    BatchUpdateEpisodesRequest:
+      type: object
+      required: [tmdbId, episodes]
+      properties:
+        tmdbId:
+          type: integer
+        episodes:
+          type: array
+          items:
+            type: object
+            required: [seasonNumber, episodeNumber, watched]
+            properties:
+              seasonNumber:
+                type: integer
+              episodeNumber:
+                type: integer
+              watched:
+                type: boolean
+    BatchUpdateEpisodesResponse:
+      type: object
+      required: [episodes, newStatus, syncedCollaboratorIds]
+      properties:
+        episodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EpisodeStatusItem"
+        newStatus:
+          type: [string, "null"]
+        syncedCollaboratorIds:
+          type: array
+          items:
+            type: string
+    MarkNextEpisodeRequest:
+      type: object
+      required: [tmdbId]
+      properties:
+        tmdbId:
+          type: integer
+    MarkNextEpisodeResponse:
+      type: object
+      required: [episode, newStatus, episodeDetails]
+      properties:
+        episode:
+          $ref: "#/components/schemas/EpisodeStatusItem"
+        newStatus:
+          type: [string, "null"]
+        episodeDetails:
+          type: object
+          required: [seasonNumber, episodeNumber, name, airDate]
+          properties:
+            seasonNumber:
+              type: integer
+            episodeNumber:
+              type: integer
+            name:
+              type: string
+            airDate:
+              type: string
+    GetSchedulesResponse:
+      type: object
+      required: [schedules, totalShows]
+      properties:
+        schedules:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              additionalProperties: true
+        totalShows:
+          type: integer
+    CreateScheduleRequest:
+      type: object
+      required: [tmdbId, dayOfWeek]
+      properties:
+        tmdbId:
+          type: integer
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+    DeleteSchedulesResponse:
+      type: object
+      required: [message, deletedSchedules]
+      properties:
+        message:
+          type: string
+        deletedSchedules:
+          type: array
+          items:
+            type: object
+            required: [id, tmdbId, dayOfWeek, createdAt]
+            properties:
+              id:
+                type: string
+              tmdbId:
+                type: integer
+              dayOfWeek:
+                type: integer
+              createdAt:
+                type: string
+    PasskeyDevice:
+      type: object
+      required: [id, credentialId, deviceName, createdAt, lastUsed]
+      properties:
+        id:
+          type: string
+        credentialId:
+          type: string
+        deviceName:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        lastUsed:
+          type: [string, "null"]
+          format: date-time
+    ListDevicesResponse:
+      type: object
+      required: [devices]
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PasskeyDevice"
+    ClaimInitiateResponse:
+      type: object
+      required: [claimId, claimCode, token, magicLink, qrPayload, expiresAt]
+      properties:
+        claimId:
+          type: string
+        claimCode:
+          type: string
+        token:
+          type: string
+        magicLink:
+          type: string
+        qrPayload:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    ExportResponse:
+      type: object
+      required: [data, filename, mimetype]
+      properties:
+        data:
+          type: string
+        filename:
+          type: string
+        mimetype:
+          type: string
+    ImportResult:
+      type: object
+      required: [success, imported, errors]
+      properties:
+        success:
+          type: boolean
+        imported:
+          type: object
+          required: [lists, listItems, contentStatus, episodeStatus, tvShowSchedules]
+          properties:
+            lists:
+              type: integer
+            listItems:
+              type: integer
+            contentStatus:
+              type: integer
+            episodeStatus:
+              type: integer
+            tvShowSchedules:
+              type: integer
+        errors:
+          type: array
+          items:
+            type: string
+paths:
+  /api/auth/register/begin:
+    post:
+      tags: [Auth]
+      summary: Begin registration (passkey options)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBeginRequest"
+      responses:
+        "200":
+          description: Returns registration options and sets registration-challenge cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebAuthnBeginResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/register/verify:
+    post:
+      tags: [Auth]
+      summary: Verify registration response and create session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterVerifyRequest"
+      responses:
+        "200":
+          description: Returns user/session info and sets session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthVerifyResponse"
+        "400":
+          description: Invalid or expired challenge / invalid registration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/authenticate/begin:
+    get:
+      tags: [Auth]
+      summary: Begin authentication (passkey options)
+      security: []
+      responses:
+        "200":
+          description: Returns authentication options and sets authentication-challenge cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebAuthnBeginResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/authenticate/verify:
+    post:
+      tags: [Auth]
+      summary: Verify authentication response and create session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthenticateVerifyRequest"
+      responses:
+        "200":
+          description: Returns user/session info and sets session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthVerifyResponse"
+        "400":
+          description: Invalid or expired challenge / verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Credential not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/session:
+    get:
+      tags: [Auth]
+      summary: Get current session user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionGetResponse"
+        "401":
+          description: No session or invalid session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Auth]
+      summary: Update current user profile fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionPutRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionPutResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: No session or invalid session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/claim/begin:
+    get:
+      tags: [Auth]
+      summary: Begin claim flow for adding an additional passkey
+      security: []
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Options and challenge token for claim verification.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimBeginResponse"
+        "400":
+          description: Missing token / claim not active / claim expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid claim token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Claim not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/claim/verify:
+    post:
+      tags: [Auth]
+      summary: Verify claim registration response
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimVerifyRequest"
+      responses:
+        "200":
+          description: Claim consumed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Missing parameters / invalid challenge / claim not active / claim expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid claim token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Claim not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/signout:
+    post:
+      tags: [Auth]
+      summary: Sign out (clears cookies)
+      security: []
+      responses:
+        "200":
+          description: Signed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignoutResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/activity:
+    get:
+      tags: [Activity]
+      summary: Get activity timeline
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: type
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Activity feed page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityTimelineResponse"
+        "400":
+          description: Invalid cursor or request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/lists:
+    get:
+      tags: [Lists]
+      summary: List lists for the current user
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCollectionResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Lists]
+      summary: Create a list
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListCreateRequest"
+      responses:
+        "201":
+          description: List created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCreateResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/lists/archived:
+    get:
+      tags: [Lists]
+      summary: List archived lists for the current user
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Archived list collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCollectionResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/lists/{listId}:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Lists]
+      summary: Get list details
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List details payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListGetResponse"
+        "400":
+          description: Missing list ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Lists]
+      summary: Update list
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListUpdateRequest"
+      responses:
+        "200":
+          description: Updated list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListUpdateResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden (only owner can update)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: List not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Lists]
+      summary: Delete list
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "400":
+          description: Missing list ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden (only owner can delete)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: List not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/lists/{listId}/items:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: watchStatus
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum: [planning, watching, paused, completed, dropped, none]
+        style: form
+        explode: true
+      - in: query
+        name: sortOrder
+        required: false
+        schema:
+          type: string
+          enum: [ascending, descending]
+    get:
+      tags: [Lists]
+      summary: Get list items
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List items (possibly filtered)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Missing/invalid list ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: List not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Lists]
+      summary: Add item to list
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tmdbId, contentType]
+              properties:
+                tmdbId:
+                  type: integer
+                contentType:
+                  $ref: "#/components/schemas/ContentType"
+      responses:
+        "201":
+          description: Item added
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [item]
+                properties:
+                  item:
+                    type: object
+                    additionalProperties: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: List not found or access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Item already exists in list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/lists/{listId}/items/{itemId}:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: itemId
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Lists]
+      summary: Remove item from list
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "400":
+          description: Missing listId/itemId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Item or list not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/lists/{listId}/collaborators:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Lists]
+      summary: List collaborators (owner only)
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Collaborators
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Missing list ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: List not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Lists]
+      summary: Add collaborator (owner only)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+                permissionLevel:
+                  type: string
+                  enum: [collaborator, viewer]
+      responses:
+        "200":
+          description: Collaborator added
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: List not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Already a collaborator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/lists/{listId}/collaborators/{userId}:
+    parameters:
+      - in: path
+        name: listId
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+    put:
+      tags: [Lists]
+      summary: Update collaborator permissions (owner only)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissionLevel]
+              properties:
+                permissionLevel:
+                  type: string
+                  enum: [collaborator, viewer]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: List or collaborator not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Lists]
+      summary: Remove collaborator (owner only)
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Missing listId/userId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: List or collaborator not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/content/{tmdbId}/lists:
+    parameters:
+      - in: path
+        name: tmdbId
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Lists]
+      summary: Get lists containing a specific TMDB content id
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Array of { listId, itemId }
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [listId, itemId]
+                  properties:
+                    listId:
+                      type: string
+                    itemId:
+                      type: string
+        "400":
+          description: Invalid content ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/status/content:
+    get:
+      tags: [Status]
+      summary: Get content watch status
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: contentType
+          required: true
+          schema:
+            $ref: "#/components/schemas/ContentType"
+      responses:
+        "200":
+          description: Status payload (or null)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetContentStatusResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Status]
+      summary: Create or update content watch status
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertContentStatusRequest"
+      responses:
+        "201":
+          description: Created/updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentStatusResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Content not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Status]
+      summary: Update existing content watch status
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContentStatusRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentStatusResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Status not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Status]
+      summary: Delete content watch status
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: contentType
+          required: true
+          schema:
+            $ref: "#/components/schemas/ContentType"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Status not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/status/episodes:
+    get:
+      tags: [Status]
+      summary: Get episode watch status for a TV show
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: seasonNumber
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: episodeNumber
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Episode statuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EpisodeStatusListResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Status]
+      summary: Update a single episode watch status
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEpisodeStatusRequest"
+      responses:
+        "201":
+          description: Episode updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateEpisodeStatusResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Status]
+      summary: Batch update episode statuses
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchUpdateEpisodesRequest"
+      responses:
+        "200":
+          description: Batch result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUpdateEpisodesResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Status]
+      summary: Delete episode statuses (optionally scoped)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: seasonNumber
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: episodeNumber
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, deletedCount]
+                properties:
+                  message:
+                    type: string
+                  deletedCount:
+                    type: integer
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/status/episodes/next:
+    post:
+      tags: [Status]
+      summary: Mark the next available episode as watched
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkNextEpisodeRequest"
+      responses:
+        "201":
+          description: Marked next episode watched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkNextEpisodeResponse"
+        "400":
+          description: No next episode / not aired / validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: TV show not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/schedules:
+    get:
+      tags: [Schedules]
+      summary: Get schedules
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: tmdbId
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: dayOfWeek
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 6
+      responses:
+        "200":
+          description: Schedules grouped by day
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetSchedulesResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Schedules]
+      summary: Create schedule entry
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScheduleRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: TV show not found in library
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Duplicate schedule entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Schedules]
+      summary: Delete schedules for tmdbId (optionally scoped to dayOfWeek)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: dayOfWeek
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 6
+      responses:
+        "200":
+          description: Deleted schedules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteSchedulesResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Schedule not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/profile/devices:
+    get:
+      tags: [Profile]
+      summary: List passkey devices
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Devices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDevicesResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Profile]
+      summary: Initiate passkey claim
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Claim initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimInitiateResponse"
+        "400":
+          description: Max devices reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/profile/devices/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Profile]
+      summary: Delete passkey device
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StringSuccessResponse"
+        "400":
+          description: Minimum device count violation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Passkey not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/profile/devices/claims/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Profile]
+      summary: Cancel a passkey claim
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StringSuccessResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Claim not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/profile/export:
+    get:
+      tags: [Profile]
+      summary: Export user data
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: format
+          required: true
+          schema:
+            type: string
+            enum: [json, csv]
+      responses:
+        "200":
+          description: Export bundle (string payload)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResponse"
+        "400":
+          description: Invalid format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/profile/import:
+    post:
+      tags: [Profile]
+      summary: Import user data (multipart form)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, format]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                format:
+                  type: string
+                  enum: [json]
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          description: Validation or parse error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/profile/streaming:
+    get:
+      tags: [Profile]
+      summary: Get streaming preferences
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Preferences payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Profile]
+      summary: Update streaming preferences
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                country:
+                  type: string
+                region:
+                  type: string
+                providers:
+                  type: array
+                  items:
+                    type: object
+                    required: [providerId]
+                    properties:
+                      providerId:
+                        type: integer
+                      providerName:
+                        type: string
+                      logoPath:
+                        type: [string, "null"]
+      responses:
+        "200":
+          description: Updated preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tmdb/search:
+    get:
+      tags: [TMDB]
+      summary: Search TMDB (enriched with content status)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: type
+          required: false
+          schema:
+            type: string
+            enum: [all, movie, tv]
+        - in: query
+          name: year
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TMDBContentSearchResult"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: TMDB unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tmdb/discover:
+    get:
+      tags: [TMDB]
+      summary: Discover content (enriched with content status)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: type
+          required: false
+          schema:
+            type: string
+            enum: [movie, tv]
+        - in: query
+          name: genre
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: year
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: sort_by
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Discover results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TMDBContentSearchResult"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: TMDB unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tmdb/trending:
+    get:
+      tags: [TMDB]
+      summary: Trending content (enriched with content status)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: media_type
+          required: false
+          schema:
+            type: string
+            enum: [all, movie, tv]
+        - in: query
+          name: time_window
+          required: false
+          schema:
+            type: string
+            enum: [day, week]
+      responses:
+        "200":
+          description: Trending results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TMDBContentSearchResult"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: TMDB unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tmdb/details:
+    get:
+      tags: [TMDB]
+      summary: Get content details
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/ContentType"
+      responses:
+        "200":
+          description: Details payload (movie or tv)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Content not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: TMDB unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tmdb/credits:
+    get:
+      tags: [TMDB]
+      summary: Get cast list for content
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/ContentType"
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cast list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cast]
+                properties:
+                  cast:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, character, profile_path]
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        character:
+                          type: [string, "null"]
+                        profile_path:
+                          type: [string, "null"]
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tmdb/genres:
+    get:
+      tags: [TMDB]
+      summary: Get genres
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: type
+          required: false
+          schema:
+            type: string
+            enum: [movie, tv, all]
+      responses:
+        "200":
+          description: Genres list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [genres]
+                properties:
+                  genres:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tmdb/episodes/{tvId}:
+    parameters:
+      - in: path
+        name: tvId
+        required: true
+        schema:
+          type: integer
+      - in: query
+        name: season
+        required: true
+        schema:
+          type: integer
+      - in: query
+        name: episode
+        required: false
+        schema:
+          type: integer
+    get:
+      tags: [TMDB]
+      summary: Get TV season or episode details
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Season or episode payload (wrapped)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [season]
+                    properties:
+                      season:
+                        type: object
+                        additionalProperties: true
+                  - type: object
+                    required: [episode]
+                    properties:
+                      episode:
+                        type: object
+                        additionalProperties: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Season/Episode not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/watch/regions:
+    get:
+      tags: [Watch]
+      summary: List supported watch-provider regions
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Regions payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/watch/providers:
+    get:
+      tags: [Watch]
+      summary: List providers for a region (merged movie + tv)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: region
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Provider list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        [provider_id, provider_name, logo_path, display_priority]
+                      properties:
+                        provider_id:
+                          type: integer
+                        provider_name:
+                          type: string
+                        logo_path:
+                          type: [string, "null"]
+                        display_priority:
+                          type: integer
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/watch/content:
+    get:
+      tags: [Watch]
+      summary: Get content watch providers for region
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: type
+          required: true
+          schema:
+            $ref: "#/components/schemas/ContentType"
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: region
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Availability for region
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [region, providers]
+                properties:
+                  region:
+                    type: string
+                  providers:
+                    type: ["object", "null"]
+                    additionalProperties: true
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/admin/device-claim:
+    post:
+      tags: [Admin]
+      summary: Create a passkey claim for a target user (admin)
+      security:
+        - adminSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                username:
+                  type: string
+                userId:
+                  type: string
+              anyOf:
+                - required: [username]
+                - required: [userId]
+      responses:
+        "200":
+          description: Claim initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimInitiateResponse"
+        "400":
+          description: Validation / max devices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"

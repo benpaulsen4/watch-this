@@ -4,8 +4,6 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-950">
-      <main className="container mx-auto">{children}</main>
-    </div>
+    <div className="min-h-screen bg-gray-950">{children}</div>
   );
 }

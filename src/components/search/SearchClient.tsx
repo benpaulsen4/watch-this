@@ -2,15 +2,13 @@
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Filter, TrendingUp } from "lucide-react";
-import { useCallback, useMemo,useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { SearchInput } from "@/components/search/SearchInput";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent,CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import Dropdown from "@/components/ui/Dropdown";
-import {
-  TMDBContentSearchResult,
-} from "@/lib/content-status/types";
+import { TMDBContentSearchResult } from "@/lib/content-status/types";
 import type { TMDBGenre } from "@/lib/tmdb/client";
 
 import { ContentCard } from "../content/ContentCard";
@@ -51,7 +49,7 @@ export function SearchClient({ genres, children }: SearchClientProps) {
         sort_by: sortBy,
       });
       if (contentType !== "all") params.append("type", contentType);
-      if (selectedGenre) params.append("with_genres", selectedGenre);
+      if (selectedGenre) params.append("genre", selectedGenre);
       if (selectedYear) params.append("year", selectedYear);
       const response = await fetch(`/api/tmdb/discover?${params}`);
       if (!response.ok) throw new Error("Failed to load discover content");

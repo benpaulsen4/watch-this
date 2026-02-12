@@ -20,10 +20,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <PageHeader
-        title="WatchThis"
-        titleClassName="text-2xl font-bold text-red-500"
-      >
+      <PageHeader>
         <Button variant="outline" size="sm" asChild>
           <Link href="/lists">
             <List className="h-4 w-4" />
