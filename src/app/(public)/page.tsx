@@ -8,6 +8,7 @@ import {
   Search,
   Users,
 } from "lucide-react";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
@@ -16,12 +17,66 @@ import { LandingSpotlightClient } from "@/components/landing/LandingSpotlightCli
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { getCurrentUser } from "@/lib/auth/webauthn";
+import { getSiteUrl } from "@/lib/seo/site";
+
+export const metadata: Metadata = {
+  title: "WatchThis - Movie & TV Watchlists With Friends",
+  description:
+    "Track movies and TV shows with friends. Build shared lists, keep watch status in sync, and never miss the next episode.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "WatchThis - Movie & TV Watchlists With Friends",
+    description:
+      "Track movies and TV shows with friends. Build shared lists, keep watch status in sync, and never miss the next episode.",
+    url: "/",
+    siteName: "WatchThis",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "WatchThis - Movie & TV Watchlists With Friends",
+    description:
+      "Track movies and TV shows with friends. Build shared lists, keep watch status in sync, and never miss the next episode.",
+  },
+};
 
 export default async function Home() {
   const user = await getCurrentUser((await cookies()).get("session")?.value);
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        name: "WatchThis",
+        url: getSiteUrl("/"),
+        sameAs: ["https://github.com/benpaulsen4/watch-this"],
+      },
+      {
+        "@type": "WebSite",
+        name: "WatchThis",
+        url: getSiteUrl("/"),
+        inLanguage: "en",
+      },
+      {
+        "@type": "WebApplication",
+        name: "WatchThis",
+        url: getSiteUrl("/"),
+        applicationCategory: "EntertainmentApplication",
+        operatingSystem: "Web",
+        description:
+          "Track movies and TV shows with friends. Build shared lists, keep watch status in sync, and never miss the next episode.",
+      },
+    ],
+  };
 
   return (
     <main className="relative overflow-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <LandingSpotlightClient className="relative">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(900px_circle_at_var(--spot-x)_var(--spot-y),rgba(239,68,68,0.22),transparent_55%)]" />

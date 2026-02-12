@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Markdown } from "@/components/help/Markdown";
 import { getHelpDocBySlug, getHelpStaticSlugs } from "@/lib/help/service";
+import { getSiteUrl } from "@/lib/seo/site";
 
 export const dynamic = "force-static";
 export const dynamicParams = false;
@@ -19,11 +20,28 @@ export async function generateMetadata({
   params: Promise<{ slug: string[] }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  const pathname = `/help/${slug.map(encodeURIComponent).join("/")}`;
   try {
     const doc = await getHelpDocBySlug(slug);
+    const title = `${doc.meta.title} | Help Center`;
     return {
-      title: `${doc.meta.title} | Help Center`,
+      title,
       description: doc.meta.description,
+      alternates: {
+        canonical: pathname,
+      },
+      openGraph: {
+        title,
+        description: doc.meta.description,
+        url: pathname,
+        siteName: "WatchThis",
+        type: "article",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description: doc.meta.description,
+      },
     };
   } catch {
     return {
@@ -46,6 +64,48 @@ export default async function HelpDocPage({
     notFound();
   }
 
+  const pathname = `/help/${slug.map(encodeURIComponent).join("/")}`;
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Home",
+            item: getSiteUrl("/"),
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: "Help Center",
+            item: getSiteUrl("/help"),
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: doc.meta.title,
+            item: getSiteUrl(pathname),
+          },
+        ],
+      },
+      {
+        "@type": "TechArticle",
+        headline: doc.meta.title,
+        description: doc.meta.description,
+        url: getSiteUrl(pathname),
+        isPartOf: {
+          "@type": "WebSite",
+          name: "WatchThis",
+          url: getSiteUrl("/"),
+        },
+        dateModified: doc.meta.lastUpdated,
+      },
+    ],
+  };
+
   const lastUpdatedLabel = (() => {
     if (!doc.meta.lastUpdated) return undefined;
     const date = new Date(doc.meta.lastUpdated);
@@ -60,6 +120,10 @@ export default async function HelpDocPage({
 
   return (
     <article className="min-w-0">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <div className="mb-6">
         <h1 className="text-3xl font-semibold tracking-tight text-white">
           {doc.meta.title}

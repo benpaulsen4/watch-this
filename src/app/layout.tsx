@@ -7,6 +7,7 @@ import { Geist } from "next/font/google";
 
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { ReactQueryProvider } from "@/components/providers/ReactQueryProvider";
+import { getMetadataBase } from "@/lib/seo/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,9 +15,11 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
+  metadataBase: getMetadataBase(),
   title: "WatchThis - Collaborative Movie & TV Tracking",
   description:
     "Track and discover movies and TV shows with friends. Create lists, share recommendations, and never miss what to watch next.",
+  applicationName: "WatchThis",
   keywords: [
     "movies",
     "tv shows",
@@ -26,6 +29,26 @@ export const metadata: Metadata = {
     "entertainment",
   ],
   authors: [{ name: "Ben Paulsen", url: "https://benpaulsen.tech" }],
+  openGraph: {
+    title: "WatchThis - Collaborative Movie & TV Tracking",
+    description:
+      "Track and discover movies and TV shows with friends. Create lists, share recommendations, and never miss what to watch next.",
+    siteName: "WatchThis",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "WatchThis - Collaborative Movie & TV Tracking",
+    description:
+      "Track and discover movies and TV shows with friends. Create lists, share recommendations, and never miss what to watch next.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  icons: {
+    icon: [{ url: "/logo-master.svg", type: "image/svg+xml" }],
+  },
 };
 
 export const viewport: Viewport = {
