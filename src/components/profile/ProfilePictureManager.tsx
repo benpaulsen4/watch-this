@@ -3,6 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircle,Camera, Check, X } from "lucide-react";
 import { useState } from "react";
+import { sanitizeUrl } from "@braintree/sanitize-url";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -24,10 +25,18 @@ export function ProfilePictureManager({
   const [previewError, setPreviewError] = useState(false);
 
   const validateUrl = (url: string): boolean => {
-    if (!url.trim()) return true; // Empty URL is valid (removes profile picture)
+    // Empty URL is valid (removes profile picture)
+    if (!url.trim()) return true;
+
+    const sanitized = sanitizeUrl(url);
+
+    // sanitizeUrl returns "about:blank" for disallowed/unsafe URLs
+    if (sanitized === "about:blank") {
+      return false;
+    }
 
     try {
-      const urlObj = new URL(url);
+      const urlObj = new URL(sanitized);
       return urlObj.protocol === "http:" || urlObj.protocol === "https:";
     } catch {
       return false;
