@@ -1,9 +1,9 @@
 "use client";
 
+import { sanitizeUrl } from "@braintree/sanitize-url";
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircle,Camera, Check, X } from "lucide-react";
 import { useState } from "react";
-import { sanitizeUrl } from "@braintree/sanitize-url";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
