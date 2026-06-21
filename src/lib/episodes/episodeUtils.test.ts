@@ -109,7 +109,7 @@ vi.mock("../activity/activityUtils", () => ({
 
 import { db, WatchStatus } from "../db";
 import { tmdbClient } from "../tmdb/client";
-import { updateTVShowStatus } from "./episodeUtils";
+import { batchUpdateEpisodes, updateTVShowStatus } from "./episodeUtils";
 
 describe("episodeUtils.updateTVShowStatus", () => {
   beforeEach(() => {
@@ -232,5 +232,74 @@ describe("episodeUtils.updateTVShowStatus", () => {
       status: WatchStatus.COMPLETED,
       nextEpisodeDate: null,
     });
+  });
+
+  it("recomputes batch status from the watched episodes even when the last payload item is unwatched", async () => {
+    (db as any).__setMockResults([
+      // first episode update
+      [],
+      [
+        {
+          id: "ep-1",
+          userId: "u1",
+          tmdbId: 100,
+          seasonNumber: 1,
+          episodeNumber: 2,
+          watched: true,
+          watchedAt: new Date("2025-01-01T00:00:00Z"),
+        },
+      ],
+      [],
+      undefined,
+      // second episode update
+      [],
+      [
+        {
+          id: "ep-2",
+          userId: "u1",
+          tmdbId: 100,
+          seasonNumber: 1,
+          episodeNumber: 1,
+          watched: false,
+          watchedAt: null,
+        },
+      ],
+      [],
+      undefined,
+      // final show status recompute
+      [{ status: WatchStatus.WATCHING, nextEpisodeDate: null }],
+      [
+        { seasonNumber: 1, episodeNumber: 1 },
+        { seasonNumber: 1, episodeNumber: 2 },
+      ],
+      undefined,
+      [],
+    ]);
+
+    (tmdbClient.getTVShowDetails as any).mockResolvedValue({
+      name: "Test Show",
+      poster_path: null,
+      last_episode_to_air: {
+        season_number: 1,
+        episode_number: 2,
+      },
+      next_episode_to_air: null,
+      number_of_seasons: 1,
+      status: "Returning Series",
+    });
+    (tmdbClient.getTVSeasonDetails as any).mockResolvedValue({
+      episodes: [
+        { episode_number: 1, air_date: "2024-01-01" },
+        { episode_number: 2, air_date: "2024-01-08" },
+      ],
+    });
+
+    const result = await batchUpdateEpisodes("u1", 100, [
+      { seasonNumber: 1, episodeNumber: 2, watched: true },
+      { seasonNumber: 1, episodeNumber: 1, watched: false },
+    ]);
+
+    expect(result.newStatus).toBe(WatchStatus.COMPLETED);
+    expect((db as any).__getDeleteCalls()).toHaveLength(1);
   });
 });

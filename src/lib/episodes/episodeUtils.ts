@@ -69,20 +69,9 @@ async function getTVShowProgressState(
     ),
   );
   const targetSeasonNumbers = Array.from(
-    new Set(
-      showDetails.seasons
-        .map((season) => season.season_number)
-        .filter(
-          (seasonNumber) =>
-            seasonNumber > 0 &&
-            seasonNumber <= showDetails.last_episode_to_air!.season_number,
-        ),
-    ),
-  ).sort((left, right) => left - right);
-
-  if (!targetSeasonNumbers.length) {
-    targetSeasonNumbers.push(showDetails.last_episode_to_air.season_number);
-  }
+    { length: showDetails.last_episode_to_air.season_number },
+    (_, index) => index + 1,
+  );
 
   const seasonDetailsList = await Promise.all(
     targetSeasonNumbers.map(async (seasonNumber) => ({
@@ -565,14 +554,14 @@ export async function batchUpdateEpisodes(
     );
   }
 
-  const lastEpisode = episodes.at(-1);
-  if (lastEpisode) {
+  const lastWatchedEpisode = [...episodes].reverse().find((episode) => episode.watched);
+  if (lastWatchedEpisode) {
     finalStatus = await updateTVShowStatus(
       userId,
       tmdbId,
-      lastEpisode.seasonNumber,
-      lastEpisode.episodeNumber,
-      lastEpisode.watched,
+      lastWatchedEpisode.seasonNumber,
+      lastWatchedEpisode.episodeNumber,
+      true,
     );
   }
 

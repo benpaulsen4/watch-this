@@ -152,6 +152,7 @@ describe("activity service", () => {
   beforeEach(() => {
     (db as any).__setMockResults([]);
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("returns invalidCursor for bad cursor", async () => {
@@ -277,5 +278,33 @@ describe("activity service", () => {
     expect(res.upcoming).toEqual([]);
     expect(getAllCachedContent as any).not.toHaveBeenCalled();
     expect(getCachedContent as any).not.toHaveBeenCalled();
+  });
+
+  it("treats next episode dates using the user's local calendar day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-01-01T12:00:00Z"));
+
+    (db as any).__setMockResults([
+      [],
+      [],
+      [
+        {
+          tmdbId: 600,
+          scheduleId: "s4",
+          status: "watching",
+          nextEpisodeDate: new Date("2025-01-02T00:00:00Z"),
+        },
+      ],
+      [],
+    ]);
+
+    const res = await listActivityTimeline(userId, "America/New_York", {
+      limit: 10,
+    });
+
+    if (typeof res === "string") throw new Error("unexpected error");
+    expect(res.upcoming).toHaveLength(1);
+    expect(res.upcoming[0].tmdbId).toBe(600);
+    expect(getAllCachedContent as any).toHaveBeenCalledTimes(1);
   });
 });

@@ -28,6 +28,17 @@ import type {
   UpcomingActivity,
 } from "./types";
 
+function getTimezoneDateKey(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(date);
+}
+
 export async function listActivityTimeline(
   userId: string,
   userTimezone: string,
@@ -201,9 +212,11 @@ export async function listActivityTimeline(
       and(eq(showSchedules.userId, userId), eq(showSchedules.dayOfWeek, today))
     );
 
-  const now = new Date();
+  const todayKey = getTimezoneDateKey(new Date(), userTimezone);
   const candidateUpcomingRows = upcomingRows.filter(
-    (row) => !row.nextEpisodeDate || row.nextEpisodeDate <= now
+    (row) =>
+      !row.nextEpisodeDate ||
+      getTimezoneDateKey(row.nextEpisodeDate, userTimezone) <= todayKey
   );
 
   let watchedTodayTmdbIds = new Set<number>();
