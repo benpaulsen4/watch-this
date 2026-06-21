@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import matter from "gray-matter";
+import { parse as parseYaml } from "yaml";
 
 import type {
   HelpDoc,
@@ -91,6 +91,29 @@ function normalizeFrontmatter(
   };
 }
 
+type ParsedMarkdown = {
+  content: string;
+  data: unknown;
+};
+
+function parseMarkdown(raw: string): ParsedMarkdown {
+  const normalized = raw.replace(/^\uFEFF/, "");
+  const frontmatterMatch = normalized.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+
+  if (!frontmatterMatch) {
+    return {
+      content: normalized,
+      data: {},
+    };
+  }
+
+  const yamlSource = frontmatterMatch[1] ?? "";
+  const content = normalized.slice(frontmatterMatch[0].length);
+  const data = parseYaml(yamlSource) ?? {};
+
+  return { content, data };
+}
+
 async function pathExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
@@ -174,7 +197,7 @@ function compareNavItems(
 export async function getHelpDocBySlug(slug: string[]): Promise<HelpDoc> {
   const filePath = await resolveMarkdownFilePath(slug);
   const raw = await fs.readFile(filePath, "utf8");
-  const parsed = matter(raw);
+  const parsed = parseMarkdown(raw);
 
   const fallbackTitle =
     slug.length === 0 ? "Help Center" : titleizeSegment(slug[slug.length - 1]);
@@ -196,7 +219,7 @@ export async function getAllHelpDocs(): Promise<HelpDocSummary[]> {
     const slug = filePathToSlug(filePath);
     const isIndex = path.basename(filePath).toLowerCase() === "index.md";
     const raw = await fs.readFile(filePath, "utf8");
-    const parsed = matter(raw);
+    const parsed = parseMarkdown(raw);
 
     const fallbackTitle =
       slug.length === 0
