@@ -20,13 +20,24 @@ import {
   userContentStatus,
   users,
 } from "../db";
-import { getCachedContent } from "../tmdb/cache-utils";
+import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 import type {
   ActivityItem,
   ActivityTimelineResponse,
   ListActivityInput,
   UpcomingActivity,
 } from "./types";
+
+function getTimezoneDateKey(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(date);
+}
 
 export async function listActivityTimeline(
   userId: string,
@@ -186,6 +197,7 @@ export async function listActivityTimeline(
       scheduleId: showSchedules.id,
       status: userContentStatus.status,
       statusUpdatedAt: userContentStatus.updatedAt,
+      nextEpisodeDate: userContentStatus.nextEpisodeDate,
     })
     .from(showSchedules)
     .innerJoin(
@@ -200,31 +212,71 @@ export async function listActivityTimeline(
       and(eq(showSchedules.userId, userId), eq(showSchedules.dayOfWeek, today))
     );
 
-  const upcoming: UpcomingActivity[] = [];
-  for (const row of upcomingRows) {
-    const watchedToday = await db
+  const todayKey = getTimezoneDateKey(new Date(), userTimezone);
+  const candidateUpcomingRows = upcomingRows.filter(
+    (row) =>
+      !row.nextEpisodeDate ||
+      getTimezoneDateKey(row.nextEpisodeDate, userTimezone) <= todayKey
+  );
+
+  let watchedTodayTmdbIds = new Set<number>();
+  if (candidateUpcomingRows.length > 0) {
+    const watchedTodayRows = await db
       .select()
       .from(episodeWatchStatus)
       .where(
         and(
           eq(episodeWatchStatus.userId, userId),
-          eq(episodeWatchStatus.tmdbId, row.tmdbId),
+          inArray(
+            episodeWatchStatus.tmdbId,
+            candidateUpcomingRows.map((row) => row.tmdbId)
+          ),
           eq(episodeWatchStatus.watched, true),
           sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`
         )
       );
-    if (watchedToday.length > 0) continue;
+    watchedTodayTmdbIds = new Set(
+      watchedTodayRows.map((row) => row.tmdbId as number)
+    );
+  }
+
+  const rowsToHydrate = candidateUpcomingRows.filter(
+    (row) => !watchedTodayTmdbIds.has(row.tmdbId)
+  );
+
+  const upcoming: UpcomingActivity[] = [];
+  if (rowsToHydrate.length > 0) {
     try {
-      const details = await getCachedContent(
-        row.tmdbId,
-        ContentType.TV,
+      const detailsList = await getAllCachedContent(
+        rowsToHydrate.map((row) => ({
+          tmdbId: row.tmdbId,
+          contentType: ContentType.TV,
+        })),
         userId
       );
-      upcoming.push({
-        ...details,
-        scheduleId: row.scheduleId,
+
+      detailsList.forEach((details, index) => {
+        upcoming.push({
+          ...details,
+          scheduleId: rowsToHydrate[index].scheduleId,
+        });
       });
-    } catch {}
+    } catch {
+      const fallbackDetails = await Promise.allSettled(
+        rowsToHydrate.map((row) =>
+          getCachedContent(row.tmdbId, ContentType.TV, userId)
+        )
+      );
+
+      fallbackDetails.forEach((result, index) => {
+        if (result.status !== "fulfilled") return;
+
+        upcoming.push({
+          ...result.value,
+          scheduleId: rowsToHydrate[index].scheduleId,
+        });
+      });
+    }
   }
 
   const nextCursor =

@@ -18,6 +18,115 @@ import { tmdbClient } from "@/lib/tmdb/client";
 
 import { syncStatusToCollaborators } from "../activity/activityUtils";
 
+type TVShowProgressState = {
+  nextEpisodeDate: Date | null;
+  shouldMarkCompleted: boolean;
+};
+
+function areDatesEqual(
+  left: Date | null | undefined,
+  right: Date | null | undefined,
+): boolean {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+
+  return left.getTime() === right.getTime();
+}
+
+async function getTVShowProgressState(
+  userId: string,
+  tmdbId: number,
+): Promise<TVShowProgressState> {
+  const showDetails = await tmdbClient.getTVShowDetails(tmdbId);
+  const nextEpisodeDate = showDetails.next_episode_to_air?.air_date
+    ? new Date(showDetails.next_episode_to_air.air_date)
+    : null;
+
+  if (!showDetails.last_episode_to_air) {
+    return {
+      nextEpisodeDate,
+      shouldMarkCompleted: nextEpisodeDate === null,
+    };
+  }
+
+  const watchedEpisodes = await db
+    .select({
+      seasonNumber: episodeWatchStatus.seasonNumber,
+      episodeNumber: episodeWatchStatus.episodeNumber,
+    })
+    .from(episodeWatchStatus)
+    .where(
+      and(
+        eq(episodeWatchStatus.userId, userId),
+        eq(episodeWatchStatus.tmdbId, tmdbId),
+        eq(episodeWatchStatus.watched, true),
+      ),
+    );
+
+  const watchedEpisodeSet = new Set(
+    watchedEpisodes.map(
+      (episode) => `${episode.seasonNumber}-${episode.episodeNumber}`,
+    ),
+  );
+  const targetSeasonNumbers = Array.from(
+    { length: showDetails.last_episode_to_air.season_number },
+    (_, index) => index + 1,
+  );
+
+  const seasonDetailsList = await Promise.all(
+    targetSeasonNumbers.map(async (seasonNumber) => ({
+      seasonNumber,
+      details: await tmdbClient.getTVSeasonDetails(tmdbId, seasonNumber),
+    })),
+  );
+
+  const now = new Date();
+  const allAvailableEpisodesWatched = seasonDetailsList.every(
+    ({ seasonNumber, details }) =>
+      details.episodes.every((episode) => {
+        if (!episode.air_date) return true;
+
+        const airDate = new Date(episode.air_date);
+        if (Number.isNaN(airDate.getTime()) || airDate > now) {
+          return true;
+        }
+
+        if (
+          seasonNumber === showDetails.last_episode_to_air!.season_number &&
+          episode.episode_number > showDetails.last_episode_to_air!.episode_number
+        ) {
+          return true;
+        }
+
+        return watchedEpisodeSet.has(
+          `${seasonNumber}-${episode.episode_number}`,
+        );
+      }),
+  );
+
+  if (!allAvailableEpisodesWatched) {
+    return {
+      nextEpisodeDate: null,
+      shouldMarkCompleted: false,
+    };
+  }
+
+  if (!nextEpisodeDate) {
+    return {
+      nextEpisodeDate: null,
+      shouldMarkCompleted: true,
+    };
+  }
+
+  const inOneMonth = new Date();
+  inOneMonth.setMonth(inOneMonth.getMonth() + 1);
+
+  return {
+    nextEpisodeDate,
+    shouldMarkCompleted: nextEpisodeDate > inOneMonth,
+  };
+}
+
 /**
  * Sync episode status to collaborators in shared lists
  */
@@ -222,8 +331,8 @@ export async function createEpisodeActivityEntry(
 export async function updateTVShowStatus(
   userId: string,
   tmdbId: number,
-  seasonNumber: number,
-  episodeNumber: number,
+  _seasonNumber: number,
+  _episodeNumber: number,
   watched: boolean,
 ): Promise<WatchStatusEnum | null> {
   if (!watched) {
@@ -243,53 +352,29 @@ export async function updateTVShowStatus(
     .limit(1);
 
   let newStatus: WatchStatusEnum | null = null;
+  const progressState = await getTVShowProgressState(userId, tmdbId);
+  const existingStatus = contentStatus[0] ?? null;
+  const shouldMarkCompleted = progressState.shouldMarkCompleted;
 
   if (contentStatus.length === 0) {
-    // Create new status as "watching"
     await db.insert(userContentStatus).values({
       userId,
       tmdbId,
       contentType: ContentType.TV,
-      status: WatchStatus.WATCHING,
+      status: shouldMarkCompleted ? WatchStatus.COMPLETED : WatchStatus.WATCHING,
+      nextEpisodeDate: progressState.nextEpisodeDate,
     });
-    newStatus = WatchStatus.WATCHING;
-  } else if (contentStatus[0].status !== WatchStatus.WATCHING) {
-    // Update status to "watching" if it's not already
-    await db
-      .update(userContentStatus)
-      .set({
-        status: WatchStatus.WATCHING,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(userContentStatus.userId, userId),
-          eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, ContentType.TV),
-        ),
-      );
-    newStatus = WatchStatus.WATCHING;
-  } else {
-    // Check if this is the last available episode (mark as completed)
-    const showDetails = await tmdbClient.getTVShowDetails(tmdbId);
-    if (
-      showDetails.last_episode_to_air &&
-      showDetails.last_episode_to_air.season_number === seasonNumber &&
-      showDetails.last_episode_to_air.episode_number === episodeNumber
-    ) {
-      const inOneMonth = new Date();
-      inOneMonth.setMonth(inOneMonth.getMonth() + 1);
-
+    newStatus = shouldMarkCompleted
+      ? WatchStatus.COMPLETED
+      : WatchStatus.WATCHING;
+  } else if (shouldMarkCompleted) {
+    if (existingStatus.status !== WatchStatus.COMPLETED) {
       await db
         .update(userContentStatus)
         .set({
           status: WatchStatus.COMPLETED,
           updatedAt: new Date(),
-          nextEpisodeDate: showDetails.next_episode_to_air
-            ? new Date(showDetails.next_episode_to_air.air_date)
-            : showDetails.status === "Ended"
-              ? null
-              : inOneMonth,
+          nextEpisodeDate: progressState.nextEpisodeDate,
         })
         .where(
           and(
@@ -298,30 +383,72 @@ export async function updateTVShowStatus(
             eq(userContentStatus.contentType, ContentType.TV),
           ),
         );
-
       newStatus = WatchStatus.COMPLETED;
+    } else if (
+      !areDatesEqual(existingStatus.nextEpisodeDate, progressState.nextEpisodeDate)
+    ) {
+      await db
+        .update(userContentStatus)
+        .set({
+          nextEpisodeDate: progressState.nextEpisodeDate,
+        })
+        .where(
+          and(
+            eq(userContentStatus.userId, userId),
+            eq(userContentStatus.tmdbId, tmdbId),
+            eq(userContentStatus.contentType, ContentType.TV),
+          ),
+        );
+    }
 
-      // Remove schedules when show is completed
-      try {
-        const deletedSchedules = await db
-          .delete(showSchedules)
-          .where(
-            and(
-              eq(showSchedules.userId, userId),
-              eq(showSchedules.tmdbId, tmdbId),
-            ),
-          )
-          .returning();
+    // Remove schedules when show is completed
+    try {
+      const deletedSchedules = await db
+        .delete(showSchedules)
+        .where(
+          and(eq(showSchedules.userId, userId), eq(showSchedules.tmdbId, tmdbId)),
+        )
+        .returning();
 
-        if (deletedSchedules.length > 0) {
-          console.info(
-            `Automatically removed ${deletedSchedules.length} schedule(s) for completed show ${tmdbId}`,
-          );
-        }
-      } catch (error) {
-        console.error("Error removing schedules for completed show:", error);
-        // Don't fail the main operation if schedule cleanup fails
+      if (deletedSchedules.length > 0) {
+        console.info(
+          `Automatically removed ${deletedSchedules.length} schedule(s) for completed show ${tmdbId}`,
+        );
       }
+    } catch (error) {
+      console.error("Error removing schedules for completed show:", error);
+      // Don't fail the main operation if schedule cleanup fails
+    }
+  } else {
+    const needsWatchingStatus = existingStatus.status !== WatchStatus.WATCHING;
+    const needsNextEpisodeDateUpdate = !areDatesEqual(
+      existingStatus.nextEpisodeDate,
+      progressState.nextEpisodeDate,
+    );
+
+    if (needsWatchingStatus || needsNextEpisodeDateUpdate) {
+      await db
+        .update(userContentStatus)
+        .set({
+          ...(needsWatchingStatus
+            ? {
+                status: WatchStatus.WATCHING,
+                updatedAt: new Date(),
+              }
+            : {}),
+          nextEpisodeDate: progressState.nextEpisodeDate,
+        })
+        .where(
+          and(
+            eq(userContentStatus.userId, userId),
+            eq(userContentStatus.tmdbId, tmdbId),
+            eq(userContentStatus.contentType, ContentType.TV),
+          ),
+        );
+    }
+
+    if (needsWatchingStatus) {
+      newStatus = WatchStatus.WATCHING;
     }
   }
 
@@ -343,6 +470,9 @@ export async function completeEpisodeUpdate(
   episodeNumber: number,
   watched: boolean,
   episodeName?: string,
+  options?: {
+    skipShowStatus?: boolean;
+  },
 ) {
   // Update episode status
   const episodeResult = await updateEpisodeWatchStatus(
@@ -374,13 +504,15 @@ export async function completeEpisodeUpdate(
   );
 
   // Update show status
-  const newStatus = await updateTVShowStatus(
-    userId,
-    tmdbId,
-    seasonNumber,
-    episodeNumber,
-    watched,
-  );
+  const newStatus = options?.skipShowStatus
+    ? null
+    : await updateTVShowStatus(
+        userId,
+        tmdbId,
+        seasonNumber,
+        episodeNumber,
+        watched,
+      );
 
   return {
     episode: episodeResult,
@@ -412,13 +544,25 @@ export async function batchUpdateEpisodes(
       episode.seasonNumber,
       episode.episodeNumber,
       episode.watched,
+      undefined,
+      { skipShowStatus: true },
     );
 
     results.push(result.episode);
     result.syncedCollaboratorIds.forEach((id) =>
       allSyncedCollaboratorIds.add(id),
     );
-    finalStatus = result.newStatus;
+  }
+
+  const lastWatchedEpisode = [...episodes].reverse().find((episode) => episode.watched);
+  if (lastWatchedEpisode) {
+    finalStatus = await updateTVShowStatus(
+      userId,
+      tmdbId,
+      lastWatchedEpisode.seasonNumber,
+      lastWatchedEpisode.episodeNumber,
+      true,
+    );
   }
 
   return {

@@ -102,6 +102,24 @@ vi.mock("../tmdb/client", () => {
 
 vi.mock("../tmdb/cache-utils", async () => {
   return {
+    getAllCachedContent: vi.fn(async (items: Array<{ tmdbId: number }>) =>
+      items.map(({ tmdbId }) => ({
+        tmdbId,
+        contentType: "tv",
+        title: "Some show",
+        overview: "",
+        posterPath: null,
+        backdropPath: null,
+        releaseDate: "2020-01-01T00:00:00.000Z",
+        voteAverage: 8,
+        voteCount: 100,
+        popularity: 10,
+        genreIds: [],
+        adult: null,
+        watchStatus: "planning",
+        statusUpdatedAt: null,
+      })),
+    ),
     getCachedContent: vi.fn((tmdbId: number) => {
       return {
         tmdbId,
@@ -124,7 +142,7 @@ vi.mock("../tmdb/cache-utils", async () => {
 });
 
 import { db } from "../db";
-import { getCachedContent } from "../tmdb/cache-utils";
+import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 import { listActivityTimeline } from "./service";
 
 describe("activity service", () => {
@@ -134,6 +152,7 @@ describe("activity service", () => {
   beforeEach(() => {
     (db as any).__setMockResults([]);
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("returns invalidCursor for bad cursor", async () => {
@@ -212,8 +231,8 @@ describe("activity service", () => {
 
   it("builds upcoming list and skips shows already watched today", async () => {
     const upcomingRows = [
-      { tmdbId: 300, scheduleId: "s1", status: "watching" },
-      { tmdbId: 400, scheduleId: "s2", status: "planning" },
+      { tmdbId: 300, scheduleId: "s1", status: "watching", nextEpisodeDate: null },
+      { tmdbId: 400, scheduleId: "s2", status: "planning", nextEpisodeDate: null },
     ];
     (db as any).__setMockResults([
       // collaborative lists
@@ -222,10 +241,8 @@ describe("activity service", () => {
       [],
       // upcoming rows
       upcomingRows,
-      // watchedToday for first row -> non-empty to skip
-      [{ id: "w1" }],
-      // watchedToday for second row -> empty to include
-      [],
+      // watchedToday rows -> skip tmdbId 300
+      [{ tmdbId: 300 }],
     ]);
 
     const res = await listActivityTimeline(userId, tz, { limit: 10 });
@@ -234,7 +251,60 @@ describe("activity service", () => {
     expect(res.upcoming[0].tmdbId).toBe(400);
     expect(res.upcoming[0].scheduleId).toBe("s2");
     expect(res.upcoming[0].watchStatus).toBe("planning");
-    expect(getCachedContent as any).toHaveBeenCalledTimes(1);
-    expect((getCachedContent as any).mock.calls[0][0]).toBe(400);
+    expect(getAllCachedContent as any).toHaveBeenCalledTimes(1);
+    expect((getAllCachedContent as any).mock.calls[0][0]).toEqual([
+      { tmdbId: 400, contentType: "tv" },
+    ]);
+    expect(getCachedContent as any).not.toHaveBeenCalled();
+  });
+
+  it("skips upcoming suggestions when the next episode is known but not aired yet", async () => {
+    const futureDate = new Date("2999-01-01T00:00:00Z");
+    (db as any).__setMockResults([
+      [],
+      [],
+      [
+        {
+          tmdbId: 500,
+          scheduleId: "s3",
+          status: "watching",
+          nextEpisodeDate: futureDate,
+        },
+      ],
+    ]);
+
+    const res = await listActivityTimeline(userId, tz, { limit: 10 });
+    if (typeof res === "string") throw new Error("unexpected error");
+    expect(res.upcoming).toEqual([]);
+    expect(getAllCachedContent as any).not.toHaveBeenCalled();
+    expect(getCachedContent as any).not.toHaveBeenCalled();
+  });
+
+  it("treats next episode dates using the user's local calendar day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-01-01T12:00:00Z"));
+
+    (db as any).__setMockResults([
+      [],
+      [],
+      [
+        {
+          tmdbId: 600,
+          scheduleId: "s4",
+          status: "watching",
+          nextEpisodeDate: new Date("2025-01-02T00:00:00Z"),
+        },
+      ],
+      [],
+    ]);
+
+    const res = await listActivityTimeline(userId, "America/New_York", {
+      limit: 10,
+    });
+
+    if (typeof res === "string") throw new Error("unexpected error");
+    expect(res.upcoming).toHaveLength(1);
+    expect(res.upcoming[0].tmdbId).toBe(600);
+    expect(getAllCachedContent as any).toHaveBeenCalledTimes(1);
   });
 });
