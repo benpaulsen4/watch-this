@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
@@ -6,7 +5,12 @@ import {
   verifyChallengeToken,
   verifyClaimToken,
 } from "@/lib/auth/webauthn";
-import { activityFeed, db , passkeyClaims } from "@/lib/db";
+import { activityFeed, db } from "@/lib/db";
+import { consumeClaim } from "@/lib/profile/devices/service";
+
+// Thrown when the claim could not be atomically consumed (already
+// consumed/cancelled/expired), to roll back the surrounding transaction.
+class ClaimUnavailableError extends Error {}
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,44 +35,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid challenge" }, { status: 400 });
     }
 
-    const claimRows = await db
-      .select()
-      .from(passkeyClaims)
-      .where(eq(passkeyClaims.id, claim.claimId))
-      .limit(1);
+    // Consume the claim and register the passkey atomically. The claim is
+    // consumed first via a single conditional UPDATE, so concurrent redemptions
+    // cannot both proceed; if registration then fails, the transaction rolls
+    // back the consume and the claim stays available for a retry.
+    await db.transaction(async (tx) => {
+      const consumed = await consumeClaim(tx, claim.claimId);
+      if (!consumed) {
+        throw new ClaimUnavailableError();
+      }
 
-    if (claimRows.length === 0) {
-      return NextResponse.json({ error: "Claim not found" }, { status: 404 });
-    }
+      await verifyAdditionalPasskeyRegistration(
+        claim.userId,
+        registrationResponse,
+        challenge.challenge,
+        deviceName,
+      );
 
-    const claimRow = claimRows[0];
-    if (claimRow.status !== "active") {
-      return NextResponse.json({ error: "Claim not active" }, { status: 400 });
-    }
-    if (claimRow.expiresAt && claimRow.expiresAt.getTime() < Date.now()) {
-      return NextResponse.json({ error: "Claim expired" }, { status: 400 });
-    }
-
-    await verifyAdditionalPasskeyRegistration(
-      claim.userId,
-      registrationResponse,
-      challenge.challenge,
-      deviceName,
-    );
-
-    await db
-      .update(passkeyClaims)
-      .set({ status: "consumed", consumedAt: new Date() })
-      .where(eq(passkeyClaims.id, claim.claimId));
-
-    await db.insert(activityFeed).values({
-      userId: claim.userId,
-      activityType: "claim_consumed",
-      metadata: { claimId: claim.claimId },
+      await tx.insert(activityFeed).values({
+        userId: claim.userId,
+        activityType: "claim_consumed",
+        metadata: { claimId: claim.claimId },
+      });
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof ClaimUnavailableError) {
+      return NextResponse.json(
+        { error: "Claim not active" },
+        { status: 400 },
+      );
+    }
     console.error("Claim verify error:", error);
     return NextResponse.json(
       { error: "Failed to verify claim" },

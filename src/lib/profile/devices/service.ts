@@ -4,6 +4,7 @@ import { createClaimToken } from "@/lib/auth/webauthn";
 import {
   activityFeed,
   db,
+  type PasskeyClaim,
   passkeyClaims,
   passkeyCredentials,
   users,
@@ -14,6 +15,9 @@ import type {
   ClaimInitiator,
   PasskeyDevice,
 } from "./types";
+
+// A Drizzle query executor: either the top-level `db` or a transaction handle.
+type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function listDevices(userId: string): Promise<PasskeyDevice[]> {
   const rows = await db
@@ -119,6 +123,35 @@ export async function initiateClaim(
     qrPayload: magicLink,
     expiresAt: expiresAt.toISOString(),
   };
+}
+
+/**
+ * Atomically consume a passkey claim. A single conditional UPDATE flips the
+ * row to "consumed" only if it is still active and unexpired, so two concurrent
+ * redemptions can never both succeed: the database serializes the writes and
+ * only the first matches the WHERE clause. Returns the consumed row, or null if
+ * the claim was already consumed/cancelled/expired (i.e. not available).
+ *
+ * Pass a transaction handle as `executor` so the consume can be rolled back if
+ * the subsequent passkey registration fails, leaving the claim retryable.
+ */
+export async function consumeClaim(
+  executor: DbExecutor,
+  claimId: string,
+): Promise<PasskeyClaim | null> {
+  const now = new Date();
+  const [row] = await executor
+    .update(passkeyClaims)
+    .set({ status: "consumed", consumedAt: now })
+    .where(
+      and(
+        eq(passkeyClaims.id, claimId),
+        eq(passkeyClaims.status, "active"),
+        gt(passkeyClaims.expiresAt, now),
+      ),
+    )
+    .returning();
+  return row ?? null;
 }
 
 export async function cancelClaim(

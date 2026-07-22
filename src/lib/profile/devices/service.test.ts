@@ -2,6 +2,7 @@ import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   cancelClaim,
+  consumeClaim,
   countActiveDevices,
   deletePasskey,
   initiateClaim,
@@ -65,10 +66,25 @@ vi.mock("@/lib/db", () => {
           return c;
         },
         where() {
-          if (throwOnUpdate) {
-            return Promise.reject(new Error("update failed"));
-          }
-          return Promise.resolve({ ok: true });
+          // Returned object is awaitable (for callers that await where())
+          // and also supports .returning() (for conditional-consume callers).
+          return {
+            returning() {
+              if (throwOnUpdate) {
+                return Promise.reject(new Error("update failed"));
+              }
+              return Promise.resolve(resolveNext());
+            },
+            then(onFulfilled: (v: any) => any, onRejected?: (e: any) => any) {
+              if (throwOnUpdate) {
+                return Promise.reject(new Error("update failed")).then(
+                  onFulfilled,
+                  onRejected,
+                );
+              }
+              return Promise.resolve({ ok: true }).then(onFulfilled);
+            },
+          };
         },
       };
       return c;
@@ -253,6 +269,20 @@ describe("devices service", () => {
     });
 
     vi.useRealTimers();
+  });
+
+  it("consumeClaim returns the row when the conditional update matches (AUTH-03)", async () => {
+    const { db } = await mockedDbModule;
+    db.__setMockResults([[{ id: "claim-1", status: "consumed" }]]);
+    const row = await consumeClaim(db, "claim-1");
+    expect(row).toMatchObject({ id: "claim-1", status: "consumed" });
+  });
+
+  it("consumeClaim returns null when no row matches (already consumed/expired)", async () => {
+    const { db } = await mockedDbModule;
+    db.__setMockResults([[]]);
+    const row = await consumeClaim(db, "claim-1");
+    expect(row).toBeNull();
   });
 
   it("cancelClaim returns success and performs update", async () => {
