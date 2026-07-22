@@ -476,6 +476,50 @@ describe("Profile Data Service", () => {
       expect(result.errors[0]).toContain("Failed to import list");
     });
 
+    it("returns static error messages that do not leak exception text (API-04)", async () => {
+      const { valuesMock } = setupImportMocks();
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      // Content status insert throws with a sensitive DB constraint message.
+      valuesMock.mockReturnValueOnce({
+        onConflictDoUpdate: vi
+          .fn()
+          .mockRejectedValue(
+            new Error(
+              'duplicate key value violates unique constraint "user_content_status_user_id_tmdb_id_content_type_key"'
+            )
+          ),
+      });
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify({
+          contentStatus: [
+            {
+              id: "s1",
+              tmdbId: 1,
+              contentType: "movie",
+              status: "completed",
+              createdAt: mockDate.toISOString(),
+              updatedAt: mockDate.toISOString(),
+            },
+          ],
+        })
+      );
+
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+
+      expect(result.errors).toHaveLength(1);
+      // Static, indexed message only. No DB internals leaked to the client.
+      expect(result.errors[0]).toBe("Failed to import content status entry 1");
+      expect(result.errors[0]).not.toContain("constraint");
+      expect(result.errors[0]).not.toContain("duplicate key");
+      // The real exception is still logged server-side.
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
     it("should import an archived list correctly", async () => {
       const archivedImportData = {
         lists: [
