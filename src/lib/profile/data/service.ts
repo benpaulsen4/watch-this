@@ -17,6 +17,13 @@ import {
 } from "@/lib/db/schema";
 import { addToCache } from "@/lib/tmdb/cache-utils";
 
+// API-03: import hardening limits.
+// Maximum entries permitted in any single import array before we refuse to
+// process the payload (defends against resource-exhaustion / huge fan-out).
+const MAX_IMPORT_ENTRIES = 5000;
+// Maximum number of concurrent TMDB cache-warm requests during an import.
+const CACHE_WARM_CONCURRENCY = 5;
+
 import type {
   ContentStatusExportRow,
   CSVExportModel,
@@ -213,13 +220,30 @@ export async function exportUserData(
 export async function importUserData(
   userId: string,
   fileContent: string
-): Promise<ImportResult | "parseError"> {
+): Promise<ImportResult | "parseError" | "tooLarge"> {
   // 1. Parse JSON to `JSONImportModel` (or return 'parseError')
   let importModel: JSONImportModel;
   try {
     importModel = JSON.parse(fileContent);
   } catch {
     return "parseError";
+  }
+
+  // 1b. Reject oversized payloads before doing any work (API-03). Each import
+  //     array is bounded independently so a single huge section cannot cause
+  //     excessive DB work / TMDB fan-out.
+  const totalListItems = (importModel.lists ?? []).reduce(
+    (sum, list) => sum + (list.items?.length ?? 0),
+    0
+  );
+  if (
+    (importModel.lists?.length ?? 0) > MAX_IMPORT_ENTRIES ||
+    totalListItems > MAX_IMPORT_ENTRIES ||
+    (importModel.contentStatus?.length ?? 0) > MAX_IMPORT_ENTRIES ||
+    (importModel.episodeStatus?.length ?? 0) > MAX_IMPORT_ENTRIES ||
+    (importModel.tvShowSchedules?.length ?? 0) > MAX_IMPORT_ENTRIES
+  ) {
+    return "tooLarge";
   }
 
   const result: ImportResult = {
@@ -233,6 +257,42 @@ export async function importUserData(
     },
     errors: [],
   };
+
+  // 1c. Pre-warm the TMDB cache once per unique (tmdbId, contentType) with
+  //     bounded concurrency (API-03), rather than issuing a live addToCache
+  //     call for every list item sequentially. Items whose content could not
+  //     be cached are skipped later with a per-item error.
+  const uniqueContent = new Map<
+    string,
+    { tmdbId: number; contentType: ContentTypeEnum }
+  >();
+  for (const list of importModel.lists ?? []) {
+    for (const item of list.items ?? []) {
+      uniqueContent.set(`${item.contentType}:${item.tmdbId}`, {
+        tmdbId: item.tmdbId,
+        contentType: item.contentType,
+      });
+    }
+  }
+  const cachedContentKeys = new Set<string>();
+  const uniquePairs = Array.from(uniqueContent.values());
+  for (let i = 0; i < uniquePairs.length; i += CACHE_WARM_CONCURRENCY) {
+    const chunk = uniquePairs.slice(i, i + CACHE_WARM_CONCURRENCY);
+    const settled = await Promise.allSettled(
+      chunk.map((pair) => addToCache(pair.tmdbId, pair.contentType))
+    );
+    settled.forEach((outcome, idx) => {
+      const pair = chunk[idx];
+      if (outcome.status === "fulfilled") {
+        cachedContentKeys.add(`${pair.contentType}:${pair.tmdbId}`);
+      } else {
+        console.error(
+          `Failed to warm TMDB cache for ${pair.contentType} ${pair.tmdbId}:`,
+          outcome.reason
+        );
+      }
+    });
+  }
 
   // 2. Import lists from `JSONImportModel.lists` to the `lists` table.
   //    Never trust the client-supplied primary key: always create a fresh
@@ -265,14 +325,13 @@ export async function importUserData(
         //    generates their own primary keys.
         if (list.items) {
           for (const item of list.items) {
-            // 3a. Before adding the item to the list, first try adding it to the `tmdb_cache` table to ensure it exists
-            try {
-              await addToCache(item.tmdbId, item.contentType);
-            } catch (e) {
+            // 3a. The item's content must have been successfully cached during
+            //     the pre-warm phase; if not, skip it.
+            if (!cachedContentKeys.has(`${item.contentType}:${item.tmdbId}`)) {
               result.errors.push(
-                `Failed to import list item ${item.tmdbId} for list ${list.id}: ${e}`
+                `Failed to import list item ${item.tmdbId} for list ${list.id}: cache unavailable`
               );
-              continue; // Skip this item if cache addition fails
+              continue; // Skip this item if cache addition failed
             }
             // 3b. If cache addition is successful, insert the list item into the `list_items` table
             try {

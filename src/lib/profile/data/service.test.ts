@@ -349,7 +349,7 @@ describe("Profile Data Service", () => {
       const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
-      if (result === "parseError") return;
+      if (typeof result === "string") return;
 
       expect(result.success).toBe(true);
       expect(result.imported.lists).toBe(1);
@@ -369,6 +369,74 @@ describe("Profile Data Service", () => {
       expect(result).toBe("parseError");
     });
 
+    it("should reject payloads with too many entries (API-03)", async () => {
+      setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      const hugeContentStatus = Array.from({ length: 5001 }, (_, i) => ({
+        id: `status-${i}`,
+        tmdbId: i,
+        contentType: "movie",
+        status: "completed",
+        createdAt: mockDate.toISOString(),
+        updatedAt: mockDate.toISOString(),
+      }));
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify({ contentStatus: hugeContentStatus })
+      );
+
+      expect(result).toBe("tooLarge");
+      // Nothing should have been written when the payload is rejected.
+      expect(mockedDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("should warm the cache only once per unique (tmdbId, contentType) (API-03)", async () => {
+      setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      const dedupeData = {
+        lists: [
+          {
+            id: "list-1",
+            name: "Dupes",
+            description: null,
+            listType: "movies",
+            isPublic: false,
+            isArchived: false,
+            syncWatchStatus: false,
+            createdAt: mockDate.toISOString(),
+            updatedAt: mockDate.toISOString(),
+            items: [
+              {
+                id: "item-1",
+                tmdbId: 555,
+                contentType: "movie",
+                createdAt: mockDate.toISOString(),
+              },
+              {
+                id: "item-2",
+                tmdbId: 555,
+                contentType: "movie",
+                createdAt: mockDate.toISOString(),
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await importUserData(userId, JSON.stringify(dedupeData));
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+
+      // Two duplicate items, but the cache is warmed only once.
+      expect(addToCache).toHaveBeenCalledTimes(1);
+      expect(addToCache).toHaveBeenCalledWith(555, "movie");
+      // Both items are still inserted (dedupe happens at the DB layer).
+      expect(result.imported.listItems).toBe(2);
+    });
+
     it("should handle cache addition failure gracefully", async () => {
       setupImportMocks();
       (addToCache as any).mockRejectedValue(new Error("Cache failed"));
@@ -376,7 +444,7 @@ describe("Profile Data Service", () => {
       const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
-      if (result === "parseError") return;
+      if (typeof result === "string") return;
 
       expect(result.imported.lists).toBe(1);
       expect(result.imported.listItems).toBe(0); // Should fail to import item
@@ -397,7 +465,7 @@ describe("Profile Data Service", () => {
       const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
-      if (result === "parseError") return;
+      if (typeof result === "string") return;
 
       expect(result.imported.lists).toBe(0);
       // If list fails, items are inside the list loop, so they won't be processed or the error will catch the block
