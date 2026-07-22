@@ -78,6 +78,17 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
+    // Validate tmdbId as a positive integer at the boundary (API-06) so a
+    // crafted string (e.g. "../../authentication/token/new") can never reach
+    // the upstream TMDB path template.
+    const numericTmdbId = Number(tmdbId);
+    if (!Number.isInteger(numericTmdbId) || numericTmdbId <= 0) {
+      return NextResponse.json(
+        { error: "tmdbId must be a positive integer" },
+        { status: 400 }
+      );
+    }
+
     if (!["movie", "tv"].includes(contentType)) {
       return NextResponse.json(
         { error: 'contentType must be either "movie" or "tv"' },
@@ -85,7 +96,7 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
     const result = await createListItem(userId, listId, {
-      tmdbId,
+      tmdbId: numericTmdbId,
       contentType,
     });
     if (result === "notFound") {
