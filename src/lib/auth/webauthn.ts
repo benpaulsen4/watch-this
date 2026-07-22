@@ -52,6 +52,27 @@ export interface AuthSession {
   tokenVersion: number;
 }
 
+// WebAuthn challenge tokens are issued in a "begin" step and redeemed in a
+// "verify" step. Binding the flow (and, where known, the username/user/claim
+// it was minted for) into the token prevents a challenge issued for one flow or
+// subject from being replayed in another.
+export type ChallengeFlow = "register" | "authenticate" | "claim";
+
+export interface ChallengeBinding {
+  flow: ChallengeFlow;
+  username?: string;
+  userId?: string;
+  claimId?: string;
+}
+
+export interface ChallengePayload {
+  challenge: string;
+  flow: ChallengeFlow;
+  username?: string;
+  userId?: string;
+  claimId?: string;
+}
+
 // Generate registration options for new passkey
 export async function generatePasskeyRegistrationOptions(username: string) {
   // Check if username already exists
@@ -354,10 +375,17 @@ export async function verifySessionToken(
 }
 
 // Create JWT challenge token
-export async function createChallengeToken(challenge: string): Promise<string> {
+export async function createChallengeToken(
+  challenge: string,
+  binding: ChallengeBinding
+): Promise<string> {
   const payload = {
     typ: TOKEN_TYPE.CHALLENGE,
     challenge,
+    flow: binding.flow,
+    ...(binding.username !== undefined ? { username: binding.username } : {}),
+    ...(binding.userId !== undefined ? { userId: binding.userId } : {}),
+    ...(binding.claimId !== undefined ? { claimId: binding.claimId } : {}),
   };
 
   return await new SignJWT(payload)
@@ -367,15 +395,41 @@ export async function createChallengeToken(challenge: string): Promise<string> {
     .sign(getJwtSecret());
 }
 
-// Verify JWT challenge token
+// Verify JWT challenge token. The caller must pass the flow it expects, plus
+// any subject identifiers (username/userId/claimId) it knows; a token whose
+// bound values don't match is rejected.
+//
+// TODO(FOLLOW-UP): challenge tokens are still replayable within their 10-minute
+// lifetime -- full single-use enforcement needs a server-side nonce store
+// (e.g. a `challenge_nonces` table, or the existing session store) recording
+// consumed challenge ids. The flow/subject binding below is implemented fully;
+// the single-use store is deferred to keep this PR contained.
 export async function verifyChallengeToken(
-  token: string
-): Promise<{ challenge: string } | null> {
+  token: string,
+  expected: ChallengeBinding
+): Promise<ChallengePayload | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
     if (payload.typ !== TOKEN_TYPE.CHALLENGE) return null;
+    if (payload.flow !== expected.flow) return null;
+    if (
+      expected.username !== undefined &&
+      payload.username !== expected.username
+    ) {
+      return null;
+    }
+    if (expected.userId !== undefined && payload.userId !== expected.userId) {
+      return null;
+    }
+    if (expected.claimId !== undefined && payload.claimId !== expected.claimId) {
+      return null;
+    }
     return {
       challenge: payload.challenge as string,
+      flow: payload.flow as ChallengeFlow,
+      username: payload.username as string | undefined,
+      userId: payload.userId as string | undefined,
+      claimId: payload.claimId as string | undefined,
     };
   } catch {
     return null;

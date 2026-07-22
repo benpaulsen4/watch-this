@@ -45,9 +45,13 @@ describe("webauthn token type binding (AUTH-01)", () => {
   });
 
   it("accepts a challenge token in the challenge verifier", async () => {
-    const token = await createChallengeToken("chal-abc");
-    const challenge = await verifyChallengeToken(token);
-    expect(challenge).toMatchObject({ challenge: "chal-abc" });
+    const token = await createChallengeToken("chal-abc", {
+      flow: "authenticate",
+    });
+    const challenge = await verifyChallengeToken(token, {
+      flow: "authenticate",
+    });
+    expect(challenge).toMatchObject({ challenge: "chal-abc", flow: "authenticate" });
   });
 
   it("rejects a claim token presented as a session token", async () => {
@@ -56,7 +60,9 @@ describe("webauthn token type binding (AUTH-01)", () => {
   });
 
   it("rejects a challenge token presented as a session token", async () => {
-    const challengeToken = await createChallengeToken("chal-abc");
+    const challengeToken = await createChallengeToken("chal-abc", {
+      flow: "authenticate",
+    });
     expect(await verifySessionToken(challengeToken)).toBeNull();
   });
 
@@ -67,11 +73,65 @@ describe("webauthn token type binding (AUTH-01)", () => {
 
   it("rejects a session token presented as a challenge token", async () => {
     const sessionToken = await createSessionToken(fakeUser);
-    expect(await verifyChallengeToken(sessionToken)).toBeNull();
+    expect(
+      await verifyChallengeToken(sessionToken, { flow: "authenticate" }),
+    ).toBeNull();
   });
 
   it("rejects a claim token presented as a challenge token", async () => {
     const claimToken = await createClaimToken("claim-1", "user-123");
-    expect(await verifyChallengeToken(claimToken)).toBeNull();
+    expect(
+      await verifyChallengeToken(claimToken, { flow: "claim" }),
+    ).toBeNull();
+  });
+});
+
+describe("webauthn challenge flow/subject binding (AUTH-06)", () => {
+  it("rejects a challenge minted for a different flow", async () => {
+    const token = await createChallengeToken("chal", { flow: "register" });
+    expect(await verifyChallengeToken(token, { flow: "authenticate" })).toBeNull();
+    expect(await verifyChallengeToken(token, { flow: "claim" })).toBeNull();
+  });
+
+  it("rejects a register challenge redeemed with a different username", async () => {
+    const token = await createChallengeToken("chal", {
+      flow: "register",
+      username: "alice",
+    });
+    expect(
+      await verifyChallengeToken(token, { flow: "register", username: "mallory" }),
+    ).toBeNull();
+    expect(
+      await verifyChallengeToken(token, { flow: "register", username: "alice" }),
+    ).toMatchObject({ challenge: "chal", username: "alice" });
+  });
+
+  it("rejects a claim challenge redeemed with a different user or claim id", async () => {
+    const token = await createChallengeToken("chal", {
+      flow: "claim",
+      userId: "user-1",
+      claimId: "claim-1",
+    });
+    expect(
+      await verifyChallengeToken(token, {
+        flow: "claim",
+        userId: "user-2",
+        claimId: "claim-1",
+      }),
+    ).toBeNull();
+    expect(
+      await verifyChallengeToken(token, {
+        flow: "claim",
+        userId: "user-1",
+        claimId: "claim-2",
+      }),
+    ).toBeNull();
+    expect(
+      await verifyChallengeToken(token, {
+        flow: "claim",
+        userId: "user-1",
+        claimId: "claim-1",
+      }),
+    ).toMatchObject({ userId: "user-1", claimId: "claim-1" });
   });
 });

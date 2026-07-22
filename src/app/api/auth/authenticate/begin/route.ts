@@ -16,7 +16,9 @@ export async function GET() {
     // Set challenge in httpOnly cookie for security
     response.cookies.set(
       "authentication-challenge",
-      await createChallengeToken(options.challenge),
+      // Usernameless auth: the subject is unknown until verification, so only
+      // the flow is bound here.
+      await createChallengeToken(options.challenge, { flow: "authenticate" }),
       {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",

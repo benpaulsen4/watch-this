@@ -41,7 +41,11 @@ export async function GET(request: NextRequest) {
     const options = await generateAdditionalPasskeyRegistrationOptions(
       verified.userId,
     );
-    const challengeToken = await createChallengeToken(options.challenge);
+    const challengeToken = await createChallengeToken(options.challenge, {
+      flow: "claim",
+      userId: verified.userId,
+      claimId: verified.claimId,
+    });
 
     return NextResponse.json({ options, challengeToken });
   } catch (error) {

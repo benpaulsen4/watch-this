@@ -46,7 +46,10 @@ export async function POST(request: NextRequest) {
     // Set challenge in httpOnly cookie for security
     response.cookies.set(
       "registration-challenge",
-      await createChallengeToken(options.challenge),
+      await createChallengeToken(options.challenge, {
+        flow: "register",
+        username: username.trim(),
+      }),
       {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",

@@ -30,7 +30,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    const challenge = await verifyChallengeToken(challengeToken);
+    const challenge = await verifyChallengeToken(challengeToken, {
+      flow: "claim",
+      userId: claim.userId,
+      claimId: claim.claimId,
+    });
     if (!challenge) {
       return NextResponse.json({ error: "Invalid challenge" }, { status: 400 });
     }
