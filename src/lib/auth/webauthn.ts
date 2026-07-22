@@ -46,6 +46,12 @@ const TOKEN_TYPE = {
   CHALLENGE: "challenge",
 } as const;
 
+// A Drizzle query executor: either the top-level `db` or a transaction handle.
+// Narrowed to the query builders this module uses so both `db` and a
+// transaction handle satisfy it, letting callers run credential writes inside
+// an existing transaction (commit/roll back atomically with surrounding work).
+export type DbExecutor = Pick<typeof db, "select" | "insert">;
+
 export interface AuthSession {
   userId: string;
   username: string;
@@ -196,7 +202,11 @@ export async function verifyAdditionalPasskeyRegistration(
   userId: string,
   registrationResponse: RegistrationResponseJSON,
   expectedChallenge: string,
-  deviceName?: string
+  deviceName?: string,
+  // Run the device-cap read and credential insert on this executor. Pass a
+  // transaction handle so the credential is committed/rolled back together
+  // with the caller's other writes (e.g. consuming a passkey claim).
+  executor: DbExecutor = db
 ) {
   const verification: VerifyRegistrationResponseOpts = {
     response: registrationResponse,
@@ -215,7 +225,7 @@ export async function verifyAdditionalPasskeyRegistration(
   const credentialID = credential.id;
   const credentialPublicKey = credential.publicKey;
   const counter = credential.counter;
-  const activeDevicesRows = await db
+  const activeDevicesRows = await executor
     .select({ id: passkeyCredentials.id })
     .from(passkeyCredentials)
     .where(
@@ -229,7 +239,7 @@ export async function verifyAdditionalPasskeyRegistration(
     throw new Error("Maximum devices reached");
   }
 
-  const [newCredential] = await db
+  const [newCredential] = await executor
     .insert(passkeyCredentials)
     .values({
       userId,

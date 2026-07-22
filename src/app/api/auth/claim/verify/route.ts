@@ -49,11 +49,16 @@ export async function POST(request: NextRequest) {
         throw new ClaimUnavailableError();
       }
 
+      // Register the passkey on the SAME transaction, so if anything after
+      // this (or this itself) throws, the credential insert rolls back
+      // alongside the claim consumption -- no orphan credential can persist
+      // while the claim reverts to active.
       await verifyAdditionalPasskeyRegistration(
         claim.userId,
         registrationResponse,
         challenge.challenge,
         deviceName,
+        tx,
       );
 
       await tx.insert(activityFeed).values({

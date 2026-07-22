@@ -72,9 +72,16 @@ export function createInMemoryLimiter(): RateLimiter {
 // Swap this single binding to change the backing store (see note above).
 const limiter: RateLimiter = createInMemoryLimiter();
 
-// Per-endpoint-group limits. Auth endpoints guard passkey/registration flows;
-// admin endpoints guard privileged device-claim issuance.
+// Per-endpoint-group limits, matched most-specific-prefix first (see the
+// `RULES.find` below). Each rule keys its own bucket by prefix, so traffic to
+// one rule never consumes another's budget.
+//
+// The session read is a safe, client-polled GET; a tight shared limit here
+// would 429 multiple users behind one NAT/shared IP out of normal app use, so
+// it gets its own looser bucket. Brute-force protection stays tight on the
+// begin/verify mutation endpoints and on admin device-claim issuance.
 const RULES: Array<{ prefix: string; limit: number; windowMs: number }> = [
+  { prefix: "/api/auth/session", limit: 120, windowMs: 60_000 },
   { prefix: "/api/auth/", limit: 20, windowMs: 60_000 },
   { prefix: "/api/admin/", limit: 10, windowMs: 60_000 },
 ];
