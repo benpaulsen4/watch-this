@@ -98,7 +98,6 @@ export async function POST(request: NextRequest) {
         deviceName: credential.deviceName,
         createdAt: credential.createdAt,
       },
-      token,
     });
 
     // Clear registration challenge cookie

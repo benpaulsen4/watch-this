@@ -66,7 +66,6 @@ export async function POST(request: NextRequest) {
         deviceName: credential.deviceName,
         lastUsed: credential.lastUsed,
       },
-      token,
     });
 
     // Clear authentication challenge cookie
