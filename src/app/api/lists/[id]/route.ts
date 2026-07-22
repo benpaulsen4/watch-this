@@ -20,6 +20,13 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
 
     const listWithItems = await getList(userId, listId);
 
+    // getList returns the "notFound" sentinel for both a missing list and an
+    // access-denied list (they are indistinguishable here); map it to a real
+    // 404 instead of serializing the string with a 200 (API-08).
+    if (listWithItems === "notFound") {
+      return NextResponse.json({ error: "List not found" }, { status: 404 });
+    }
+
     return NextResponse.json(listWithItems);
   } catch (error) {
     console.error("Error fetching list:", error);
