@@ -94,7 +94,10 @@ export async function initiateClaim(
         gt(passkeyClaims.createdAt, oneHourAgo),
       ),
     );
-  if (claimsLastHour.length >= 5 && initiator === "user") {
+  // Enforce the 5/hour claim cap for admin-initiated claims too, not just
+  // user-initiated ones, so a leaked/abused admin secret can't mint unlimited
+  // device claims for a single user.
+  if (claimsLastHour.length >= 5) {
     return "rateLimit";
   }
 

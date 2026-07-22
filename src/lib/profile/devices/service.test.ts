@@ -229,6 +229,18 @@ describe("devices service", () => {
     expect(res).toBe("rateLimit");
   });
 
+  it("initiateClaim enforces rate limit for admin initiator too (API-07)", async () => {
+    const { db } = await mockedDbModule;
+    db.__setMockResults([
+      // countActiveDevices: less than 10
+      [{ id: "a" }],
+      // claims in last hour: 5
+      [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }],
+    ]);
+    const res = await initiateClaim("user-1", "admin");
+    expect(res).toBe("rateLimit");
+  });
+
   it("initiateClaim creates claim and returns token, magic link and qr payload", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-01-01T00:00:00Z"));
