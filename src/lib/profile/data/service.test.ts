@@ -320,6 +320,7 @@ describe("Profile Data Service", () => {
       const valuesMock = vi.fn();
       const onConflictDoUpdateMock = vi.fn();
       const onConflictDoNothingMock = vi.fn();
+      const returningMock = vi.fn();
 
       (mockedDb.insert as any).mockReturnValue({
         values: valuesMock.mockReturnValue({
@@ -327,10 +328,18 @@ describe("Profile Data Service", () => {
             onConflictDoUpdateMock.mockResolvedValue(undefined),
           onConflictDoNothing:
             onConflictDoNothingMock.mockResolvedValue(undefined),
+          // Lists are inserted with a DB-generated id (API-01), so the insert
+          // uses .returning() to recover the new id for nested list items.
+          returning: returningMock.mockResolvedValue([{ id: "generated-list-1" }]),
         }),
       });
 
-      return { valuesMock, onConflictDoUpdateMock, onConflictDoNothingMock };
+      return {
+        valuesMock,
+        onConflictDoUpdateMock,
+        onConflictDoNothingMock,
+        returningMock,
+      };
     };
 
     it("should successfully import valid data", async () => {
@@ -340,7 +349,7 @@ describe("Profile Data Service", () => {
       const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
-      if (result === "parseError") return;
+      if (typeof result === "string") return;
 
       expect(result.success).toBe(true);
       expect(result.imported.lists).toBe(1);
@@ -360,6 +369,74 @@ describe("Profile Data Service", () => {
       expect(result).toBe("parseError");
     });
 
+    it("should reject payloads with too many entries (API-03)", async () => {
+      setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      const hugeContentStatus = Array.from({ length: 5001 }, (_, i) => ({
+        id: `status-${i}`,
+        tmdbId: i,
+        contentType: "movie",
+        status: "completed",
+        createdAt: mockDate.toISOString(),
+        updatedAt: mockDate.toISOString(),
+      }));
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify({ contentStatus: hugeContentStatus })
+      );
+
+      expect(result).toBe("tooLarge");
+      // Nothing should have been written when the payload is rejected.
+      expect(mockedDb.insert).not.toHaveBeenCalled();
+    });
+
+    it("should warm the cache only once per unique (tmdbId, contentType) (API-03)", async () => {
+      setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      const dedupeData = {
+        lists: [
+          {
+            id: "list-1",
+            name: "Dupes",
+            description: null,
+            listType: "movies",
+            isPublic: false,
+            isArchived: false,
+            syncWatchStatus: false,
+            createdAt: mockDate.toISOString(),
+            updatedAt: mockDate.toISOString(),
+            items: [
+              {
+                id: "item-1",
+                tmdbId: 555,
+                contentType: "movie",
+                createdAt: mockDate.toISOString(),
+              },
+              {
+                id: "item-2",
+                tmdbId: 555,
+                contentType: "movie",
+                createdAt: mockDate.toISOString(),
+              },
+            ],
+          },
+        ],
+      };
+
+      const result = await importUserData(userId, JSON.stringify(dedupeData));
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+
+      // Two duplicate items, but the cache is warmed only once.
+      expect(addToCache).toHaveBeenCalledTimes(1);
+      expect(addToCache).toHaveBeenCalledWith(555, "movie");
+      // Both items are still inserted (dedupe happens at the DB layer).
+      expect(result.imported.listItems).toBe(2);
+    });
+
     it("should handle cache addition failure gracefully", async () => {
       setupImportMocks();
       (addToCache as any).mockRejectedValue(new Error("Cache failed"));
@@ -367,7 +444,7 @@ describe("Profile Data Service", () => {
       const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
-      if (result === "parseError") return;
+      if (typeof result === "string") return;
 
       expect(result.imported.lists).toBe(1);
       expect(result.imported.listItems).toBe(0); // Should fail to import item
@@ -379,15 +456,16 @@ describe("Profile Data Service", () => {
       const { valuesMock } = setupImportMocks();
       (addToCache as any).mockResolvedValue({});
 
-      // Mock failure for the first insert (list)
+      // Mock failure for the first insert (list). Lists now insert with
+      // .returning() (API-01), so reject there.
       valuesMock.mockReturnValueOnce({
-        onConflictDoUpdate: vi.fn().mockRejectedValue(new Error("DB Error")),
+        returning: vi.fn().mockRejectedValue(new Error("DB Error")),
       });
 
       const result = await importUserData(userId, jsonData);
 
       expect(result).not.toBe("parseError");
-      if (result === "parseError") return;
+      if (typeof result === "string") return;
 
       expect(result.imported.lists).toBe(0);
       // If list fails, items are inside the list loop, so they won't be processed or the error will catch the block
@@ -396,6 +474,50 @@ describe("Profile Data Service", () => {
       expect(result.imported.listItems).toBe(0);
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors[0]).toContain("Failed to import list");
+    });
+
+    it("returns static error messages that do not leak exception text (API-04)", async () => {
+      const { valuesMock } = setupImportMocks();
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      // Content status insert throws with a sensitive DB constraint message.
+      valuesMock.mockReturnValueOnce({
+        onConflictDoUpdate: vi
+          .fn()
+          .mockRejectedValue(
+            new Error(
+              'duplicate key value violates unique constraint "user_content_status_user_id_tmdb_id_content_type_key"'
+            )
+          ),
+      });
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify({
+          contentStatus: [
+            {
+              id: "s1",
+              tmdbId: 1,
+              contentType: "movie",
+              status: "completed",
+              createdAt: mockDate.toISOString(),
+              updatedAt: mockDate.toISOString(),
+            },
+          ],
+        })
+      );
+
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+
+      expect(result.errors).toHaveLength(1);
+      // Static, indexed message only. No DB internals leaked to the client.
+      expect(result.errors[0]).toBe("Failed to import content status entry 1");
+      expect(result.errors[0]).not.toContain("constraint");
+      expect(result.errors[0]).not.toContain("duplicate key");
+      // The real exception is still logged server-side.
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
 
     it("should import an archived list correctly", async () => {
@@ -421,11 +543,60 @@ describe("Profile Data Service", () => {
 
       await importUserData(userId, JSON.stringify(archivedImportData));
 
+      // The list is inserted as a fresh row owned by the importer with a
+      // DB-generated id; the client-supplied id is never honored (API-01).
       expect(valuesMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: "list-archived",
+          ownerId: userId,
           isArchived: true,
         })
+      );
+      expect(valuesMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: "list-archived" })
+      );
+    });
+
+    it("does not trust client-supplied list ids (prevents overwriting another user's list)", async () => {
+      const { valuesMock, onConflictDoUpdateMock } = setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      // A read-only viewer supplies another user's list id in the import file.
+      const foreignImportData = {
+        lists: [
+          {
+            id: "someone-elses-list-id",
+            name: "Injected List",
+            description: null,
+            listType: "mixed",
+            isPublic: false,
+            isArchived: false,
+            syncWatchStatus: false,
+            createdAt: mockDate.toISOString(),
+            updatedAt: mockDate.toISOString(),
+            items: [],
+          },
+        ],
+      };
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify(foreignImportData)
+      );
+      expect(result).not.toBe("parseError");
+
+      // The list is created as a brand-new row owned by the importer, and the
+      // supplied primary key is never used.
+      expect(valuesMock).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId: userId, name: "Injected List" })
+      );
+      const listInsertPayloads = valuesMock.mock.calls.map((c) => c[0]);
+      expect(
+        listInsertPayloads.some((p) => p.id === "someone-elses-list-id")
+      ).toBe(false);
+
+      // The list insert must never upsert onto an existing lists.id row.
+      expect(onConflictDoUpdateMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ target: "lists.id" })
       );
     });
   });

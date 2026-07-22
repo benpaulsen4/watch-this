@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
 import { importUserData } from "@/lib/profile/data/service";
 
+// Maximum accepted import file size (API-03). Reject anything larger before
+// reading it into memory or processing it.
+const MAX_IMPORT_BYTES = 1024 * 1024; // 1 MB
+
 // POST /api/profile/import - Import user's lists data from JSON only
 export const POST = withAuth(async (request: AuthenticatedRequest) => {
   try {
@@ -18,12 +22,24 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
         { status: 400 }
       );
     }
+    if (file.size > MAX_IMPORT_BYTES) {
+      return NextResponse.json(
+        { error: "Import file is too large (max 1MB)" },
+        { status: 413 }
+      );
+    }
     const fileContent = await file.text();
     const result = await importUserData(request.user.id, fileContent);
     if (result === "parseError") {
       return NextResponse.json(
         { error: `Failed to parse JSON file` },
         { status: 400 }
+      );
+    }
+    if (result === "tooLarge") {
+      return NextResponse.json(
+        { error: "Import file contains too many entries" },
+        { status: 413 }
       );
     }
     return NextResponse.json(result);

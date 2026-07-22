@@ -46,11 +46,15 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    const result = await getContentStatus(
-      userId,
-      parseInt(tmdbId),
-      contentType,
-    );
+    const numericTmdbId = parseInt(tmdbId, 10);
+    if (Number.isNaN(numericTmdbId) || numericTmdbId <= 0) {
+      return NextResponse.json(
+        { error: "tmdbId must be a positive integer" },
+        { status: 400 },
+      );
+    }
+
+    const result = await getContentStatus(userId, numericTmdbId, contentType);
     return NextResponse.json(result);
   } catch (error) {
     return handleApiError(error, "Get content status");
@@ -208,9 +212,17 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
+    const numericTmdbId = parseInt(tmdbId, 10);
+    if (Number.isNaN(numericTmdbId) || numericTmdbId <= 0) {
+      return NextResponse.json(
+        { error: "tmdbId must be a positive integer" },
+        { status: 400 },
+      );
+    }
+
     const result = await deleteContentStatus(
       userId,
-      parseInt(tmdbId),
+      numericTmdbId,
       contentType,
     );
     if (result === "notFound") {

@@ -310,9 +310,11 @@ class TMDBClient {
   async getExtendedMovieDetails(
     movieId: number,
   ): Promise<ExtendedTMDBMovieDetails> {
-    return this.request<ExtendedTMDBMovieDetails>(
-      `/movie/${movieId}?append_to_response=credits,keywords`,
-    );
+    // Build the path from a numeric-only value and pass append_to_response as
+    // a query param rather than concatenating into the path (API-06).
+    return this.request<ExtendedTMDBMovieDetails>(`/movie/${Number(movieId)}`, {
+      append_to_response: "credits,keywords",
+    });
   }
 
   // Get TV show details
@@ -324,9 +326,11 @@ class TMDBClient {
   async getExtendedTVShowDetails(
     tvId: number,
   ): Promise<ExtendedTMDBTVShowDetails> {
-    return this.request<ExtendedTMDBTVShowDetails>(
-      `/tv/${tvId}?append_to_response=aggregate_credits,keywords`,
-    );
+    // Build the path from a numeric-only value and pass append_to_response as
+    // a query param rather than concatenating into the path (API-06).
+    return this.request<ExtendedTMDBTVShowDetails>(`/tv/${Number(tvId)}`, {
+      append_to_response: "aggregate_credits,keywords",
+    });
   }
 
   // Get trending content

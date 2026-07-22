@@ -5,6 +5,7 @@ import {
   listCollaborators,
   listItems,
   lists,
+  PermissionLevel,
   showSchedules,
   userContentStatus,
 } from "@/lib/db/schema";
@@ -31,11 +32,27 @@ export async function syncStatusToCollaborators(
           eq(lists.syncWatchStatus, true),
           eq(listItems.tmdbId, tmdbId),
           eq(listItems.contentType, contentType),
-          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId))
+          // Only the owner or a COLLABORATOR (write-capable) may drive a sync;
+          // a read-only viewer must not overwrite other members' statuses.
+          or(
+            eq(lists.ownerId, userId),
+            and(
+              eq(listCollaborators.userId, userId),
+              eq(
+                listCollaborators.permissionLevel,
+                PermissionLevel.COLLABORATOR
+              )
+            )
+          )
         )
       );
 
     const syncedCollaboratorIds = new Set<string>();
+
+    // TODO(FOLLOW-UP): collaborators are written to without an opt-in/
+    // acceptance step. A user added as a collaborator has their content status
+    // mutated by others before ever accepting the invitation. Add an
+    // acceptance flag and gate sync writes on it (see PR API-02 notes).
 
     // For each sync-enabled list, update status for all collaborators
     for (const list of syncEnabledLists) {

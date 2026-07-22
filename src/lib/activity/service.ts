@@ -44,7 +44,8 @@ export async function listActivityTimeline(
   userTimezone: string,
   input: ListActivityInput
 ): Promise<ActivityTimelineResponse | "invalidCursor"> {
-  const limit = Math.max(1, input.limit || 10);
+  // Clamp both floor and ceiling so a caller cannot request an unbounded page.
+  const limit = Math.min(Math.max(1, input.limit || 10), 100);
   let cursorDate: Date | undefined;
   if (input.cursor) {
     const d = new Date(input.cursor);

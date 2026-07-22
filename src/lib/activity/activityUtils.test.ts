@@ -73,6 +73,7 @@ vi.mock("@/lib/db/schema", () => {
     listCollaborators: {} as any,
     listItems: {} as any,
     lists: {} as any,
+    PermissionLevel: { COLLABORATOR: "collaborator", VIEWER: "viewer" },
     showSchedules: {} as any,
     userContentStatus: {} as any,
   };

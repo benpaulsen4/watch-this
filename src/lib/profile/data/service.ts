@@ -17,6 +17,13 @@ import {
 } from "@/lib/db/schema";
 import { addToCache } from "@/lib/tmdb/cache-utils";
 
+// API-03: import hardening limits.
+// Maximum entries permitted in any single import array before we refuse to
+// process the payload (defends against resource-exhaustion / huge fan-out).
+const MAX_IMPORT_ENTRIES = 5000;
+// Maximum number of concurrent TMDB cache-warm requests during an import.
+const CACHE_WARM_CONCURRENCY = 5;
+
 import type {
   ContentStatusExportRow,
   CSVExportModel,
@@ -213,13 +220,30 @@ export async function exportUserData(
 export async function importUserData(
   userId: string,
   fileContent: string
-): Promise<ImportResult | "parseError"> {
+): Promise<ImportResult | "parseError" | "tooLarge"> {
   // 1. Parse JSON to `JSONImportModel` (or return 'parseError')
   let importModel: JSONImportModel;
   try {
     importModel = JSON.parse(fileContent);
   } catch {
     return "parseError";
+  }
+
+  // 1b. Reject oversized payloads before doing any work (API-03). Each import
+  //     array is bounded independently so a single huge section cannot cause
+  //     excessive DB work / TMDB fan-out.
+  const totalListItems = (importModel.lists ?? []).reduce(
+    (sum, list) => sum + (list.items?.length ?? 0),
+    0
+  );
+  if (
+    (importModel.lists?.length ?? 0) > MAX_IMPORT_ENTRIES ||
+    totalListItems > MAX_IMPORT_ENTRIES ||
+    (importModel.contentStatus?.length ?? 0) > MAX_IMPORT_ENTRIES ||
+    (importModel.episodeStatus?.length ?? 0) > MAX_IMPORT_ENTRIES ||
+    (importModel.tvShowSchedules?.length ?? 0) > MAX_IMPORT_ENTRIES
+  ) {
+    return "tooLarge";
   }
 
   const result: ImportResult = {
@@ -234,14 +258,58 @@ export async function importUserData(
     errors: [],
   };
 
-  // 2. Import lists from `JSONImportModel.lists` to the `lists` table (update existing lists)
+  // 1c. Pre-warm the TMDB cache once per unique (tmdbId, contentType) with
+  //     bounded concurrency (API-03), rather than issuing a live addToCache
+  //     call for every list item sequentially. Items whose content could not
+  //     be cached are skipped later with a per-item error.
+  const uniqueContent = new Map<
+    string,
+    { tmdbId: number; contentType: ContentTypeEnum }
+  >();
+  for (const list of importModel.lists ?? []) {
+    for (const item of list.items ?? []) {
+      uniqueContent.set(`${item.contentType}:${item.tmdbId}`, {
+        tmdbId: item.tmdbId,
+        contentType: item.contentType,
+      });
+    }
+  }
+  const cachedContentKeys = new Set<string>();
+  const uniquePairs = Array.from(uniqueContent.values());
+  for (let i = 0; i < uniquePairs.length; i += CACHE_WARM_CONCURRENCY) {
+    const chunk = uniquePairs.slice(i, i + CACHE_WARM_CONCURRENCY);
+    const settled = await Promise.allSettled(
+      chunk.map((pair) => addToCache(pair.tmdbId, pair.contentType))
+    );
+    settled.forEach((outcome, idx) => {
+      const pair = chunk[idx];
+      if (outcome.status === "fulfilled") {
+        cachedContentKeys.add(`${pair.contentType}:${pair.tmdbId}`);
+      } else {
+        console.error(
+          `Failed to warm TMDB cache for ${pair.contentType} ${pair.tmdbId}:`,
+          outcome.reason
+        );
+      }
+    });
+  }
+
+  // 2. Import lists from `JSONImportModel.lists` to the `lists` table.
+  //    Never trust the client-supplied primary key: always create a fresh
+  //    list owned by the importing user (the DB generates the id). Otherwise a
+  //    read-only viewer could supply another user's list id and rewrite it via
+  //    an id-keyed upsert. We map the old id -> new id so nested list items
+  //    still attach to the correct newly-created list.
+  // Running item counter used only for static, non-leaky error messages
+  // (API-04). We never interpolate DB exception text into the response.
+  let listItemNumber = 0;
   if (importModel.lists) {
-    for (const list of importModel.lists) {
+    for (const [listIndex, list] of importModel.lists.entries()) {
+      const listNumber = listIndex + 1;
       try {
-        await db
+        const [insertedList] = await db
           .insert(lists)
           .values({
-            id: list.id,
             ownerId: userId,
             name: list.name,
             description: list.description,
@@ -252,39 +320,30 @@ export async function importUserData(
             createdAt: new Date(list.createdAt),
             updatedAt: new Date(list.updatedAt),
           })
-          .onConflictDoUpdate({
-            target: lists.id,
-            set: {
-              name: list.name,
-              description: list.description,
-              listType: list.listType,
-              isPublic: list.isPublic,
-              isArchived: list.isArchived,
-              syncWatchStatus: list.syncWatchStatus,
-              updatedAt: new Date(list.updatedAt),
-            },
-          });
+          .returning({ id: lists.id });
+        const newListId = insertedList.id;
         result.imported.lists++;
 
-        // 3. Import list items from `JSONImportModel.listItems` to the `list_items` table (ignore existing items)
+        // 3. Import list items into the `list_items` table (ignore existing
+        //    items). Items attach to the freshly-generated list id, and the DB
+        //    generates their own primary keys.
         if (list.items) {
           for (const item of list.items) {
-            // 3a. Before adding the item to the list, first try adding it to the `tmdb_cache` table to ensure it exists
-            try {
-              await addToCache(item.tmdbId, item.contentType);
-            } catch (e) {
+            listItemNumber++;
+            // 3a. The item's content must have been successfully cached during
+            //     the pre-warm phase; if not, skip it.
+            if (!cachedContentKeys.has(`${item.contentType}:${item.tmdbId}`)) {
               result.errors.push(
-                `Failed to import list item ${item.tmdbId} for list ${list.id}: ${e}`
+                `Failed to import list item ${listItemNumber}`
               );
-              continue; // Skip this item if cache addition fails
+              continue; // Skip this item if cache addition failed
             }
             // 3b. If cache addition is successful, insert the list item into the `list_items` table
             try {
               await db
                 .insert(listItems)
                 .values({
-                  id: item.id,
-                  listId: list.id, // Ensure it belongs to the imported list
+                  listId: newListId, // Attach to the newly-created list
                   tmdbId: item.tmdbId,
                   contentType: item.contentType,
                   createdAt: new Date(item.createdAt),
@@ -292,26 +351,30 @@ export async function importUserData(
                 .onConflictDoNothing();
               result.imported.listItems++;
             } catch (e) {
+              console.error(
+                `Import: failed to insert list item ${listItemNumber}:`,
+                e
+              );
               result.errors.push(
-                `Failed to import list item ${item.tmdbId} for list ${list.id}: ${e}`
+                `Failed to import list item ${listItemNumber}`
               );
             }
           }
         }
       } catch (e) {
-        result.errors.push(`Failed to import list ${list.id}: ${e}`);
+        console.error(`Import: failed to insert list ${listNumber}:`, e);
+        result.errors.push(`Failed to import list ${listNumber}`);
       }
     }
   }
 
   // 4. Import content status from `JSONImportModel.contentStatus` to the `user_content_status` table (update existing status)
   if (importModel.contentStatus) {
-    for (const status of importModel.contentStatus) {
+    for (const [index, status] of importModel.contentStatus.entries()) {
       try {
         await db
           .insert(userContentStatus)
           .values({
-            id: status.id,
             userId: userId,
             tmdbId: status.tmdbId,
             contentType: status.contentType,
@@ -332,8 +395,12 @@ export async function importUserData(
           });
         result.imported.contentStatus++;
       } catch (e) {
+        console.error(
+          `Import: failed to insert content status entry ${index + 1}:`,
+          e
+        );
         result.errors.push(
-          `Failed to import content status for ${status.tmdbId}: ${e}`
+          `Failed to import content status entry ${index + 1}`
         );
       }
     }
@@ -341,12 +408,11 @@ export async function importUserData(
 
   // 5. Import episode status from `JSONImportModel.episodeStatus` to the `episode_watch_status` table (update existing status)
   if (importModel.episodeStatus) {
-    for (const status of importModel.episodeStatus) {
+    for (const [index, status] of importModel.episodeStatus.entries()) {
       try {
         await db
           .insert(episodeWatchStatus)
           .values({
-            id: status.id,
             userId: userId,
             tmdbId: status.tmdbId,
             seasonNumber: status.seasonNumber,
@@ -371,8 +437,12 @@ export async function importUserData(
           });
         result.imported.episodeStatus++;
       } catch (e) {
+        console.error(
+          `Import: failed to insert episode status entry ${index + 1}:`,
+          e
+        );
         result.errors.push(
-          `Failed to import episode status for ${status.tmdbId} S${status.seasonNumber}E${status.episodeNumber}: ${e}`
+          `Failed to import episode status entry ${index + 1}`
         );
       }
     }
@@ -380,12 +450,11 @@ export async function importUserData(
 
   // 6. Import TV show schedules from `JSONImportModel.tvShowSchedules` to the `show_schedules` table (update existing schedules)
   if (importModel.tvShowSchedules) {
-    for (const schedule of importModel.tvShowSchedules) {
+    for (const [index, schedule] of importModel.tvShowSchedules.entries()) {
       try {
         await db
           .insert(showSchedules)
           .values({
-            id: schedule.id,
             userId: userId,
             tmdbId: schedule.tmdbId,
             dayOfWeek: schedule.dayOfWeek,
@@ -404,9 +473,11 @@ export async function importUserData(
           });
         result.imported.tvShowSchedules++;
       } catch (e) {
-        result.errors.push(
-          `Failed to import schedule for ${schedule.tmdbId}: ${e}`
+        console.error(
+          `Import: failed to insert schedule entry ${index + 1}:`,
+          e
         );
+        result.errors.push(`Failed to import schedule entry ${index + 1}`);
       }
     }
   }
