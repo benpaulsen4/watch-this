@@ -9,6 +9,7 @@ import {
   listCollaborators,
   listItems,
   lists,
+  PermissionLevel,
   showSchedules,
   userContentStatus,
   WatchStatus,
@@ -152,11 +153,26 @@ export async function syncEpisodeStatusToCollaborators(
           eq(lists.syncWatchStatus, true),
           eq(listItems.tmdbId, tmdbId),
           eq(listItems.contentType, ContentType.TV),
-          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+          // Only the owner or a COLLABORATOR (write-capable) may drive a sync;
+          // a read-only viewer must not overwrite other members' episode
+          // statuses or delete their schedules.
+          or(
+            eq(lists.ownerId, userId),
+            and(
+              eq(listCollaborators.userId, userId),
+              eq(
+                listCollaborators.permissionLevel,
+                PermissionLevel.COLLABORATOR,
+              ),
+            ),
+          ),
         ),
       );
 
     const syncedCollaboratorIds = new Set<string>();
+
+    // TODO(FOLLOW-UP): collaborators are written to without an opt-in/
+    // acceptance step (see syncStatusToCollaborators and PR API-02 notes).
 
     // For each sync-enabled list, update episode status for all collaborators
     for (const list of syncEnabledLists) {
