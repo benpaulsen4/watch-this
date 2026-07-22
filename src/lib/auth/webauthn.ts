@@ -37,6 +37,15 @@ function getJwtSecret(): Uint8Array {
   return jwtSecretCache;
 }
 
+// Distinct token types. Every JWT this module signs carries a `typ` claim so a
+// token minted for one purpose (e.g. a short-lived claim token) can never be
+// replayed as another (e.g. a 7-day session), even though they share a secret.
+const TOKEN_TYPE = {
+  SESSION: "session",
+  CLAIM: "claim",
+  CHALLENGE: "challenge",
+} as const;
+
 export interface AuthSession {
   userId: string;
   username: string;
@@ -217,7 +226,7 @@ export async function createClaimToken(
   claimId: string,
   userId: string
 ): Promise<string> {
-  const payload = { claimId, userId };
+  const payload = { typ: TOKEN_TYPE.CLAIM, claimId, userId };
 
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -232,6 +241,7 @@ export async function verifyClaimToken(
 ): Promise<{ claimId: string; userId: string } | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
+    if (payload.typ !== TOKEN_TYPE.CLAIM) return null;
     return {
       claimId: payload.claimId as string,
       userId: payload.userId as string,
@@ -312,6 +322,7 @@ export async function verifyPasskeyAuthentication(
 // Create JWT session token
 export async function createSessionToken(user: User): Promise<string> {
   const payload = {
+    typ: TOKEN_TYPE.SESSION,
     userId: user.id,
     username: user.username,
   };
@@ -329,6 +340,7 @@ export async function verifySessionToken(
 ): Promise<AuthSession | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
+    if (payload.typ !== TOKEN_TYPE.SESSION) return null;
     return {
       userId: payload.userId as string,
       username: payload.username as string,
@@ -341,6 +353,7 @@ export async function verifySessionToken(
 // Create JWT challenge token
 export async function createChallengeToken(challenge: string): Promise<string> {
   const payload = {
+    typ: TOKEN_TYPE.CHALLENGE,
     challenge,
   };
 
@@ -357,6 +370,7 @@ export async function verifyChallengeToken(
 ): Promise<{ challenge: string } | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
+    if (payload.typ !== TOKEN_TYPE.CHALLENGE) return null;
     return {
       challenge: payload.challenge as string,
     };
