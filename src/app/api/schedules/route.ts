@@ -18,8 +18,28 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     const { searchParams } = new URL(request.url);
     const tmdbIdParam = searchParams.get("tmdbId");
     const dayOfWeekParam = searchParams.get("dayOfWeek");
-    const tmdbId = tmdbIdParam ? parseInt(tmdbIdParam) : undefined;
-    const dayOfWeek = dayOfWeekParam ? parseInt(dayOfWeekParam) : undefined;
+
+    let tmdbId: number | undefined;
+    if (tmdbIdParam) {
+      tmdbId = parseInt(tmdbIdParam, 10);
+      if (Number.isNaN(tmdbId) || tmdbId <= 0) {
+        return NextResponse.json(
+          { error: "tmdbId must be a positive integer" },
+          { status: 400 },
+        );
+      }
+    }
+
+    let dayOfWeek: number | undefined;
+    if (dayOfWeekParam) {
+      dayOfWeek = parseInt(dayOfWeekParam, 10);
+      if (Number.isNaN(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+        return NextResponse.json(
+          { error: "dayOfWeek must be a number between 0-6" },
+          { status: 400 },
+        );
+      }
+    }
 
     const response = await listSchedules(request.user.id, tmdbId, dayOfWeek);
     return NextResponse.json(response);
@@ -99,8 +119,24 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    const tmdbId = parseInt(tmdbIdParam);
-    const dayOfWeek = dayOfWeekParam ? parseInt(dayOfWeekParam) : undefined;
+    const tmdbId = parseInt(tmdbIdParam, 10);
+    if (Number.isNaN(tmdbId) || tmdbId <= 0) {
+      return NextResponse.json(
+        { error: "tmdbId must be a positive integer" },
+        { status: 400 },
+      );
+    }
+
+    let dayOfWeek: number | undefined;
+    if (dayOfWeekParam) {
+      dayOfWeek = parseInt(dayOfWeekParam, 10);
+      if (Number.isNaN(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+        return NextResponse.json(
+          { error: "dayOfWeek must be a number between 0-6" },
+          { status: 400 },
+        );
+      }
+    }
 
     const result = await deleteSchedules(request.user.id, tmdbId, dayOfWeek);
     if (result === "notFound") {

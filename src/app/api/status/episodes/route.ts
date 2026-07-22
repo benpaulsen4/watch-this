@@ -29,11 +29,41 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
+    const numericTmdbId = parseInt(tmdbId, 10);
+    if (Number.isNaN(numericTmdbId) || numericTmdbId <= 0) {
+      return NextResponse.json(
+        { error: "tmdbId must be a positive integer" },
+        { status: 400 },
+      );
+    }
+
+    let numericSeason: number | undefined;
+    if (seasonNumber !== null) {
+      numericSeason = parseInt(seasonNumber, 10);
+      if (Number.isNaN(numericSeason)) {
+        return NextResponse.json(
+          { error: "seasonNumber must be a number" },
+          { status: 400 },
+        );
+      }
+    }
+
+    let numericEpisode: number | undefined;
+    if (episodeNumber !== null) {
+      numericEpisode = parseInt(episodeNumber, 10);
+      if (Number.isNaN(numericEpisode)) {
+        return NextResponse.json(
+          { error: "episodeNumber must be a number" },
+          { status: 400 },
+        );
+      }
+    }
+
     const result = await listEpisodeStatuses(
       userId,
-      parseInt(tmdbId),
-      seasonNumber ? parseInt(seasonNumber) : undefined,
-      episodeNumber ? parseInt(episodeNumber) : undefined,
+      numericTmdbId,
+      numericSeason,
+      numericEpisode,
     );
     return NextResponse.json(result);
   } catch (error) {
@@ -155,11 +185,41 @@ export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
+    const numericTmdbId = parseInt(tmdbId, 10);
+    if (Number.isNaN(numericTmdbId) || numericTmdbId <= 0) {
+      return NextResponse.json(
+        { error: "tmdbId must be a positive integer" },
+        { status: 400 },
+      );
+    }
+
+    let numericSeason: number | undefined;
+    if (seasonNumber !== null) {
+      numericSeason = parseInt(seasonNumber, 10);
+      if (Number.isNaN(numericSeason)) {
+        return NextResponse.json(
+          { error: "seasonNumber must be a number" },
+          { status: 400 },
+        );
+      }
+    }
+
+    let numericEpisode: number | undefined;
+    if (episodeNumber !== null) {
+      numericEpisode = parseInt(episodeNumber, 10);
+      if (Number.isNaN(numericEpisode)) {
+        return NextResponse.json(
+          { error: "episodeNumber must be a number" },
+          { status: 400 },
+        );
+      }
+    }
+
     const { deletedCount } = await deleteEpisodeStatuses(
       userId,
-      parseInt(tmdbId),
-      seasonNumber ? parseInt(seasonNumber) : undefined,
-      episodeNumber ? parseInt(episodeNumber) : undefined,
+      numericTmdbId,
+      numericSeason,
+      numericEpisode,
     );
     return NextResponse.json({
       message: `Removed ${deletedCount} episode status(es) successfully`,
