@@ -320,6 +320,7 @@ describe("Profile Data Service", () => {
       const valuesMock = vi.fn();
       const onConflictDoUpdateMock = vi.fn();
       const onConflictDoNothingMock = vi.fn();
+      const returningMock = vi.fn();
 
       (mockedDb.insert as any).mockReturnValue({
         values: valuesMock.mockReturnValue({
@@ -327,10 +328,18 @@ describe("Profile Data Service", () => {
             onConflictDoUpdateMock.mockResolvedValue(undefined),
           onConflictDoNothing:
             onConflictDoNothingMock.mockResolvedValue(undefined),
+          // Lists are inserted with a DB-generated id (API-01), so the insert
+          // uses .returning() to recover the new id for nested list items.
+          returning: returningMock.mockResolvedValue([{ id: "generated-list-1" }]),
         }),
       });
 
-      return { valuesMock, onConflictDoUpdateMock, onConflictDoNothingMock };
+      return {
+        valuesMock,
+        onConflictDoUpdateMock,
+        onConflictDoNothingMock,
+        returningMock,
+      };
     };
 
     it("should successfully import valid data", async () => {
@@ -379,9 +388,10 @@ describe("Profile Data Service", () => {
       const { valuesMock } = setupImportMocks();
       (addToCache as any).mockResolvedValue({});
 
-      // Mock failure for the first insert (list)
+      // Mock failure for the first insert (list). Lists now insert with
+      // .returning() (API-01), so reject there.
       valuesMock.mockReturnValueOnce({
-        onConflictDoUpdate: vi.fn().mockRejectedValue(new Error("DB Error")),
+        returning: vi.fn().mockRejectedValue(new Error("DB Error")),
       });
 
       const result = await importUserData(userId, jsonData);
@@ -421,11 +431,60 @@ describe("Profile Data Service", () => {
 
       await importUserData(userId, JSON.stringify(archivedImportData));
 
+      // The list is inserted as a fresh row owned by the importer with a
+      // DB-generated id; the client-supplied id is never honored (API-01).
       expect(valuesMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: "list-archived",
+          ownerId: userId,
           isArchived: true,
         })
+      );
+      expect(valuesMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: "list-archived" })
+      );
+    });
+
+    it("does not trust client-supplied list ids (prevents overwriting another user's list)", async () => {
+      const { valuesMock, onConflictDoUpdateMock } = setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      // A read-only viewer supplies another user's list id in the import file.
+      const foreignImportData = {
+        lists: [
+          {
+            id: "someone-elses-list-id",
+            name: "Injected List",
+            description: null,
+            listType: "mixed",
+            isPublic: false,
+            isArchived: false,
+            syncWatchStatus: false,
+            createdAt: mockDate.toISOString(),
+            updatedAt: mockDate.toISOString(),
+            items: [],
+          },
+        ],
+      };
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify(foreignImportData)
+      );
+      expect(result).not.toBe("parseError");
+
+      // The list is created as a brand-new row owned by the importer, and the
+      // supplied primary key is never used.
+      expect(valuesMock).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerId: userId, name: "Injected List" })
+      );
+      const listInsertPayloads = valuesMock.mock.calls.map((c) => c[0]);
+      expect(
+        listInsertPayloads.some((p) => p.id === "someone-elses-list-id")
+      ).toBe(false);
+
+      // The list insert must never upsert onto an existing lists.id row.
+      expect(onConflictDoUpdateMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ target: "lists.id" })
       );
     });
   });

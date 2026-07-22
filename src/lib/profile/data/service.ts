@@ -234,14 +234,18 @@ export async function importUserData(
     errors: [],
   };
 
-  // 2. Import lists from `JSONImportModel.lists` to the `lists` table (update existing lists)
+  // 2. Import lists from `JSONImportModel.lists` to the `lists` table.
+  //    Never trust the client-supplied primary key: always create a fresh
+  //    list owned by the importing user (the DB generates the id). Otherwise a
+  //    read-only viewer could supply another user's list id and rewrite it via
+  //    an id-keyed upsert. We map the old id -> new id so nested list items
+  //    still attach to the correct newly-created list.
   if (importModel.lists) {
     for (const list of importModel.lists) {
       try {
-        await db
+        const [insertedList] = await db
           .insert(lists)
           .values({
-            id: list.id,
             ownerId: userId,
             name: list.name,
             description: list.description,
@@ -252,21 +256,13 @@ export async function importUserData(
             createdAt: new Date(list.createdAt),
             updatedAt: new Date(list.updatedAt),
           })
-          .onConflictDoUpdate({
-            target: lists.id,
-            set: {
-              name: list.name,
-              description: list.description,
-              listType: list.listType,
-              isPublic: list.isPublic,
-              isArchived: list.isArchived,
-              syncWatchStatus: list.syncWatchStatus,
-              updatedAt: new Date(list.updatedAt),
-            },
-          });
+          .returning({ id: lists.id });
+        const newListId = insertedList.id;
         result.imported.lists++;
 
-        // 3. Import list items from `JSONImportModel.listItems` to the `list_items` table (ignore existing items)
+        // 3. Import list items into the `list_items` table (ignore existing
+        //    items). Items attach to the freshly-generated list id, and the DB
+        //    generates their own primary keys.
         if (list.items) {
           for (const item of list.items) {
             // 3a. Before adding the item to the list, first try adding it to the `tmdb_cache` table to ensure it exists
@@ -283,8 +279,7 @@ export async function importUserData(
               await db
                 .insert(listItems)
                 .values({
-                  id: item.id,
-                  listId: list.id, // Ensure it belongs to the imported list
+                  listId: newListId, // Attach to the newly-created list
                   tmdbId: item.tmdbId,
                   contentType: item.contentType,
                   createdAt: new Date(item.createdAt),
@@ -311,7 +306,6 @@ export async function importUserData(
         await db
           .insert(userContentStatus)
           .values({
-            id: status.id,
             userId: userId,
             tmdbId: status.tmdbId,
             contentType: status.contentType,
@@ -346,7 +340,6 @@ export async function importUserData(
         await db
           .insert(episodeWatchStatus)
           .values({
-            id: status.id,
             userId: userId,
             tmdbId: status.tmdbId,
             seasonNumber: status.seasonNumber,
@@ -385,7 +378,6 @@ export async function importUserData(
         await db
           .insert(showSchedules)
           .values({
-            id: schedule.id,
             userId: userId,
             tmdbId: schedule.tmdbId,
             dayOfWeek: schedule.dayOfWeek,
