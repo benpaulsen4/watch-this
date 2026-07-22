@@ -49,6 +49,7 @@ const TOKEN_TYPE = {
 export interface AuthSession {
   userId: string;
   username: string;
+  tokenVersion: number;
 }
 
 // Generate registration options for new passkey
@@ -325,6 +326,7 @@ export async function createSessionToken(user: User): Promise<string> {
     typ: TOKEN_TYPE.SESSION,
     userId: user.id,
     username: user.username,
+    tokenVersion: user.tokenVersion,
   };
 
   return await new SignJWT(payload)
@@ -344,6 +346,7 @@ export async function verifySessionToken(
     return {
       userId: payload.userId as string,
       username: payload.username as string,
+      tokenVersion: (payload.tokenVersion as number | undefined) ?? 0,
     };
   } catch {
     return null;
@@ -394,5 +397,13 @@ export async function getCurrentUser(
     .where(eq(users.id, session.userId))
     .limit(1);
 
-  return userData[0] || null;
+  const user = userData[0];
+  if (!user) return null;
+
+  // Reject sessions minted before the user's token version was bumped
+  // (signout-all or passkey deletion), so revocation takes effect immediately
+  // rather than waiting for the 7-day JWT expiry.
+  if (session.tokenVersion !== user.tokenVersion) return null;
+
+  return user;
 }

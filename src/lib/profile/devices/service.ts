@@ -1,7 +1,13 @@
-import { and, desc, eq, gt,isNull } from "drizzle-orm";
+import { and, desc, eq, gt,isNull, sql } from "drizzle-orm";
 
 import { createClaimToken } from "@/lib/auth/webauthn";
-import { activityFeed,db , passkeyClaims, passkeyCredentials } from "@/lib/db";
+import {
+  activityFeed,
+  db,
+  passkeyClaims,
+  passkeyCredentials,
+  users,
+} from "@/lib/db";
 
 import type {
   ClaimInitiateResponse,
@@ -151,6 +157,14 @@ export async function deletePasskey(
           eq(passkeyCredentials.userId, userId),
         ),
       );
+
+    // Deleting a passkey revokes every outstanding session for this user by
+    // bumping their token version, so a lost/compromised device cannot keep a
+    // live session for up to 7 days after the credential is removed.
+    await db
+      .update(users)
+      .set({ tokenVersion: sql`${users.tokenVersion} + 1` })
+      .where(eq(users.id, userId));
 
     await db.insert(activityFeed).values({
       userId,

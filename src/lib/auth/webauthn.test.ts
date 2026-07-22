@@ -18,6 +18,7 @@ import {
 const fakeUser = {
   id: "user-123",
   username: "alice",
+  tokenVersion: 3,
 } as Parameters<typeof createSessionToken>[0];
 
 beforeAll(() => {
@@ -29,6 +30,12 @@ describe("webauthn token type binding (AUTH-01)", () => {
     const token = await createSessionToken(fakeUser);
     const session = await verifySessionToken(token);
     expect(session).toMatchObject({ userId: "user-123", username: "alice" });
+  });
+
+  it("round-trips the token version in the session token (AUTH-02)", async () => {
+    const token = await createSessionToken(fakeUser);
+    const session = await verifySessionToken(token);
+    expect(session?.tokenVersion).toBe(3);
   });
 
   it("accepts a claim token in the claim verifier", async () => {

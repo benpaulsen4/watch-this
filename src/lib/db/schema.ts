@@ -20,6 +20,10 @@ export const users = pgTable("users", {
   profilePictureUrl: varchar("profile_picture_url", { length: 500 }),
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   country: varchar("country", { length: 2 }),
+  // Incremented to invalidate all outstanding session JWTs for this user
+  // (e.g. on "sign out all devices" or passkey deletion). Sessions carry the
+  // value they were minted with and are rejected once it falls behind.
+  tokenVersion: integer("token_version").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

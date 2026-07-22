@@ -11,6 +11,7 @@ import {
 // Mock DB module with minimal drizzle-like chaining and helpers
 vi.mock("@/lib/db", () => {
   const insertCalls: Array<{ table: any; payload: any }> = [];
+  const updateCalls: Array<{ table: any }> = [];
   const resultsQueue: any[] = [];
   let throwOnUpdate = false;
 
@@ -56,7 +57,8 @@ vi.mock("@/lib/db", () => {
       };
       return c;
     },
-    update(_table: any) {
+    update(table: any) {
+      updateCalls.push({ table });
       const c = {
         ...chain,
         set() {
@@ -78,8 +80,12 @@ vi.mock("@/lib/db", () => {
     __getInsertCalls() {
       return insertCalls.slice();
     },
+    __getUpdateCalls() {
+      return updateCalls.slice();
+    },
     __resetInserts() {
       insertCalls.length = 0;
+      updateCalls.length = 0;
     },
     __setThrowUpdate(v: boolean) {
       throwOnUpdate = v;
@@ -89,8 +95,14 @@ vi.mock("@/lib/db", () => {
   const passkeyCredentials = { __tag: "passkeyCredentials" } as any;
   const passkeyClaims = { __tag: "passkeyClaims" } as any;
   const activityFeed = { __tag: "activityFeed" } as any;
+  const users = {
+    __tag: "users",
+    // Non-undefined so the real drizzle `sql` template used to bump
+    // tokenVersion can interpolate it without throwing.
+    tokenVersion: { __tag: "users.tokenVersion" },
+  } as any;
 
-  return { db, passkeyCredentials, passkeyClaims, activityFeed };
+  return { db, passkeyCredentials, passkeyClaims, activityFeed, users };
 });
 
 // Mock claim token generator
@@ -265,7 +277,7 @@ describe("devices service", () => {
   });
 
   it("deletePasskey updates credential and inserts activity when allowed", async () => {
-    const { db, activityFeed } = await mockedDbModule;
+    const { db, activityFeed, users } = (await mockedDbModule) as any;
     db.__setMockResults([
       // countActiveDevices
       [{ id: "a" }, { id: "b" }],
@@ -281,5 +293,10 @@ describe("devices service", () => {
       activityType: "passkey_deleted",
       metadata: { credentialId: "cred-9" },
     });
+
+    // AUTH-02: deleting a passkey bumps the user's token version to revoke
+    // all outstanding sessions.
+    const updates = db.__getUpdateCalls();
+    expect(updates.some((c: any) => c.table === users)).toBe(true);
   });
 });
