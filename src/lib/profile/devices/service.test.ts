@@ -13,6 +13,7 @@ import {
 vi.mock("@/lib/db", () => {
   const insertCalls: Array<{ table: any; payload: any }> = [];
   const updateCalls: Array<{ table: any }> = [];
+  const selectProjections: any[] = [];
   const resultsQueue: any[] = [];
   let throwOnUpdate = false;
 
@@ -45,7 +46,8 @@ vi.mock("@/lib/db", () => {
   };
 
   const db = {
-    select() {
+    select(projection?: any) {
+      selectProjections.push(projection);
       return { ...chain };
     },
     insert(table: any) {
@@ -99,9 +101,13 @@ vi.mock("@/lib/db", () => {
     __getUpdateCalls() {
       return updateCalls.slice();
     },
+    __getSelectProjections() {
+      return selectProjections.slice();
+    },
     __resetInserts() {
       insertCalls.length = 0;
       updateCalls.length = 0;
+      selectProjections.length = 0;
     },
     __setThrowUpdate(v: boolean) {
       throwOnUpdate = v;
@@ -190,29 +196,30 @@ describe("devices service", () => {
     });
   });
 
-  it("countActiveDevices returns rows length", async () => {
+  // DATA-08a: countActiveDevices aggregates in the database. The mock returns a
+  // single aggregate row, so code that fell back to `rows.length` would report
+  // 1 here instead of 7.
+  it("countActiveDevices reads the aggregate value, not the row count (DATA-08a)", async () => {
     const { db } = await mockedDbModule;
-    db.__setMockResults([[{ id: "a" }, { id: "b" }, { id: "c" }]]);
+    db.__setMockResults([[{ value: 7 }]]);
     const count = await countActiveDevices("u-1");
-    expect(count).toBe(3);
+    expect(count).toBe(7);
+
+    // The query must project an aggregate, never the full credential rows.
+    const projections = db.__getSelectProjections();
+    expect(projections[0]).toBeDefined();
+    expect(Object.keys(projections[0])).toEqual(["value"]);
+  });
+
+  it("countActiveDevices returns 0 when the aggregate row is missing", async () => {
+    const { db } = await mockedDbModule;
+    db.__setMockResults([[]]);
+    expect(await countActiveDevices("u-1")).toBe(0);
   });
 
   it("initiateClaim returns maxDevices when >= 10 active", async () => {
     const { db } = await mockedDbModule;
-    db.__setMockResults([
-      [
-        { id: "a" },
-        { id: "b" },
-        { id: "c" },
-        { id: "d" },
-        { id: "e" },
-        { id: "f" },
-        { id: "g" },
-        { id: "h" },
-        { id: "i" },
-        { id: "j" },
-      ],
-    ]);
+    db.__setMockResults([[{ value: 10 }]]);
     const res = await initiateClaim("user-1", "user");
     expect(res).toBe("maxDevices");
   });
@@ -221,9 +228,9 @@ describe("devices service", () => {
     const { db } = await mockedDbModule;
     db.__setMockResults([
       // countActiveDevices: less than 10
-      [{ id: "a" }],
-      // claims in last hour: 5
-      [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }],
+      [{ value: 1 }],
+      // claims in last hour: 5 (DATA-08a: an aggregate, not 5 materialised rows)
+      [{ value: 5 }],
     ]);
     const res = await initiateClaim("user-1", "user");
     expect(res).toBe("rateLimit");
@@ -233,9 +240,9 @@ describe("devices service", () => {
     const { db } = await mockedDbModule;
     db.__setMockResults([
       // countActiveDevices: less than 10
-      [{ id: "a" }],
+      [{ value: 1 }],
       // claims in last hour: 5
-      [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }],
+      [{ value: 5 }],
     ]);
     const res = await initiateClaim("user-1", "admin");
     expect(res).toBe("rateLimit");
@@ -251,9 +258,9 @@ describe("devices service", () => {
     const { db } = await mockedDbModule;
     db.__setMockResults([
       // countActiveDevices
-      [{ id: "a" }],
+      [{ value: 1 }],
       // claims last hour
-      [],
+      [{ value: 0 }],
       // insert(passkeyClaims).returning()
       [{ id: "claim-123" }],
     ]);
@@ -313,7 +320,7 @@ describe("devices service", () => {
 
   it("deletePasskey enforces minimum device count", async () => {
     const { db } = await mockedDbModule;
-    db.__setMockResults([[{ id: "only" }]]); // countActiveDevices -> 1
+    db.__setMockResults([[{ value: 1 }]]); // countActiveDevices -> 1
     const res = await deletePasskey("user-1", "cred-1");
     expect(res).toBe("minimum");
   });
@@ -322,7 +329,7 @@ describe("devices service", () => {
     const { db, activityFeed, users } = (await mockedDbModule) as any;
     db.__setMockResults([
       // countActiveDevices
-      [{ id: "a" }, { id: "b" }],
+      [{ value: 2 }],
     ]);
 
     const result = await deletePasskey("user-1", "cred-9");

@@ -12,6 +12,43 @@ import {
   tmdbClient,
 } from "./client";
 
+// DATA-09: `tmdb_cache` is the widest table in the schema -- an unbounded
+// `overview` plus three integer arrays, one of which holds up to 50 cast ids.
+// `mapToContent` reads none of the id arrays, yet an unprojected `select()`
+// pulled all of them for every item on every list page. Every read below
+// projects exactly the columns that are actually consumed: what `mapToContent`
+// maps, plus `id` and `updatedAt` for the cache-expiry/refresh path.
+const cacheColumns = {
+  id: tmdbCache.id,
+  tmdbId: tmdbCache.tmdbId,
+  contentType: tmdbCache.contentType,
+  title: tmdbCache.title,
+  overview: tmdbCache.overview,
+  posterPath: tmdbCache.posterPath,
+  backdropPath: tmdbCache.backdropPath,
+  releaseDate: tmdbCache.releaseDate,
+  voteAverage: tmdbCache.voteAverage,
+  voteCount: tmdbCache.voteCount,
+  popularity: tmdbCache.popularity,
+  genreIds: tmdbCache.genreIds,
+  adult: tmdbCache.adult,
+  updatedAt: tmdbCache.updatedAt,
+} as const;
+
+/** The subset of `tmdb_cache` that any read path in this module needs. */
+export type CachedContentRow = Pick<TMDBCache, keyof typeof cacheColumns>;
+
+// LOGIC-09: TMDB returns `""` -- not null -- for `release_date` /
+// `first_air_date` on announced-but-unscheduled titles, and `new Date("")` is
+// an Invalid Date, which the NOT NULL `release_date` column rejects at insert
+// time. Adding any upcoming title to a list therefore threw. Mirrors the guard
+// already used in `src/lib/lists/recommendations.ts`.
+function toReleaseDate(value: string | null | undefined): Date {
+  if (!value) return new Date(0);
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
+}
+
 export async function addToCache(
   tmdbId: number,
   contentType: ContentTypeEnum
@@ -50,10 +87,11 @@ export async function addToCache(
       overview: contentDetails!.overview,
       posterPath: contentDetails!.poster_path,
       backdropPath: contentDetails!.backdrop_path,
-      releaseDate:
+      releaseDate: toReleaseDate(
         "release_date" in contentDetails!
-          ? new Date(contentDetails.release_date)
-          : new Date(contentDetails!.first_air_date),
+          ? contentDetails.release_date
+          : contentDetails!.first_air_date
+      ),
       voteAverage: contentDetails!.vote_average.toString(),
       voteCount: contentDetails!.vote_count,
       popularity: contentDetails!.popularity.toString(),
@@ -63,7 +101,7 @@ export async function addToCache(
       adult: "adult" in contentDetails! ? contentDetails.adult : null,
     })
     .onConflictDoNothing()
-    .returning();
+    .returning(cacheColumns);
 
   if (data) {
     return mapToContent(data);
@@ -71,7 +109,7 @@ export async function addToCache(
 
   // Handle race condition where insert failed due to conflict
   const [existingData] = await db
-    .select()
+    .select(cacheColumns)
     .from(tmdbCache)
     .where(
       and(eq(tmdbCache.tmdbId, tmdbId), eq(tmdbCache.contentType, contentType))
@@ -123,10 +161,11 @@ export async function updateCache(
       overview: contentDetails!.overview,
       posterPath: contentDetails!.poster_path,
       backdropPath: contentDetails!.backdrop_path,
-      releaseDate:
+      releaseDate: toReleaseDate(
         "release_date" in contentDetails!
-          ? new Date(contentDetails.release_date)
-          : new Date(contentDetails!.first_air_date),
+          ? contentDetails.release_date
+          : contentDetails!.first_air_date
+      ),
       voteAverage: contentDetails!.vote_average.toString(),
       voteCount: contentDetails!.vote_count,
       popularity: contentDetails!.popularity.toString(),
@@ -137,7 +176,7 @@ export async function updateCache(
       updatedAt: new Date(),
     })
     .where(eq(tmdbCache.id, cacheId))
-    .returning();
+    .returning(cacheColumns);
 
   return mapToContent(data);
 }
@@ -148,7 +187,7 @@ export async function getCachedContent(
   userId: string
 ): Promise<TMDBContent> {
   const [cacheData] = await db
-    .select()
+    .select(cacheColumns)
     .from(tmdbCache)
     .where(
       and(eq(tmdbCache.tmdbId, tmdbId), eq(tmdbCache.contentType, contentType))
@@ -209,16 +248,16 @@ export async function getAllCachedContent(
     );
   }
 
-  let cacheData: TMDBCache[] = [];
+  let cacheData: CachedContentRow[] = [];
 
   if (conditions.length > 0) {
     cacheData = await db
-      .select()
+      .select(cacheColumns)
       .from(tmdbCache)
       .where(or(...conditions));
   }
 
-  const cacheMap = new Map<string, TMDBCache>();
+  const cacheMap = new Map<string, CachedContentRow>();
   for (const item of cacheData) {
     cacheMap.set(`${item.contentType}:${item.tmdbId}`, item);
   }
@@ -266,7 +305,7 @@ export async function getAllCachedContent(
   return enrichAllWithContentStatus(allItemsInOrder, userId);
 }
 
-export function mapToContent(cacheData: TMDBCache): TMDBContent {
+export function mapToContent(cacheData: CachedContentRow): TMDBContent {
   return {
     tmdbId: cacheData.tmdbId,
     contentType: cacheData.contentType as ContentTypeEnum,

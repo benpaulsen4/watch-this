@@ -9,7 +9,7 @@ import {
   verifyRegistrationResponse,
   type VerifyRegistrationResponseOpts,
 } from "@simplewebauthn/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { jwtVerify, SignJWT } from "jose";
 
 import { passkeyCredentials, type User, users } from "../db";
@@ -225,8 +225,10 @@ export async function verifyAdditionalPasskeyRegistration(
   const credentialID = credential.id;
   const credentialPublicKey = credential.publicKey;
   const counter = credential.counter;
-  const activeDevicesRows = await executor
-    .select({ id: passkeyCredentials.id })
+  // DATA-08a: count in the database rather than selecting every credential row
+  // to read `.length`. This is on the registration hot path.
+  const [activeDevices] = await executor
+    .select({ value: count() })
     .from(passkeyCredentials)
     .where(
       and(
@@ -235,7 +237,7 @@ export async function verifyAdditionalPasskeyRegistration(
       )
     );
 
-  if (activeDevicesRows.length >= 10) {
+  if ((activeDevices?.value ?? 0) >= 10) {
     throw new Error("Maximum devices reached");
   }
 
