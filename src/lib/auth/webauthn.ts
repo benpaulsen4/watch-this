@@ -37,9 +37,46 @@ function getJwtSecret(): Uint8Array {
   return jwtSecretCache;
 }
 
+// Distinct token types. Every JWT this module signs carries a `typ` claim so a
+// token minted for one purpose (e.g. a short-lived claim token) can never be
+// replayed as another (e.g. a 7-day session), even though they share a secret.
+const TOKEN_TYPE = {
+  SESSION: "session",
+  CLAIM: "claim",
+  CHALLENGE: "challenge",
+} as const;
+
+// A Drizzle query executor: either the top-level `db` or a transaction handle.
+// Narrowed to the query builders this module uses so both `db` and a
+// transaction handle satisfy it, letting callers run credential writes inside
+// an existing transaction (commit/roll back atomically with surrounding work).
+export type DbExecutor = Pick<typeof db, "select" | "insert">;
+
 export interface AuthSession {
   userId: string;
   username: string;
+  tokenVersion: number;
+}
+
+// WebAuthn challenge tokens are issued in a "begin" step and redeemed in a
+// "verify" step. Binding the flow (and, where known, the username/user/claim
+// it was minted for) into the token prevents a challenge issued for one flow or
+// subject from being replayed in another.
+export type ChallengeFlow = "register" | "authenticate" | "claim";
+
+export interface ChallengeBinding {
+  flow: ChallengeFlow;
+  username?: string;
+  userId?: string;
+  claimId?: string;
+}
+
+export interface ChallengePayload {
+  challenge: string;
+  flow: ChallengeFlow;
+  username?: string;
+  userId?: string;
+  claimId?: string;
 }
 
 // Generate registration options for new passkey
@@ -165,7 +202,11 @@ export async function verifyAdditionalPasskeyRegistration(
   userId: string,
   registrationResponse: RegistrationResponseJSON,
   expectedChallenge: string,
-  deviceName?: string
+  deviceName?: string,
+  // Run the device-cap read and credential insert on this executor. Pass a
+  // transaction handle so the credential is committed/rolled back together
+  // with the caller's other writes (e.g. consuming a passkey claim).
+  executor: DbExecutor = db
 ) {
   const verification: VerifyRegistrationResponseOpts = {
     response: registrationResponse,
@@ -184,7 +225,7 @@ export async function verifyAdditionalPasskeyRegistration(
   const credentialID = credential.id;
   const credentialPublicKey = credential.publicKey;
   const counter = credential.counter;
-  const activeDevicesRows = await db
+  const activeDevicesRows = await executor
     .select({ id: passkeyCredentials.id })
     .from(passkeyCredentials)
     .where(
@@ -198,7 +239,7 @@ export async function verifyAdditionalPasskeyRegistration(
     throw new Error("Maximum devices reached");
   }
 
-  const [newCredential] = await db
+  const [newCredential] = await executor
     .insert(passkeyCredentials)
     .values({
       userId,
@@ -217,7 +258,7 @@ export async function createClaimToken(
   claimId: string,
   userId: string
 ): Promise<string> {
-  const payload = { claimId, userId };
+  const payload = { typ: TOKEN_TYPE.CLAIM, claimId, userId };
 
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -232,6 +273,7 @@ export async function verifyClaimToken(
 ): Promise<{ claimId: string; userId: string } | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
+    if (payload.typ !== TOKEN_TYPE.CLAIM) return null;
     return {
       claimId: payload.claimId as string,
       userId: payload.userId as string,
@@ -312,8 +354,10 @@ export async function verifyPasskeyAuthentication(
 // Create JWT session token
 export async function createSessionToken(user: User): Promise<string> {
   const payload = {
+    typ: TOKEN_TYPE.SESSION,
     userId: user.id,
     username: user.username,
+    tokenVersion: user.tokenVersion,
   };
 
   return await new SignJWT(payload)
@@ -329,9 +373,11 @@ export async function verifySessionToken(
 ): Promise<AuthSession | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
+    if (payload.typ !== TOKEN_TYPE.SESSION) return null;
     return {
       userId: payload.userId as string,
       username: payload.username as string,
+      tokenVersion: (payload.tokenVersion as number | undefined) ?? 0,
     };
   } catch {
     return null;
@@ -339,9 +385,17 @@ export async function verifySessionToken(
 }
 
 // Create JWT challenge token
-export async function createChallengeToken(challenge: string): Promise<string> {
+export async function createChallengeToken(
+  challenge: string,
+  binding: ChallengeBinding
+): Promise<string> {
   const payload = {
+    typ: TOKEN_TYPE.CHALLENGE,
     challenge,
+    flow: binding.flow,
+    ...(binding.username !== undefined ? { username: binding.username } : {}),
+    ...(binding.userId !== undefined ? { userId: binding.userId } : {}),
+    ...(binding.claimId !== undefined ? { claimId: binding.claimId } : {}),
   };
 
   return await new SignJWT(payload)
@@ -351,14 +405,41 @@ export async function createChallengeToken(challenge: string): Promise<string> {
     .sign(getJwtSecret());
 }
 
-// Verify JWT challenge token
+// Verify JWT challenge token. The caller must pass the flow it expects, plus
+// any subject identifiers (username/userId/claimId) it knows; a token whose
+// bound values don't match is rejected.
+//
+// TODO(FOLLOW-UP): challenge tokens are still replayable within their 10-minute
+// lifetime -- full single-use enforcement needs a server-side nonce store
+// (e.g. a `challenge_nonces` table, or the existing session store) recording
+// consumed challenge ids. The flow/subject binding below is implemented fully;
+// the single-use store is deferred to keep this PR contained.
 export async function verifyChallengeToken(
-  token: string
-): Promise<{ challenge: string } | null> {
+  token: string,
+  expected: ChallengeBinding
+): Promise<ChallengePayload | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
+    if (payload.typ !== TOKEN_TYPE.CHALLENGE) return null;
+    if (payload.flow !== expected.flow) return null;
+    if (
+      expected.username !== undefined &&
+      payload.username !== expected.username
+    ) {
+      return null;
+    }
+    if (expected.userId !== undefined && payload.userId !== expected.userId) {
+      return null;
+    }
+    if (expected.claimId !== undefined && payload.claimId !== expected.claimId) {
+      return null;
+    }
     return {
       challenge: payload.challenge as string,
+      flow: payload.flow as ChallengeFlow,
+      username: payload.username as string | undefined,
+      userId: payload.userId as string | undefined,
+      claimId: payload.claimId as string | undefined,
     };
   } catch {
     return null;
@@ -380,5 +461,13 @@ export async function getCurrentUser(
     .where(eq(users.id, session.userId))
     .limit(1);
 
-  return userData[0] || null;
+  const user = userData[0];
+  if (!user) return null;
+
+  // Reject sessions minted before the user's token version was bumped
+  // (signout-all or passkey deletion), so revocation takes effect immediately
+  // rather than waiting for the 7-day JWT expiry.
+  if (session.tokenVersion !== user.tokenVersion) return null;
+
+  return user;
 }

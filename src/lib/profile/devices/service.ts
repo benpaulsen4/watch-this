@@ -1,13 +1,23 @@
-import { and, desc, eq, gt,isNull } from "drizzle-orm";
+import { and, desc, eq, gt,isNull, sql } from "drizzle-orm";
 
 import { createClaimToken } from "@/lib/auth/webauthn";
-import { activityFeed,db , passkeyClaims, passkeyCredentials } from "@/lib/db";
+import {
+  activityFeed,
+  db,
+  type PasskeyClaim,
+  passkeyClaims,
+  passkeyCredentials,
+  users,
+} from "@/lib/db";
 
 import type {
   ClaimInitiateResponse,
   ClaimInitiator,
   PasskeyDevice,
 } from "./types";
+
+// A Drizzle query executor: either the top-level `db` or a transaction handle.
+type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function listDevices(userId: string): Promise<PasskeyDevice[]> {
   const rows = await db
@@ -84,7 +94,10 @@ export async function initiateClaim(
         gt(passkeyClaims.createdAt, oneHourAgo),
       ),
     );
-  if (claimsLastHour.length >= 5 && initiator === "user") {
+  // Enforce the 5/hour claim cap for admin-initiated claims too, not just
+  // user-initiated ones, so a leaked/abused admin secret can't mint unlimited
+  // device claims for a single user.
+  if (claimsLastHour.length >= 5) {
     return "rateLimit";
   }
 
@@ -113,6 +126,35 @@ export async function initiateClaim(
     qrPayload: magicLink,
     expiresAt: expiresAt.toISOString(),
   };
+}
+
+/**
+ * Atomically consume a passkey claim. A single conditional UPDATE flips the
+ * row to "consumed" only if it is still active and unexpired, so two concurrent
+ * redemptions can never both succeed: the database serializes the writes and
+ * only the first matches the WHERE clause. Returns the consumed row, or null if
+ * the claim was already consumed/cancelled/expired (i.e. not available).
+ *
+ * Pass a transaction handle as `executor` so the consume can be rolled back if
+ * the subsequent passkey registration fails, leaving the claim retryable.
+ */
+export async function consumeClaim(
+  executor: DbExecutor,
+  claimId: string,
+): Promise<PasskeyClaim | null> {
+  const now = new Date();
+  const [row] = await executor
+    .update(passkeyClaims)
+    .set({ status: "consumed", consumedAt: now })
+    .where(
+      and(
+        eq(passkeyClaims.id, claimId),
+        eq(passkeyClaims.status, "active"),
+        gt(passkeyClaims.expiresAt, now),
+      ),
+    )
+    .returning();
+  return row ?? null;
 }
 
 export async function cancelClaim(
@@ -151,6 +193,14 @@ export async function deletePasskey(
           eq(passkeyCredentials.userId, userId),
         ),
       );
+
+    // Deleting a passkey revokes every outstanding session for this user by
+    // bumping their token version, so a lost/compromised device cannot keep a
+    // live session for up to 7 days after the credential is removed.
+    await db
+      .update(users)
+      .set({ tokenVersion: sql`${users.tokenVersion} + 1` })
+      .where(eq(users.id, userId));
 
     await db.insert(activityFeed).values({
       userId,

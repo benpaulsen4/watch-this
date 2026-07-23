@@ -37,7 +37,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const challengePayload = await verifyChallengeToken(storedChallenge);
+    const challengePayload = await verifyChallengeToken(storedChallenge, {
+      flow: "authenticate",
+    });
     if (!challengePayload) {
       return NextResponse.json(
         { error: "Invalid or expired challenge" },
@@ -66,7 +68,6 @@ export async function POST(request: NextRequest) {
         deviceName: credential.deviceName,
         lastUsed: credential.lastUsed,
       },
-      token,
     });
 
     // Clear authentication challenge cookie

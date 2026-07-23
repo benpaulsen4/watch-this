@@ -2,6 +2,7 @@ import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   cancelClaim,
+  consumeClaim,
   countActiveDevices,
   deletePasskey,
   initiateClaim,
@@ -11,6 +12,7 @@ import {
 // Mock DB module with minimal drizzle-like chaining and helpers
 vi.mock("@/lib/db", () => {
   const insertCalls: Array<{ table: any; payload: any }> = [];
+  const updateCalls: Array<{ table: any }> = [];
   const resultsQueue: any[] = [];
   let throwOnUpdate = false;
 
@@ -56,17 +58,33 @@ vi.mock("@/lib/db", () => {
       };
       return c;
     },
-    update(_table: any) {
+    update(table: any) {
+      updateCalls.push({ table });
       const c = {
         ...chain,
         set() {
           return c;
         },
         where() {
-          if (throwOnUpdate) {
-            return Promise.reject(new Error("update failed"));
-          }
-          return Promise.resolve({ ok: true });
+          // Returned object is awaitable (for callers that await where())
+          // and also supports .returning() (for conditional-consume callers).
+          return {
+            returning() {
+              if (throwOnUpdate) {
+                return Promise.reject(new Error("update failed"));
+              }
+              return Promise.resolve(resolveNext());
+            },
+            then(onFulfilled: (v: any) => any, onRejected?: (e: any) => any) {
+              if (throwOnUpdate) {
+                return Promise.reject(new Error("update failed")).then(
+                  onFulfilled,
+                  onRejected,
+                );
+              }
+              return Promise.resolve({ ok: true }).then(onFulfilled);
+            },
+          };
         },
       };
       return c;
@@ -78,8 +96,12 @@ vi.mock("@/lib/db", () => {
     __getInsertCalls() {
       return insertCalls.slice();
     },
+    __getUpdateCalls() {
+      return updateCalls.slice();
+    },
     __resetInserts() {
       insertCalls.length = 0;
+      updateCalls.length = 0;
     },
     __setThrowUpdate(v: boolean) {
       throwOnUpdate = v;
@@ -89,8 +111,14 @@ vi.mock("@/lib/db", () => {
   const passkeyCredentials = { __tag: "passkeyCredentials" } as any;
   const passkeyClaims = { __tag: "passkeyClaims" } as any;
   const activityFeed = { __tag: "activityFeed" } as any;
+  const users = {
+    __tag: "users",
+    // Non-undefined so the real drizzle `sql` template used to bump
+    // tokenVersion can interpolate it without throwing.
+    tokenVersion: { __tag: "users.tokenVersion" },
+  } as any;
 
-  return { db, passkeyCredentials, passkeyClaims, activityFeed };
+  return { db, passkeyCredentials, passkeyClaims, activityFeed, users };
 });
 
 // Mock claim token generator
@@ -201,6 +229,18 @@ describe("devices service", () => {
     expect(res).toBe("rateLimit");
   });
 
+  it("initiateClaim enforces rate limit for admin initiator too (API-07)", async () => {
+    const { db } = await mockedDbModule;
+    db.__setMockResults([
+      // countActiveDevices: less than 10
+      [{ id: "a" }],
+      // claims in last hour: 5
+      [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }],
+    ]);
+    const res = await initiateClaim("user-1", "admin");
+    expect(res).toBe("rateLimit");
+  });
+
   it("initiateClaim creates claim and returns token, magic link and qr payload", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-01-01T00:00:00Z"));
@@ -243,6 +283,20 @@ describe("devices service", () => {
     vi.useRealTimers();
   });
 
+  it("consumeClaim returns the row when the conditional update matches (AUTH-03)", async () => {
+    const { db } = await mockedDbModule;
+    db.__setMockResults([[{ id: "claim-1", status: "consumed" }]]);
+    const row = await consumeClaim(db, "claim-1");
+    expect(row).toMatchObject({ id: "claim-1", status: "consumed" });
+  });
+
+  it("consumeClaim returns null when no row matches (already consumed/expired)", async () => {
+    const { db } = await mockedDbModule;
+    db.__setMockResults([[]]);
+    const row = await consumeClaim(db, "claim-1");
+    expect(row).toBeNull();
+  });
+
   it("cancelClaim returns success and performs update", async () => {
     const { db } = await mockedDbModule;
     db.__setThrowUpdate(false);
@@ -265,7 +319,7 @@ describe("devices service", () => {
   });
 
   it("deletePasskey updates credential and inserts activity when allowed", async () => {
-    const { db, activityFeed } = await mockedDbModule;
+    const { db, activityFeed, users } = (await mockedDbModule) as any;
     db.__setMockResults([
       // countActiveDevices
       [{ id: "a" }, { id: "b" }],
@@ -281,5 +335,10 @@ describe("devices service", () => {
       activityType: "passkey_deleted",
       metadata: { credentialId: "cred-9" },
     });
+
+    // AUTH-02: deleting a passkey bumps the user's token version to revoke
+    // all outstanding sessions.
+    const updates = db.__getUpdateCalls();
+    expect(updates.some((c: any) => c.table === users)).toBe(true);
   });
 });
