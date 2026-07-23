@@ -3,6 +3,11 @@ import simpleImportSort from "eslint-plugin-simple-import-sort";
 import unusedImports from "eslint-plugin-unused-imports";
 
 const config = [
+  {
+    // Agent worktrees under .claude/ are full checkouts of this repo, so
+    // linting them re-reports every file against whatever branch they hold.
+    ignores: [".claude/**", ".next/**"],
+  },
   ...eslintConfigNext,
   {
     plugins: {
