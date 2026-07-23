@@ -28,6 +28,26 @@ import type {
   UpcomingActivity,
 } from "./types";
 
+const DEFAULT_TIME_ZONE = "UTC";
+
+/**
+ * LOGIC-12: `userTimezone` comes straight from the profile and is fed to
+ * `Intl.DateTimeFormat` and to `AT TIME ZONE` in SQL. A stale or renamed IANA
+ * zone makes `Intl` throw `RangeError`, which used to 500 the whole endpoint —
+ * including the activities array, which has nothing to do with timezones.
+ * Validate once and degrade to UTC instead.
+ */
+function resolveTimeZone(timeZone: string | null | undefined): string {
+  if (!timeZone) return DEFAULT_TIME_ZONE;
+
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+    return timeZone;
+  } catch {
+    return DEFAULT_TIME_ZONE;
+  }
+}
+
 function getTimezoneDateKey(date: Date, timeZone: string): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -39,82 +59,86 @@ function getTimezoneDateKey(date: Date, timeZone: string): string {
   return formatter.format(date);
 }
 
+/**
+ * LOGIC-14: pagination used a bare `createdAt` cursor with a strict `lt`.
+ * Batch writes can land several rows in the same millisecond, so a page
+ * boundary falling mid-tie silently dropped every remaining row at that
+ * timestamp. The cursor is now compound — `<iso>|<id>` — with `id` acting as
+ * the tiebreaker in both the predicate and the ordering. Bare-ISO cursors
+ * minted by older clients still parse and keep the old strict-`lt` behaviour.
+ */
+function encodeCursor(createdAt: Date, id: string): string {
+  return `${createdAt.toISOString()}|${id}`;
+}
+
+function decodeCursor(
+  cursor: string,
+): { createdAt: Date; id?: string } | "invalid" {
+  const separatorIndex = cursor.lastIndexOf("|");
+  const rawDate =
+    separatorIndex === -1 ? cursor : cursor.slice(0, separatorIndex);
+  const rawId =
+    separatorIndex === -1 ? undefined : cursor.slice(separatorIndex + 1);
+
+  const createdAt = new Date(rawDate);
+  if (Number.isNaN(createdAt.getTime())) return "invalid";
+
+  return { createdAt, id: rawId || undefined };
+}
+
 export async function listActivityTimeline(
   userId: string,
   userTimezone: string,
   input: ListActivityInput
 ): Promise<ActivityTimelineResponse | "invalidCursor"> {
+  const timeZone = resolveTimeZone(userTimezone);
+
   // Clamp both floor and ceiling so a caller cannot request an unbounded page.
   const limit = Math.min(Math.max(1, input.limit || 10), 100);
   let cursorDate: Date | undefined;
+  let cursorId: string | undefined;
   if (input.cursor) {
-    const d = new Date(input.cursor);
-    if (isNaN(d.getTime())) {
+    const decoded = decodeCursor(input.cursor);
+    if (decoded === "invalid") {
       return "invalidCursor";
     }
-    cursorDate = d;
+    cursorDate = decoded.createdAt;
+    cursorId = decoded.id;
   }
 
-  let whereConditions;
-  if (cursorDate && input.type) {
-    whereConditions = and(
-      or(
-        eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId])
-      ),
-      lt(activityFeed.createdAt, cursorDate),
-      eq(activityFeed.activityType, input.type)
-    );
-  } else if (cursorDate) {
-    whereConditions = and(
-      or(
-        eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId])
-      ),
-      lt(activityFeed.createdAt, cursorDate)
-    );
-  } else if (input.type) {
-    whereConditions = and(
-      or(
-        eq(activityFeed.userId, userId),
-        arrayContains(activityFeed.collaborators, [userId])
-      ),
-      eq(activityFeed.activityType, input.type)
-    );
-  } else {
-    whereConditions = or(
-      eq(activityFeed.userId, userId),
-      arrayContains(activityFeed.collaborators, [userId])
-    );
-  }
+  const cursorCondition = cursorDate
+    ? cursorId
+      ? or(
+          lt(activityFeed.createdAt, cursorDate),
+          and(
+            eq(activityFeed.createdAt, cursorDate),
+            lt(activityFeed.id, cursorId)
+          )
+        )
+      : lt(activityFeed.createdAt, cursorDate)
+    : undefined;
 
-  const userCollaborativeLists = await db
-    .select({ listId: lists.id })
+  // DATA-08b: the set of lists the user can see is resolved by the database as
+  // a subquery instead of being pulled into JS and fed back in as a literal
+  // `inArray` list.
+  const visibleListIds = db
+    .select({ id: lists.id })
     .from(lists)
     .leftJoin(listCollaborators, eq(lists.id, listCollaborators.listId))
     .where(or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)));
 
-  const collaborativeListIds = userCollaborativeLists.map((l) => l.listId);
-
-  if (collaborativeListIds.length > 0) {
-    let collaborativeConditions = and(
-      inArray(activityFeed.listId, collaborativeListIds),
-      eq(activityFeed.isCollaborative, true)
-    );
-    if (cursorDate) {
-      collaborativeConditions = and(
-        collaborativeConditions,
-        lt(activityFeed.createdAt, cursorDate)
-      );
-    }
-    if (input.type) {
-      collaborativeConditions = and(
-        collaborativeConditions,
-        eq(activityFeed.activityType, input.type)
-      );
-    }
-    whereConditions = or(whereConditions, collaborativeConditions);
-  }
+  const whereConditions = and(
+    or(
+      eq(activityFeed.userId, userId),
+      arrayContains(activityFeed.collaborators, [userId]),
+      and(
+        inArray(activityFeed.listId, visibleListIds),
+        eq(activityFeed.isCollaborative, true)
+      )
+    ),
+    cursorCondition,
+    input.type ? eq(activityFeed.activityType, input.type) : undefined
+  );
 
   const activitiesRows = await db
     .select({
@@ -132,9 +156,11 @@ export async function listActivityTimeline(
       userProfilePicture: users.profilePictureUrl,
     })
     .from(activityFeed)
-    .leftJoin(users, eq(activityFeed.userId, users.id))
+    // DATA-11: `activity_feed.user_id` is NOT NULL with a cascading FK, so the
+    // user row always exists — an outer join only blocks planner reordering.
+    .innerJoin(users, eq(activityFeed.userId, users.id))
     .where(whereConditions)
-    .orderBy(desc(activityFeed.createdAt))
+    .orderBy(desc(activityFeed.createdAt), desc(activityFeed.id))
     .limit(limit + 1);
 
   const hasMore = activitiesRows.length > limit;
@@ -157,7 +183,7 @@ export async function listActivityTimeline(
     activityType: row.activityType,
     user: {
       id: row.userId,
-      username: row.username || "",
+      username: row.username,
       profilePictureUrl: row.userProfilePicture ?? null,
     },
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
@@ -177,7 +203,7 @@ export async function listActivityTimeline(
   }));
 
   const dayNameFormatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: userTimezone,
+    timeZone,
     weekday: "short",
   });
   const dayName = dayNameFormatter.format(new Date());
@@ -213,11 +239,11 @@ export async function listActivityTimeline(
       and(eq(showSchedules.userId, userId), eq(showSchedules.dayOfWeek, today))
     );
 
-  const todayKey = getTimezoneDateKey(new Date(), userTimezone);
+  const todayKey = getTimezoneDateKey(new Date(), timeZone);
   const candidateUpcomingRows = upcomingRows.filter(
     (row) =>
       !row.nextEpisodeDate ||
-      getTimezoneDateKey(row.nextEpisodeDate, userTimezone) <= todayKey
+      getTimezoneDateKey(row.nextEpisodeDate, timeZone) <= todayKey
   );
 
   let watchedTodayTmdbIds = new Set<number>();
@@ -233,7 +259,7 @@ export async function listActivityTimeline(
             candidateUpcomingRows.map((row) => row.tmdbId)
           ),
           eq(episodeWatchStatus.watched, true),
-          sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${userTimezone}) = DATE(now() AT TIME ZONE ${userTimezone})`
+          sql`DATE(${episodeWatchStatus.watchedAt} AT TIME ZONE ${timeZone}) = DATE(now() AT TIME ZONE ${timeZone})`
         )
       );
     watchedTodayTmdbIds = new Set(
@@ -282,7 +308,10 @@ export async function listActivityTimeline(
 
   const nextCursor =
     hasMore && resultRows.length > 0
-      ? resultRows[resultRows.length - 1].createdAt.toISOString()
+      ? encodeCursor(
+          resultRows[resultRows.length - 1].createdAt,
+          resultRows[resultRows.length - 1].id
+        )
       : null;
 
   return { activities, upcoming, hasMore, nextCursor };
