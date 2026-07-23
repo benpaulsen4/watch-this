@@ -129,6 +129,38 @@ describe("schedules service", () => {
     expect(res.schedules[2][1].title).toBeNull();
   });
 
+  // LOGIC-05: `schedulesByDay` is pre-seeded with keys 0-6 only. An import
+  // could historically write dayOfWeek 9, and `schedulesByDay[9].push(...)`
+  // then threw "Cannot read properties of undefined" on every subsequent
+  // GET /api/schedules -- permanently breaking the page for that user, with no
+  // in-app way to delete the offending row because the UI could not render.
+  it("skips out-of-range day keys instead of throwing (LOGIC-05)", async () => {
+    const rows = [
+      { id: "ok", userId, tmdbId: 1, dayOfWeek: 3, createdAt: now },
+      { id: "bad-high", userId, tmdbId: 2, dayOfWeek: 9, createdAt: now },
+      { id: "bad-low", userId, tmdbId: 3, dayOfWeek: -1, createdAt: now },
+    ];
+    (db as any).__setMockResults([rows]);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await listSchedules(userId);
+
+    // The good row still renders; the bad rows are dropped, not fatal.
+    expect(res.schedules[3]).toHaveLength(1);
+    expect(res.schedules[3][0].id).toBe("ok");
+    expect(Object.keys(res.schedules).sort()).toEqual([
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+    ]);
+    expect(errorSpy).toHaveBeenCalledTimes(2);
+    errorSpy.mockRestore();
+  });
+
   it("createSchedule returns notFound when show not in library", async () => {
     const contentMissing: any[] = [];
     (db as any).__setMockResults([contentMissing]);

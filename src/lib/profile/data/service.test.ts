@@ -599,5 +599,193 @@ describe("Profile Data Service", () => {
         expect.objectContaining({ target: "lists.id" })
       );
     });
+
+    // LOGIC-04: rows must never be inserted with an explicit `id` from the
+    // file. `onConflictDoUpdate` targets the unique constraint, not the primary
+    // key, and Postgres only handles the conflict named in the target -- so a
+    // collision on `id` raises an uncovered duplicate-key error and every row
+    // of a cross-user import fails while the result still reports success.
+    // This behaviour was already correct when this batch was picked up; the
+    // test locks it in.
+    it("never carries a client-supplied id into any insert (LOGIC-04)", async () => {
+      const { valuesMock, onConflictDoUpdateMock } = setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      const result = await importUserData(userId, jsonData);
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+
+      // Every row imported cleanly.
+      expect(result.errors).toEqual([]);
+      expect(result.imported.contentStatus).toBe(1);
+      expect(result.imported.episodeStatus).toBe(1);
+      expect(result.imported.tvShowSchedules).toBe(1);
+
+      // Not one insert payload carries an id, for any table.
+      const payloads = valuesMock.mock.calls.map((c) => c[0]);
+      expect(payloads.length).toBeGreaterThan(0);
+      for (const payload of payloads) {
+        expect(payload).not.toHaveProperty("id");
+      }
+
+      // And every upsert targets the natural unique key, never the PK, so the
+      // conflict Postgres is told about is the one that can actually happen.
+      for (const call of onConflictDoUpdateMock.mock.calls) {
+        const target = call[0].target as string[];
+        expect(Array.isArray(target)).toBe(true);
+        expect(target.length).toBeGreaterThan(1);
+        expect(target).not.toContain("userContentStatus.id");
+        expect(target).not.toContain("episodeWatchStatus.id");
+        expect(target).not.toContain("showSchedules.id");
+      }
+    });
+
+    // LOGIC-05
+    it("rejects out-of-range dayOfWeek rather than writing them (LOGIC-05)", async () => {
+      const { valuesMock } = setupImportMocks();
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify({
+          tvShowSchedules: [
+            {
+              tmdbId: 1,
+              dayOfWeek: 9,
+              createdAt: mockDate.toISOString(),
+              updatedAt: mockDate.toISOString(),
+            },
+            {
+              tmdbId: 2,
+              dayOfWeek: -1,
+              createdAt: mockDate.toISOString(),
+              updatedAt: mockDate.toISOString(),
+            },
+            {
+              tmdbId: 3,
+              dayOfWeek: 1.5,
+              createdAt: mockDate.toISOString(),
+              updatedAt: mockDate.toISOString(),
+            },
+            {
+              tmdbId: 4,
+              dayOfWeek: "3",
+              createdAt: mockDate.toISOString(),
+              updatedAt: mockDate.toISOString(),
+            },
+            {
+              tmdbId: 5,
+              dayOfWeek: 3,
+              createdAt: mockDate.toISOString(),
+              updatedAt: mockDate.toISOString(),
+            },
+          ],
+        })
+      );
+
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+
+      // Only the valid row is written.
+      expect(result.imported.tvShowSchedules).toBe(1);
+      expect(result.errors).toHaveLength(4);
+      for (const error of result.errors) {
+        expect(error).toMatch(/dayOfWeek must be an integer between 0 and 6/);
+      }
+
+      const scheduleWrites = valuesMock.mock.calls
+        .map((c) => c[0])
+        .filter((p) => p.dayOfWeek !== undefined);
+      expect(scheduleWrites).toHaveLength(1);
+      expect(scheduleWrites[0].dayOfWeek).toBe(3);
+    });
+
+    it("accepts both boundary days", async () => {
+      setupImportMocks();
+      const result = await importUserData(
+        userId,
+        JSON.stringify({
+          tvShowSchedules: [0, 6].map((dayOfWeek, i) => ({
+            tmdbId: i,
+            dayOfWeek,
+            createdAt: mockDate.toISOString(),
+            updatedAt: mockDate.toISOString(),
+          })),
+        })
+      );
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+      expect(result.imported.tvShowSchedules).toBe(2);
+      expect(result.errors).toEqual([]);
+    });
+
+    // LOGIC-07: each section's try sits INSIDE its loop, so a truthy
+    // non-iterable value threw from the for...of itself, outside any handler.
+    describe("malformed structure returns parseError, not a 500 (LOGIC-07)", () => {
+      const cases: Array<[string, unknown]> = [
+        ["lists is a number", { lists: 5 }],
+        ["lists is an object", { lists: { a: 1 } }],
+        ["lists is a string", { lists: "nope" }],
+        ["contentStatus is a number", { contentStatus: 5 }],
+        ["episodeStatus is a number", { episodeStatus: 5 }],
+        ["tvShowSchedules is a number", { tvShowSchedules: 5 }],
+        [
+          "list.items is a number",
+          { lists: [{ name: "L", items: 3 }] },
+        ],
+        ["payload is null", null],
+        ["payload is a number", 7],
+      ];
+
+      for (const [name, payload] of cases) {
+        it(name, async () => {
+          setupImportMocks();
+          const result = await importUserData(userId, JSON.stringify(payload));
+          expect(result).toBe("parseError");
+          // Nothing may be written for a payload we refuse to parse.
+          expect(mockedDb.insert).not.toHaveBeenCalled();
+        });
+      }
+    });
+
+    it("still returns a result when the closing activity write fails (LOGIC-07)", async () => {
+      const { valuesMock } = setupImportMocks();
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      (addToCache as any).mockResolvedValue({});
+
+      // Everything imports, then the final activity insert blows up. Before the
+      // fix that threw *after* all data was committed, so the caller saw a 500
+      // despite a fully successful import. Only the activity write fails; every
+      // data row is committed first.
+      const defaultValues = valuesMock.getMockImplementation();
+      valuesMock.mockImplementation((payload: any) => {
+        if (payload && "activityType" in payload) {
+          throw new Error("activity insert failed");
+        }
+        return defaultValues?.(payload);
+      });
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify({
+          contentStatus: [
+            {
+              tmdbId: 1,
+              contentType: "movie",
+              status: "completed",
+              createdAt: mockDate.toISOString(),
+              updatedAt: mockDate.toISOString(),
+            },
+          ],
+        })
+      );
+
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+      expect(result.success).toBe(true);
+      // The data itself was imported; only the audit write was lost.
+      expect(result.imported.contentStatus).toBe(1);
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
   });
 });

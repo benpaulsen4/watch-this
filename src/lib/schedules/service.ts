@@ -230,13 +230,27 @@ export async function listSchedules(
   titleResults.forEach((r) => titleMap.set(r.tmdbId, r.title));
 
   schedules.forEach((s) => {
+    // LOGIC-05: `schedulesByDay` is pre-seeded with keys 0-6 only. A row with a
+    // day outside that range (historically reachable via an unvalidated import)
+    // used to throw "Cannot read properties of undefined", permanently breaking
+    // GET /api/schedules -- and with it the only UI that could delete the row.
+    // Import validation and a DB CHECK constraint now prevent such rows, but
+    // read defensively so a single bad row can never take the page down again.
+    const bucket: ScheduleItem[] | undefined = schedulesByDay[s.dayOfWeek];
+    if (!bucket) {
+      console.error(
+        `Skipping schedule ${s.id} with out-of-range dayOfWeek ${s.dayOfWeek}`
+      );
+      return;
+    }
+
     const item: ScheduleItem = {
       id: s.id,
       tmdbId: s.tmdbId,
       createdAt: s.createdAt.toISOString(),
       title: titleMap.get(s.tmdbId) ?? null,
     };
-    schedulesByDay[s.dayOfWeek].push(item);
+    bucket.push(item);
   });
 
   return { schedules: schedulesByDay, totalShows: schedules.length };

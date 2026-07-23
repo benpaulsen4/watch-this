@@ -24,6 +24,13 @@ const MAX_IMPORT_ENTRIES = 5000;
 // Maximum number of concurrent TMDB cache-warm requests during an import.
 const CACHE_WARM_CONCURRENCY = 5;
 
+// LOGIC-05: `show_schedules.day_of_week` is 0 (Sunday) to 6 (Saturday). This
+// mirrors the CHECK constraint added in migration 0010; imports are the only
+// path that ever wrote outside the range.
+function isValidDayOfWeek(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 6;
+}
+
 import type {
   ContentStatusExportRow,
   CSVExportModel,
@@ -227,6 +234,36 @@ export async function importUserData(
     importModel = JSON.parse(fileContent);
   } catch {
     return "parseError";
+  }
+
+  // 1a. LOGIC-07: validate the *structure* before touching any of it. Each
+  //     section's per-row try/catch sits inside its loop, so a truthy
+  //     non-iterable value (e.g. `{"lists": 5}`) used to throw from the
+  //     `for...of` itself -- outside any handler -- and surface as a 500 rather
+  //     than the intended "parseError".
+  if (typeof importModel !== "object" || importModel === null) {
+    return "parseError";
+  }
+  for (const section of [
+    "lists",
+    "contentStatus",
+    "episodeStatus",
+    "tvShowSchedules",
+  ] as const) {
+    const value = importModel[section];
+    if (value !== undefined && value !== null && !Array.isArray(value)) {
+      return "parseError";
+    }
+  }
+  for (const list of importModel.lists ?? []) {
+    if (typeof list !== "object" || list === null) return "parseError";
+    if (
+      list.items !== undefined &&
+      list.items !== null &&
+      !Array.isArray(list.items)
+    ) {
+      return "parseError";
+    }
   }
 
   // 1b. Reject oversized payloads before doing any work (API-03). Each import
@@ -452,6 +489,17 @@ export async function importUserData(
   if (importModel.tvShowSchedules) {
     for (const [index, schedule] of importModel.tvShowSchedules.entries()) {
       try {
+        // LOGIC-05: reject out-of-range days. `listSchedules` buckets rows into
+        // keys 0-6, so a row with e.g. dayOfWeek 9 used to break every
+        // subsequent GET /api/schedules for the importing user, with no in-app
+        // way to remove it because the deleting UI could not render.
+        if (!isValidDayOfWeek(schedule?.dayOfWeek)) {
+          result.errors.push(
+            `Failed to import schedule entry ${index + 1}: dayOfWeek must be an integer between 0 and 6`
+          );
+          continue;
+        }
+
         await db
           .insert(showSchedules)
           .values({
@@ -482,19 +530,27 @@ export async function importUserData(
     }
   }
 
-  // 7. Write activity feed entry for successful import
-  await db.insert(activityFeed).values({
-    activityType: ActivityType.PROFILE_IMPORT,
-    userId: userId,
-    metadata: {
-      lists: result.imported.lists,
-      listItems: result.imported.listItems,
-      contentStatus: result.imported.contentStatus,
-      episodeStatus: result.imported.episodeStatus,
-      tvShowSchedules: result.imported.tvShowSchedules,
-      errors: result.errors.length,
-    },
-  });
+  // 7. Write activity feed entry for successful import.
+  //    LOGIC-07: this was the only activity write in the codebase not wrapped
+  //    in try/catch. It runs *after* every row has been committed, so a failure
+  //    here threw and the caller saw a 500 despite a successful import. Match
+  //    the surrounding convention: log it and carry on.
+  try {
+    await db.insert(activityFeed).values({
+      activityType: ActivityType.PROFILE_IMPORT,
+      userId: userId,
+      metadata: {
+        lists: result.imported.lists,
+        listItems: result.imported.listItems,
+        contentStatus: result.imported.contentStatus,
+        episodeStatus: result.imported.episodeStatus,
+        tvShowSchedules: result.imported.tvShowSchedules,
+        errors: result.errors.length,
+      },
+    });
+  } catch (e) {
+    console.error("Import: failed to write the profile_import activity:", e);
+  }
 
   // 8. Return `ImportResult`, with error strings for individually failed items (which should not cause wholistic failure)
   return result;
