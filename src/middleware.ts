@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getClientIp } from "@/lib/net/client-ip";
+
 /**
  * IP-based rate limiting for authentication and admin endpoints.
  *
@@ -85,16 +87,6 @@ const RULES: Array<{ prefix: string; limit: number; windowMs: number }> = [
   { prefix: "/api/auth/", limit: 20, windowMs: 60_000 },
   { prefix: "/api/admin/", limit: 10, windowMs: 60_000 },
 ];
-
-function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    // First entry is the originating client.
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
-}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

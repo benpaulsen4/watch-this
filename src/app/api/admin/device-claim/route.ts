@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { db, users } from "@/lib/db";
+import { getClientIp } from "@/lib/net/client-ip";
 import { initiateClaim } from "@/lib/profile/devices/service";
 
 // Constant-time secret comparison that does not leak via early return or via
@@ -18,15 +19,6 @@ function secretsMatch(provided: string, expected: string): boolean {
     return false;
   }
   return timingSafeEqual(providedBuf, expectedBuf);
-}
-
-function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 export async function POST(request: NextRequest) {
