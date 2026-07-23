@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
@@ -12,17 +12,131 @@ import {
   PermissionLevel,
   showSchedules,
   userContentStatus,
+  users,
   WatchStatus,
   WatchStatusEnum,
 } from "@/lib/db/schema";
+import type { TMDBTVShowDetails } from "@/lib/tmdb/client";
 import { tmdbClient } from "@/lib/tmdb/client";
 
 import { syncStatusToCollaborators } from "../activity/activityUtils";
+
+/** A Drizzle query executor: either the top-level `db` or a transaction handle. */
+type DbExecutor =
+  | typeof db
+  | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 type TVShowProgressState = {
   nextEpisodeDate: Date | null;
   shouldMarkCompleted: boolean;
 };
+
+export type EpisodeSelection = {
+  seasonNumber: number;
+  episodeNumber: number;
+  watched: boolean;
+};
+
+const DEFAULT_TIME_ZONE = "UTC";
+
+/**
+ * Fall back to UTC when a stored IANA zone is missing, stale or renamed.
+ * `Intl.DateTimeFormat` throws `RangeError` on an unknown zone, and a bad
+ * profile value must never take down an episode update (LOGIC-12/DATA-10).
+ */
+export function resolveTimeZone(timeZone: string | null | undefined): string {
+  if (!timeZone) return DEFAULT_TIME_ZONE;
+
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+    return timeZone;
+  } catch {
+    return DEFAULT_TIME_ZONE;
+  }
+}
+
+/** "YYYY-MM-DD" for `date` as observed in `timeZone`. */
+export function getTimezoneDateKey(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/**
+ * TMDB air dates are bare calendar days ("2026-07-21"). Parsing them with
+ * `new Date()` pins them to UTC midnight, which is up to a day away from the
+ * calendar day the viewer actually experienced (LOGIC-15). Keep bare dates as
+ * calendar keys so they can be compared against the viewer's local day, and
+ * return null for missing/unparseable values (LOGIC-11).
+ */
+export function getAirDateKey(
+  airDate: string | null | undefined,
+): string | null {
+  if (!airDate) return null;
+
+  const trimmed = airDate.trim();
+  if (!trimmed) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return getTimezoneDateKey(parsed, DEFAULT_TIME_ZONE);
+}
+
+/**
+ * True only when the episode's air date is known and is on or before the
+ * viewer's current local day. A missing or unparseable date counts as
+ * not aired, so an episode with no air date can never be marked watched.
+ */
+export function hasAired(
+  airDate: string | null | undefined,
+  now: Date,
+  timeZone: string,
+): boolean {
+  const airDateKey = getAirDateKey(airDate);
+  if (!airDateKey) return false;
+
+  return airDateKey <= getTimezoneDateKey(now, timeZone);
+}
+
+/**
+ * Load the user's configured timezone so date decisions in the episode paths
+ * use the calendar the user actually experiences rather than server-local
+ * time (DATA-10). Never throws — falls back to UTC.
+ *
+ * TODO(FOLLOW-UP): DATA-10 content-status watchedAt — the same threading is
+ * still missing from `src/lib/content-status/service.ts`, which stamps its
+ * `watchedAt` values from server-local `new Date()` without consulting the
+ * user's timezone. That file is owned by a separate change.
+ */
+export async function getUserTimeZone(userId: string): Promise<string> {
+  try {
+    const rows = await db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    return resolveTimeZone(rows?.[0]?.timezone);
+  } catch (error) {
+    console.error("Error loading user timezone:", error);
+    return DEFAULT_TIME_ZONE;
+  }
+}
+
+function parseNextEpisodeDate(
+  airDate: string | null | undefined,
+): Date | null {
+  if (!airDate) return null;
+
+  const parsed = new Date(airDate);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function areDatesEqual(
   left: Date | null | undefined,
@@ -37,13 +151,17 @@ function areDatesEqual(
 async function getTVShowProgressState(
   userId: string,
   tmdbId: number,
+  timeZone: string,
+  preloadedShowDetails?: TMDBTVShowDetails,
 ): Promise<TVShowProgressState> {
-  const showDetails = await tmdbClient.getTVShowDetails(tmdbId);
-  const nextEpisodeDate = showDetails.next_episode_to_air?.air_date
-    ? new Date(showDetails.next_episode_to_air.air_date)
-    : null;
+  const showDetails =
+    preloadedShowDetails ?? (await tmdbClient.getTVShowDetails(tmdbId));
+  const nextEpisodeDate = parseNextEpisodeDate(
+    showDetails.next_episode_to_air?.air_date,
+  );
+  const lastEpisodeToAir = showDetails.last_episode_to_air;
 
-  if (!showDetails.last_episode_to_air) {
+  if (!lastEpisodeToAir) {
     return {
       nextEpisodeDate,
       shouldMarkCompleted: nextEpisodeDate === null,
@@ -69,10 +187,20 @@ async function getTVShowProgressState(
       (episode) => `${episode.seasonNumber}-${episode.episodeNumber}`,
     ),
   );
+
+  // LOGIC-01: TMDB files previews and pilot specials under season 0, so
+  // `last_episode_to_air.season_number` can legitimately be 0. Building
+  // 1..0 produces an empty season list, and an empty list is "fully watched"
+  // vacuously — the show would flip to completed with nothing watched and
+  // lose every schedule. Fall back to the season that actually contains the
+  // last aired episode.
   const targetSeasonNumbers = Array.from(
-    { length: showDetails.last_episode_to_air.season_number },
+    { length: Math.max(lastEpisodeToAir.season_number, 0) },
     (_, index) => index + 1,
   );
+  if (!targetSeasonNumbers.length) {
+    targetSeasonNumbers.push(lastEpisodeToAir.season_number);
+  }
 
   const seasonDetailsList = await Promise.all(
     targetSeasonNumbers.map(async (seasonNumber) => ({
@@ -82,28 +210,35 @@ async function getTVShowProgressState(
   );
 
   const now = new Date();
-  const allAvailableEpisodesWatched = seasonDetailsList.every(
-    ({ seasonNumber, details }) =>
-      details.episodes.every((episode) => {
-        if (!episode.air_date) return true;
+  let airedEpisodeCount = 0;
+  let unwatchedAiredEpisodeCount = 0;
 
-        const airDate = new Date(episode.air_date);
-        if (Number.isNaN(airDate.getTime()) || airDate > now) {
-          return true;
-        }
+  for (const { seasonNumber, details } of seasonDetailsList) {
+    for (const episode of details.episodes ?? []) {
+      // Unknown or future air dates cannot block completion.
+      if (!hasAired(episode.air_date, now, timeZone)) continue;
 
-        if (
-          seasonNumber === showDetails.last_episode_to_air!.season_number &&
-          episode.episode_number > showDetails.last_episode_to_air!.episode_number
-        ) {
-          return true;
-        }
+      // TMDB can list episodes past the one it reports as last-aired.
+      if (
+        seasonNumber === lastEpisodeToAir.season_number &&
+        episode.episode_number > lastEpisodeToAir.episode_number
+      ) {
+        continue;
+      }
 
-        return watchedEpisodeSet.has(
-          `${seasonNumber}-${episode.episode_number}`,
-        );
-      }),
-  );
+      airedEpisodeCount += 1;
+      if (
+        !watchedEpisodeSet.has(`${seasonNumber}-${episode.episode_number}`)
+      ) {
+        unwatchedAiredEpisodeCount += 1;
+      }
+    }
+  }
+
+  // Never conclude "fully watched" from an empty set of episodes — that is the
+  // vacuous truth that LOGIC-01 turned into instant completion.
+  const allAvailableEpisodesWatched =
+    airedEpisodeCount > 0 && unwatchedAiredEpisodeCount === 0;
 
   if (!allAvailableEpisodesWatched) {
     return {
@@ -129,55 +264,95 @@ async function getTVShowProgressState(
 }
 
 /**
- * Sync episode status to collaborators in shared lists
+ * Resolve the sync-enabled lists this user may drive writes for, deduplicated
+ * by list id. The join against `list_collaborators` fans out one row per
+ * collaborator, so without this the caller repeats identical work N times
+ * (DATA-05). Mirrors the `Map` approach in `src/lib/schedules/service.ts`.
  */
-export async function syncEpisodeStatusToCollaborators(
+async function getSyncEnabledListsForUser(
   userId: string,
   tmdbId: number,
-  seasonNumber: number,
-  episodeNumber: number,
-  watched: boolean,
-): Promise<string[]> {
-  try {
-    // Find all lists that contain this TV show and have sync enabled
-    const syncEnabledLists = await db
-      .select({
-        listId: lists.id,
-        ownerId: lists.ownerId,
-      })
-      .from(lists)
-      .innerJoin(listItems, eq(listItems.listId, lists.id))
-      .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
-      .where(
-        and(
-          eq(lists.syncWatchStatus, true),
-          eq(listItems.tmdbId, tmdbId),
-          eq(listItems.contentType, ContentType.TV),
-          // Only the owner or a COLLABORATOR (write-capable) may drive a sync;
-          // a read-only viewer must not overwrite other members' episode
-          // statuses or delete their schedules.
-          or(
-            eq(lists.ownerId, userId),
-            and(
-              eq(listCollaborators.userId, userId),
-              eq(
-                listCollaborators.permissionLevel,
-                PermissionLevel.COLLABORATOR,
-              ),
-            ),
+  executor: DbExecutor,
+): Promise<Array<{ listId: string; ownerId: string }>> {
+  const rows = await executor
+    .select({
+      listId: lists.id,
+      ownerId: lists.ownerId,
+    })
+    .from(lists)
+    .innerJoin(listItems, eq(listItems.listId, lists.id))
+    .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
+    .where(
+      and(
+        eq(lists.syncWatchStatus, true),
+        eq(listItems.tmdbId, tmdbId),
+        eq(listItems.contentType, ContentType.TV),
+        // Only the owner or a COLLABORATOR (write-capable) may drive a sync;
+        // a read-only viewer must not overwrite other members' episode
+        // statuses or delete their schedules.
+        or(
+          eq(lists.ownerId, userId),
+          and(
+            eq(listCollaborators.userId, userId),
+            eq(listCollaborators.permissionLevel, PermissionLevel.COLLABORATOR),
           ),
         ),
-      );
+      ),
+    );
+
+  const uniqueLists = new Map<string, { listId: string; ownerId: string }>();
+  for (const row of rows) {
+    if (!uniqueLists.has(row.listId)) {
+      uniqueLists.set(row.listId, {
+        listId: row.listId,
+        ownerId: row.ownerId,
+      });
+    }
+  }
+
+  return Array.from(uniqueLists.values());
+}
+
+function dedupeEpisodeSelections(
+  episodes: EpisodeSelection[],
+): EpisodeSelection[] {
+  // A single upsert statement cannot touch the same conflict target twice,
+  // and the last instruction for an episode is the one the user meant.
+  const byKey = new Map<string, EpisodeSelection>();
+  for (const episode of episodes) {
+    byKey.set(`${episode.seasonNumber}-${episode.episodeNumber}`, episode);
+  }
+
+  return Array.from(byKey.values());
+}
+
+/**
+ * Sync episode statuses to collaborators in shared lists.
+ */
+export async function syncEpisodeStatusesToCollaborators(
+  userId: string,
+  tmdbId: number,
+  episodes: EpisodeSelection[],
+  executor: DbExecutor = db,
+): Promise<string[]> {
+  const targetEpisodes = dedupeEpisodeSelections(episodes);
+  if (targetEpisodes.length === 0) return [];
+
+  try {
+    const syncEnabledLists = await getSyncEnabledListsForUser(
+      userId,
+      tmdbId,
+      executor,
+    );
 
     const syncedCollaboratorIds = new Set<string>();
 
     // TODO(FOLLOW-UP): collaborators are written to without an opt-in/
     // acceptance step (see syncStatusToCollaborators and PR API-02 notes).
 
-    // For each sync-enabled list, update episode status for all collaborators
     for (const list of syncEnabledLists) {
       // Get all collaborators (including owner) for this list
-      const collaborators = await db
+      const collaborators = await executor
         .select({ userId: listCollaborators.userId })
         .from(listCollaborators)
         .where(eq(listCollaborators.listId, list.listId));
@@ -188,50 +363,36 @@ export async function syncEpisodeStatusToCollaborators(
         list.ownerId,
       ].filter((id) => id !== userId); // Exclude the user who made the update
 
-      // Update episode status for each collaborator
       for (const collaboratorId of allUsers) {
-        // Check if collaborator already has episode status
-        const existingEpisodeStatus = await db
-          .select()
-          .from(episodeWatchStatus)
-          .where(
-            and(
-              eq(episodeWatchStatus.userId, collaboratorId),
-              eq(episodeWatchStatus.tmdbId, tmdbId),
-              eq(episodeWatchStatus.seasonNumber, seasonNumber),
-              eq(episodeWatchStatus.episodeNumber, episodeNumber),
-            ),
-          )
-          .limit(1);
+        if (syncedCollaboratorIds.has(collaboratorId)) continue;
 
-        if (existingEpisodeStatus.length === 0) {
-          // Create new episode status
-          await db.insert(episodeWatchStatus).values({
-            userId: collaboratorId,
-            tmdbId,
-            seasonNumber,
-            episodeNumber,
-            watched: watched,
-            watchedAt: watched ? new Date() : null,
+        const now = new Date();
+        await executor
+          .insert(episodeWatchStatus)
+          .values(
+            targetEpisodes.map((episode) => ({
+              userId: collaboratorId,
+              tmdbId,
+              seasonNumber: episode.seasonNumber,
+              episodeNumber: episode.episodeNumber,
+              watched: episode.watched,
+              watchedAt: episode.watched ? now : null,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [
+              episodeWatchStatus.userId,
+              episodeWatchStatus.tmdbId,
+              episodeWatchStatus.seasonNumber,
+              episodeWatchStatus.episodeNumber,
+            ],
+            set: {
+              watched: sql`excluded.watched`,
+              watchedAt: sql`excluded.watched_at`,
+              updatedAt: now,
+            },
           });
-        } else {
-          // Update existing status
-          await db
-            .update(episodeWatchStatus)
-            .set({
-              watched: watched,
-              watchedAt: watched ? new Date() : null,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(episodeWatchStatus.userId, collaboratorId),
-                eq(episodeWatchStatus.tmdbId, tmdbId),
-                eq(episodeWatchStatus.seasonNumber, seasonNumber),
-                eq(episodeWatchStatus.episodeNumber, episodeNumber),
-              ),
-            );
-        }
+
         syncedCollaboratorIds.add(collaboratorId);
       }
     }
@@ -242,6 +403,21 @@ export async function syncEpisodeStatusToCollaborators(
     // Don't throw error to avoid breaking the main status update
     return [];
   }
+}
+
+/**
+ * Sync a single episode's status to collaborators in shared lists.
+ */
+export async function syncEpisodeStatusToCollaborators(
+  userId: string,
+  tmdbId: number,
+  seasonNumber: number,
+  episodeNumber: number,
+  watched: boolean,
+): Promise<string[]> {
+  return syncEpisodeStatusesToCollaborators(userId, tmdbId, [
+    { seasonNumber, episodeNumber, watched },
+  ]);
 }
 
 /**
@@ -316,10 +492,18 @@ export async function createEpisodeActivityEntry(
   watched: boolean,
   syncedCollaboratorIds: string[],
   episodeName?: string,
+  options?: {
+    showDetails?: TMDBTVShowDetails;
+    episodeCount?: number;
+    executor?: DbExecutor;
+  },
 ) {
   try {
-    const showDetails = await tmdbClient.getTVShowDetails(tmdbId);
-    await db.insert(activityFeed).values({
+    const showDetails =
+      options?.showDetails ?? (await tmdbClient.getTVShowDetails(tmdbId));
+    const executor = options?.executor ?? db;
+
+    await executor.insert(activityFeed).values({
       userId,
       activityType: ActivityType.EPISODE_PROGRESS,
       tmdbId,
@@ -331,6 +515,9 @@ export async function createEpisodeActivityEntry(
         title: showDetails.name,
         posterPath: showDetails.poster_path,
         ...(episodeName && { episodeName }),
+        ...(options?.episodeCount && options.episodeCount > 1
+          ? { episodeCount: options.episodeCount }
+          : {}),
       },
       collaborators: syncedCollaboratorIds,
       isCollaborative: syncedCollaboratorIds.length > 0,
@@ -350,10 +537,12 @@ export async function updateTVShowStatus(
   _seasonNumber: number,
   _episodeNumber: number,
   watched: boolean,
+  options?: {
+    timeZone?: string;
+    showDetails?: TMDBTVShowDetails;
+  },
 ): Promise<WatchStatusEnum | null> {
-  if (!watched) {
-    return null;
-  }
+  const timeZone = options?.timeZone ?? (await getUserTimeZone(userId));
 
   const contentStatus = await db
     .select()
@@ -367,8 +556,22 @@ export async function updateTVShowStatus(
     )
     .limit(1);
 
+  // LOGIC-02: un-marking an episode has to recompute the show status too,
+  // otherwise a mis-clicked finale leaves the show stuck on `completed` with
+  // its schedules already deleted and no UI path back. The only case an
+  // unwatch must not act on is a show that has no status row at all — there
+  // is nothing to downgrade and no reason to start tracking it.
+  if (contentStatus.length === 0 && !watched) {
+    return null;
+  }
+
   let newStatus: WatchStatusEnum | null = null;
-  const progressState = await getTVShowProgressState(userId, tmdbId);
+  const progressState = await getTVShowProgressState(
+    userId,
+    tmdbId,
+    timeZone,
+    options?.showDetails,
+  );
   const existingStatus = contentStatus[0] ?? null;
   const shouldMarkCompleted = progressState.shouldMarkCompleted;
 
@@ -417,7 +620,11 @@ export async function updateTVShowStatus(
         );
     }
 
-    // Remove schedules when show is completed
+    // TODO(FOLLOW-UP): LOGIC-06 — completing a show hard-deletes its
+    // schedules, which is unrecoverable because `createSchedule` refuses
+    // completed shows. These should be soft-disabled (a `disabled` /
+    // `disabledAt` column) so re-opening a show restores its schedule.
+    // That needs a schema change and is owned by a separate change.
     try {
       const deletedSchedules = await db
         .delete(showSchedules)
@@ -488,6 +695,7 @@ export async function completeEpisodeUpdate(
   episodeName?: string,
   options?: {
     skipShowStatus?: boolean;
+    timeZone?: string;
   },
 ) {
   // Update episode status
@@ -528,6 +736,7 @@ export async function completeEpisodeUpdate(
         seasonNumber,
         episodeNumber,
         watched,
+        { timeZone: options?.timeZone },
       );
 
   return {
@@ -538,52 +747,120 @@ export async function completeEpisodeUpdate(
 }
 
 /**
- * Batch update multiple episodes
+ * Batch update multiple episodes.
+ *
+ * DATA-04: the show is fetched from TMDB once for the whole batch, every
+ * episode row is written in a single upsert, one summary activity row is
+ * emitted, and the writes run inside a transaction so a mid-batch failure
+ * cannot leave half a season marked with a stale show status.
  */
 export async function batchUpdateEpisodes(
   userId: string,
   tmdbId: number,
-  episodes: Array<{
-    seasonNumber: number;
-    episodeNumber: number;
-    watched: boolean;
-  }>,
+  episodes: EpisodeSelection[],
 ) {
-  const results = [];
-  const allSyncedCollaboratorIds = new Set<string>();
-  let finalStatus = null;
+  const targetEpisodes = dedupeEpisodeSelections(episodes);
 
-  for (const episode of episodes) {
-    const result = await completeEpisodeUpdate(
-      userId,
-      tmdbId,
-      episode.seasonNumber,
-      episode.episodeNumber,
-      episode.watched,
-      undefined,
-      { skipShowStatus: true },
-    );
+  if (targetEpisodes.length === 0) {
+    return {
+      episodes: [],
+      newStatus: null,
+      syncedCollaboratorIds: [] as string[],
+    };
+  }
 
-    results.push(result.episode);
-    result.syncedCollaboratorIds.forEach((id) =>
-      allSyncedCollaboratorIds.add(id),
+  const timeZone = await getUserTimeZone(userId);
+
+  // Every episode in a batch belongs to the same show, so one TMDB round trip
+  // covers the whole batch instead of one per episode. Fetched before the
+  // transaction opens so a slow upstream call never holds a DB transaction.
+  let showDetails: TMDBTVShowDetails | undefined;
+  try {
+    showDetails = await tmdbClient.getTVShowDetails(tmdbId);
+  } catch (error) {
+    console.error(
+      "Error loading show details for batch episode update:",
+      error,
     );
   }
 
-  const lastWatchedEpisode = [...episodes].reverse().find((episode) => episode.watched);
-  if (lastWatchedEpisode) {
-    finalStatus = await updateTVShowStatus(
-      userId,
-      tmdbId,
-      lastWatchedEpisode.seasonNumber,
-      lastWatchedEpisode.episodeNumber,
-      true,
-    );
-  }
+  const now = new Date();
+  const rows = targetEpisodes.map((episode) => ({
+    userId,
+    tmdbId,
+    seasonNumber: episode.seasonNumber,
+    episodeNumber: episode.episodeNumber,
+    watched: episode.watched,
+    watchedAt: episode.watched ? now : null,
+  }));
+
+  const anyWatched = targetEpisodes.some((episode) => episode.watched);
+  const summaryEpisode =
+    [...targetEpisodes].reverse().find((episode) => episode.watched === anyWatched) ??
+    targetEpisodes[targetEpisodes.length - 1];
+
+  const { updatedEpisodes, syncedCollaboratorIds } = await db.transaction(
+    async (tx) => {
+      const updated = await tx
+        .insert(episodeWatchStatus)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: [
+            episodeWatchStatus.userId,
+            episodeWatchStatus.tmdbId,
+            episodeWatchStatus.seasonNumber,
+            episodeWatchStatus.episodeNumber,
+          ],
+          set: {
+            watched: sql`excluded.watched`,
+            watchedAt: sql`excluded.watched_at`,
+            updatedAt: now,
+          },
+        })
+        .returning();
+
+      const synced = await syncEpisodeStatusesToCollaborators(
+        userId,
+        tmdbId,
+        targetEpisodes,
+        tx,
+      );
+
+      // One summary row per perceived action rather than one row per episode.
+      await createEpisodeActivityEntry(
+        userId,
+        tmdbId,
+        summaryEpisode.seasonNumber,
+        summaryEpisode.episodeNumber,
+        anyWatched,
+        synced,
+        undefined,
+        {
+          showDetails,
+          episodeCount: targetEpisodes.length,
+          executor: tx,
+        },
+      );
+
+      return { updatedEpisodes: updated ?? [], syncedCollaboratorIds: synced };
+    },
+  );
+
+  // LOGIC-02: recompute unconditionally. An all-unwatch batch ("reset season")
+  // contains no watched episode, and skipping the recompute used to leave the
+  // show stuck on `completed`.
+  const finalStatus = await updateTVShowStatus(
+    userId,
+    tmdbId,
+    summaryEpisode.seasonNumber,
+    summaryEpisode.episodeNumber,
+    anyWatched,
+    { timeZone, showDetails },
+  );
 
   return {
-    episodes: results,
+    episodes: updatedEpisodes,
     newStatus: finalStatus,
-    syncedCollaboratorIds: Array.from(allSyncedCollaboratorIds),
+    syncedCollaboratorIds,
   };
 }
