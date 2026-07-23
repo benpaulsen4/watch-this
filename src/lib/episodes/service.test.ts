@@ -359,8 +359,9 @@ describe("episodes service", () => {
 
     await markNextEpisodeWatched(userId, 14);
 
-    // The ordered watched-episode scan is now bounded to one row instead of
-    // pulling every watched episode into JS to read `[0]`.
-    expect((db as any).__getLimitCalls()[0]).toBe(1);
+    // Two bounded lookups: the ordered watched-episode scan (previously
+    // unbounded — it pulled every watched episode into JS to read `[0]`) and
+    // the existing-status probe.
+    expect((db as any).__getLimitCalls()).toEqual([1, 1]);
   });
 });
