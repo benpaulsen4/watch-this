@@ -781,8 +781,8 @@ export async function batchUpdateEpisodes(
   const timeZone = await getUserTimeZone(userId);
 
   // Every episode in a batch belongs to the same show, so one TMDB round trip
-  // covers the whole batch instead of one per episode. Fetched before the
-  // transaction opens so a slow upstream call never holds a DB transaction.
+  // covers the whole batch instead of one per episode. Fetched up front so the
+  // upstream latency is paid once, before any write starts.
   let showDetails: TMDBTVShowDetails | undefined;
   try {
     showDetails = await tmdbClient.getTVShowDetails(tmdbId);
