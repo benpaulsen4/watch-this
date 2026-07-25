@@ -192,6 +192,39 @@ describe("syncStatusToCollaborators", () => {
     expect(result).toEqual(["collab-1"]);
   });
 
+  // DATA-05
+  it("does not repeat work when the collaborator join fans a list out", async () => {
+    // The join has no groupBy/distinct, so a list with three collaborators
+    // comes back as three identical rows.
+    const fannedOutLists = [
+      { listId: "list-1", ownerId: "owner-1" },
+      { listId: "list-1", ownerId: "owner-1" },
+      { listId: "list-1", ownerId: "owner-1" },
+    ];
+
+    (db as any).__setMockResults([
+      fannedOutLists,
+      [{ userId: "collab-1" }],
+      [{ id: "status-1" }],
+      undefined,
+      [{ id: "status-2" }],
+      undefined,
+    ]);
+
+    const result = await syncStatusToCollaborators(
+      "user-1",
+      10,
+      "movie",
+      "completed"
+    );
+
+    expect(result.slice().sort()).toEqual(["collab-1", "owner-1"].sort());
+
+    // Two collaborators, two writes — not two writes per duplicated join row.
+    expect((db as any).__getUpdateCalls()).toHaveLength(2);
+    expect((db as any).__getInsertCalls()).toHaveLength(0);
+  });
+
   it("returns [] when an error occurs", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     (db.select as any).mockImplementationOnce(() => {

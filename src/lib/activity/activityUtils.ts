@@ -47,6 +47,20 @@ export async function syncStatusToCollaborators(
         )
       );
 
+    // DATA-05: the join against `list_collaborators` fans out one row per
+    // collaborator, so a list with 5 collaborators appears 5 times and the
+    // inner loop below repeats identical work 5 times. Collapse to one entry
+    // per list (same approach as `src/lib/schedules/service.ts`).
+    const uniqueLists = new Map<string, { listId: string; ownerId: string }>();
+    for (const row of syncEnabledLists) {
+      if (!uniqueLists.has(row.listId)) {
+        uniqueLists.set(row.listId, {
+          listId: row.listId,
+          ownerId: row.ownerId,
+        });
+      }
+    }
+
     const syncedCollaboratorIds = new Set<string>();
 
     // TODO(FOLLOW-UP): collaborators are written to without an opt-in/
@@ -55,7 +69,7 @@ export async function syncStatusToCollaborators(
     // acceptance flag and gate sync writes on it (see PR API-02 notes).
 
     // For each sync-enabled list, update status for all collaborators
-    for (const list of syncEnabledLists) {
+    for (const list of uniqueLists.values()) {
       // Get all collaborators (including owner) for this list
       const collaborators = await db
         .select({ userId: listCollaborators.userId })
@@ -70,6 +84,8 @@ export async function syncStatusToCollaborators(
 
       // Update status for each collaborator
       for (const collaboratorId of allUsers) {
+        if (syncedCollaboratorIds.has(collaboratorId)) continue;
+
         // Check if collaborator already has a status for this content
         const existingStatus = await db
           .select()

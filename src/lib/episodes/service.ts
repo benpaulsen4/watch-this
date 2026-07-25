@@ -8,6 +8,8 @@ import {
   batchUpdateEpisodes as batchUpdate,
   completeEpisodeUpdate,
   createEpisodeActivityEntry,
+  getUserTimeZone,
+  hasAired,
   syncEpisodeStatusToCollaborators,
   updateTVShowStatus,
 } from "./episodeUtils";
@@ -97,13 +99,17 @@ export async function markNextEpisodeWatched(
   userId: string,
   tmdbId: number,
 ): Promise<MarkNextEpisodeResult | MarkNextEpisodeError> {
+  let showDetails;
   try {
-    await tmdbClient.getTVShowDetails(tmdbId);
+    showDetails = await tmdbClient.getTVShowDetails(tmdbId);
   } catch (error) {
     if (error instanceof Error && error.message.includes("404"))
       return "notFound";
     throw error;
   }
+  const timeZone = await getUserTimeZone(userId);
+  // DATA-08b: only the most recently watched episode is used, so let the
+  // database do the ordering and return a single row.
   const watchedEpisodes = await db
     .select()
     .from(episodeWatchStatus)
@@ -117,7 +123,8 @@ export async function markNextEpisodeWatched(
     .orderBy(
       desc(episodeWatchStatus.seasonNumber),
       desc(episodeWatchStatus.episodeNumber),
-    );
+    )
+    .limit(1);
   let nextSeasonNumber = 1;
   let nextEpisodeNumber = 1;
   if (watchedEpisodes.length > 0) {
@@ -131,9 +138,20 @@ export async function markNextEpisodeWatched(
     } catch {
       throw new Error("Failed to get season details");
     }
-    if (lastWatched.episodeNumber < seasonDetails.episodes.length) {
+    // LOGIC-10: TMDB seasons are not numbered 1..length — recaps and specials
+    // are commonly filed as episode 0 and numbering gaps exist — so the count
+    // of entries says nothing about the highest episode number. Pick the
+    // smallest episode number strictly greater than the last watched one.
+    const followingEpisodeNumbers = (seasonDetails.episodes ?? [])
+      .map((episode) => episode.episode_number)
+      .filter(
+        (episodeNumber) =>
+          typeof episodeNumber === "number" &&
+          episodeNumber > lastWatched.episodeNumber,
+      );
+    if (followingEpisodeNumbers.length > 0) {
       nextSeasonNumber = lastWatched.seasonNumber;
-      nextEpisodeNumber = lastWatched.episodeNumber + 1;
+      nextEpisodeNumber = Math.min(...followingEpisodeNumbers);
     } else {
       nextSeasonNumber = lastWatched.seasonNumber + 1;
       nextEpisodeNumber = 1;
@@ -151,9 +169,13 @@ export async function markNextEpisodeWatched(
       return "noNextEpisode";
     throw error;
   }
-  const airDate = new Date(nextEpisodeDetails.air_date);
-  const now = new Date();
-  if (airDate > now) return "notAired";
+  // LOGIC-11/LOGIC-15: a missing or unparseable air date must count as
+  // not-aired (`new Date(null)` is the epoch and `new Date("")` is an Invalid
+  // Date, and every comparison with an Invalid Date is false, so the old guard
+  // fell straight through). Bare "YYYY-MM-DD" dates are compared as calendar
+  // days in the user's timezone rather than as UTC instants.
+  if (!hasAired(nextEpisodeDetails.air_date, new Date(), timeZone))
+    return "notAired";
   const existingStatus = await db
     .select()
     .from(episodeWatchStatus)
@@ -208,6 +230,7 @@ export async function markNextEpisodeWatched(
     true,
     syncedCollaboratorIds,
     nextEpisodeDetails.name,
+    { showDetails },
   );
   const newStatus = await updateTVShowStatus(
     userId,
@@ -215,6 +238,7 @@ export async function markNextEpisodeWatched(
     nextSeasonNumber,
     nextEpisodeNumber,
     true,
+    { timeZone, showDetails },
   );
   return {
     episode: mapRow(result),

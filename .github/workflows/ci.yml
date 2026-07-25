@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: "package-lock.json"
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: "package-lock.json"
+      - name: Install
+        run: npm ci
+      # `npm run lint` rewrites files with --fix, which would let a violation
+      # pass here. lint:ci is the non-mutating, warnings-are-errors form.
+      - name: Lint
+        run: npm run lint:ci
+
+  vitest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: "package-lock.json"
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: npm run test
+        env:
+          CI: true
+
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: "package-lock.json"
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build
+        env:
+          # src/lib/db/index.ts throws at module scope when DATABASE_URL is
+          # unset, and `next build` evaluates route modules while collecting
+          # page data. Nothing connects to a database during the build, so a
+          # placeholder is sufficient - and keeps a real credential out of CI.
+          DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
