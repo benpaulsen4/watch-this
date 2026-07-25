@@ -17,6 +17,10 @@ const connectionString = process.env.DATABASE_URL;
 // module re-evaluation reuses the existing pool.
 const isProduction = process.env.NODE_ENV === "production";
 
+// `sslmode` / `ssl` in the URL is postgres-js's own way of asking for TLS, so a
+// URL that sets it already says what it wants and we must not answer for it.
+const urlSpecifiesTls = /[?&](sslmode|ssl)=/.test(connectionString);
+
 function createClient() {
   return postgres(connectionString, {
     // Sized for Fluid Compute, NOT the classic one-invocation-per-instance
@@ -37,13 +41,16 @@ function createClient() {
     // Named prepared statements are not supported by transaction-mode poolers
     // (PgBouncer/Supavisor), which is what a serverless deployment sits behind.
     prepare: false,
-    // postgres-js only enables TLS when the URL asks for it. Managed Postgres
-    // always requires it, so default to "require" in production for URLs that
-    // omit the parameter; URLs that specify it keep their own setting.
-    ssl:
-      isProduction && !/[?&](sslmode|ssl)=/.test(connectionString)
-        ? "require"
-        : undefined,
+    // Managed Postgres always requires TLS, so default to "require" in
+    // production for URLs that omit the parameter.
+    //
+    // This MUST spread the key in rather than set it to undefined. postgres-js
+    // resolves every option with `k in options ? options[k] : query[k] ?? ...`
+    // (see parseOptions in postgres/src/index.js), an `in` check -- so an
+    // explicitly present `ssl: undefined` *wins* over the URL's `?sslmode=` and
+    // falls through to the driver default of `false`, i.e. it silently turns
+    // TLS off. "Let the URL decide" has to be expressed as an absent key.
+    ...(isProduction && !urlSpecifiesTls ? { ssl: "require" as const } : {}),
   });
 }
 
