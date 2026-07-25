@@ -385,12 +385,36 @@ describe("activity service", () => {
 
     const res = await listActivityTimeline(userId, tz, {
       limit: 10,
-      cursor: "2025-01-01T00:00:00.000Z|a2",
+      // `activity_feed.id` is a uuid column, so a real successor cursor carries
+      // a uuid here.
+      cursor: "2025-01-01T00:00:00.000Z|1e5f7a2c-9d64-4f2b-8a41-0c3b6d9e7f11",
     });
 
-    // `new Date("2025-01-01T00:00:00.000Z|a2")` is an Invalid Date, so the old
+    // `new Date("2025-01-01T00:00:00.000Z|<id>")` is an Invalid Date, so the old
     // parser rejected its own successor cursor outright.
     expect(res).not.toBe("invalidCursor");
+  });
+
+  // The id half is fed straight to `lt(activityFeed.id, ...)` against a uuid
+  // column, so anything that is not uuid-shaped made Postgres raise
+  // `22P02 invalid input syntax for type uuid` — an unhandled 500 on an
+  // endpoint that already has a working invalidCursor -> 400 path.
+  it.each([
+    ["2025-01-01T00:00:00.000Z|x"],
+    ["2025-01-01T00:00:00.000Z|"],
+    ["2025-01-01T00:00:00.000Z|'; drop table activity_feed --"],
+    ["2025-01-01T00:00:00.000Z|1e5f7a2c-9d64-4f2b-8a41-0c3b6d9e7f1"],
+    ["2025-01-01T00:00:00.000Z|1e5f7a2c9d644f2b8a410c3b6d9e7f11"],
+  ])("rejects a compound cursor whose id half is not a uuid (%s)", async (
+    cursor,
+  ) => {
+    (db as any).__setMockResults([[], []]);
+
+    const res = await listActivityTimeline(userId, tz, { limit: 10, cursor });
+
+    expect(res).toBe("invalidCursor");
+    // Rejected before any query is issued.
+    expect((db.select as any).mock.calls).toHaveLength(0);
   });
 
   it("still accepts a legacy bare-ISO cursor", async () => {

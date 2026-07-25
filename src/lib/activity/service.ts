@@ -30,6 +30,16 @@ import type {
 } from "./types";
 
 /**
+ * `activity_feed.id` is a `uuid` column, and the cursor reaches this service
+ * verbatim from a query param. Feeding an arbitrary string to `lt(id, ...)`
+ * makes Postgres raise `22P02 invalid input syntax for type uuid`, which
+ * surfaces as an unhandled 500 on an endpoint that already has a perfectly
+ * good `invalidCursor` -> 400 path. Validate the shape here instead.
+ */
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
  * LOGIC-14: pagination used a bare `createdAt` cursor with a strict `lt`.
  * Batch writes can land several rows in the same millisecond, so a page
  * boundary falling mid-tie silently dropped every remaining row at that
@@ -53,7 +63,12 @@ function decodeCursor(
   const createdAt = new Date(rawDate);
   if (Number.isNaN(createdAt.getTime())) return "invalid";
 
-  return { createdAt, id: rawId || undefined };
+  // A bare-ISO cursor (no separator) has no id half and stays legacy-shaped.
+  // Anything else claiming to carry an id must actually carry a uuid.
+  if (rawId === undefined) return { createdAt };
+  if (!UUID_PATTERN.test(rawId)) return "invalid";
+
+  return { createdAt, id: rawId };
 }
 
 export async function listActivityTimeline(
