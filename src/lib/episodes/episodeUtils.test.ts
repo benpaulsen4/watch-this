@@ -163,6 +163,39 @@ describe("episodeUtils date helpers", () => {
     );
     expect(hasAired("2026-07-21", afterUtcMidnight, "UTC")).toBe(true);
   });
+
+  // LOGIC-15: an air date that carries a time is an instant, and resolving it
+  // in UTC while comparing it against a key built from the viewer's zone puts
+  // two calendars in one comparison.
+  it("resolves a timestamped air date in the requested timezone", () => {
+    const instant = "2026-07-20T22:00:00Z";
+
+    expect(getAirDateKey(instant, "Pacific/Auckland")).toBe("2026-07-21");
+    expect(getAirDateKey(instant, "Pacific/Honolulu")).toBe("2026-07-20");
+    expect(getAirDateKey(instant, "UTC")).toBe("2026-07-20");
+    // No zone given: UTC, as before.
+    expect(getAirDateKey(instant)).toBe("2026-07-20");
+  });
+
+  it("does not count a timestamped air date that is still in the viewer's future", () => {
+    // 2026-07-20 13:00Z is 2026-07-21 01:00 in Auckland, and the viewer is
+    // only at 2026-07-20 18:00 local — the episode has not aired for them.
+    expect(
+      hasAired(
+        "2026-07-20T13:00:00Z",
+        new Date("2026-07-20T06:00:00Z"),
+        "Pacific/Auckland",
+      ),
+    ).toBe(false);
+    // Same instant, a viewer far enough into their day to have seen it.
+    expect(
+      hasAired(
+        "2026-07-20T13:00:00Z",
+        new Date("2026-07-21T06:00:00Z"),
+        "Pacific/Auckland",
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("episodeUtils.updateTVShowStatus", () => {
@@ -320,6 +353,35 @@ describe("episodeUtils.updateTVShowStatus", () => {
     // all of its schedules with it.
     expect(result).toBe(WatchStatus.WATCHING);
     expect((db as any).__getDeleteCalls()).toHaveLength(0);
+    expect((tmdbClient.getTVSeasonDetails as any).mock.calls).toEqual([
+      [100, 0],
+    ]);
+  });
+
+  // LOGIC-01
+  it("clamps a negative last-aired season number instead of fetching it verbatim", async () => {
+    (db as any).__setMockResults([
+      TIMEZONE_ROW,
+      [{ status: "planning", nextEpisodeDate: null }],
+      [],
+      undefined,
+    ]);
+
+    (tmdbClient.getTVShowDetails as any).mockResolvedValue({
+      last_episode_to_air: {
+        season_number: -1,
+        episode_number: 1,
+      },
+      next_episode_to_air: null,
+    });
+    (tmdbClient.getTVSeasonDetails as any).mockResolvedValue({
+      episodes: [{ episode_number: 1, air_date: "2024-01-01" }],
+    });
+
+    await updateTVShowStatus("u1", 100, 1, 1, true);
+
+    // `Math.max(season_number, 0)` guarded the generated range but the fallback
+    // pushed the raw value, so a negative season number still went to TMDB.
     expect((tmdbClient.getTVSeasonDetails as any).mock.calls).toEqual([
       [100, 0],
     ]);

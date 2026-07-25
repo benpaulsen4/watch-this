@@ -48,9 +48,15 @@ export type EpisodeSelection = {
  * calendar day the viewer actually experienced (LOGIC-15). Keep bare dates as
  * calendar keys so they can be compared against the viewer's local day, and
  * return null for missing/unparseable values (LOGIC-11).
+ *
+ * A value that carries a time (or an offset) is a real instant, so it has to be
+ * resolved in the *viewer's* zone: resolving it in UTC and then comparing the
+ * result against a key built from the viewer's zone mixes two calendars in one
+ * comparison, which is exactly the bug LOGIC-15 exists to fix.
  */
 export function getAirDateKey(
   airDate: string | null | undefined,
+  timeZone: string = DEFAULT_TIME_ZONE,
 ): string | null {
   if (!airDate) return null;
 
@@ -62,7 +68,7 @@ export function getAirDateKey(
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return null;
 
-  return getTimezoneDateKey(parsed, DEFAULT_TIME_ZONE);
+  return getTimezoneDateKey(parsed, timeZone);
 }
 
 /**
@@ -75,7 +81,7 @@ export function hasAired(
   now: Date,
   timeZone: string,
 ): boolean {
-  const airDateKey = getAirDateKey(airDate);
+  const airDateKey = getAirDateKey(airDate, timeZone);
   if (!airDateKey) return false;
 
   return airDateKey <= getTimezoneDateKey(now, timeZone);
@@ -171,12 +177,15 @@ async function getTVShowProgressState(
   // vacuously — the show would flip to completed with nothing watched and
   // lose every schedule. Fall back to the season that actually contains the
   // last aired episode.
+  const lastSeasonNumber = Math.max(lastEpisodeToAir.season_number, 0);
   const targetSeasonNumbers = Array.from(
-    { length: Math.max(lastEpisodeToAir.season_number, 0) },
+    { length: lastSeasonNumber },
     (_, index) => index + 1,
   );
   if (!targetSeasonNumbers.length) {
-    targetSeasonNumbers.push(lastEpisodeToAir.season_number);
+    // Clamped, not raw: a negative `season_number` would otherwise slip past
+    // the `Math.max` guard above and be fetched verbatim.
+    targetSeasonNumbers.push(lastSeasonNumber);
   }
 
   const seasonDetailsList = await Promise.all(
