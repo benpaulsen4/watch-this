@@ -32,6 +32,7 @@ describe("db client (DATA-03)", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     delete globalForDb.__watchThisPostgresClient;
     if (originalUrl === undefined) {
       delete process.env.DATABASE_URL;
@@ -72,5 +73,87 @@ describe("db client (DATA-03)", () => {
   it("throws when DATABASE_URL is missing", async () => {
     delete process.env.DATABASE_URL;
     await expect(import("./index")).rejects.toThrow(/DATABASE_URL/);
+  });
+
+  it("caches the client in production too", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    await import("./index");
+    expect(postgresMock).toHaveBeenCalledTimes(1);
+    expect(globalForDb.__watchThisPostgresClient).toBeDefined();
+
+    // A production build can evaluate this module more than once across route
+    // bundles; the second evaluation must reuse the pool, not open a new one.
+    vi.resetModules();
+    await import("./index");
+    expect(postgresMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe("production pool options", () => {
+    const loadOptions = async (url: string) => {
+      vi.stubEnv("NODE_ENV", "production");
+      process.env.DATABASE_URL = url;
+      await import("./index");
+      const options = postgresMock.mock.calls[0][1];
+      if (!options) throw new Error("no pool options passed");
+      return options;
+    };
+
+    it("allows a little real concurrency per instance", async () => {
+      const options = await loadOptions(
+        "postgres://user:pw@db.example.com:5432/watchthis",
+      );
+      // Fluid Compute multiplexes concurrent invocations onto one instance, so
+      // `max: 1` serialises every concurrent request behind a single socket.
+      expect(options.max).toBeGreaterThan(1);
+      // But still far below the driver default of 10 that DATA-03 was about.
+      expect(options.max).toBeLessThanOrEqual(3);
+      expect(options.idle_timeout).toBe(20);
+    });
+
+    // The ssl regex is the subtlest line in the module: it must default TLS on
+    // for URLs that say nothing about it, and defer to URLs that do.
+    it("defaults ssl to require when the URL says nothing about TLS", async () => {
+      const options = await loadOptions(
+        "postgres://user:pw@db.example.com:5432/watchthis",
+      );
+      expect(options.ssl).toBe("require");
+    });
+
+    it("defers to an explicit ?sslmode= in the URL", async () => {
+      const options = await loadOptions(
+        "postgres://user:pw@db.example.com:5432/watchthis?sslmode=verify-full",
+      );
+      expect(options.ssl).toBeUndefined();
+    });
+
+    it("defers to an explicit &ssl= in a URL with other params", async () => {
+      const options = await loadOptions(
+        "postgres://user:pw@db.example.com:5432/watchthis?pool_timeout=5&ssl=true",
+      );
+      expect(options.ssl).toBeUndefined();
+    });
+
+    // `sslrootcert` names a CA file; it does not decide whether TLS is on, so
+    // it must NOT suppress the default. A regex of /ssl/ would get this wrong.
+    it("still defaults ssl on when only ?sslrootcert= is present", async () => {
+      const options = await loadOptions(
+        "postgres://user:pw@db.example.com:5432/watchthis?sslrootcert=/ca.pem",
+      );
+      expect(options.ssl).toBe("require");
+    });
+
+    it("leaves ssl unset outside production", async () => {
+      const options = await loadOptions(
+        "postgres://user:pw@db.example.com:5432/watchthis",
+      );
+      expect(options.ssl).toBe("require");
+
+      postgresMock.mockClear();
+      delete globalForDb.__watchThisPostgresClient;
+      vi.resetModules();
+      vi.stubEnv("NODE_ENV", "development");
+      await import("./index");
+      expect(postgresMock.mock.calls[0][1]?.ssl).toBeUndefined();
+    });
   });
 });

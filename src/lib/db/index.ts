@@ -13,15 +13,23 @@ const connectionString = process.env.DATABASE_URL;
 // dev fast-refresh (the old pool keeps its sockets open) and, in production,
 // takes the driver default of `max: 10` *per lambda instance* -- 30 warm
 // instances is 300 connections against a pooler that typically caps far lower.
-// So: explicit, serverless-sized pool options, plus a `globalThis` cache
-// outside production so module re-evaluation reuses the existing pool.
+// So: explicit, serverless-sized pool options, plus a `globalThis` cache so
+// module re-evaluation reuses the existing pool.
 const isProduction = process.env.NODE_ENV === "production";
 
 function createClient() {
   return postgres(connectionString, {
-    // Serverless: one connection per instance. Concurrency comes from the
-    // platform spawning instances, not from a deep per-instance pool.
-    max: isProduction ? 1 : 5,
+    // Sized for Fluid Compute, NOT the classic one-invocation-per-instance
+    // lambda model. Fluid multiplexes concurrent invocations onto a single
+    // instance, so `max: 1` would make every concurrent request on that
+    // instance queue behind one socket -- and several service functions hold
+    // that socket for a whole transaction, so one slow transaction stalls
+    // every other request the instance is serving. 3 keeps a small amount of
+    // real concurrency while staying far below what DATA-03 was filed
+    // against: 30 warm instances x 3 = 90 connections, versus 300 for the
+    // driver default. `idle_timeout` below returns the extra sockets quickly,
+    // so they are only held while actually needed.
+    max: isProduction ? 3 : 5,
     // Return sockets to the pooler promptly instead of holding them idle.
     idle_timeout: 20,
     // Fail fast rather than hanging a request for the driver's default.
@@ -43,11 +51,12 @@ const globalForDb = globalThis as unknown as {
   __watchThisPostgresClient?: ReturnType<typeof createClient>;
 };
 
+// Cache unconditionally. The Prisma-style "dev only" guard exists to avoid
+// leaking a singleton into a long-lived server process, which does not apply
+// here: a Next production build can evaluate this module more than once across
+// route bundles, and reusing one pool is strictly safer than creating a second.
 const client = globalForDb.__watchThisPostgresClient ?? createClient();
-
-if (!isProduction) {
-  globalForDb.__watchThisPostgresClient = client;
-}
+globalForDb.__watchThisPostgresClient = client;
 
 // Create the database instance
 export const db = drizzle(client, { schema });
