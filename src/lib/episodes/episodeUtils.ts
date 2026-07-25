@@ -528,8 +528,6 @@ export async function updateTVShowStatus(
     showDetails?: TMDBTVShowDetails;
   },
 ): Promise<WatchStatusEnum | null> {
-  const timeZone = options?.timeZone ?? (await getUserTimeZone(userId));
-
   const contentStatus = await db
     .select()
     .from(userContentStatus)
@@ -547,9 +545,14 @@ export async function updateTVShowStatus(
   // its schedules already deleted and no UI path back. The only case an
   // unwatch must not act on is a show that has no status row at all — there
   // is nothing to downgrade and no reason to start tracking it.
+  //
+  // Checked before the timezone lookup: this is the most common no-op path and
+  // it has no use for a calendar.
   if (contentStatus.length === 0 && !watched) {
     return null;
   }
+
+  const timeZone = options?.timeZone ?? (await getUserTimeZone(userId));
 
   let newStatus: WatchStatusEnum | null = null;
   const progressState = await getTVShowProgressState(
@@ -629,7 +632,16 @@ export async function updateTVShowStatus(
       // Don't fail the main operation if schedule cleanup fails
     }
   } else {
-    const needsWatchingStatus = existingStatus.status !== WatchStatus.WATCHING;
+    // LOGIC-02 promotes a show back to `watching`, but only for the two cases
+    // it is meant to cover: the user marked something watched, or a `completed`
+    // show no longer qualifies as complete. `WatchStatus` also contains
+    // `planning`, `paused` and `dropped`, and un-ticking an episode of a show
+    // the user deliberately paused or dropped must not silently re-open it —
+    // `syncStatusToCollaborators` would then push that resurrection out to
+    // everyone on the shared list.
+    const needsWatchingStatus =
+      existingStatus.status !== WatchStatus.WATCHING &&
+      (watched || existingStatus.status === WatchStatus.COMPLETED);
     const needsNextEpisodeDateUpdate = !areDatesEqual(
       existingStatus.nextEpisodeDate,
       progressState.nextEpisodeDate,

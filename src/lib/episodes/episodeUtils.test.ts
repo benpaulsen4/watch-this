@@ -89,8 +89,11 @@ vi.mock("../db", () => {
   } as any;
   const users = {} as any;
   const WatchStatus = {
+    PLANNING: "planning",
     WATCHING: "watching",
+    PAUSED: "paused",
     COMPLETED: "completed",
+    DROPPED: "dropped",
   } as any;
 
   return {
@@ -120,6 +123,7 @@ vi.mock("../activity/activityUtils", () => ({
   syncStatusToCollaborators: vi.fn(async () => undefined),
 }));
 
+import { syncStatusToCollaborators } from "../activity/activityUtils";
 import { db, WatchStatus } from "../db";
 import { tmdbClient } from "../tmdb/client";
 import {
@@ -131,7 +135,8 @@ import {
 } from "./episodeUtils";
 
 // Every `updateTVShowStatus` call that is not handed a timezone resolves the
-// user's zone first; this is the row that lookup consumes.
+// user's zone — after the content-status lookup, which can short-circuit the
+// whole call without needing a calendar at all.
 const TIMEZONE_ROW = [{ timezone: "UTC" }];
 
 describe("episodeUtils date helpers", () => {
@@ -209,8 +214,8 @@ describe("episodeUtils.updateTVShowStatus", () => {
     nextEpisodeDate.setDate(nextEpisodeDate.getDate() + 7);
 
     (db as any).__setMockResults([
-      TIMEZONE_ROW,
       [{ status: WatchStatus.WATCHING, nextEpisodeDate: null }],
+      TIMEZONE_ROW,
       [
         { seasonNumber: 1, episodeNumber: 1 },
         { seasonNumber: 1, episodeNumber: 2 },
@@ -249,13 +254,13 @@ describe("episodeUtils.updateTVShowStatus", () => {
     existingNextEpisodeDate.setDate(existingNextEpisodeDate.getDate() + 5);
 
     (db as any).__setMockResults([
-      TIMEZONE_ROW,
       [
         {
           status: WatchStatus.WATCHING,
           nextEpisodeDate: existingNextEpisodeDate,
         },
       ],
+      TIMEZONE_ROW,
       [{ seasonNumber: 1, episodeNumber: 2 }],
       undefined,
     ]);
@@ -286,8 +291,8 @@ describe("episodeUtils.updateTVShowStatus", () => {
 
   it("marks a show completed only when all aired episodes are watched and no near-term episode is known", async () => {
     (db as any).__setMockResults([
-      TIMEZONE_ROW,
       [{ status: WatchStatus.WATCHING, nextEpisodeDate: null }],
+      TIMEZONE_ROW,
       [
         { seasonNumber: 1, episodeNumber: 1 },
         { seasonNumber: 1, episodeNumber: 2 },
@@ -324,8 +329,8 @@ describe("episodeUtils.updateTVShowStatus", () => {
   // LOGIC-01
   it("does not complete a season-0 show whose specials are unwatched", async () => {
     (db as any).__setMockResults([
-      TIMEZONE_ROW,
       [{ status: "planning", nextEpisodeDate: null }],
+      TIMEZONE_ROW,
       // nothing watched at all
       [],
       undefined,
@@ -361,8 +366,8 @@ describe("episodeUtils.updateTVShowStatus", () => {
   // LOGIC-01
   it("clamps a negative last-aired season number instead of fetching it verbatim", async () => {
     (db as any).__setMockResults([
-      TIMEZONE_ROW,
       [{ status: "planning", nextEpisodeDate: null }],
+      TIMEZONE_ROW,
       [],
       undefined,
     ]);
@@ -390,8 +395,8 @@ describe("episodeUtils.updateTVShowStatus", () => {
   // LOGIC-01
   it("does not complete a show when TMDB returns no episodes for its seasons", async () => {
     (db as any).__setMockResults([
-      TIMEZONE_ROW,
       [{ status: "planning", nextEpisodeDate: null }],
+      TIMEZONE_ROW,
       [],
       undefined,
     ]);
@@ -414,8 +419,8 @@ describe("episodeUtils.updateTVShowStatus", () => {
   // LOGIC-02
   it("downgrades a completed show back to watching when an episode is un-marked", async () => {
     (db as any).__setMockResults([
-      TIMEZONE_ROW,
       [{ status: WatchStatus.COMPLETED, nextEpisodeDate: null }],
+      TIMEZONE_ROW,
       // The finale was just un-marked, so only episode 1 remains watched.
       [{ seasonNumber: 1, episodeNumber: 1 }],
       undefined,
@@ -447,14 +452,121 @@ describe("episodeUtils.updateTVShowStatus", () => {
     expect((db as any).__getDeleteCalls()).toHaveLength(0);
   });
 
+  // LOGIC-02: the downgrade is for `completed` only.
+  it.each([[WatchStatus.DROPPED], [WatchStatus.PAUSED], [WatchStatus.PLANNING]])(
+    "leaves a %s show alone when an episode is un-marked",
+    async (status) => {
+      (db as any).__setMockResults([
+        [{ status, nextEpisodeDate: null }],
+        TIMEZONE_ROW,
+        [{ seasonNumber: 1, episodeNumber: 1 }],
+        undefined,
+      ]);
+
+      (tmdbClient.getTVShowDetails as any).mockResolvedValue({
+        last_episode_to_air: {
+          season_number: 1,
+          episode_number: 2,
+        },
+        next_episode_to_air: null,
+      });
+      (tmdbClient.getTVSeasonDetails as any).mockResolvedValue({
+        episodes: [
+          { episode_number: 1, air_date: "2024-01-01" },
+          { episode_number: 2, air_date: "2024-01-08" },
+        ],
+      });
+
+      const result = await updateTVShowStatus("u1", 100, 1, 2, false);
+
+      // `status !== WATCHING` is also true for planning/paused/dropped, so
+      // un-ticking an episode of a show the user deliberately dropped re-opened
+      // it as `watching` — and pushed that out to every collaborator.
+      expect(result).toBeNull();
+      expect((db as any).__getUpdateCalls()).toHaveLength(0);
+      expect((db as any).__getDeleteCalls()).toHaveLength(0);
+      expect(syncStatusToCollaborators as any).not.toHaveBeenCalled();
+    },
+  );
+
+  // LOGIC-02: only the status is pinned; the schedule hint still refreshes.
+  it("still refreshes nextEpisodeDate for a dropped show without re-opening it", async () => {
+    const staleNextEpisodeDate = new Date("2026-01-01T00:00:00Z");
+
+    (db as any).__setMockResults([
+      [{ status: WatchStatus.DROPPED, nextEpisodeDate: staleNextEpisodeDate }],
+      TIMEZONE_ROW,
+      [{ seasonNumber: 1, episodeNumber: 1 }],
+      undefined,
+    ]);
+
+    (tmdbClient.getTVShowDetails as any).mockResolvedValue({
+      last_episode_to_air: {
+        season_number: 1,
+        episode_number: 2,
+      },
+      next_episode_to_air: null,
+    });
+    (tmdbClient.getTVSeasonDetails as any).mockResolvedValue({
+      episodes: [
+        { episode_number: 1, air_date: "2024-01-01" },
+        { episode_number: 2, air_date: "2024-01-08" },
+      ],
+    });
+
+    const result = await updateTVShowStatus("u1", 100, 1, 2, false);
+
+    expect(result).toBeNull();
+    expect((db as any).__getUpdateCalls()).toHaveLength(1);
+    expect((db as any).__getUpdateCalls()[0].payload).toEqual({
+      nextEpisodeDate: null,
+    });
+    expect(syncStatusToCollaborators as any).not.toHaveBeenCalled();
+  });
+
+  // Pre-existing behaviour: actually watching something resumes a dropped show.
+  it("resumes a dropped show when an episode is marked watched", async () => {
+    (db as any).__setMockResults([
+      [{ status: WatchStatus.DROPPED, nextEpisodeDate: null }],
+      TIMEZONE_ROW,
+      [{ seasonNumber: 1, episodeNumber: 1 }],
+      undefined,
+    ]);
+
+    (tmdbClient.getTVShowDetails as any).mockResolvedValue({
+      last_episode_to_air: {
+        season_number: 1,
+        episode_number: 2,
+      },
+      next_episode_to_air: null,
+    });
+    (tmdbClient.getTVSeasonDetails as any).mockResolvedValue({
+      episodes: [
+        { episode_number: 1, air_date: "2024-01-01" },
+        { episode_number: 2, air_date: "2024-01-08" },
+      ],
+    });
+
+    const result = await updateTVShowStatus("u1", 100, 1, 1, true);
+
+    expect(result).toBe(WatchStatus.WATCHING);
+    expect((db as any).__getUpdateCalls()[0].payload).toMatchObject({
+      status: WatchStatus.WATCHING,
+    });
+    expect(syncStatusToCollaborators as any).toHaveBeenCalledTimes(1);
+  });
+
   it("does not start tracking a show when un-marking an episode it has no status for", async () => {
-    (db as any).__setMockResults([TIMEZONE_ROW, []]);
+    (db as any).__setMockResults([[]]);
 
     const result = await updateTVShowStatus("u1", 100, 1, 2, false);
 
     expect(result).toBeNull();
     expect((db as any).__getInsertCalls()).toHaveLength(0);
     expect(tmdbClient.getTVShowDetails as any).not.toHaveBeenCalled();
+    // The no-op path costs exactly one query: the content-status probe. The
+    // timezone lookup used to run before the guard, for nothing.
+    expect((db.select as any).mock.calls).toHaveLength(1);
   });
 
   // LOGIC-15 / DATA-10
@@ -465,8 +577,8 @@ describe("episodeUtils.updateTVShowStatus", () => {
 
     try {
       (db as any).__setMockResults([
-        [{ timezone: "Pacific/Auckland" }],
         [{ status: WatchStatus.WATCHING, nextEpisodeDate: null }],
+        [{ timezone: "Pacific/Auckland" }],
         // only the first episode is watched
         [{ seasonNumber: 1, episodeNumber: 1 }],
         undefined,
