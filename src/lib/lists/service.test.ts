@@ -42,6 +42,16 @@ vi.mock("../db", () => {
     select: vi.fn(() => chain),
     insert: vi.fn((table: any) => {
       (chain as any).__currentInsertTable = table;
+      // Lets a test make only the activity_feed write fail, so best-effort vs
+      // strict activity handling can be told apart.
+      if (table === activityFeed && (db as any).__activityInsertShouldFail) {
+        return {
+          values: (payload: any) => {
+            insertCalls.push({ table, payload });
+            return Promise.reject(new Error("activity insert failed"));
+          },
+        };
+      }
       return chain;
     }),
     update: vi.fn(() => chain),
@@ -62,12 +72,16 @@ vi.mock("../db", () => {
   (db as any).__resetInserts = () => {
     insertCalls.length = 0;
     (db as any).__txShouldFail = false;
+    (db as any).__activityInsertShouldFail = false;
     db.select.mockClear();
     db.insert.mockClear();
     db.transaction.mockClear();
   };
   (db as any).__setTxShouldFail = (v: boolean) => {
     (db as any).__txShouldFail = v;
+  };
+  (db as any).__setActivityInsertShouldFail = (v: boolean) => {
+    (db as any).__activityInsertShouldFail = v;
   };
 
   const lists = {} as any;
@@ -193,7 +207,7 @@ vi.mock("../tmdb/contentUtils", () => {
   };
 });
 
-import { activityFeed, ActivityType,db } from "../db";
+import { activityFeed, ActivityType,db, listItems } from "../db";
 import {
   createList,
   createListCollaborator,
@@ -383,8 +397,100 @@ describe("lists service", () => {
     expect(typeof res).not.toBe("string");
     // Only the list-ownership lookup. No separate "does this item exist" read.
     expect((db as any).select).toHaveBeenCalledTimes(1);
-    // The write and its activity entry go through a transaction.
-    expect((db as any).transaction).toHaveBeenCalled();
+    // The item insert stands alone: its activity entry is best-effort, so there
+    // is nothing left to make atomic and no transaction to open. See the rule
+    // comment in `createListItem`.
+    expect((db as any).transaction).not.toHaveBeenCalled();
+  });
+
+  // Adding to a list is not a destructive action, so its feed entry must never
+  // be able to fail it. Previously the item insert and the activity insert
+  // shared a transaction, which meant a broken activity_feed write rolled the
+  // user's "add to list" back.
+  it("createListItem still succeeds when the activity write fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const listData = [{ ownerId: userId, listType: "mixed", name: "L" }];
+    const inserted = [
+      { id: "item-7", tmdbId: 77, contentType: "movie", createdAt: now },
+    ];
+    (db as any).__setMockResults([listData, inserted]);
+    (db as any).__setActivityInsertShouldFail(true);
+
+    const res = await createListItem(userId, "list-4", {
+      tmdbId: 77,
+      contentType: "movie",
+    });
+
+    if (typeof res === "string") throw new Error("expected the add to succeed");
+    expect(res.id).toBe("item-7");
+    // The failure is logged, not surfaced.
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  // Deleting a list IS destructive, so the asymmetry is deliberate: its audit
+  // entry stays strict and a failed write rolls the delete back. This locks in
+  // both halves of the rule so neither is "unified" away later.
+  it("deleteList keeps its audit write strict while createListItem does not", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    (db as any).__setMockResults([
+      [{ ownerId: userId, name: "N", listType: "mixed" }],
+      undefined,
+    ]);
+    (db as any).__setTxShouldFail(true);
+    await expect(deleteList(userId, "list-3")).rejects.toThrow();
+
+    (db as any).__resetInserts();
+    (db as any).__setMockResults([
+      [{ ownerId: userId, listType: "mixed", name: "L" }],
+      [{ id: "item-8", tmdbId: 88, contentType: "movie", createdAt: now }],
+    ]);
+    (db as any).__setActivityInsertShouldFail(true);
+    await expect(
+      createListItem(userId, "list-4", { tmdbId: 88, contentType: "movie" })
+    ).resolves.toMatchObject({ id: "item-8" });
+
+    errorSpy.mockRestore();
+  });
+
+  // The conflict path must not do the TMDB round-trip *after* learning it is a
+  // conflict, and the happy path must warm the cache before the row exists --
+  // a row whose content cannot be resolved makes the whole list unreadable.
+  it("createListItem warms the cache before the row exists", async () => {
+    const { addToCache } = await import("../tmdb/cache-utils");
+    const listData = [{ ownerId: userId, listType: "mixed", name: "L" }];
+    const inserted = [
+      { id: "item-6", tmdbId: 66, contentType: "movie", createdAt: now },
+    ];
+    (db as any).__setMockResults([listData, inserted]);
+    (addToCache as any).mockClear();
+
+    const order: string[] = [];
+    (addToCache as any).mockImplementationOnce(async (tmdbId: number) => {
+      order.push("addToCache");
+      return {
+        tmdbId,
+        contentType: "movie",
+        title: "Movie",
+        posterPath: null,
+      };
+    });
+    const insertSpy = (db as any).insert as any;
+    const originalInsert = insertSpy.getMockImplementation();
+    insertSpy.mockImplementation((table: any) => {
+      if (table === listItems) order.push("insert");
+      return originalInsert(table);
+    });
+
+    const res = await createListItem(userId, "list-4", {
+      tmdbId: 66,
+      contentType: "movie",
+    });
+    insertSpy.mockImplementation(originalInsert);
+
+    expect(typeof res).not.toBe("string");
+    expect(order).toEqual(["addToCache", "insert"]);
   });
 
   it("createListItem inserts and returns item row", async () => {
