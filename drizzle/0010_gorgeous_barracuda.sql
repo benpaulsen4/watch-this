@@ -1,4 +1,4 @@
-ALTER TABLE "passkey_credentials" DROP CONSTRAINT "passkey_credentials_credential_id_unique";--> statement-breakpoint
+ALTER TABLE "passkey_credentials" DROP CONSTRAINT IF EXISTS "passkey_credentials_credential_id_unique";--> statement-breakpoint
 CREATE INDEX "activity_feed_user_id_created_at_id_idx" ON "activity_feed" USING btree ("user_id","created_at" DESC NULLS LAST,"id" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "activity_feed_collaborators_idx" ON "activity_feed" USING gin ("collaborators");--> statement-breakpoint
 CREATE INDEX "activity_feed_list_id_idx" ON "activity_feed" USING btree ("list_id");--> statement-breakpoint
