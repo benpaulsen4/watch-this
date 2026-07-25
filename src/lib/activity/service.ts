@@ -20,6 +20,7 @@ import {
   userContentStatus,
   users,
 } from "../db";
+import { getTimezoneDateKey, resolveTimeZone } from "../time";
 import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 import type {
   ActivityItem,
@@ -27,37 +28,6 @@ import type {
   ListActivityInput,
   UpcomingActivity,
 } from "./types";
-
-const DEFAULT_TIME_ZONE = "UTC";
-
-/**
- * LOGIC-12: `userTimezone` comes straight from the profile and is fed to
- * `Intl.DateTimeFormat` and to `AT TIME ZONE` in SQL. A stale or renamed IANA
- * zone makes `Intl` throw `RangeError`, which used to 500 the whole endpoint —
- * including the activities array, which has nothing to do with timezones.
- * Validate once and degrade to UTC instead.
- */
-function resolveTimeZone(timeZone: string | null | undefined): string {
-  if (!timeZone) return DEFAULT_TIME_ZONE;
-
-  try {
-    new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
-    return timeZone;
-  } catch {
-    return DEFAULT_TIME_ZONE;
-  }
-}
-
-function getTimezoneDateKey(date: Date, timeZone: string): string {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-
-  return formatter.format(date);
-}
 
 /**
  * LOGIC-14: pagination used a bare `createdAt` cursor with a strict `lt`.

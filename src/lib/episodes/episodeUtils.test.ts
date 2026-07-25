@@ -126,7 +126,6 @@ import {
   batchUpdateEpisodes,
   getAirDateKey,
   hasAired,
-  resolveTimeZone,
   syncEpisodeStatusesToCollaborators,
   updateTVShowStatus,
 } from "./episodeUtils";
@@ -163,13 +162,6 @@ describe("episodeUtils date helpers", () => {
       false,
     );
     expect(hasAired("2026-07-21", afterUtcMidnight, "UTC")).toBe(true);
-  });
-
-  it("falls back to UTC for an invalid stored timezone", () => {
-    expect(resolveTimeZone("Not/AZone")).toBe("UTC");
-    expect(resolveTimeZone("")).toBe("UTC");
-    expect(resolveTimeZone(null)).toBe("UTC");
-    expect(resolveTimeZone("Pacific/Auckland")).toBe("Pacific/Auckland");
   });
 });
 

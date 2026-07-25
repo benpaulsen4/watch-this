@@ -16,6 +16,11 @@ import {
   WatchStatus,
   WatchStatusEnum,
 } from "@/lib/db/schema";
+import {
+  DEFAULT_TIME_ZONE,
+  getTimezoneDateKey,
+  resolveTimeZone,
+} from "@/lib/time";
 import type { TMDBTVShowDetails } from "@/lib/tmdb/client";
 import { tmdbClient } from "@/lib/tmdb/client";
 
@@ -36,34 +41,6 @@ export type EpisodeSelection = {
   episodeNumber: number;
   watched: boolean;
 };
-
-const DEFAULT_TIME_ZONE = "UTC";
-
-/**
- * Fall back to UTC when a stored IANA zone is missing, stale or renamed.
- * `Intl.DateTimeFormat` throws `RangeError` on an unknown zone, and a bad
- * profile value must never take down an episode update (LOGIC-12/DATA-10).
- */
-export function resolveTimeZone(timeZone: string | null | undefined): string {
-  if (!timeZone) return DEFAULT_TIME_ZONE;
-
-  try {
-    new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
-    return timeZone;
-  } catch {
-    return DEFAULT_TIME_ZONE;
-  }
-}
-
-/** "YYYY-MM-DD" for `date` as observed in `timeZone`. */
-export function getTimezoneDateKey(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
 
 /**
  * TMDB air dates are bare calendar days ("2026-07-21"). Parsing them with
