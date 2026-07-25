@@ -26,11 +26,6 @@ import { tmdbClient } from "@/lib/tmdb/client";
 
 import { syncStatusToCollaborators } from "../activity/activityUtils";
 
-/** A Drizzle query executor: either the top-level `db` or a transaction handle. */
-type DbExecutor =
-  | typeof db
-  | Parameters<Parameters<typeof db.transaction>[0]>[0];
-
 type TVShowProgressState = {
   nextEpisodeDate: Date | null;
   shouldMarkCompleted: boolean;
@@ -258,9 +253,8 @@ async function getTVShowProgressState(
 async function getSyncEnabledListsForUser(
   userId: string,
   tmdbId: number,
-  executor: DbExecutor,
 ): Promise<Array<{ listId: string; ownerId: string }>> {
-  const rows = await executor
+  const rows = await db
     .select({
       listId: lists.id,
       ownerId: lists.ownerId,
@@ -314,22 +308,23 @@ function dedupeEpisodeSelections(
 
 /**
  * Sync episode statuses to collaborators in shared lists.
+ *
+ * Best-effort by design: a failure here must not cost the user their own
+ * episode writes. That contract only holds while this runs on its own
+ * connection, so it deliberately takes no executor — swallowing an error
+ * inside a caller's transaction would abort that transaction and turn its
+ * `COMMIT` into a silent `ROLLBACK`.
  */
 export async function syncEpisodeStatusesToCollaborators(
   userId: string,
   tmdbId: number,
   episodes: EpisodeSelection[],
-  executor: DbExecutor = db,
 ): Promise<string[]> {
   const targetEpisodes = dedupeEpisodeSelections(episodes);
   if (targetEpisodes.length === 0) return [];
 
   try {
-    const syncEnabledLists = await getSyncEnabledListsForUser(
-      userId,
-      tmdbId,
-      executor,
-    );
+    const syncEnabledLists = await getSyncEnabledListsForUser(userId, tmdbId);
 
     const syncedCollaboratorIds = new Set<string>();
 
@@ -338,7 +333,7 @@ export async function syncEpisodeStatusesToCollaborators(
 
     for (const list of syncEnabledLists) {
       // Get all collaborators (including owner) for this list
-      const collaborators = await executor
+      const collaborators = await db
         .select({ userId: listCollaborators.userId })
         .from(listCollaborators)
         .where(eq(listCollaborators.listId, list.listId));
@@ -353,7 +348,7 @@ export async function syncEpisodeStatusesToCollaborators(
         if (syncedCollaboratorIds.has(collaboratorId)) continue;
 
         const now = new Date();
-        await executor
+        await db
           .insert(episodeWatchStatus)
           .values(
             targetEpisodes.map((episode) => ({
@@ -468,7 +463,13 @@ export async function updateEpisodeWatchStatus(
 }
 
 /**
- * Create activity entry for episode progress
+ * Create activity entry for episode progress.
+ *
+ * Best-effort like the collaborator sync, and for the same reason it takes no
+ * executor: an activity row is never worth rolling back a caller's writes for,
+ * and a swallowed failure inside somebody else's transaction would do exactly
+ * that (Postgres aborts the transaction and turns its `COMMIT` into a silent
+ * `ROLLBACK`).
  */
 export async function createEpisodeActivityEntry(
   userId: string,
@@ -481,15 +482,13 @@ export async function createEpisodeActivityEntry(
   options?: {
     showDetails?: TMDBTVShowDetails;
     episodeCount?: number;
-    executor?: DbExecutor;
   },
 ) {
   try {
     const showDetails =
       options?.showDetails ?? (await tmdbClient.getTVShowDetails(tmdbId));
-    const executor = options?.executor ?? db;
 
-    await executor.insert(activityFeed).values({
+    await db.insert(activityFeed).values({
       userId,
       activityType: ActivityType.EPISODE_PROGRESS,
       tmdbId,
@@ -748,9 +747,21 @@ export async function completeEpisodeUpdate(
  * Batch update multiple episodes.
  *
  * DATA-04: the show is fetched from TMDB once for the whole batch, every
- * episode row is written in a single upsert, one summary activity row is
- * emitted, and the writes run inside a transaction so a mid-batch failure
- * cannot leave half a season marked with a stale show status.
+ * episode row is written in a single upsert, and the activity feed gets one
+ * summary row per perceived action instead of one row per episode.
+ *
+ * There is deliberately no transaction here. The episode upsert is a single
+ * statement, so it is already atomic on its own — wrapping it bought nothing
+ * but a BEGIN/COMMIT round trip. It also actively hurt: the collaborator sync
+ * and the activity insert both swallow their own errors, which is correct for
+ * independent best-effort writes but catastrophic inside a transaction. In
+ * Postgres a failed statement aborts the transaction, every later statement
+ * fails with `25P02`, and `COMMIT` is silently downgraded to `ROLLBACK` with no
+ * error raised to the client — so a swallowed sync failure discarded the user's
+ * episode writes while this function happily returned the rows it thought it
+ * had persisted and the route replied `200`. Those two secondary writes now run
+ * after the episode upsert has committed, where failing them costs only the
+ * sync/activity row they were responsible for.
  */
 export async function batchUpdateEpisodes(
   userId: string,
@@ -792,57 +803,67 @@ export async function batchUpdateEpisodes(
     watchedAt: episode.watched ? now : null,
   }));
 
-  const anyWatched = targetEpisodes.some((episode) => episode.watched);
-  const summaryEpisode =
-    [...targetEpisodes].reverse().find((episode) => episode.watched === anyWatched) ??
-    targetEpisodes[targetEpisodes.length - 1];
-
-  const { updatedEpisodes, syncedCollaboratorIds } = await db.transaction(
-    async (tx) => {
-      const updated = await tx
-        .insert(episodeWatchStatus)
-        .values(rows)
-        .onConflictDoUpdate({
-          target: [
-            episodeWatchStatus.userId,
-            episodeWatchStatus.tmdbId,
-            episodeWatchStatus.seasonNumber,
-            episodeWatchStatus.episodeNumber,
-          ],
-          set: {
-            watched: sql`excluded.watched`,
-            watchedAt: sql`excluded.watched_at`,
-            updatedAt: now,
-          },
-        })
-        .returning();
-
-      const synced = await syncEpisodeStatusesToCollaborators(
-        userId,
-        tmdbId,
-        targetEpisodes,
-        tx,
-      );
-
-      // One summary row per perceived action rather than one row per episode.
-      await createEpisodeActivityEntry(
-        userId,
-        tmdbId,
-        summaryEpisode.seasonNumber,
-        summaryEpisode.episodeNumber,
-        anyWatched,
-        synced,
-        undefined,
-        {
-          showDetails,
-          episodeCount: targetEpisodes.length,
-          executor: tx,
-        },
-      );
-
-      return { updatedEpisodes: updated ?? [], syncedCollaboratorIds: synced };
-    },
+  // The route validates each item's `watched` independently, so a batch may
+  // legitimately mix marks and un-marks.
+  const watchedSelections = targetEpisodes.filter((episode) => episode.watched);
+  const unwatchedSelections = targetEpisodes.filter(
+    (episode) => !episode.watched,
   );
+  const anyWatched = watchedSelections.length > 0;
+  const statusEpisode =
+    watchedSelections[watchedSelections.length - 1] ??
+    unwatchedSelections[unwatchedSelections.length - 1];
+
+  const updatedEpisodes =
+    (await db
+      .insert(episodeWatchStatus)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [
+          episodeWatchStatus.userId,
+          episodeWatchStatus.tmdbId,
+          episodeWatchStatus.seasonNumber,
+          episodeWatchStatus.episodeNumber,
+        ],
+        set: {
+          watched: sql`excluded.watched`,
+          watchedAt: sql`excluded.watched_at`,
+          updatedAt: now,
+        },
+      })
+      .returning()) ?? [];
+
+  // Best-effort, and only ever after the episode rows are safely committed.
+  const syncedCollaboratorIds = await syncEpisodeStatusesToCollaborators(
+    userId,
+    tmdbId,
+    targetEpisodes,
+  );
+
+  // One summary row per perceived action rather than one row per episode. A
+  // mixed batch is two actions: collapsing it into a single `watched: true` row
+  // made the feed claim the un-marked episodes had been watched.
+  for (const [selections, watched] of [
+    [watchedSelections, true],
+    [unwatchedSelections, false],
+  ] as const) {
+    if (selections.length === 0) continue;
+
+    const summaryEpisode = selections[selections.length - 1];
+    await createEpisodeActivityEntry(
+      userId,
+      tmdbId,
+      summaryEpisode.seasonNumber,
+      summaryEpisode.episodeNumber,
+      watched,
+      syncedCollaboratorIds,
+      undefined,
+      {
+        showDetails,
+        episodeCount: selections.length,
+      },
+    );
+  }
 
   // LOGIC-02: recompute unconditionally. An all-unwatch batch ("reset season")
   // contains no watched episode, and skipping the recompute used to leave the
@@ -850,8 +871,8 @@ export async function batchUpdateEpisodes(
   const finalStatus = await updateTVShowStatus(
     userId,
     tmdbId,
-    summaryEpisode.seasonNumber,
-    summaryEpisode.episodeNumber,
+    statusEpisode.seasonNumber,
+    statusEpisode.episodeNumber,
     anyWatched,
     { timeZone, showDetails },
   );
