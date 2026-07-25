@@ -249,8 +249,15 @@ function main() {
   }
 }
 
-// Run the script if called directly. Guarded on `require` so the module can be
-// imported from an ESM test runner without executing the CLI.
-if (typeof require !== "undefined" && require.main === module) {
+// Run the script if called directly. Both halves of the CommonJS pair are
+// guarded so the module can be imported from an ESM test runner without
+// executing the CLI: a bundler can inject `require` without also injecting
+// `module`, and a bare `module` reference would then throw a ReferenceError
+// rather than skipping the CLI.
+if (
+  typeof require !== "undefined" &&
+  typeof module !== "undefined" &&
+  require.main === module
+) {
   main();
 }
