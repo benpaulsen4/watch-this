@@ -119,18 +119,23 @@ describe("db client (DATA-03)", () => {
       expect(options.ssl).toBe("require");
     });
 
+    // These two assert the key is ABSENT, not merely undefined. postgres-js
+    // resolves options with an `in` check, so a present-but-undefined `ssl`
+    // overrides the URL's own `?sslmode=` and disables TLS. `toBeUndefined()`
+    // cannot tell the two apart -- it passes either way -- which is exactly how
+    // that regression reached production. See ./ssl.test.ts.
     it("defers to an explicit ?sslmode= in the URL", async () => {
       const options = await loadOptions(
         "postgres://user:pw@db.example.com:5432/watchthis?sslmode=verify-full",
       );
-      expect(options.ssl).toBeUndefined();
+      expect(options).not.toHaveProperty("ssl");
     });
 
     it("defers to an explicit &ssl= in a URL with other params", async () => {
       const options = await loadOptions(
         "postgres://user:pw@db.example.com:5432/watchthis?pool_timeout=5&ssl=true",
       );
-      expect(options.ssl).toBeUndefined();
+      expect(options).not.toHaveProperty("ssl");
     });
 
     // `sslrootcert` names a CA file; it does not decide whether TLS is on, so
@@ -153,7 +158,7 @@ describe("db client (DATA-03)", () => {
       vi.resetModules();
       vi.stubEnv("NODE_ENV", "development");
       await import("./index");
-      expect(postgresMock.mock.calls[0][1]?.ssl).toBeUndefined();
+      expect(postgresMock.mock.calls[0][1]).not.toHaveProperty("ssl");
     });
   });
 });
