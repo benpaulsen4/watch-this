@@ -718,6 +718,137 @@ describe("Profile Data Service", () => {
       expect(result.errors).toEqual([]);
     });
 
+    // The size check is O(1) per section, so it runs before anything walks the
+    // arrays. An oversized payload is refused outright rather than validated
+    // element by element first.
+    it("refuses an oversized payload before validating its elements", async () => {
+      setupImportMocks();
+
+      const tooManyLists: unknown[] = Array.from(
+        { length: 5001 },
+        (_, i) => ({
+          name: `List ${i}`,
+          description: null,
+          listType: "mixed",
+          isPublic: false,
+          isArchived: false,
+          syncWatchStatus: false,
+          items: [],
+        })
+      );
+      // A malformed element buried in the array. Validating first would report
+      // this as a parseError, having already walked 5000 good entries.
+      tooManyLists[5000] = null;
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify({ lists: tooManyLists })
+      );
+
+      expect(result).toBe("tooLarge");
+      expect(mockedDb.insert).not.toHaveBeenCalled();
+    });
+
+    // LOGIC-03 (consumer side): fixing the exporter did not help third-party or
+    // hand-edited files that omit timestamps -- `new Date(undefined)` is an
+    // Invalid Date, which Postgres rejects, so the row was silently downgraded
+    // to a per-row error and lost. Never hand the driver an Invalid Date.
+    it("substitutes the import time for missing or unparseable timestamps (LOGIC-03)", async () => {
+      const { valuesMock } = setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      const result = await importUserData(
+        userId,
+        JSON.stringify({
+          lists: [
+            {
+              name: "No timestamps",
+              description: null,
+              listType: "mixed",
+              isPublic: false,
+              isArchived: false,
+              syncWatchStatus: false,
+              items: [{ tmdbId: 101, contentType: "movie" }],
+            },
+          ],
+          contentStatus: [
+            { tmdbId: 202, contentType: "tv", status: "completed" },
+          ],
+          episodeStatus: [
+            {
+              tmdbId: 202,
+              seasonNumber: 1,
+              episodeNumber: 1,
+              watched: true,
+              createdAt: "not a date",
+              updatedAt: null,
+            },
+          ],
+          tvShowSchedules: [{ tmdbId: 202, dayOfWeek: 3 }],
+        })
+      );
+
+      expect(result).not.toBe("parseError");
+      if (typeof result === "string") return;
+
+      // Every section imported rather than erroring out per row.
+      expect(result.errors).toEqual([]);
+      expect(result.imported.lists).toBe(1);
+      expect(result.imported.listItems).toBe(1);
+      expect(result.imported.contentStatus).toBe(1);
+      expect(result.imported.episodeStatus).toBe(1);
+      expect(result.imported.tvShowSchedules).toBe(1);
+
+      // Not one Invalid Date reaches the driver, on any table.
+      const payloads = valuesMock.mock.calls.map((c) => c[0]);
+      expect(payloads.length).toBeGreaterThan(0);
+      let dateFields = 0;
+      for (const payload of payloads) {
+        for (const value of Object.values(payload)) {
+          if (value instanceof Date) {
+            dateFields++;
+            expect(Number.isNaN(value.getTime())).toBe(false);
+            expect(value).toEqual(mockDate);
+          }
+        }
+      }
+      expect(dateFields).toBeGreaterThan(0);
+
+      // An absent watchedAt still means null, not a fabricated timestamp.
+      const episodePayload = payloads.find(
+        (p) => p.seasonNumber !== undefined
+      );
+      expect(episodePayload.watchedAt).toBeNull();
+    });
+
+    it("still honours timestamps that are present and valid", async () => {
+      const { valuesMock } = setupImportMocks();
+      (addToCache as any).mockResolvedValue({});
+
+      const earlier = new Date("2020-05-05T10:00:00.000Z");
+      const result = await importUserData(
+        userId,
+        JSON.stringify({
+          contentStatus: [
+            {
+              tmdbId: 1,
+              contentType: "movie",
+              status: "completed",
+              createdAt: earlier.toISOString(),
+              updatedAt: earlier.toISOString(),
+            },
+          ],
+        })
+      );
+      expect(result).not.toBe("parseError");
+
+      const payload = valuesMock.mock.calls
+        .map((c) => c[0])
+        .find((p) => p.status === "completed");
+      expect(payload.createdAt).toEqual(earlier);
+      expect(payload.updatedAt).toEqual(earlier);
+    });
+
     // LOGIC-07: each section's try sits INSIDE its loop, so a truthy
     // non-iterable value threw from the for...of itself, outside any handler.
     describe("malformed structure returns parseError, not a 500 (LOGIC-07)", () => {
