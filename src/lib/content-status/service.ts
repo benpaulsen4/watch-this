@@ -90,37 +90,25 @@ export async function createOrUpdateContentStatus(
     // up "completed" with its schedules still live -- and the schedules page
     // would keep showing a show the user had finished.
     const result = await db.transaction(async (tx) => {
-      const existing = await tx
-        .select()
-        .from(userContentStatus)
-        .where(
-          and(
-            eq(userContentStatus.userId, userId),
-            eq(userContentStatus.tmdbId, tmdbId),
-            eq(userContentStatus.contentType, contentType)
-          )
-        )
-        .limit(1);
-
-      let row;
-      if (existing.length > 0) {
-        [row] = await tx
-          .update(userContentStatus)
-          .set({ status, updatedAt: new Date() })
-          .where(
-            and(
-              eq(userContentStatus.userId, userId),
-              eq(userContentStatus.tmdbId, tmdbId),
-              eq(userContentStatus.contentType, contentType)
-            )
-          )
-          .returning();
-      } else {
-        [row] = await tx
-          .insert(userContentStatus)
-          .values({ userId, tmdbId, contentType, status })
-          .returning();
-      }
+      // DATA-07(c): this was a check-then-insert -- select, then branch to
+      // update or insert against unique(userId, tmdbId, contentType). READ
+      // COMMITTED does not serialise that: two concurrent status writes both
+      // see no row, and the loser hits the unique constraint and surfaces as a
+      // 500. Wrapping it in a transaction made it marginally worse, because the
+      // violation also rolled back the schedule cleanup below. Let the database
+      // arbitrate with a single upsert on the natural key instead.
+      const [row] = await tx
+        .insert(userContentStatus)
+        .values({ userId, tmdbId, contentType, status })
+        .onConflictDoUpdate({
+          target: [
+            userContentStatus.userId,
+            userContentStatus.tmdbId,
+            userContentStatus.contentType,
+          ],
+          set: { status, updatedAt: new Date() },
+        })
+        .returning();
 
       if (
         contentType === ContentType.TV &&

@@ -9,6 +9,8 @@ vi.mock("@/lib/db", () => {
   const insertCalls: Array<{ table: any; payload: any }> = [];
   // DATA-07(d): records every write and whether it ran inside a transaction.
   const opLog: Array<{ op: string; table: any; inTransaction: boolean }> = [];
+  // DATA-07(c): records the conflict target of every upsert.
+  const upsertCalls: Array<{ table: any; config: any }> = [];
   let inTransaction = false;
   let throwOnDelete = false;
 
@@ -30,6 +32,13 @@ vi.mock("@/lib/db", () => {
     set: () => chain,
     values: (payload: any) => {
       insertCalls.push({ table: (chain as any).__currentInsertTable, payload });
+      return chain;
+    },
+    onConflictDoUpdate: (config: any) => {
+      upsertCalls.push({
+        table: (chain as any).__currentInsertTable,
+        config,
+      });
       return chain;
     },
     then: (resolve: any) => Promise.resolve(resultsQueue.shift()).then(resolve),
@@ -64,12 +73,14 @@ vi.mock("@/lib/db", () => {
   (db as any).__setMockResults = setResults;
   (db as any).__getInsertCalls = () => insertCalls.slice();
   (db as any).__getOpLog = () => opLog.slice();
+  (db as any).__getUpsertCalls = () => upsertCalls.slice();
   (db as any).__setThrowOnDelete = (v: boolean) => {
     throwOnDelete = v;
   };
   (db as any).__resetInserts = () => {
     insertCalls.length = 0;
     opLog.length = 0;
+    upsertCalls.length = 0;
     throwOnDelete = false;
     inTransaction = false;
     db.select.mockClear();
@@ -106,7 +117,13 @@ vi.mock("@/lib/tmdb/client", () => {
 });
 
 vi.mock("@/lib/db/schema", () => {
-  const userContentStatus = {} as any;
+  // Named column stubs so an upsert's conflict target can be asserted.
+  const userContentStatus = {
+    userId: "userContentStatus.userId",
+    tmdbId: "userContentStatus.tmdbId",
+    contentType: "userContentStatus.contentType",
+    id: "userContentStatus.id",
+  } as any;
   const showSchedules = {} as any;
   const activityFeed = {} as any;
   const ContentType = { MOVIE: "movie", TV: "tv" } as const;
@@ -164,7 +181,8 @@ describe("content-status service", () => {
         updatedAt: now,
       },
     ];
-    (db as any).__setMockResults([[], inserted]);
+    // A single upsert; there is no pre-check select to feed (DATA-07c).
+    (db as any).__setMockResults([inserted]);
     const res = await createOrUpdateContentStatus(userId, {
       tmdbId: 10,
       contentType: "movie",
@@ -309,7 +327,6 @@ describe("content-status service", () => {
 
   it("createOrUpdateContentStatus clears schedules inside the same transaction (DATA-07d)", async () => {
     (db as any).__setMockResults([
-      [],
       [
         {
           id: "cs7",
@@ -344,6 +361,93 @@ describe("content-status service", () => {
       (o: any) => o.op === "insert" && o.table === activityFeed
     );
     expect(activityWrite?.inTransaction).toBe(false);
+  });
+
+  // DATA-07(c): `createListItem` replaced check-then-insert with a DB-arbitrated
+  // conflict, but the identical pattern here was only moved *into* a
+  // transaction, not fixed. READ COMMITTED does not serialise select-then-
+  // branch against unique(userId, tmdbId, contentType): two concurrent status
+  // writes both see no row and the loser hits the constraint, so a plain
+  // "mark as watching" 500s -- and, once the block was transactional, took the
+  // schedule cleanup down with it.
+  it("createOrUpdateContentStatus upserts on the natural key instead of check-then-insert (DATA-07c)", async () => {
+    (db as any).__setMockResults([
+      [
+        {
+          id: "cs8",
+          userId,
+          tmdbId: 44,
+          contentType: "movie",
+          status: "completed",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    ]);
+
+    const res = await createOrUpdateContentStatus(userId, {
+      tmdbId: 44,
+      contentType: "movie",
+      status: "completed",
+    } as any);
+
+    if (res === "notFound") throw new Error("unexpected");
+    expect(res.status.id).toBe("cs8");
+
+    // No "does a row already exist" read: the race was only closeable by
+    // letting the database decide.
+    expect(db.select).not.toHaveBeenCalled();
+    // And exactly one write to the status table, not an update-or-insert branch.
+    const statusWrites = (db as any)
+      .__getOpLog()
+      .filter((o: any) => o.table === userContentStatus);
+    expect(statusWrites).toHaveLength(1);
+    expect(statusWrites[0].op).toBe("insert");
+    expect(statusWrites[0].inTransaction).toBe(true);
+
+    // The conflict target must be the natural key, so the conflict Postgres is
+    // told about is the one that can actually happen -- not the primary key.
+    const upserts = (db as any)
+      .__getUpsertCalls()
+      .filter((u: any) => u.table === userContentStatus);
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0].config.target).toEqual([
+      userContentStatus.userId,
+      userContentStatus.tmdbId,
+      userContentStatus.contentType,
+    ]);
+    expect(upserts[0].config.set.status).toBe("completed");
+  });
+
+  it("createOrUpdateContentStatus still clears schedules on the update path (DATA-07c)", async () => {
+    // The upsert must keep the schedule cleanup that the update branch used to
+    // reach -- an existing "watching" row moving to "completed" is the common
+    // case, and it has to drop the show's schedules in the same transaction.
+    (db as any).__setMockResults([
+      [
+        {
+          id: "cs9",
+          userId,
+          tmdbId: 45,
+          contentType: "tv",
+          status: "completed",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    ]);
+
+    await createOrUpdateContentStatus(userId, {
+      tmdbId: 45,
+      contentType: "tv",
+      status: "completed",
+    } as any);
+
+    const ops = (db as any).__getOpLog();
+    const scheduleDelete = ops.find(
+      (o: any) => o.op === "delete" && o.table === showSchedules
+    );
+    expect(scheduleDelete?.inTransaction).toBe(true);
   });
 
   it("deleteContentStatus returns notFound when missing", async () => {
