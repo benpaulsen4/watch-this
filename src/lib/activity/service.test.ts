@@ -6,10 +6,17 @@ vi.mock("../db", () => {
     resultsQueue.length = 0;
     resultsQueue.push(...arr);
   };
+  const joinCalls: Array<{ type: "left" | "inner"; table: any }> = [];
   const chain: any = {
     from: () => chain,
-    leftJoin: () => chain,
-    innerJoin: () => chain,
+    leftJoin: (table: any) => {
+      joinCalls.push({ type: "left", table });
+      return chain;
+    },
+    innerJoin: (table: any) => {
+      joinCalls.push({ type: "inner", table });
+      return chain;
+    },
     where: () => chain,
     orderBy: () => chain,
     groupBy: () => chain,
@@ -35,6 +42,10 @@ vi.mock("../db", () => {
     delete: vi.fn(() => chain),
   };
   (db as any).__setMockResults = setResults;
+  (db as any).__getJoinCalls = () => joinCalls.slice();
+  (db as any).__resetJoinCalls = () => {
+    joinCalls.length = 0;
+  };
 
   const users = {} as any;
   const lists = {} as any;
@@ -141,7 +152,7 @@ vi.mock("../tmdb/cache-utils", async () => {
   };
 });
 
-import { db } from "../db";
+import { db, users } from "../db";
 import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 import { listActivityTimeline } from "./service";
 
@@ -151,6 +162,7 @@ describe("activity service", () => {
 
   beforeEach(() => {
     (db as any).__setMockResults([]);
+    (db as any).__resetJoinCalls();
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -215,7 +227,7 @@ describe("activity service", () => {
       { id: "c2", username: "charlie", profilePictureUrl: null },
     ];
 
-    (db as any).__setMockResults([[], rows, collaboratorUsers, []]);
+    (db as any).__setMockResults([rows, collaboratorUsers, []]);
 
     const res = await listActivityTimeline(userId, tz, { limit: 2 });
     if (typeof res === "string") throw new Error("unexpected error");
@@ -235,8 +247,6 @@ describe("activity service", () => {
       { tmdbId: 400, scheduleId: "s2", status: "planning", nextEpisodeDate: null },
     ];
     (db as any).__setMockResults([
-      // collaborative lists
-      [],
       // activities
       [],
       // upcoming rows
@@ -262,7 +272,6 @@ describe("activity service", () => {
     const futureDate = new Date("2999-01-01T00:00:00Z");
     (db as any).__setMockResults([
       [],
-      [],
       [
         {
           tmdbId: 500,
@@ -286,7 +295,6 @@ describe("activity service", () => {
 
     (db as any).__setMockResults([
       [],
-      [],
       [
         {
           tmdbId: 600,
@@ -306,5 +314,133 @@ describe("activity service", () => {
     expect(res.upcoming).toHaveLength(1);
     expect(res.upcoming[0].tmdbId).toBe(600);
     expect(getAllCachedContent as any).toHaveBeenCalledTimes(1);
+  });
+
+  // LOGIC-12
+  it("degrades to UTC instead of 500ing when the stored timezone is invalid", async () => {
+    const rows = [
+      {
+        id: "a1",
+        userId,
+        activityType: "list_created",
+        tmdbId: null,
+        contentType: null,
+        listId: "l1",
+        metadata: { listName: "Favorites" },
+        collaborators: [],
+        isCollaborative: false,
+        createdAt: new Date("2025-01-01T00:00:00Z"),
+        username: "alice",
+        userProfilePicture: null,
+      },
+    ];
+    (db as any).__setMockResults([rows, []]);
+
+    // A stale or renamed IANA zone makes `Intl.DateTimeFormat` throw
+    // `RangeError`, which used to reject the whole endpoint — activities
+    // included, despite having nothing to do with timezones.
+    const res = await listActivityTimeline(userId, "Mars/Olympus_Mons", {
+      limit: 10,
+    });
+
+    if (typeof res === "string") throw new Error("unexpected error");
+    expect(res.activities).toHaveLength(1);
+    expect(res.activities[0].id).toBe("a1");
+    expect(res.upcoming).toEqual([]);
+  });
+
+  // LOGIC-14
+  it("emits a compound (createdAt, id) cursor so tied timestamps are not skipped", async () => {
+    const tied = new Date("2025-01-01T00:00:00.000Z");
+    // Batch writes land several rows in the same millisecond.
+    const rows = ["a1", "a2", "a3"].map((id) => ({
+      id,
+      userId,
+      activityType: "episode_progress",
+      tmdbId: 1,
+      contentType: "tv",
+      listId: null,
+      metadata: {},
+      collaborators: [],
+      isCollaborative: false,
+      createdAt: tied,
+      username: "alice",
+      userProfilePicture: null,
+    }));
+
+    (db as any).__setMockResults([rows, []]);
+
+    const res = await listActivityTimeline(userId, tz, { limit: 2 });
+    if (typeof res === "string") throw new Error("unexpected error");
+
+    expect(res.hasMore).toBe(true);
+    // A bare `createdAt` cursor plus a strict `lt` would skip every remaining
+    // row sharing this millisecond.
+    expect(res.nextCursor).toBe(`${tied.toISOString()}|a2`);
+  });
+
+  // LOGIC-14
+  it("accepts a compound cursor", async () => {
+    (db as any).__setMockResults([[], []]);
+
+    const res = await listActivityTimeline(userId, tz, {
+      limit: 10,
+      // `activity_feed.id` is a uuid column, so a real successor cursor carries
+      // a uuid here.
+      cursor: "2025-01-01T00:00:00.000Z|1e5f7a2c-9d64-4f2b-8a41-0c3b6d9e7f11",
+    });
+
+    // `new Date("2025-01-01T00:00:00.000Z|<id>")` is an Invalid Date, so the old
+    // parser rejected its own successor cursor outright.
+    expect(res).not.toBe("invalidCursor");
+  });
+
+  // The id half is fed straight to `lt(activityFeed.id, ...)` against a uuid
+  // column, so anything that is not uuid-shaped made Postgres raise
+  // `22P02 invalid input syntax for type uuid` — an unhandled 500 on an
+  // endpoint that already has a working invalidCursor -> 400 path.
+  it.each([
+    ["2025-01-01T00:00:00.000Z|x"],
+    ["2025-01-01T00:00:00.000Z|"],
+    ["2025-01-01T00:00:00.000Z|'; drop table activity_feed --"],
+    ["2025-01-01T00:00:00.000Z|1e5f7a2c-9d64-4f2b-8a41-0c3b6d9e7f1"],
+    ["2025-01-01T00:00:00.000Z|1e5f7a2c9d644f2b8a410c3b6d9e7f11"],
+  ])("rejects a compound cursor whose id half is not a uuid (%s)", async (
+    cursor,
+  ) => {
+    (db as any).__setMockResults([[], []]);
+
+    const res = await listActivityTimeline(userId, tz, { limit: 10, cursor });
+
+    expect(res).toBe("invalidCursor");
+    // Rejected before any query is issued.
+    expect((db.select as any).mock.calls).toHaveLength(0);
+  });
+
+  it("still accepts a legacy bare-ISO cursor", async () => {
+    (db as any).__setMockResults([[], []]);
+
+    const res = await listActivityTimeline(userId, tz, {
+      limit: 10,
+      cursor: "2025-01-01T00:00:00.000Z",
+    });
+
+    expect(res).not.toBe("invalidCursor");
+  });
+
+  // DATA-11
+  it("inner-joins the activity author", async () => {
+    (db as any).__setMockResults([[], []]);
+
+    await listActivityTimeline(userId, tz, { limit: 10 });
+
+    const joins = (db as any).__getJoinCalls() as Array<{
+      type: string;
+      table: any;
+    }>;
+    const userJoins = joins.filter((join) => join.table === users);
+    expect(userJoins).toHaveLength(1);
+    // `activity_feed.user_id` is NOT NULL with a cascading FK.
+    expect(userJoins[0].type).toBe("inner");
   });
 });
