@@ -15,9 +15,20 @@ vi.mock("../db", () => {
     leftJoin: () => chain,
     where: () => chain,
     groupBy: () => Promise.resolve(resultsQueue.shift()),
-    orderBy: () => chain,
+    orderBy: () => Promise.resolve(resultsQueue.shift()),
     limit: () => Promise.resolve(resultsQueue.shift()),
     returning: () => Promise.resolve(resultsQueue.shift()),
+    onConflictDoNothing: () => chain,
+    // Subquery alias used by the DATA-06 windowed poster query. Returns a
+    // proxy so `ranked.<column>` references resolve to something inert.
+    as: (name: string) =>
+      new Proxy(
+        {},
+        {
+          get: (_t, prop) =>
+            prop === "then" ? undefined : `${name}.${String(prop)}`,
+        }
+      ),
     set: () => chain,
     values: (payload: any) => {
       insertCalls.push({ table: (chain as any).__currentInsertTable, payload });
@@ -31,15 +42,46 @@ vi.mock("../db", () => {
     select: vi.fn(() => chain),
     insert: vi.fn((table: any) => {
       (chain as any).__currentInsertTable = table;
+      // Lets a test make only the activity_feed write fail, so best-effort vs
+      // strict activity handling can be told apart.
+      if (table === activityFeed && (db as any).__activityInsertShouldFail) {
+        return {
+          values: (payload: any) => {
+            insertCalls.push({ table, payload });
+            return Promise.reject(new Error("activity insert failed"));
+          },
+        };
+      }
       return chain;
     }),
     update: vi.fn(() => chain),
     delete: vi.fn(() => chain),
+    // DATA-07: run the callback against the same chain so transactional writes
+    // are recorded exactly like non-transactional ones. `__setThrowInTx` makes
+    // the transaction body reject so rollback behaviour can be asserted.
+    transaction: vi.fn(async (fn: any) => {
+      const result = await fn(db);
+      if ((db as any).__txShouldFail) {
+        throw new Error("transaction rolled back");
+      }
+      return result;
+    }),
   };
   (db as any).__setMockResults = setResults;
   (db as any).__getInsertCalls = () => insertCalls.slice();
   (db as any).__resetInserts = () => {
     insertCalls.length = 0;
+    (db as any).__txShouldFail = false;
+    (db as any).__activityInsertShouldFail = false;
+    db.select.mockClear();
+    db.insert.mockClear();
+    db.transaction.mockClear();
+  };
+  (db as any).__setTxShouldFail = (v: boolean) => {
+    (db as any).__txShouldFail = v;
+  };
+  (db as any).__setActivityInsertShouldFail = (v: boolean) => {
+    (db as any).__activityInsertShouldFail = v;
   };
 
   const lists = {} as any;
@@ -165,7 +207,7 @@ vi.mock("../tmdb/contentUtils", () => {
   };
 });
 
-import { activityFeed, ActivityType,db } from "../db";
+import { activityFeed, ActivityType,db, listItems } from "../db";
 import {
   createList,
   createListCollaborator,
@@ -276,6 +318,30 @@ describe("lists service", () => {
     expect(activity.payload.metadata.listName).toBe("N");
   });
 
+  // DATA-07(b): the delete and its audit entry commit together. Previously the
+  // activity insert sat in a swallowing try/catch *after* a committed delete,
+  // so a destructive action could lose its audit record with no signal.
+  it("deleteList performs the delete and the audit write in one transaction", async () => {
+    (db as any).__setMockResults([
+      [{ ownerId: userId, name: "N", listType: "mixed" }],
+      undefined,
+    ]);
+    await deleteList(userId, "list-3");
+    expect((db as any).transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("deleteList surfaces a failed audit write instead of silently swallowing it", async () => {
+    (db as any).__setMockResults([
+      [{ ownerId: userId, name: "N", listType: "mixed" }],
+      undefined,
+    ]);
+    (db as any).__setTxShouldFail(true);
+    await expect(deleteList(userId, "list-3")).rejects.toThrow(
+      /transaction rolled back/
+    );
+    (db as any).__setTxShouldFail(false);
+  });
+
   it("createListItem enforces listType", async () => {
     const listData = [{ ownerId: userId, listType: "movies", name: "L" }];
     (db as any).__setMockResults([listData]);
@@ -297,20 +363,138 @@ describe("lists service", () => {
     expect(res).toBe("notFound");
   });
 
-  it("createListItem returns conflict when item exists", async () => {
+  // DATA-07(c): conflict is now decided by the database. An insert that returns
+  // no row means another writer won the race; the old check-then-insert let
+  // concurrent adds through the existence check and 500'd on the constraint.
+  it("createListItem returns conflict when the insert returns no row", async () => {
     const listData = [{ ownerId: userId, listType: "mixed", name: "L" }];
-    const existingItem = [{ id: "item-1" }];
-    (db as any).__setMockResults([listData, existingItem]);
+    const insertLostRace: any[] = [];
+    (db as any).__setMockResults([listData, insertLostRace]);
     const res = await createListItem(userId, "list-4", {
       tmdbId: 1,
       contentType: "movie",
     });
     expect(res).toBe("conflict");
+
+    // The conflict path must not emit a spurious "item added" activity entry.
+    const inserts = (db as any).__getInsertCalls();
+    expect(inserts.find((c: any) => c.table === activityFeed)).toBeUndefined();
+  });
+
+  it("createListItem uses onConflictDoNothing rather than a pre-check select (DATA-07c)", async () => {
+    const listData = [{ ownerId: userId, listType: "mixed", name: "L" }];
+    const inserted = [
+      { id: "item-9", tmdbId: 5, contentType: "movie", createdAt: now },
+    ];
+    (db as any).__setMockResults([listData, inserted]);
+    (db as any).select.mockClear();
+
+    const res = await createListItem(userId, "list-4", {
+      tmdbId: 5,
+      contentType: "movie",
+    });
+
+    expect(typeof res).not.toBe("string");
+    // Only the list-ownership lookup. No separate "does this item exist" read.
+    expect((db as any).select).toHaveBeenCalledTimes(1);
+    // The item insert stands alone: its activity entry is best-effort, so there
+    // is nothing left to make atomic and no transaction to open. See the rule
+    // comment in `createListItem`.
+    expect((db as any).transaction).not.toHaveBeenCalled();
+  });
+
+  // Adding to a list is not a destructive action, so its feed entry must never
+  // be able to fail it. Previously the item insert and the activity insert
+  // shared a transaction, which meant a broken activity_feed write rolled the
+  // user's "add to list" back.
+  it("createListItem still succeeds when the activity write fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const listData = [{ ownerId: userId, listType: "mixed", name: "L" }];
+    const inserted = [
+      { id: "item-7", tmdbId: 77, contentType: "movie", createdAt: now },
+    ];
+    (db as any).__setMockResults([listData, inserted]);
+    (db as any).__setActivityInsertShouldFail(true);
+
+    const res = await createListItem(userId, "list-4", {
+      tmdbId: 77,
+      contentType: "movie",
+    });
+
+    if (typeof res === "string") throw new Error("expected the add to succeed");
+    expect(res.id).toBe("item-7");
+    // The failure is logged, not surfaced.
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  // Deleting a list IS destructive, so the asymmetry is deliberate: its audit
+  // entry stays strict and a failed write rolls the delete back. This locks in
+  // both halves of the rule so neither is "unified" away later.
+  it("deleteList keeps its audit write strict while createListItem does not", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    (db as any).__setMockResults([
+      [{ ownerId: userId, name: "N", listType: "mixed" }],
+      undefined,
+    ]);
+    (db as any).__setTxShouldFail(true);
+    await expect(deleteList(userId, "list-3")).rejects.toThrow();
+
+    (db as any).__resetInserts();
+    (db as any).__setMockResults([
+      [{ ownerId: userId, listType: "mixed", name: "L" }],
+      [{ id: "item-8", tmdbId: 88, contentType: "movie", createdAt: now }],
+    ]);
+    (db as any).__setActivityInsertShouldFail(true);
+    await expect(
+      createListItem(userId, "list-4", { tmdbId: 88, contentType: "movie" })
+    ).resolves.toMatchObject({ id: "item-8" });
+
+    errorSpy.mockRestore();
+  });
+
+  // The conflict path must not do the TMDB round-trip *after* learning it is a
+  // conflict, and the happy path must warm the cache before the row exists --
+  // a row whose content cannot be resolved makes the whole list unreadable.
+  it("createListItem warms the cache before the row exists", async () => {
+    const { addToCache } = await import("../tmdb/cache-utils");
+    const listData = [{ ownerId: userId, listType: "mixed", name: "L" }];
+    const inserted = [
+      { id: "item-6", tmdbId: 66, contentType: "movie", createdAt: now },
+    ];
+    (db as any).__setMockResults([listData, inserted]);
+    (addToCache as any).mockClear();
+
+    const order: string[] = [];
+    (addToCache as any).mockImplementationOnce(async (tmdbId: number) => {
+      order.push("addToCache");
+      return {
+        tmdbId,
+        contentType: "movie",
+        title: "Movie",
+        posterPath: null,
+      };
+    });
+    const insertSpy = (db as any).insert as any;
+    const originalInsert = insertSpy.getMockImplementation();
+    insertSpy.mockImplementation((table: any) => {
+      if (table === listItems) order.push("insert");
+      return originalInsert(table);
+    });
+
+    const res = await createListItem(userId, "list-4", {
+      tmdbId: 66,
+      contentType: "movie",
+    });
+    insertSpy.mockImplementation(originalInsert);
+
+    expect(typeof res).not.toBe("string");
+    expect(order).toEqual(["addToCache", "insert"]);
   });
 
   it("createListItem inserts and returns item row", async () => {
     const listData = [{ ownerId: userId, listType: "mixed", name: "L" }];
-    const noExisting: any[] = [];
     const inserted = [
       {
         id: "item-2",
@@ -321,7 +505,7 @@ describe("lists service", () => {
         createdAt: now,
       },
     ];
-    (db as any).__setMockResults([listData, noExisting, inserted]);
+    (db as any).__setMockResults([listData, inserted]);
     const res = await createListItem(userId, "list-4", {
       tmdbId: 10,
       contentType: "movie",
@@ -518,17 +702,81 @@ describe("lists service", () => {
         collaborators: 0,
       },
     ];
-    const posters1 = [
-      { tmdbId: 1, contentType: "movie", posterPath: "/p1.jpg" },
-      { tmdbId: 2, contentType: "movie", posterPath: "/p2.jpg" },
+    // DATA-06: a single windowed query returns the newest items for *every*
+    // list at once, tagged with their listId.
+    const posters = [
+      { listId: "l1", tmdbId: 1, contentType: "movie" },
+      { listId: "l1", tmdbId: 2, contentType: "movie" },
+      { listId: "l2", tmdbId: 3, contentType: "movie" },
     ];
-    const posters2 = [
-      { tmdbId: 3, contentType: "movie", posterPath: "/q1.jpg" },
-    ];
-    (db as any).__setMockResults([base, posters1, posters2]);
+    (db as any).__setMockResults([base, posters]);
     const res = await listLists(userId);
     expect(res[0].posterPaths).toEqual(["/p1.jpg", "/p2.jpg"]);
     expect(res[1].posterPaths).toEqual(["/q1.jpg"]);
+  });
+
+  it("listLists issues a bounded number of queries regardless of list count (DATA-06)", async () => {
+    const { getAllCachedContent } = await import("../tmdb/cache-utils");
+
+    const run = async (listCount: number) => {
+      const many = Array.from({ length: listCount }, (_, i) => ({
+        id: `list-${i}`,
+        name: `List ${i}`,
+        description: null,
+        listType: "mixed",
+        isPublic: false,
+        isArchived: false,
+        syncWatchStatus: false,
+        ownerId: userId,
+        createdAt: now,
+        updatedAt: now,
+        itemCount: 1,
+        collaborators: 0,
+      }));
+      // One poster row per list, all resolved by the same windowed query.
+      const posters = many.map((l) => ({
+        listId: l.id,
+        tmdbId: 1,
+        contentType: "movie",
+      }));
+
+      (db as any).__setMockResults([many, posters]);
+      (db as any).select.mockClear();
+      (getAllCachedContent as any).mockClear();
+
+      const res = await listLists(userId);
+      return {
+        res,
+        selects: (db as any).select.mock.calls.length,
+        cacheCalls: (getAllCachedContent as any).mock.calls.length,
+        cacheArgs: (getAllCachedContent as any).mock.calls[0]?.[0],
+      };
+    };
+
+    const small = await run(2);
+    const large = await run(40);
+
+    // The query count is constant: the list/count query plus the two halves of
+    // the windowed poster query. The old code issued one poster select *and*
+    // one cache call per list, so 40 lists meant ~120 round-trips.
+    expect(small.selects).toBe(3);
+    expect(large.selects).toBe(small.selects);
+
+    expect(small.cacheCalls).toBe(1);
+    expect(large.cacheCalls).toBe(1);
+    // Deduped to the union of distinct content across every list.
+    expect(large.cacheArgs).toEqual([{ tmdbId: 1, contentType: "movie" }]);
+
+    expect(large.res).toHaveLength(40);
+    expect(large.res.every((l) => l.posterPaths.length === 1)).toBe(true);
+  });
+
+  it("listLists returns early without a poster query when there are no lists", async () => {
+    (db as any).__setMockResults([[]]);
+    (db as any).select.mockClear();
+    const res = await listLists(userId);
+    expect(res).toEqual([]);
+    expect((db as any).select).toHaveBeenCalledTimes(1);
   });
 
   it("listArchivedLists returns archived lists", async () => {
@@ -548,8 +796,8 @@ describe("lists service", () => {
         collaborators: 0,
       },
     ];
-    const posters = [{ tmdbId: 1, contentType: "movie", posterPath: "/p1.jpg" }];
-    
+    const posters = [{ listId: "l3", tmdbId: 1, contentType: "movie" }];
+
     // The implementation of fetchLists calls db.select(...).where(..., eq(lists.isArchived, isArchived))
     // Our mock setup for db just returns the next result in the queue for the main query.
     // So we just need to provide the expected result.

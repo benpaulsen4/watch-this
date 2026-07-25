@@ -77,46 +77,44 @@ export async function createOrUpdateContentStatus(
 ): Promise<CreateOrUpdateContentStatusResult> {
   const { tmdbId, contentType, status } = input;
   try {
+    // DATA-07(d): the TMDB lookup is hoisted ahead of the transaction so no
+    // network call is held open inside it.
     const contentDetails =
       contentType === ContentType.MOVIE
         ? await tmdbClient.getMovieDetails(tmdbId)
         : await tmdbClient.getTVShowDetails(tmdbId);
-    const existing = await db
-      .select()
-      .from(userContentStatus)
-      .where(
-        and(
-          eq(userContentStatus.userId, userId),
-          eq(userContentStatus.tmdbId, tmdbId),
-          eq(userContentStatus.contentType, contentType)
-        )
-      )
-      .limit(1);
-    let result;
-    if (existing.length > 0) {
-      [result] = await db
-        .update(userContentStatus)
-        .set({ status, updatedAt: new Date() })
-        .where(
-          and(
-            eq(userContentStatus.userId, userId),
-            eq(userContentStatus.tmdbId, tmdbId),
-            eq(userContentStatus.contentType, contentType)
-          )
-        )
-        .returning();
-    } else {
-      [result] = await db
+
+    // DATA-07(d): the status write and the schedule cleanup it implies must
+    // commit together. Previously the schedule delete sat in its own swallowing
+    // try/catch after an already-committed status change, so a show could end
+    // up "completed" with its schedules still live -- and the schedules page
+    // would keep showing a show the user had finished.
+    const result = await db.transaction(async (tx) => {
+      // DATA-07(c): this was a check-then-insert -- select, then branch to
+      // update or insert against unique(userId, tmdbId, contentType). READ
+      // COMMITTED does not serialise that: two concurrent status writes both
+      // see no row, and the loser hits the unique constraint and surfaces as a
+      // 500. Wrapping it in a transaction made it marginally worse, because the
+      // violation also rolled back the schedule cleanup below. Let the database
+      // arbitrate with a single upsert on the natural key instead.
+      const [row] = await tx
         .insert(userContentStatus)
         .values({ userId, tmdbId, contentType, status })
+        .onConflictDoUpdate({
+          target: [
+            userContentStatus.userId,
+            userContentStatus.tmdbId,
+            userContentStatus.contentType,
+          ],
+          set: { status, updatedAt: new Date() },
+        })
         .returning();
-    }
-    if (
-      contentType === ContentType.TV &&
-      (status === TVWatchStatus.COMPLETED || status === TVWatchStatus.DROPPED)
-    ) {
-      try {
-        await db
+
+      if (
+        contentType === ContentType.TV &&
+        (status === TVWatchStatus.COMPLETED || status === TVWatchStatus.DROPPED)
+      ) {
+        await tx
           .delete(showSchedules)
           .where(
             and(
@@ -124,8 +122,15 @@ export async function createOrUpdateContentStatus(
               eq(showSchedules.tmdbId, tmdbId)
             )
           );
-      } catch {}
-    }
+      }
+
+      return row;
+    });
+
+    // NOTE: `syncStatusToCollaborators` writes other users' rows through the
+    // top-level `db` handle, so it cannot join this transaction without
+    // changing `src/lib/activity/activityUtils.ts`, which this branch does not
+    // own. Its half of DATA-07(d) is left for that owner.
     const syncedCollaboratorIds = await syncStatusToCollaborators(
       userId,
       tmdbId,
@@ -177,24 +182,43 @@ export async function updateContentStatus(
   if (existing.length === 0) return "notFound";
   const updateData: any = { updatedAt: new Date() };
   if (status !== undefined) updateData.status = status;
-  const [result] = await db
-    .update(userContentStatus)
-    .set(updateData)
-    .where(
-      and(
-        eq(userContentStatus.userId, userId),
-        eq(userContentStatus.tmdbId, tmdbId),
-        eq(userContentStatus.contentType, contentType)
-      )
-    )
-    .returning();
-  if (
+
+  const clearsSchedules =
     status !== undefined &&
     contentType === ContentType.TV &&
-    (status === TVWatchStatus.COMPLETED || status === TVWatchStatus.DROPPED)
-  ) {
+    (status === TVWatchStatus.COMPLETED || status === TVWatchStatus.DROPPED);
+
+  // DATA-07(d): hoist the TMDB lookup out of the transaction below. It is only
+  // needed for the activity metadata, and a network call must never be held
+  // open inside a DB transaction.
+  let contentDetails: Awaited<
+    ReturnType<typeof tmdbClient.getTVShowDetails>
+  > | null = null;
+  if (clearsSchedules) {
     try {
-      await db
+      contentDetails = await tmdbClient.getTVShowDetails(tmdbId);
+    } catch {
+      contentDetails = null;
+    }
+  }
+
+  // DATA-07(d): the status change and the schedule cleanup it implies commit
+  // together, so a show can never end up "completed" with surviving schedules.
+  const result = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(userContentStatus)
+      .set(updateData)
+      .where(
+        and(
+          eq(userContentStatus.userId, userId),
+          eq(userContentStatus.tmdbId, tmdbId),
+          eq(userContentStatus.contentType, contentType)
+        )
+      )
+      .returning();
+
+    if (clearsSchedules) {
+      await tx
         .delete(showSchedules)
         .where(
           and(
@@ -202,7 +226,15 @@ export async function updateContentStatus(
             eq(showSchedules.tmdbId, tmdbId)
           )
         );
-    } catch {}
+    }
+
+    return row;
+  });
+
+  if (clearsSchedules) {
+    // NOTE: see createOrUpdateContentStatus -- collaborator sync writes through
+    // the top-level `db` handle and cannot join the transaction without
+    // changing activity/activityUtils.ts, which this branch does not own.
     const syncedCollaboratorIds = await syncStatusToCollaborators(
       userId,
       tmdbId,
@@ -210,7 +242,6 @@ export async function updateContentStatus(
       status
     );
     try {
-      const contentDetails = await tmdbClient.getTVShowDetails(tmdbId);
       await db.insert(activityFeed).values({
         userId,
         activityType: ActivityType.STATUS_CHANGED,
@@ -218,8 +249,8 @@ export async function updateContentStatus(
         contentType,
         metadata: {
           status,
-          title: contentDetails.name,
-          posterPath: contentDetails.poster_path,
+          title: contentDetails?.name,
+          posterPath: contentDetails?.poster_path,
         },
         collaborators: syncedCollaboratorIds,
         isCollaborative: syncedCollaboratorIds.length > 0,

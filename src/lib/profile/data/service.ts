@@ -38,6 +38,29 @@ import type {
   TVShowSchedules,
 } from "./types";
 
+// LOGIC-05: `show_schedules.day_of_week` is 0 (Sunday) to 6 (Saturday). This
+// mirrors the CHECK constraint added in migration 0010; imports are the only
+// path that ever wrote outside the range.
+function isValidDayOfWeek(value: unknown): value is number {
+  return (
+    Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 6
+  );
+}
+
+// LOGIC-03 (consumer side): a bare `new Date(row.createdAt)` yields an Invalid
+// Date for any third-party or hand-edited JSON that omits a timestamp, and
+// Postgres rejects it -- downgraded by the per-row try/catch to a per-row error,
+// but still a row silently lost. Fixing the exporter only closed the producer
+// side. Same shape as `toReleaseDate` in src/lib/tmdb/cache-utils.ts: parse,
+// then fall back rather than hand an Invalid Date to the driver. Returns null so
+// callers pick their own fallback -- a missing `watchedAt` stays null, while a
+// missing `createdAt`/`updatedAt` becomes the import time.
+function toImportDate(value: unknown): Date | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export async function exportUserData(
   userId: string,
   format: ExportFormat
@@ -229,21 +252,59 @@ export async function importUserData(
     return "parseError";
   }
 
-  // 1b. Reject oversized payloads before doing any work (API-03). Each import
-  //     array is bounded independently so a single huge section cannot cause
-  //     excessive DB work / TMDB fan-out.
-  const totalListItems = (importModel.lists ?? []).reduce(
-    (sum, list) => sum + (list.items?.length ?? 0),
-    0
-  );
+  // 1a. LOGIC-07: validate the *structure* before touching any of it. Each
+  //     section's per-row try/catch sits inside its loop, so a truthy
+  //     non-iterable value (e.g. `{"lists": 5}`) used to throw from the
+  //     `for...of` itself -- outside any handler -- and surface as a 500 rather
+  //     than the intended "parseError".
+  if (typeof importModel !== "object" || importModel === null) {
+    return "parseError";
+  }
+  for (const section of [
+    "lists",
+    "contentStatus",
+    "episodeStatus",
+    "tvShowSchedules",
+  ] as const) {
+    const value = importModel[section];
+    if (value !== undefined && value !== null && !Array.isArray(value)) {
+      return "parseError";
+    }
+  }
+  // 1b. Reject oversized payloads before doing any per-row work (API-03). Each
+  //     import array is bounded independently so a single huge section cannot
+  //     cause excessive DB work / TMDB fan-out. These are O(1) length reads, so
+  //     they come before anything that walks the arrays.
   if (
     (importModel.lists?.length ?? 0) > MAX_IMPORT_ENTRIES ||
-    totalListItems > MAX_IMPORT_ENTRIES ||
     (importModel.contentStatus?.length ?? 0) > MAX_IMPORT_ENTRIES ||
     (importModel.episodeStatus?.length ?? 0) > MAX_IMPORT_ENTRIES ||
     (importModel.tvShowSchedules?.length ?? 0) > MAX_IMPORT_ENTRIES
   ) {
     return "tooLarge";
+  }
+  // The nested item total needs one pass; still ahead of the per-list structure
+  // check below, so an oversized payload is refused before it is validated.
+  // Element-safe: `lists` is known to be an array here but its members are not
+  // yet known to be objects.
+  const totalListItems = (importModel.lists ?? []).reduce(
+    (sum, list) => sum + (list?.items?.length ?? 0),
+    0
+  );
+  if (totalListItems > MAX_IMPORT_ENTRIES) {
+    return "tooLarge";
+  }
+
+  // 1c. Only now walk the lists to validate each element's shape.
+  for (const list of importModel.lists ?? []) {
+    if (typeof list !== "object" || list === null) return "parseError";
+    if (
+      list.items !== undefined &&
+      list.items !== null &&
+      !Array.isArray(list.items)
+    ) {
+      return "parseError";
+    }
   }
 
   const result: ImportResult = {
@@ -258,7 +319,7 @@ export async function importUserData(
     errors: [],
   };
 
-  // 1c. Pre-warm the TMDB cache once per unique (tmdbId, contentType) with
+  // 1d. Pre-warm the TMDB cache once per unique (tmdbId, contentType) with
   //     bounded concurrency (API-03), rather than issuing a live addToCache
   //     call for every list item sequentially. Items whose content could not
   //     be cached are skipped later with a per-item error.
@@ -303,6 +364,8 @@ export async function importUserData(
   // Running item counter used only for static, non-leaky error messages
   // (API-04). We never interpolate DB exception text into the response.
   let listItemNumber = 0;
+  // Fallback for any timestamp the file omits or that will not parse.
+  const importedAt = new Date();
   if (importModel.lists) {
     for (const [listIndex, list] of importModel.lists.entries()) {
       const listNumber = listIndex + 1;
@@ -317,8 +380,8 @@ export async function importUserData(
             isPublic: list.isPublic,
             isArchived: list.isArchived,
             syncWatchStatus: list.syncWatchStatus,
-            createdAt: new Date(list.createdAt),
-            updatedAt: new Date(list.updatedAt),
+            createdAt: toImportDate(list.createdAt) ?? importedAt,
+            updatedAt: toImportDate(list.updatedAt) ?? importedAt,
           })
           .returning({ id: lists.id });
         const newListId = insertedList.id;
@@ -346,7 +409,7 @@ export async function importUserData(
                   listId: newListId, // Attach to the newly-created list
                   tmdbId: item.tmdbId,
                   contentType: item.contentType,
-                  createdAt: new Date(item.createdAt),
+                  createdAt: toImportDate(item.createdAt) ?? importedAt,
                 })
                 .onConflictDoNothing();
               result.imported.listItems++;
@@ -379,8 +442,8 @@ export async function importUserData(
             tmdbId: status.tmdbId,
             contentType: status.contentType,
             status: status.status,
-            createdAt: new Date(status.createdAt),
-            updatedAt: new Date(status.updatedAt),
+            createdAt: toImportDate(status.createdAt) ?? importedAt,
+            updatedAt: toImportDate(status.updatedAt) ?? importedAt,
           })
           .onConflictDoUpdate({
             target: [
@@ -390,7 +453,7 @@ export async function importUserData(
             ],
             set: {
               status: status.status,
-              updatedAt: new Date(status.updatedAt),
+              updatedAt: toImportDate(status.updatedAt) ?? importedAt,
             },
           });
         result.imported.contentStatus++;
@@ -418,9 +481,9 @@ export async function importUserData(
             seasonNumber: status.seasonNumber,
             episodeNumber: status.episodeNumber,
             watched: status.watched,
-            watchedAt: status.watchedAt ? new Date(status.watchedAt) : null,
-            createdAt: new Date(status.createdAt),
-            updatedAt: new Date(status.updatedAt),
+            watchedAt: toImportDate(status.watchedAt),
+            createdAt: toImportDate(status.createdAt) ?? importedAt,
+            updatedAt: toImportDate(status.updatedAt) ?? importedAt,
           })
           .onConflictDoUpdate({
             target: [
@@ -431,8 +494,8 @@ export async function importUserData(
             ],
             set: {
               watched: status.watched,
-              watchedAt: status.watchedAt ? new Date(status.watchedAt) : null,
-              updatedAt: new Date(status.updatedAt),
+              watchedAt: toImportDate(status.watchedAt),
+              updatedAt: toImportDate(status.updatedAt) ?? importedAt,
             },
           });
         result.imported.episodeStatus++;
@@ -452,14 +515,25 @@ export async function importUserData(
   if (importModel.tvShowSchedules) {
     for (const [index, schedule] of importModel.tvShowSchedules.entries()) {
       try {
+        // LOGIC-05: reject out-of-range days. `listSchedules` buckets rows into
+        // keys 0-6, so a row with e.g. dayOfWeek 9 used to break every
+        // subsequent GET /api/schedules for the importing user, with no in-app
+        // way to remove it because the deleting UI could not render.
+        if (!isValidDayOfWeek(schedule?.dayOfWeek)) {
+          result.errors.push(
+            `Failed to import schedule entry ${index + 1}: dayOfWeek must be an integer between 0 and 6`
+          );
+          continue;
+        }
+
         await db
           .insert(showSchedules)
           .values({
             userId: userId,
             tmdbId: schedule.tmdbId,
             dayOfWeek: schedule.dayOfWeek,
-            createdAt: new Date(schedule.createdAt),
-            updatedAt: new Date(schedule.updatedAt),
+            createdAt: toImportDate(schedule.createdAt) ?? importedAt,
+            updatedAt: toImportDate(schedule.updatedAt) ?? importedAt,
           })
           .onConflictDoUpdate({
             target: [
@@ -468,7 +542,7 @@ export async function importUserData(
               showSchedules.dayOfWeek,
             ],
             set: {
-              updatedAt: new Date(schedule.updatedAt),
+              updatedAt: toImportDate(schedule.updatedAt) ?? importedAt,
             },
           });
         result.imported.tvShowSchedules++;
@@ -482,19 +556,27 @@ export async function importUserData(
     }
   }
 
-  // 7. Write activity feed entry for successful import
-  await db.insert(activityFeed).values({
-    activityType: ActivityType.PROFILE_IMPORT,
-    userId: userId,
-    metadata: {
-      lists: result.imported.lists,
-      listItems: result.imported.listItems,
-      contentStatus: result.imported.contentStatus,
-      episodeStatus: result.imported.episodeStatus,
-      tvShowSchedules: result.imported.tvShowSchedules,
-      errors: result.errors.length,
-    },
-  });
+  // 7. Write activity feed entry for successful import.
+  //    LOGIC-07: this was the only activity write in the codebase not wrapped
+  //    in try/catch. It runs *after* every row has been committed, so a failure
+  //    here threw and the caller saw a 500 despite a successful import. Match
+  //    the surrounding convention: log it and carry on.
+  try {
+    await db.insert(activityFeed).values({
+      activityType: ActivityType.PROFILE_IMPORT,
+      userId: userId,
+      metadata: {
+        lists: result.imported.lists,
+        listItems: result.imported.listItems,
+        contentStatus: result.imported.contentStatus,
+        episodeStatus: result.imported.episodeStatus,
+        tvShowSchedules: result.imported.tvShowSchedules,
+        errors: result.errors.length,
+      },
+    });
+  } catch (e) {
+    console.error("Import: failed to write the profile_import activity:", e);
+  }
 
   // 8. Return `ImportResult`, with error strings for individually failed items (which should not cause wholistic failure)
   return result;

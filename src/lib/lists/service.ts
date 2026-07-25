@@ -97,33 +97,83 @@ async function fetchLists(
       lists.updatedAt
     );
 
-  // Get poster URLs for each list (up to 4 items)
-  return await Promise.all(
-    userListsWithCounts.map(async (list) => {
-      const posterItems = await db
-        .select({
-          tmdbId: listItems.tmdbId,
-          contentType: listItems.contentType,
-        })
-        .from(listItems)
-        .where(and(eq(listItems.listId, list.id)))
-        .orderBy(desc(listItems.createdAt))
-        .limit(6);
+  if (userListsWithCounts.length === 0) return [];
 
-      const contentDetails = await getAllCachedContent(
-        posterItems as { tmdbId: number; contentType: ContentTypeEnum }[],
-        userId
-      );
+  // DATA-06: this used to map over the lists and await a poster query, a cache
+  // query and a status query *per list* -- 40 lists meant ~120 round-trips, and
+  // the Promise.all fan-out saturated the pool rather than helping. One
+  // windowed query now fetches the newest 6 items for every list at once, and
+  // a single getAllCachedContent call resolves the union of their content.
+  const listIds = userListsWithCounts.map((l) => l.id);
 
-      return {
-        ...list,
-        posterPaths: contentDetails
-          .filter((i) => !!i.posterPath)
-          .slice(0, 4)
-          .map((i) => i.posterPath!),
-      };
+  const rankedItems = db
+    .select({
+      listId: listItems.listId,
+      tmdbId: listItems.tmdbId,
+      contentType: listItems.contentType,
+      rowNumber: sql<number>`ROW_NUMBER() OVER (
+          PARTITION BY ${listItems.listId}
+          ORDER BY ${listItems.createdAt} DESC
+        )`.as("row_number"),
     })
+    .from(listItems)
+    .where(inArray(listItems.listId, listIds))
+    .as("ranked_items");
+
+  const posterItems = await db
+    .select({
+      listId: rankedItems.listId,
+      tmdbId: rankedItems.tmdbId,
+      contentType: rankedItems.contentType,
+    })
+    .from(rankedItems)
+    .where(sql`${rankedItems.rowNumber} <= 6`)
+    .orderBy(rankedItems.listId, rankedItems.rowNumber);
+
+  // Resolve every distinct piece of content in one call rather than once per
+  // list; an uncached item would otherwise trigger a TMDB fetch inside the
+  // per-list fan-out.
+  const uniqueContent = new Map<
+    string,
+    { tmdbId: number; contentType: ContentTypeEnum }
+  >();
+  for (const item of posterItems) {
+    uniqueContent.set(`${item.contentType}:${item.tmdbId}`, {
+      tmdbId: item.tmdbId,
+      contentType: item.contentType as ContentTypeEnum,
+    });
+  }
+
+  const contentDetails = await getAllCachedContent(
+    Array.from(uniqueContent.values()),
+    userId
   );
+  const posterPathByKey = new Map<string, string | null>();
+  for (const detail of contentDetails) {
+    posterPathByKey.set(
+      `${detail.contentType}:${detail.tmdbId}`,
+      detail.posterPath ?? null
+    );
+  }
+
+  const postersByList = new Map<string, string[]>();
+  for (const item of posterItems) {
+    const posterPath = posterPathByKey.get(
+      `${item.contentType}:${item.tmdbId}`
+    );
+    if (!posterPath) continue;
+    const existing = postersByList.get(item.listId);
+    if (existing) {
+      if (existing.length < 4) existing.push(posterPath);
+    } else {
+      postersByList.set(item.listId, [posterPath]);
+    }
+  }
+
+  return userListsWithCounts.map((list) => ({
+    ...list,
+    posterPaths: postersByList.get(list.id) ?? [],
+  }));
 }
 
 export async function listLists(userId: string): Promise<ListResponse[]> {
@@ -457,17 +507,24 @@ export async function deleteList(
   if (!existing) return "notFound";
   if (existing.ownerId !== userId) return "forbidden";
 
-  await db.delete(lists).where(eq(lists.id, listId));
-  try {
-    await db.insert(activityFeed).values({
+  // DATA-07(b): the delete and its audit entry must commit together. Previously
+  // the activity insert sat in a swallowing try/catch after an already-committed
+  // delete, so a failure silently lost the audit record for a destructive action.
+  //
+  // This is the *strict* half of the rule written out in `createListItem`:
+  // deleting a list is destructive and irreversible, so its audit entry is part
+  // of the action rather than a feed item, and losing the entry rolls the delete
+  // back. Every other activity write in this module is best-effort. Do not
+  // "unify" the two -- the asymmetry is deliberate.
+  await db.transaction(async (tx) => {
+    await tx.delete(lists).where(eq(lists.id, listId));
+    await tx.insert(activityFeed).values({
       userId,
       activityType: ActivityType.LIST_DELETED,
       metadata: { listName: existing.name, listType: existing.listType },
       createdAt: new Date(),
     });
-  } catch (error) {
-    console.error("Error in deleteList activity:", error);
-  }
+  });
   return { message: "List deleted successfully" };
 }
 
@@ -514,21 +571,26 @@ export async function createListItem(
     return "invalidType";
   }
 
-  const [existingItem] = await db
-    .select({ id: listItems.id })
-    .from(listItems)
-    .where(
-      and(
-        eq(listItems.listId, listId),
-        eq(listItems.tmdbId, input.tmdbId),
-        eq(listItems.contentType, input.contentType)
-      )
-    )
-    .limit(1);
-  if (existingItem) return "conflict";
-
+  // DATA-07(c): the TMDB round-trip is kept out of any transaction -- a network
+  // call must never be held open inside one.
+  //
+  // This deliberately runs *before* the insert, even though it means a duplicate
+  // add pays for it before finding out it is a duplicate. Warming the cache is a
+  // precondition of the row existing, not merely metadata for the activity entry
+  // below: every read path re-derives list items through `getAllCachedContent`,
+  // which calls `addToCache` for anything uncached and throws for a tmdbId TMDB
+  // does not know. Inserting first would let an unresolvable tmdbId become a
+  // permanent row that makes `getListItems` return "notFound" for the entire
+  // list and `fetchLists` throw outright -- with no in-app way to delete it.
+  // The cost on a duplicate add is one TMDB read (served from the Next data
+  // cache, `revalidate: 3600`) plus two queries, which is the cheaper half of
+  // the trade against a row that can outlive its content.
   const contentDetails = await addToCache(input.tmdbId, input.contentType);
 
+  // DATA-07(c): this used to be a check-then-insert. Two concurrent adds of the
+  // same title both passed the existence check and the loser hit the unique
+  // constraint, surfacing as a 500 instead of the intended "conflict". Let the
+  // database arbitrate: an empty `returning()` means another writer won.
   const [newItem] = await db
     .insert(listItems)
     .values({
@@ -536,8 +598,23 @@ export async function createListItem(
       tmdbId: Number(input.tmdbId),
       contentType: input.contentType,
     })
+    .onConflictDoNothing()
     .returning();
 
+  if (!newItem) return "conflict";
+
+  // The rule for activity_feed writes in this module, so it is not re-litigated:
+  //
+  //   * A *destructive* action's entry is strict -- it commits in the same
+  //     transaction as the action, so losing the record fails the action.
+  //     `deleteList` is the only case; the entry is the audit trail for
+  //     something the user cannot undo.
+  //   * Every other entry is best-effort -- it is a feed item, not an audit
+  //     record, and must never fail the user's action. Log and carry on.
+  //
+  // Adding to a list is the second kind. A failed feed insert must not turn a
+  // successful "add to list" into an error, so this write is deliberately
+  // outside any transaction with the item insert above.
   try {
     await db.insert(activityFeed).values({
       userId,

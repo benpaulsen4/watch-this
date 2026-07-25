@@ -1,4 +1,4 @@
-import { and, desc, eq, gt,isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import { createClaimToken } from "@/lib/auth/webauthn";
 import {
@@ -63,8 +63,11 @@ function generateClaimCode(length: number = 12): string {
 }
 
 export async function countActiveDevices(userId: string): Promise<number> {
-  const rows = await db
-    .select({ id: passkeyCredentials.id })
+  // DATA-08a: count in the database rather than selecting every row and
+  // reading `.length`. This runs on the hot path of claim creation and
+  // passkey deletion.
+  const [row] = await db
+    .select({ value: count() })
     .from(passkeyCredentials)
     .where(
       and(
@@ -72,7 +75,7 @@ export async function countActiveDevices(userId: string): Promise<number> {
         isNull(passkeyCredentials.deletedAt),
       ),
     );
-  return rows.length;
+  return row?.value ?? 0;
 }
 
 export async function initiateClaim(
@@ -85,8 +88,10 @@ export async function initiateClaim(
   }
 
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const claimsLastHour = await db
-    .select({ id: passkeyClaims.id })
+  // DATA-08a: aggregate in the database instead of materialising every claim
+  // row just to read its length.
+  const [claimsLastHour] = await db
+    .select({ value: count() })
     .from(passkeyClaims)
     .where(
       and(
@@ -97,7 +102,7 @@ export async function initiateClaim(
   // Enforce the 5/hour claim cap for admin-initiated claims too, not just
   // user-initiated ones, so a leaked/abused admin secret can't mint unlimited
   // device claims for a single user.
-  if (claimsLastHour.length >= 5) {
+  if ((claimsLastHour?.value ?? 0) >= 5) {
     return "rateLimit";
   }
 
