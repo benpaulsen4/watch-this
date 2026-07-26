@@ -51,7 +51,10 @@ describe("ListSelector", () => {
         if (url === "/api/lists" && method === "GET") {
           return { ok: true, json: async () => ({ lists }) } as Response;
         }
-        if (url === `/api/content/${contentId}/lists` && method === "GET") {
+        if (
+          url === `/api/content/${contentId}/lists?contentType=tv` &&
+          method === "GET"
+        ) {
           const arr = Object.entries(listsWithContent).map(
             ([listId, itemId]) => ({ listId, itemId }),
           );
@@ -146,7 +149,10 @@ describe("ListSelector", () => {
         if (url === "/api/lists" && method === "GET") {
           return { ok: true, json: async () => ({ lists }) } as Response;
         }
-        if (url === `/api/content/${contentId}/lists` && method === "GET") {
+        if (
+          url === `/api/content/${contentId}/lists?contentType=tv` &&
+          method === "GET"
+        ) {
           const arr = Object.entries(listsWithContent).map(
             ([listId, itemId]) => ({ listId, itemId }),
           );
@@ -204,5 +210,79 @@ describe("ListSelector", () => {
 
     expect(await screen.findByText(/Quick Created/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Added/i).length).toBeGreaterThan(1);
+  });
+
+  // UI-05: a TMDB id is only unique within a content type, and list_items is
+  // keyed on (listId, tmdbId, contentType), so one id can legitimately be in a
+  // list twice. Asking for membership by id alone answered for the wrong row.
+  it("scopes the membership request and its cache entry by content type", async () => {
+    const client = setupQueryClient();
+    const requested: string[] = [];
+
+    lists = [
+      {
+        id: "list-mixed",
+        name: "Mixed List",
+        description: "",
+        listType: "mixed",
+        isPublic: true,
+        syncWatchStatus: false,
+        collaborators: 0,
+      },
+    ];
+
+    vi.spyOn(global, "fetch").mockImplementation((async (
+      input: RequestInfo | URL,
+    ) => {
+      const url = String(input);
+      if (url.startsWith(`/api/content/${contentId}/lists`)) {
+        requested.push(url);
+        // Only the movie is in the list; the show with the same id is not.
+        const isMovie = url.includes("contentType=movie");
+        return {
+          ok: true,
+          json: async () =>
+            isMovie ? [{ listId: "list-mixed", itemId: "item-movie" }] : [],
+        } as Response;
+      }
+      if (url === "/api/lists") {
+        return { ok: true, json: async () => ({ lists }) } as Response;
+      }
+      return { ok: true, json: async () => ({}) } as Response;
+    }) as any);
+
+    const { unmount } = renderWithQuery(
+      <ListSelector
+        contentType="movie"
+        contentId={contentId}
+        title="Shared Id"
+        posterPath={null}
+      />,
+      client,
+    );
+
+    await waitFor(() => expect(screen.getByText(/Added/i)).toBeInTheDocument());
+    unmount();
+
+    // Same id, different type: it must not read the movie's answer out of cache.
+    renderWithQuery(
+      <ListSelector
+        contentType="tv"
+        contentId={contentId}
+        title="Shared Id"
+        posterPath={null}
+      />,
+      client,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^Add$/i })).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Added/i)).toBeNull();
+
+    expect(requested).toEqual([
+      `/api/content/${contentId}/lists?contentType=movie`,
+      `/api/content/${contentId}/lists?contentType=tv`,
+    ]);
   });
 });

@@ -54,15 +54,20 @@ export function ListSelector({
     },
   });
 
+  // The content type belongs in both the key and the request: a TMDB id is only
+  // unique within a type, so a movie and a show can share one, and without it
+  // the two collide in the cache and in the query behind it.
   const { data: listsWithContentData } = useQuery<
     {
       listId: string;
       itemId: string;
     }[]
   >({
-    queryKey: ["content", contentId, "lists"],
+    queryKey: ["content", contentId, contentType, "lists"],
     queryFn: async () => {
-      const response = await fetch(`/api/content/${contentId}/lists`);
+      const response = await fetch(
+        `/api/content/${contentId}/lists?contentType=${contentType}`,
+      );
       if (!response.ok) throw new Error("Failed to fetch lists for content");
       return response.json();
     },
@@ -111,7 +116,7 @@ export function ListSelector({
         queryKey: ["lists", listId, "items"],
       });
       await queryClient.invalidateQueries({
-        queryKey: ["content", contentId, "lists"],
+        queryKey: ["content", contentId, contentType, "lists"],
       });
       if (listId === currentListId) onInclusionChange?.();
     },
@@ -139,7 +144,7 @@ export function ListSelector({
         queryKey: ["lists", listId, "items"],
       });
       await queryClient.invalidateQueries({
-        queryKey: ["content", contentId, "lists"],
+        queryKey: ["content", contentId, contentType, "lists"],
       });
       if (listId === currentListId) onInclusionChange?.();
     },
