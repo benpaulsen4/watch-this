@@ -37,7 +37,7 @@ export function StreamingPreferences() {
   const PROVIDERS_PER_PAGE = 20;
 
   // Use streaming preferences from context
-  const { streamingPreferences, refreshStreamingPreferences } =
+  const { streamingPreferences, streamingError, refreshStreamingPreferences } =
     useStreamingPreferences();
 
   // React Query: regions
@@ -319,7 +319,11 @@ export function StreamingPreferences() {
         )}
       </div>
 
-      {error && <div className="text-red-400 text-sm">{error}</div>}
+      {/* A load failure in the auth context used to be swallowed entirely - the
+          panel just came up empty as if nothing were saved. */}
+      {(error || streamingError) && (
+        <div className="text-red-400 text-sm">{error || streamingError}</div>
+      )}
 
       <div className="flex justify-end">
         <Button onClick={handleSave} loading={savePreferences.isPending}>

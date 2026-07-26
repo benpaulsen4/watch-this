@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -17,6 +18,13 @@ interface AuthState {
   error: string | null;
   streamingPreferences: StreamingPreferences | null;
   streamingLoading: boolean;
+  /**
+   * Whether a load has been attempted for the current user, successfully or
+   * not. `streamingPreferences` alone cannot answer that: a failed attempt
+   * leaves it null, which is indistinguishable from "not tried yet".
+   */
+  streamingLoaded: boolean;
+  streamingError: string | null;
 }
 
 interface AuthContextType extends AuthState {
@@ -34,18 +42,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error: null,
     streamingPreferences: null,
     streamingLoading: false,
+    streamingLoaded: false,
+    streamingError: null,
   });
 
   const refreshSession = useCallback(async () => {
     try {
       setState((prev) => ({ ...prev, loading: true, error: null }));
       const session = await getCurrentSession();
-      setState((prev) => ({
-        ...prev,
-        user: session?.user || null,
-        loading: false,
-        error: null,
-      }));
+      setState((prev) => {
+        const user = session?.user || null;
+        // A different user must not inherit the previous one's preferences, and
+        // the loaded flag has to fall back with them or they never reload.
+        const switchedUser = prev.user?.id !== user?.id;
+        return {
+          ...prev,
+          user,
+          loading: false,
+          error: null,
+          ...(switchedUser
+            ? {
+                streamingPreferences: null,
+                streamingLoaded: false,
+                streamingError: null,
+              }
+            : {}),
+        };
+      });
     } catch (error) {
       console.error("Failed to refresh session:", error);
       setState((prev) => ({
@@ -60,7 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshStreamingPreferences = useCallback(async () => {
     try {
-      setState((prev) => ({ ...prev, streamingLoading: true }));
+      setState((prev) => ({
+        ...prev,
+        streamingLoading: true,
+        streamingError: null,
+      }));
       const response = await fetch("/api/profile/streaming");
       if (response.ok) {
         const data = await response.json();
@@ -68,12 +95,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           streamingPreferences: data,
           streamingLoading: false,
+          streamingLoaded: true,
+          streamingError: null,
         }));
       } else {
         setState((prev) => ({
           ...prev,
           streamingPreferences: null,
           streamingLoading: false,
+          streamingLoaded: true,
+          streamingError: `Failed to load streaming preferences (${response.status})`,
         }));
       }
     } catch (error) {
@@ -82,6 +113,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         streamingPreferences: null,
         streamingLoading: false,
+        streamingLoaded: true,
+        streamingError:
+          error instanceof Error
+            ? error.message
+            : "Failed to load streaming preferences",
       }));
     }
   }, []);
@@ -93,6 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       error: null,
       streamingPreferences: null,
       streamingLoading: false,
+      streamingLoaded: false,
+      streamingError: null,
     });
   }, []);
 
@@ -100,24 +138,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshSession();
   }, [refreshSession]);
 
-  // Load streaming preferences when user is authenticated
+  // Load streaming preferences once the user is known. The guard is
+  // `streamingLoaded`, not `streamingPreferences`: a failed request leaves the
+  // preferences null and clears the loading flag, which restores the entry
+  // condition exactly, so keying off them re-fires this effect forever and
+  // hammers /api/profile/streaming for as long as it keeps failing.
   useEffect(() => {
-    if (state.user && !state.streamingPreferences && !state.streamingLoading) {
+    if (state.user && !state.streamingLoaded && !state.streamingLoading) {
       refreshStreamingPreferences();
     }
   }, [
     state.user,
-    state.streamingPreferences,
+    state.streamingLoaded,
     state.streamingLoading,
     refreshStreamingPreferences,
   ]);
 
-  const value: AuthContextType = {
-    ...state,
-    refreshSession,
-    refreshStreamingPreferences,
-    clearAuth,
-  };
+  // Rebuilding this object every render re-renders every consumer's subtree on
+  // any auth state change, and on renders caused by something else entirely.
+  const value = useMemo<AuthContextType>(
+    () => ({
+      ...state,
+      refreshSession,
+      refreshStreamingPreferences,
+      clearAuth,
+    }),
+    [state, refreshSession, refreshStreamingPreferences, clearAuth],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -150,11 +197,13 @@ export function useStreamingPreferences() {
   const {
     streamingPreferences,
     streamingLoading,
+    streamingError,
     refreshStreamingPreferences,
   } = useAuth();
   return {
     streamingPreferences,
     streamingLoading,
+    streamingError,
     refreshStreamingPreferences,
   };
 }
