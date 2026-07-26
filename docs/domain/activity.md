@@ -59,7 +59,8 @@ Although the DB stores `activityType` as a string, UI rendering is keyed off the
 - `status_changed`:
   - `{ status, title, posterPath }`
 - `episode_progress`:
-  - `{ seasonNumber, episodeNumber, watched, title, posterPath, episodeName? }`
+  - `{ seasonNumber, episodeNumber, watched, title, posterPath, episodeName?, episodeCount? }`
+  - `episodeCount` is present only for batch writes covering more than one episode; the season/episode pair then identifies the last episode in that group. A mixed batch produces two rows, one per `watched` value (see [episodes.md](./episodes.md)).
 - `list_item_added`:
   - `{ title, listName, posterPath }`
 - `list_item_removed`:
@@ -130,18 +131,20 @@ Implemented in [route.ts](../../src/app/api/activity/route.ts).
 - Authentication: enforced via `withAuth` (cookie session)
 - Query params:
   - `limit` (number, default `10`): page size
-  - `cursor` (string, optional): ISO timestamp; fetches items with `createdAt < cursor`
+  - `cursor` (string, optional): a `nextCursor` value from a previous response (`<ISO>|<uuid>`, or a bare ISO timestamp from older clients)
   - `type` (string, optional): filters by `activityType` (one of `ActivityType.*`)
 - Errors:
-  - `400` when `cursor` cannot be parsed as a Date
+  - `400` when the cursor’s date half cannot be parsed, or its id half is present but is not a uuid
 
 ## Timeline Query and Pagination
 
 The timeline query lives in [listActivityTimeline](../../src/lib/activity/service.ts) and uses keyset pagination:
 
-- Results are ordered by `createdAt DESC`.
+- Results are ordered by `createdAt DESC, id DESC`.
+- `limit` is clamped to `1..100`.
 - The service fetches `limit + 1` rows to compute `hasMore`.
-- `nextCursor` is the last returned item’s `createdAt` (as `toISOString()`).
+- `nextCursor` is compound: `<createdAt ISO>|<id>` (LOGIC-14). Batch writes can land several rows in the same millisecond, so a bare `createdAt` cursor with a strict `lt` silently dropped every remaining row at a timestamp that a page boundary fell inside. `id` is the tiebreaker in both the predicate (`createdAt < c OR (createdAt = c AND id < cursorId)`) and the ordering.
+- Bare-ISO cursors minted by older clients still parse and keep the old strict-`lt` behaviour. A cursor that carries an `id` half which is not a uuid is rejected as `invalidCursor` → `400`, rather than reaching Postgres and raising `22P02` as a 500.
 
 Collaborator user profiles are hydrated by a secondary query for `users` matching the collected `collaborators` IDs.
 
@@ -149,10 +152,11 @@ Collaborator user profiles are hydrated by a secondary query for `users` matchin
 
 The `upcoming` field is not stored in `activity_feed`. It is computed during timeline reads in [service.ts](../../src/lib/activity/service.ts):
 
-- Determines “today” using the requesting user’s timezone.
-- Loads rows from `show_schedules` for that day.
-- Excludes shows that already had an episode watched “today” (timezone-aware date comparison).
-- Hydrates content details using cached TMDB data.
+- Determines “today” as a day-of-week (`0..6`) using the requesting user’s timezone, falling back to the server’s `getDay()` only if the formatted weekday name is unrecognised.
+- Loads rows from `show_schedules` for that day, inner-joined to `user_content_status` for `contentType="tv"` — a scheduled show with no status row does not appear.
+- **Excludes shows whose `nextEpisodeDate` is still in the future** (`service.ts:228-232`): a row survives only when `nextEpisodeDate` is `null` or its date, in the user’s timezone, is on or before today. This is the core of the caught-up preservation behaviour. A show the user has finished every aired episode of carries a real future air date in `nextEpisodeDate` (see [content-status.md](./content-status.md)), so it stays out of “upcoming” until that episode actually airs, instead of nagging every scheduled day with an episode that does not exist yet. Shows the user is mid-run on have `nextEpisodeDate = null` and always qualify.
+- Excludes shows that already had an episode watched “today”, compared in the user’s timezone (`DATE(watched_at AT TIME ZONE tz) = DATE(now() AT TIME ZONE tz)`). This query only runs when at least one candidate survived the filter above.
+- Hydrates content details using cached TMDB data, with a per-show `getCachedContent` fallback if the bulk fetch throws.
 
 This keeps schedules lightweight while making “what’s up next” available anywhere the activity feed is shown.
 
