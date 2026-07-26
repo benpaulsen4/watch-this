@@ -21,7 +21,7 @@ Movie and TV watchlists for you and your friends, with passkey security, shared 
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20.9+ (Next.js 16 requirement; CI runs 20.x)
 - PostgreSQL
 - TMDB API key
 
@@ -83,14 +83,19 @@ Open http://localhost:3000
 
 See [.env.example](.env.example) for the full list. Common variables:
 
-| Variable          | Purpose                                                     |
-| ----------------- | ----------------------------------------------------------- |
-| `DATABASE_URL`    | PostgreSQL connection string                                |
-| `TMDB_API_KEY`    | TMDB API key used for search/details/recommendations        |
-| `APP_URL`         | Public base URL of the app (local: `http://localhost:3000`) |
-| `WEBAUTHN_RP_ID`  | Relying Party ID (domain), e.g. `localhost`                 |
-| `WEBAUTHN_ORIGIN` | WebAuthn origin, e.g. `http://localhost:3000`               |
-| `WEBAUTHN_SECRET` | Secret for session/signing (do not commit)                  |
+| Variable             | Purpose                                                             |
+| -------------------- | ------------------------------------------------------------------- |
+| `DATABASE_URL`       | PostgreSQL connection string                                        |
+| `TMDB_API_KEY`       | TMDB API key used for search/details/recommendations                |
+| `SITE_URL`           | Public base URL, for canonical/OG/sitemap URLs                      |
+| `WEBAUTHN_RP_ID`     | Relying Party ID (domain), e.g. `localhost`                         |
+| `WEBAUTHN_ORIGIN`    | WebAuthn origin, e.g. `http://localhost:3000`                       |
+| `WEBAUTHN_SECRET`    | Secret for session/signing (do not commit)                          |
+| `ADMIN_API_SECRET`   | Gates `POST /api/admin/device-claim`; unset disables the endpoint    |
+
+`WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN` fall back to localhost only outside
+production. A production deploy without them fails loudly rather than
+validating passkey ceremonies against `localhost`.
 
 ## Scripts
 
@@ -101,6 +106,7 @@ See [.env.example](.env.example) for the full list. Common variables:
 | `npm run start`       | Start production server      |
 | `npm run lint`        | Run ESLint                   |
 | `npm run test`        | Run tests once (CI-friendly) |
+| `npm run test:coverage` | Run tests with a v8 coverage report and thresholds |
 | `npm run test:watch`  | Run tests in watch mode      |
 | `npm run test:ui`     | Run tests with Vitest UI     |
 | `npm run db:generate` | Generate Drizzle migrations  |

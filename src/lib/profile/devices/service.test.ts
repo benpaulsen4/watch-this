@@ -128,7 +128,12 @@ vi.mock("@/lib/db", () => {
 });
 
 // Mock claim token generator
-vi.mock("@/lib/auth/webauthn", () => ({
+vi.mock("@/lib/auth/webauthn", async (importOriginal) => ({
+  // Partial mock rather than a full stub: SUPPLY-02 made getWebAuthnOrigin the
+  // single source of truth for the magic-link origin, and stubbing it here
+  // would stop this test noticing if the link and the ceremony ever drifted
+  // apart again. Only the token minting is faked.
+  ...(await importOriginal<typeof import("@/lib/auth/webauthn")>()),
   createClaimToken: vi.fn(
     async (claimId: string, userId: string) => `mocktoken-${claimId}-${userId}`,
   ),

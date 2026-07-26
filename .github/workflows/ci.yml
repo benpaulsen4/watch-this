@@ -1,5 +1,11 @@
 name: CI
 
+# SUPPLY-09: third-party actions are pinned to full commit SHAs, not to the
+# floating `@v4` tag. A major tag is mutable -- whoever controls the action
+# repository can repoint it at new code, which then runs here with access to the
+# checkout and the npm cache. The trailing comment is the version that SHA is,
+# so the pin stays readable; update both together.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -10,9 +16,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20.x"
           cache: "npm"
@@ -27,9 +33,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20.x"
           cache: "npm"
@@ -46,17 +52,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20.x"
           cache: "npm"
           cache-dependency-path: "package-lock.json"
       - name: Install
         run: npm ci
+      # Runs the suite with coverage so the thresholds in vitest.config.mts are
+      # actually enforced somewhere. They are floors just under current
+      # coverage, so this fails on a real regression, not on ordinary churn.
       - name: Test
-        run: npm run test
+        run: npm run test:coverage
         env:
           CI: true
 
@@ -65,9 +74,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20.x"
           cache: "npm"

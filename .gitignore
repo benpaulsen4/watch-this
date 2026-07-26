@@ -30,8 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env.local
+# env files
+# Only .env.local was ignored, so a `.env` or `.env.production` -- created by
+# tooling, or by a developer following a different convention -- would be picked
+# up by `git add .` with no warning. Ignore the whole family and allow only the
+# committed template back in.
+.env*
+!.env.example
 
 # vercel
 .vercel

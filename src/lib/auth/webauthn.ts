@@ -16,14 +16,68 @@ import { passkeyCredentials, type User, users } from "../db";
 import { db } from "../db/index";
 
 const RP_NAME = process.env.WEBAUTHN_RP_NAME || "WatchThis";
-const RP_ID =
-  process.env.VERCEL_ENV === "preview"
+
+// SUPPLY-02. WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN used to fall back to localhost
+// unconditionally. A production deploy missing either one would therefore
+// validate every ceremony against localhost and *succeed* -- the RP ID and
+// origin checks are string comparisons, so the wrong expected value is not an
+// error, it is a silently wrong security decision. Fail closed instead, the
+// same way getJwtSecret() does for WEBAUTHN_SECRET below. The localhost
+// defaults stay for development, where they are what you actually want.
+//
+// Read on each call rather than cached at module scope: these are plain env
+// reads with nothing to memoise, and a module-scope throw would crash at import
+// time during `next build`, which evaluates route modules without runtime env.
+function requireInProduction(
+  name: "WEBAUTHN_RP_ID" | "WEBAUTHN_ORIGIN",
+  value: string | undefined,
+  developmentDefault: string
+): string {
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      `${name} environment variable is required in production; refusing to ` +
+        `validate WebAuthn ceremonies against ${developmentDefault}`
+    );
+  }
+  return developmentDefault;
+}
+
+export function getRpId(): string {
+  return process.env.VERCEL_ENV === "preview"
     ? process.env.VERCEL_URL!
-    : process.env.WEBAUTHN_RP_ID || "localhost";
-const ORIGIN =
-  process.env.VERCEL_ENV === "preview"
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.WEBAUTHN_ORIGIN || "http://localhost:3000";
+    : requireInProduction(
+        "WEBAUTHN_RP_ID",
+        process.env.WEBAUTHN_RP_ID,
+        "localhost"
+      );
+}
+
+// The single source of truth for the expected WebAuthn origin. Exported because
+// the device-claim service builds magic links from the same value and used to
+// derive it independently, which let the two drift apart.
+export function getWebAuthnOrigin(): string {
+  // The `&& VERCEL_URL` is not redundant. The getOrigin() this replaced in
+  // devices/service.ts guarded on it and fell through to WEBAUTHN_ORIGIN when it
+  // was absent; without the guard a preview deployment missing VERCEL_URL would
+  // build the literal string "https://undefined" and hand it to the ceremony as
+  // the expected origin -- silently wrong, which is the exact failure this
+  // change exists to remove.
+  //
+  // getRpId above deliberately keeps its unguarded `VERCEL_URL!`: that, and the
+  // instability of a deployment-specific RP ID, are AUTH-07, which the owner has
+  // decided not to address. This function is only restoring a guard that existed
+  // on master.
+  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return requireInProduction(
+    "WEBAUTHN_ORIGIN",
+    process.env.WEBAUTHN_ORIGIN,
+    "http://localhost:3000"
+  );
+}
+
 let jwtSecretCache: Uint8Array | null = null;
 function getJwtSecret(): Uint8Array {
   if (jwtSecretCache) return jwtSecretCache;
@@ -94,7 +148,7 @@ export async function generatePasskeyRegistrationOptions(username: string) {
 
   const options: GenerateRegistrationOptionsOpts = {
     rpName: RP_NAME,
-    rpID: RP_ID,
+    rpID: getRpId(),
     userName: username,
     userDisplayName: username,
     timeout: 60000,
@@ -120,8 +174,8 @@ export async function verifyPasskeyRegistration(
   const verification: VerifyRegistrationResponseOpts = {
     response: registrationResponse,
     expectedChallenge,
-    expectedOrigin: ORIGIN,
-    expectedRPID: RP_ID,
+    expectedOrigin: getWebAuthnOrigin(),
+    expectedRPID: getRpId(),
   };
 
   const verificationResult = await verifyRegistrationResponse(verification);
@@ -182,7 +236,7 @@ export async function generateAdditionalPasskeyRegistrationOptions(
 
   const options: GenerateRegistrationOptionsOpts = {
     rpName: RP_NAME,
-    rpID: RP_ID,
+    rpID: getRpId(),
     userName: u.username,
     userDisplayName: u.username,
     timeout: 60000,
@@ -211,8 +265,8 @@ export async function verifyAdditionalPasskeyRegistration(
   const verification: VerifyRegistrationResponseOpts = {
     response: registrationResponse,
     expectedChallenge,
-    expectedOrigin: ORIGIN,
-    expectedRPID: RP_ID,
+    expectedOrigin: getWebAuthnOrigin(),
+    expectedRPID: getRpId(),
   };
 
   const verificationResult = await verifyRegistrationResponse(verification);
@@ -288,7 +342,7 @@ export async function verifyClaimToken(
 // Generate authentication options for existing user
 export async function generatePasskeyAuthenticationOptions() {
   const options: GenerateAuthenticationOptionsOpts = {
-    rpID: RP_ID,
+    rpID: getRpId(),
     timeout: 60000,
     userVerification: "preferred",
   };
@@ -326,8 +380,8 @@ export async function verifyPasskeyAuthentication(
   const verification = {
     response: authenticationResponse as AuthenticationResponseJSON,
     expectedChallenge,
-    expectedOrigin: ORIGIN,
-    expectedRPID: RP_ID,
+    expectedOrigin: getWebAuthnOrigin(),
+    expectedRPID: getRpId(),
     credential: {
       id: credential.credentialId,
       publicKey: Buffer.from(credential.publicKey, "base64url"),
