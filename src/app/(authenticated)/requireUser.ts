@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import type { User as ClientUser } from "@/lib/auth/client";
 import { getCurrentUser } from "@/lib/auth/webauthn";
+import type { User as DbUser } from "@/lib/db";
 
 /**
  * Resolves the signed-in user for a page in the authenticated route group, or
@@ -22,4 +24,28 @@ export async function requireUser(pathname: string) {
   }
 
   return user;
+}
+
+/**
+ * Narrows a database user row to the shape client components consume, so a page
+ * that has already resolved the session can hand it straight to a client
+ * component instead of making it re-fetch `GET /api/auth/session`.
+ *
+ * Mirrors the projection in `src/app/api/auth/session/route.ts` field for field
+ * -- the two must agree, or a component would see different data depending on
+ * whether it was seeded by the server or refreshed by the client.
+ *
+ * `profilePictureUrl` is nullable in the database but typed as a string on the
+ * client. Every consumer tests it for truthiness, so "" and null are already
+ * interchangeable there; the API route only gets away with returning null
+ * because its JSON response is untyped.
+ */
+export function toClientUser(user: DbUser): ClientUser {
+  return {
+    id: user.id,
+    username: user.username,
+    profilePictureUrl: user.profilePictureUrl ?? "",
+    timezone: user.timezone,
+    createdAt: user.createdAt.toISOString(),
+  };
 }

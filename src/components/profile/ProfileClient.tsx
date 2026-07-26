@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useFragmentNavigation } from "@/hooks/useFragmentNavigation";
+import type { User } from "@/lib/auth/client";
 
 import { useAuth } from "../providers/AuthProvider";
 import { PageHeader } from "../ui/PageHeader";
@@ -30,9 +30,17 @@ const PROFILE_TABS: ProfileTab[] = [
   "streaming",
 ];
 
-export function ProfileClient() {
+export function ProfileClient({ initialUser }: { initialUser: User }) {
   const router = useRouter();
-  const { user, loading, refreshSession } = useAuth();
+  const { user: contextUser, refreshSession } = useAuth();
+
+  // Seeded from the server render, so there is nothing to wait on: the page has
+  // already resolved the session. The context takes over once refreshSession()
+  // lands after a username, picture or timezone change, which is the only way
+  // this data changes while the page is open. Falling back to initialUser also
+  // covers the moment after signout, when the context clears but the router has
+  // not yet navigated away.
+  const user = contextUser ?? initialUser;
 
   const { activeTab, setActiveTab } = useFragmentNavigation<ProfileTab>({
     defaultTab: "profile",
@@ -49,20 +57,6 @@ export function ProfileClient() {
   };
 
   const handleUserUpdate = async () => await refreshSession();
-
-  // Unlike the rest of the authenticated pages this one renders nothing at all
-  // without the user object, and it only has it once the auth context has
-  // resolved the session client-side. Own that wait here rather than in a group
-  // layout, which would impose it on every page.
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <LoadingSpinner size="xl" variant="primary" />
-      </div>
-    );
-  }
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-950">
