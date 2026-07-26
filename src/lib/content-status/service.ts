@@ -2,6 +2,7 @@ import { and, eq, inArray, or } from "drizzle-orm";
 
 import { syncStatusToCollaborators } from "@/lib/activity/activityUtils";
 import { db } from "@/lib/db";
+import { expectRow } from "@/lib/db/expectRow";
 import {
   activityFeed,
   ActivityType,
@@ -114,7 +115,7 @@ export async function createOrUpdateContentStatus(
       // 500. Wrapping it in a transaction made it marginally worse, because the
       // violation also rolled back the schedule cleanup below. Let the database
       // arbitrate with a single upsert on the natural key instead.
-      const [row] = await tx
+      const rows = await tx
         .insert(userContentStatus)
         .values({ userId, tmdbId, contentType, status })
         .onConflictDoUpdate({
@@ -141,7 +142,9 @@ export async function createOrUpdateContentStatus(
           );
       }
 
-      return row;
+      // `onConflictDoUpdate` always produces a row -- it either inserts or
+      // updates -- so unlike `onConflictDoNothing` this cannot come back empty.
+      return expectRow(rows, "createOrUpdateContentStatus upsert");
     });
 
     // NOTE: `syncStatusToCollaborators` writes other users' rows through the
@@ -249,6 +252,12 @@ export async function updateContentStatus(
 
     return row;
   });
+
+  // The existence check at the top of this function and the UPDATE above are
+  // separate statements with a TMDB network call between them, so a concurrent
+  // deleteContentStatus can remove the row and leave the UPDATE matching
+  // nothing. Report the same "notFound" the existence check would have.
+  if (!result) return "notFound";
 
   if (clearsSchedules) {
     // NOTE: see createOrUpdateContentStatus -- collaborator sync writes through
@@ -620,6 +629,15 @@ async function mapTVShowWithNewEpisode(
           updatedAt: userContentStatus.updatedAt,
         });
 
+      // The caller read a COMPLETED status row before the `getTVShowDetails`
+      // call above, so this UPDATE normally matches it. If the user cleared
+      // their status during that network round trip the UPDATE matches nothing,
+      // and the content genuinely has no status any more -- the same shape
+      // `mapWithContentStatus` returns when it finds no row at all.
+      if (!statusData) {
+        return mapContentToDomainModel(content, ContentType.TV, null, null);
+      }
+
       return mapContentToDomainModel(
         content,
         ContentType.TV,
@@ -688,6 +706,17 @@ async function enrichTVShowWithNewEpisode(
           nextEpisodeDate: userContentStatus.nextEpisodeDate,
           updatedAt: userContentStatus.updatedAt,
         });
+
+      // As in mapTVShowWithNewEpisode: the status row was read before the
+      // `getTVShowDetails` call, so a status cleared during that round trip
+      // leaves this UPDATE matching nothing. Returning `content` untouched is
+      // what enrichWithContentStatus/enrichAllWithContentStatus already do when
+      // no status row exists. Previously this threw, and because
+      // enrichAllWithContentStatus awaits these in a Promise.all the throw took
+      // down the enrichment of every other item in the same request.
+      if (!statusData) {
+        return content;
+      }
 
       return {
         ...content,

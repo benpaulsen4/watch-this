@@ -178,6 +178,17 @@ export async function updateCache(
     .where(eq(tmdbCache.id, cacheId))
     .returning(cacheColumns);
 
+  // Both callers pass a `cacheId` they read in an earlier statement, so an empty
+  // result means the row disappeared in between. Nothing in this codebase
+  // deletes from `tmdb_cache`, so this is not reachable today -- but it is not
+  // structurally impossible either, and the alternative is `mapToContent`
+  // throwing an anonymous "cannot read properties of undefined".
+  if (!data) {
+    throw new Error(
+      `Failed to update cache: ${tmdbId} ${contentType} (row ${cacheId} no longer exists)`
+    );
+  }
+
   return mapToContent(data);
 }
 
