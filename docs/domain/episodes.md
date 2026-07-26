@@ -99,7 +99,7 @@ Operational notes:
 1. Deduplicate the selections by `(seasonNumber, episodeNumber)`, last instruction wins. A single upsert statement cannot touch the same conflict target twice, and the last entry is what the user meant. An empty batch returns `{ episodes: [], newStatus: null, syncedCollaboratorIds: [] }` without touching the database.
 2. Resolve the user’s timezone once.
 3. Fetch show details from TMDB **once** for the whole batch, up front, so the upstream latency is paid before any write starts. A failure here is logged and the batch continues without preloaded details.
-4. Write every episode row in a **single** `insert ... onConflictDoUpdate` (`episodeUtils.ts:817-834`) and return the affected rows.
+4. Write every episode row in a **single** `insert ... onConflictDoUpdate` and return the affected rows.
 5. Sync all episodes to collaborators in one call, after the upsert has committed (best-effort).
 6. Write **one activity row per perceived action**, not one per episode: the watched selections and the un-watched selections each produce at most one summary row carrying `episodeCount`. A mixed batch is two actions; collapsing it into a single `watched: true` row made the feed claim the un-marked episodes had been watched.
 7. Recompute the show status **once**, at the end, via `updateTVShowStatus(...)` with `watched = anyWatched`. This runs unconditionally: an all-unwatch batch (“reset season”) contains no watched episode, and skipping the recompute left the show stuck on `completed` (LOGIC-02).
@@ -145,7 +145,7 @@ The test is a pair of counters, not an identity check against a single episode:
 
 ### The one-month figure is a threshold, never a stored value
 
-`nextEpisodeDate` is only ever written as TMDB’s real `next_episode_to_air.air_date` or as `null`. **No placeholder date is ever stored.** The one-month figure appears exactly once, as a comparison (`episodeUtils.ts:238-245`):
+`nextEpisodeDate` is only ever written as TMDB’s real `next_episode_to_air.air_date` or as `null`. **No placeholder date is ever stored.** The one-month figure appears exactly once, as a comparison inside `getTVShowProgressState`:
 
 ```
 shouldMarkCompleted: nextEpisodeDate > inOneMonth
@@ -155,10 +155,12 @@ Read: once every aired episode is watched and TMDB *does* know when the next one
 
 While the show is *not* fully watched, `getTVShowProgressState` returns `nextEpisodeDate: null` — the hint is only meaningful for a caught-up show, and a stale value would suppress the show from “upcoming” (see [activity.md](./activity.md)).
 
+There is one exception, and it is worth knowing because the “upcoming” filter leans on the rule above. When TMDB reports **no `last_episode_to_air`** — an announced series that has not started airing — `getTVShowProgressState` returns the parsed `next_episode_to_air.air_date` immediately, before any watched-episode counting happens. So an unaired show can carry a real future `nextEpisodeDate` on a `watching` row no matter what the user has watched, and “upcoming” will suppress it until that first episode airs.
+
 ### Applying the result
 
 - **No `user_content_status` row**: insert one, with `completed` if the completion test passed and `watching` otherwise, plus the computed `nextEpisodeDate`.
-- **Row exists and the show is complete**: set `completed` (skipped if it already is), then delete the user’s `show_schedules` rows for the show (best-effort; failures are logged only). If the show was already `completed`, only a changed `nextEpisodeDate` is written.
+- **Row exists and the show is complete**: set `completed` (skipped if it already is), then delete the user’s `show_schedules` rows for the show (best-effort; failures are logged only). If the show was already `completed`, only a changed `nextEpisodeDate` is written — but the schedule cleanup still runs, because the `delete` sits outside that check.
 - **Row exists and the show is not complete**: see below.
 - Whenever the status actually changed, it is synced to collaborators via `syncStatusToCollaborators(...)` ([activityUtils.ts](../../src/lib/activity/activityUtils.ts)). `nextEpisodeDate`-only refreshes are not synced.
 
@@ -177,7 +179,7 @@ needsWatchingStatus =
 - `watched=false` on a `completed` show → downgraded to `watching`.
 - `watched=false` on a `planning`, `paused` or `dropped` show → status untouched, `null` returned, no collaborator sync. `status !== WATCHING` is true for those statuses too, so without the second clause un-ticking an episode of a show the user had deliberately dropped silently re-opened it — and pushed that resurrection out to everyone on a sync-enabled shared list.
 - `watched=true` on a `dropped` (or `paused`/`planning`) show → resumed as `watching`. Actually watching something is an explicit signal; un-ticking is not.
-- A `nextEpisodeDate` that no longer matches is refreshed **regardless**, including for a dropped show. Only the *status* is pinned; the schedule hint is allowed to go stale-free.
+- A `nextEpisodeDate` that no longer matches is refreshed **regardless**, including for a dropped show. Only the *status* is pinned; the schedule hint is still allowed to refresh.
 - The single case an unwatch does not act on at all is a show with no `user_content_status` row: there is nothing to downgrade and no reason to start tracking it. This is checked before the timezone lookup, so the common no-op path costs exactly one query.
 
 These distinctions are covered by `episodeUtils.test.ts` (“downgrades a completed show back to watching when an episode is un-marked”, “leaves a %s show alone when an episode is un-marked”, “still refreshes nextEpisodeDate for a dropped show without re-opening it”, “resumes a dropped show when an episode is marked watched”).

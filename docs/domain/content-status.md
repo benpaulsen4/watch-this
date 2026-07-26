@@ -50,7 +50,7 @@ The main table is `user_content_status` ([schema.ts](../../src/lib/db/schema.ts)
 `nextEpisodeDate` is a hint maintained by the episode-progress path ([episodeUtils.ts](../../src/lib/episodes/episodeUtils.ts)). It only ever holds one of two things:
 
 - TMDB’s `next_episode_to_air.air_date`, parsed, for a show the user is caught up on; or
-- `null` — when TMDB knows of no next episode, or when the user is not caught up (a stale hint would suppress the show from the activity feed’s “upcoming”).
+- `null` — when TMDB knows of no next episode, or when the user is not caught up (a stale hint would suppress the show from the activity feed’s “upcoming”). The exception is a show with no `last_episode_to_air` at all: the air date is passed through without consulting watch progress, so an unaired series can hold a future date here regardless. See [episodes.md](./episodes.md).
 
 **No placeholder date is ever written.** A “one month out” figure does appear in the episode logic, but purely as a comparison threshold deciding whether a known future episode is near enough to keep the show `watching`; it never becomes a stored value. See [episodes.md](./episodes.md) for the rule.
 

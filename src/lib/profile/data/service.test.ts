@@ -1129,6 +1129,13 @@ describe("Profile Data Service", () => {
       (addToCache as any).mockResolvedValue({});
       // The exporter's output, verbatim — no hand-built payload in between.
       const result = await importUserData(userId, exported.data);
+      // Assert here rather than in each test. Eight of the tests below opened
+      // with `if (typeof result === "string") return;`, which turns a failed
+      // import into a silent pass -- exactly the regression a round-trip test
+      // exists to catch. Throwing narrows `result` for every caller too.
+      if (typeof result === "string") {
+        throw new Error(`round trip failed at import: ${result}`);
+      }
 
       return { exported, result, writes };
     };
@@ -1138,7 +1145,6 @@ describe("Profile Data Service", () => {
 
       expect(result).not.toBe("parseError");
       expect(result).not.toBe("tooLarge");
-      if (typeof result === "string") return;
 
       expect(result.errors).toEqual([]);
       expect(result.imported).toEqual({
@@ -1151,8 +1157,7 @@ describe("Profile Data Service", () => {
     });
 
     it("preserves list fields, including the archived flag", async () => {
-      const { writes, result } = await roundTrip();
-      if (typeof result === "string") return;
+      const { writes } = await roundTrip();
 
       const { lists: listWrites } = writes.byTable();
       expect(listWrites).toHaveLength(2);
@@ -1188,8 +1193,7 @@ describe("Profile Data Service", () => {
     });
 
     it("reattaches list items to the correct newly-created list", async () => {
-      const { writes, result } = await roundTrip();
-      if (typeof result === "string") return;
+      const { writes } = await roundTrip();
 
       const { listItems: itemWrites } = writes.byTable();
       expect(itemWrites).toEqual([
@@ -1219,8 +1223,7 @@ describe("Profile Data Service", () => {
     });
 
     it("preserves content statuses", async () => {
-      const { writes, result } = await roundTrip();
-      if (typeof result === "string") return;
+      const { writes } = await roundTrip();
 
       const { contentStatus: statusWrites } = writes.byTable();
       expect(statusWrites).toEqual([
@@ -1244,8 +1247,7 @@ describe("Profile Data Service", () => {
     });
 
     it("preserves episode statuses, including an unwatched row", async () => {
-      const { writes, result } = await roundTrip();
-      if (typeof result === "string") return;
+      const { writes } = await roundTrip();
 
       const { episodeStatus: episodeWrites } = writes.byTable();
       expect(episodeWrites).toEqual([
@@ -1274,8 +1276,7 @@ describe("Profile Data Service", () => {
     });
 
     it("preserves schedules, including dayOfWeek 0", async () => {
-      const { writes, result } = await roundTrip();
-      if (typeof result === "string") return;
+      const { writes } = await roundTrip();
 
       const { schedules: scheduleWrites } = writes.byTable();
       expect(scheduleWrites).toEqual([
@@ -1299,8 +1300,7 @@ describe("Profile Data Service", () => {
     });
 
     it("does not carry any exported primary key into the re-import", async () => {
-      const { writes, result } = await roundTrip();
-      if (typeof result === "string") return;
+      const { writes } = await roundTrip();
 
       // The export includes every row's `id`; the import must ignore all of
       // them (API-01 / LOGIC-04). This is the one field the round trip is
@@ -1325,8 +1325,7 @@ describe("Profile Data Service", () => {
     // in the database but are absent from the export model
     // (src/lib/profile/data/types.ts), so a round trip cannot restore them.
     it("does not round-trip nextEpisodeDate or the tmdb_cache join fields", async () => {
-      const { exported, writes, result } = await roundTrip();
-      if (typeof result === "string") return;
+      const { exported, writes } = await roundTrip();
 
       const parsed = JSON.parse(exported.data);
 
@@ -1353,8 +1352,7 @@ describe("Profile Data Service", () => {
     });
 
     it("records the round trip in the activity feed", async () => {
-      const { writes, result } = await roundTrip();
-      if (typeof result === "string") return;
+      const { writes } = await roundTrip();
 
       const { activity } = writes.byTable();
       expect(activity).toHaveLength(1);
