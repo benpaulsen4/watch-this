@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
-import { createClaimToken } from "@/lib/auth/webauthn";
+import { createClaimToken, getWebAuthnOrigin } from "@/lib/auth/webauthn";
 import {
   activityFeed,
   db,
@@ -44,13 +44,6 @@ export async function listDevices(userId: string): Promise<PasskeyDevice[]> {
     createdAt: r.createdAt.toISOString(),
     lastUsed: r.lastUsed ? r.lastUsed.toISOString() : null,
   }));
-}
-
-function getOrigin() {
-  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return process.env.WEBAUTHN_ORIGIN || "http://localhost:3000";
 }
 
 function generateClaimCode(length: number = 12): string {
@@ -120,7 +113,10 @@ export async function initiateClaim(
   });
 
   const token = await createClaimToken(claim.id, userId);
-  const origin = getOrigin();
+  // SUPPLY-02: this used to derive the origin from the same env vars
+  // independently, so a magic link could point somewhere the ceremony would
+  // then refuse to validate against. One helper, one answer.
+  const origin = getWebAuthnOrigin();
   const magicLink = `${origin}/auth/claim?token=${encodeURIComponent(token)}`;
 
   return {
