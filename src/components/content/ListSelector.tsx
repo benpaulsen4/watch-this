@@ -112,9 +112,10 @@ export function ListSelector({
       return { listId };
     },
     onSuccess: async ({ listId }) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["lists", listId, "items"],
-      });
+      // NOTE: there is deliberately no ["lists", listId, "items"] invalidation
+      // here. Nothing reads that key - list items come from a server component
+      // and refresh through router.refresh() - so it only ever looked like it
+      // wired up the list refresh.
       await queryClient.invalidateQueries({
         queryKey: ["content", contentId, contentType, "lists"],
       });
@@ -140,9 +141,6 @@ export function ListSelector({
       return { listId, itemId };
     },
     onSuccess: async ({ listId }) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["lists", listId, "items"],
-      });
       await queryClient.invalidateQueries({
         queryKey: ["content", contentId, contentType, "lists"],
       });

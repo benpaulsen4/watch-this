@@ -34,7 +34,6 @@ export function SearchClient({ genres, children }: SearchClientProps) {
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortBy>("popularity.desc");
   const [showFilters, setShowFilters] = useState(false);
-  const [page, setPage] = useState(1);
 
   const discoverQuery = useInfiniteQuery<TMDBContentSearchResult>({
     queryKey: [
@@ -77,16 +76,12 @@ export function SearchClient({ genres, children }: SearchClientProps) {
     },
   });
 
-  const resetPage = () => setPage(1);
-
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
   }, []);
 
   const loadMore = () => {
     if (!searchQuery && discoverQuery.hasNextPage) {
-      const nextPage = page + 1;
-      setPage(nextPage);
       discoverQuery.fetchNextPage();
     }
   };
@@ -153,7 +148,6 @@ export function SearchClient({ genres, children }: SearchClientProps) {
                     selectedKey={contentType}
                     onSelectionChange={(key) => {
                       setContentType((key as ContentType) || "all");
-                      resetPage();
                     }}
                     options={[
                       { key: "all", label: "All" },
@@ -172,7 +166,6 @@ export function SearchClient({ genres, children }: SearchClientProps) {
                     selectedKey={selectedGenre}
                     onSelectionChange={(key) => {
                       setSelectedGenre(String(key ?? ""));
-                      resetPage();
                     }}
                     isDisabled={!!searchQuery}
                     options={[
@@ -194,7 +187,6 @@ export function SearchClient({ genres, children }: SearchClientProps) {
                     selectedKey={selectedYear}
                     onSelectionChange={(key) => {
                       setSelectedYear(String(key ?? ""));
-                      resetPage();
                     }}
                     isDisabled={!!searchQuery && contentType === "all"}
                     options={[
@@ -216,7 +208,6 @@ export function SearchClient({ genres, children }: SearchClientProps) {
                     selectedKey={sortBy}
                     onSelectionChange={(key) => {
                       setSortBy((key as SortBy) || "popularity.desc");
-                      resetPage();
                     }}
                     isDisabled={!!searchQuery}
                     options={[
