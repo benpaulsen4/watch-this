@@ -134,4 +134,33 @@ describe("CastTab", () => {
     expect(screen.getByText("Person 13")).toBeInTheDocument();
     expect(screen.queryByText("Person 1")).not.toBeInTheDocument();
   });
+
+  // UI-04 (not in the original list): the pagination controls are icon-only
+  // below sm, with their labels in `hidden sm:block` spans.
+  it("names the pagination controls when their visible labels are hidden", async () => {
+    const cast = Array.from({ length: 20 }).map((_, i) => ({
+      id: i + 1,
+      name: `Person ${i + 1}`,
+      character: `Role ${i + 1}`,
+      profile_path: null,
+    }));
+
+    vi.spyOn(global, "fetch").mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ cast }),
+    } as Response);
+
+    renderWithQuery(<CastTab contentType="tv" contentId={778} />);
+
+    await waitFor(() => expect(screen.getByText("Cast")).toBeInTheDocument());
+
+    // Tailwind's `hidden` is display:none, which removes the label text from the
+    // accessibility tree. Applying it inline is the jsdom equivalent.
+    document
+      .querySelectorAll<HTMLElement>(".hidden")
+      .forEach((el) => (el.style.display = "none"));
+
+    expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
+  });
 });

@@ -107,6 +107,7 @@ export default function ListHeader({ initialList }: ListHeaderProps) {
           variant="outline"
           size="sm"
           onClick={() => setShowCollaborationModal(true)}
+          aria-label="Share"
         >
           <Share className="h-4 w-4" />
           <span className="ml-2 hidden sm:block">Share</span>
@@ -115,11 +116,12 @@ export default function ListHeader({ initialList }: ListHeaderProps) {
           variant="outline"
           size="sm"
           onClick={() => setShowSettingsModal(true)}
+          aria-label="Settings"
         >
           <Settings className="h-4 w-4" />
           <span className="ml-2 hidden sm:block">Settings</span>
         </Button>
-        <Button onClick={() => router.push("/search")}>
+        <Button onClick={() => router.push("/search")} aria-label="Add Content">
           <Plus className="h-5 w-5" />
           <span className="ml-2 hidden sm:block">Add Content</span>
         </Button>

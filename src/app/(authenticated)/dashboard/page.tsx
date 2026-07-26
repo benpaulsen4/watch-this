@@ -18,19 +18,19 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gray-950">
       <PageHeader>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/lists">
+          <Link href="/lists" aria-label="My Lists">
             <List className="h-4 w-4" />
             <span className="ml-2 hidden sm:block">My Lists</span>
           </Link>
         </Button>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/search">
+          <Link href="/search" aria-label="Discover">
             <Search className="h-4 w-4" />
             <span className="ml-2 hidden sm:block">Discover</span>
           </Link>
         </Button>
         <Button variant="secondary" className="px-2 h-12" asChild>
-          <Link href="/profile">
+          <Link href="/profile" aria-label={`Profile for ${user.username}`}>
             <ProfileImage
               src={user.profilePictureUrl}
               username={user.username}

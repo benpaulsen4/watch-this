@@ -44,7 +44,32 @@ const initialList: ListListsResponse = {
   posterPaths: ["/x.jpg"],
 };
 
+/**
+ * Emulates the sub-640px layout. Tailwind's `hidden` is display:none, which is
+ * what drops the labels out of the accessibility tree; applying it inline is the
+ * jsdom equivalent, and unlike a stylesheet it does not outlive the render.
+ */
+function hideLabelsBelowSmBreakpoint() {
+  document
+    .querySelectorAll<HTMLElement>(".hidden")
+    .forEach((el) => (el.style.display = "none"));
+}
+
 describe("ListsClient", () => {
+  // UI-04: both header actions are icon-only below sm.
+  it("names the header actions when their visible labels are hidden", () => {
+    renderWithClient(<ListsClient initialLists={[initialList]} />);
+    hideLabelsBelowSmBreakpoint();
+
+    expect(screen.getByRole("link", { name: "Archive" })).toHaveAttribute(
+      "href",
+      "/lists/archived",
+    );
+    expect(
+      screen.getByRole("button", { name: "Create List" }),
+    ).toBeInTheDocument();
+  });
+
   it("shows create modal when clicking header button", async () => {
     const user = userEvent.setup();
     renderWithClient(<ListsClient initialLists={[initialList]} />);
