@@ -181,6 +181,9 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
           size="sm"
           className={cn("group cursor-pointer overflow-hidden", className)}
           onClick={handleCardClick}
+          aria-label={`${content.title}, ${
+            content.contentType === "movie" ? "movie" : "TV show"
+          }`}
           {...props}
         >
           <div className="relative">

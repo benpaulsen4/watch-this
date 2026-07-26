@@ -24,7 +24,13 @@ export interface ListCardProps {
 export const ListCard = forwardRef<HTMLDivElement, ListCardProps>(
   ({ list, onClick }, ref) => {
     return (
-      <Card onClick={onClick} ref={ref}>
+      <Card
+        onClick={onClick}
+        ref={ref}
+        // Without this the name a screen reader announces is every badge and
+        // count in the card concatenated together.
+        aria-label={onClick ? `Open list ${list.name}` : undefined}
+      >
         <CardHeader>
           <div className="flex items-center gap-2">
             <CardTitle className="text-gray-100 text-lg group-hover:text-white transition-colors">

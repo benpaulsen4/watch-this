@@ -58,6 +58,30 @@ describe("UpcomingActivityCard", () => {
     expect(modal.getAttribute("data-open")).toBe("true");
   });
 
+  // UI-03: the modal opener was an onClick on the <Image> itself.
+  it("opens the modal from the keyboard", async () => {
+    const upcoming = {
+      tmdbId: 303,
+      title: "Keyboard Show",
+      posterPath: "/poster.jpg",
+    };
+    renderWithClient(
+      <UpcomingActivityCard upcoming={upcoming as any} onEpisodeWatched={() => {}} />,
+    );
+
+    const opener = screen.getByRole("button", {
+      name: /View details for Keyboard Show/i,
+    });
+    opener.focus();
+
+    const user = userEvent.setup();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByTestId("content-modal").getAttribute("data-open")).toBe(
+      "true",
+    );
+  });
+
   it("calls mutation and onEpisodeWatched when clicking button", async () => {
     const upcoming = {
       tmdbId: 202,

@@ -158,6 +158,38 @@ describe("ContentCard", () => {
     ).toBeInTheDocument();
   });
 
+  // UI-03: the only way into the details modal was a mouse click on the card.
+  it("opens the details modal from the keyboard", async () => {
+    const user = userEvent.setup();
+    const tv: TMDBContent = {
+      tmdbId: 44,
+      contentType: "tv",
+      title: "Keyboard Show",
+      overview: "Overview",
+      posterPath: null,
+      backdropPath: null,
+      releaseDate: "2023-01-01",
+      voteAverage: 7.1,
+      voteCount: 200,
+      genreIds: [],
+      popularity: 0,
+      adult: null,
+      watchStatus: "watching",
+      statusUpdatedAt: null,
+    };
+    renderWithQuery(<ContentCard content={tv} />);
+
+    const card = screen.getByRole("button", {
+      name: /Keyboard Show, TV show/i,
+    });
+    card.focus();
+    await user.keyboard("{Enter}");
+
+    expect(
+      await screen.findByRole("tab", { name: /Overview/i }),
+    ).toBeInTheDocument();
+  });
+
   it("double click triggers quick-complete overlay and updates status", async () => {
     const user = userEvent.setup();
     const movie: TMDBContent = {
