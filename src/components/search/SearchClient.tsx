@@ -248,8 +248,13 @@ export function SearchClient({ genres, children }: SearchClientProps) {
           ) : displayContent.length > 0 ? (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                {/* Content type is part of the key because a TMDB id is only
+                    unique within a type, and this list is "all" by default. */}
                 {displayContent.map((item) => (
-                  <ContentCard key={item.tmdbId} content={item} />
+                  <ContentCard
+                    key={`${item.contentType}-${item.tmdbId}`}
+                    content={item}
+                  />
                 ))}
               </div>
 

@@ -89,7 +89,7 @@ describe("TrendingStrip", () => {
     // Check the first child
     const firstChild = result!.props.children[0];
     expect(firstChild.type).toBeDefined(); // It's the mocked ContentCard
-    expect(firstChild.key).toBe("1");
+    expect(firstChild.key).toBe("movie-1");
     expect(firstChild.props.content).toEqual({
       tmdbId: 1,
       contentType: "movie",
@@ -110,7 +110,7 @@ describe("TrendingStrip", () => {
 
     // Check the second child
     const secondChild = result!.props.children[1];
-    expect(secondChild.key).toBe("2");
+    expect(secondChild.key).toBe("movie-2");
     expect(secondChild.props.content).toEqual({
       tmdbId: 2,
       contentType: "movie",
@@ -128,6 +128,28 @@ describe("TrendingStrip", () => {
       statusUpdatedAt: null,
       userIdArg: userId,
     });
+  });
+
+  // UI-11: trending is fetched with type "all", so a movie and a show can arrive
+  // with the same TMDB id. Keys drive reconciliation, so a collision makes the
+  // two cards share component state.
+  it("keys cards uniquely when a movie and a show share a tmdb id", async () => {
+    (tmdbClient.getTrending as any).mockResolvedValue({
+      results: [
+        { id: 99, title: "Same Id Movie" },
+        { id: 99, name: "Same Id Show" },
+      ],
+    });
+    (mapAllWithContentStatus as any).mockResolvedValue([
+      { tmdbId: 99, contentType: "movie", title: "Same Id Movie" },
+      { tmdbId: 99, contentType: "tv", title: "Same Id Show" },
+    ]);
+
+    const result = await TrendingStrip({ items: 2, userId: "user-1" });
+    const keys = result!.props.children.map((child: any) => child.key);
+
+    expect(keys).toEqual(["movie-99", "tv-99"]);
+    expect(new Set(keys).size).toBe(2);
   });
 
   it("handles empty trending results", async () => {

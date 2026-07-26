@@ -27,12 +27,11 @@ function renderWithClient(ui: React.ReactElement) {
   );
 }
 
-beforeEach(() => {
-  // Mock matchMedia used for mdUp detection
+function mockMatchMedia(matches: boolean) {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
+      matches,
       media: query,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -40,6 +39,11 @@ beforeEach(() => {
       dispatchEvent: vi.fn(),
     })),
   });
+}
+
+beforeEach(() => {
+  // Mock matchMedia used for mdUp detection
+  mockMatchMedia(false);
 });
 
 describe("ActivityFeed", () => {
@@ -92,6 +96,64 @@ describe("ActivityFeed", () => {
 
     // Activity entry shows description from metadata
     expect(screen.getByText(/created list "My List"/)).toBeInTheDocument();
+  });
+
+  // UI-10: the request limit was derived from `mdUp`, which starts false and is
+  // corrected by an effect, and `mdUp` was part of the query key - so a desktop
+  // load fetched limit=5 under one key and then limit=10 under another.
+  describe("viewport handling", () => {
+    const manyActivities = Array.from({ length: 10 }).map((_, i) => ({
+      id: `a${i + 1}`,
+      activityType: ActivityType.LIST_CREATED,
+      user: { id: "u1", username: "alice", profilePictureUrl: null },
+      metadata: { listName: `List ${i + 1}` },
+      isCollaborative: false,
+      collaborators: [],
+      createdAt: new Date().toISOString(),
+    }));
+
+    function mockFeed() {
+      const fetchMock = vi.fn(async (_input: RequestInfo | URL) => ({
+        ok: true,
+        json: async () => ({
+          activities: manyActivities,
+          upcoming: [],
+          hasMore: false,
+        }),
+      }));
+      // @ts-expect-error allow assigning to global
+      global.fetch = fetchMock;
+      return fetchMock;
+    }
+
+    it("fetches once with a fixed limit on a narrow viewport", async () => {
+      mockMatchMedia(false);
+      const fetchMock = mockFeed();
+
+      renderWithClient(<ActivityFeed currentUsername="alice" />);
+      await screen.findByText(/created list "List 1"/);
+
+      // Let the media-query effect settle, which is what used to refetch.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(String(fetchMock.mock.calls[0][0])).toBe("/api/activity?limit=10");
+      // Narrow viewport draws one column, so it shows half the entries.
+      expect(screen.queryByText(/created list "List 5"/)).toBeInTheDocument();
+      expect(screen.queryByText(/created list "List 6"/)).toBeNull();
+    });
+
+    it("fetches once and shows the full page on a wide viewport", async () => {
+      mockMatchMedia(true);
+      const fetchMock = mockFeed();
+
+      renderWithClient(<ActivityFeed currentUsername="alice" />);
+      await screen.findByText(/created list "List 1"/);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/created list "List 10"/)).toBeInTheDocument();
+    });
   });
 
   it("shows empty state when no upcoming and no activities", async () => {

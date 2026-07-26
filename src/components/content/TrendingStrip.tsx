@@ -26,8 +26,15 @@ export default async function TrendingStrip({
 
   return (
     <>
+      {/* A TMDB id is only unique within a content type, and trending is fetched
+          with type "all", so a movie and a show can arrive with the same id.
+          Keys drive reconciliation, so a collision makes the two cards share
+          component state. */}
       {trendingContent.map((item) => (
-        <ContentCard key={item.tmdbId} content={item} />
+        <ContentCard
+          key={`${item.contentType}-${item.tmdbId}`}
+          content={item}
+        />
       ))}
     </>
   );
