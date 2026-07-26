@@ -25,6 +25,7 @@ export function UpcomingActivityCard({
 }: UpcomingActivityCardProps) {
   const [isWatching, setIsWatching] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [error, setError] = useState("");
 
   const markWatchedMutation = useMutation({
     mutationFn: async (): Promise<MarkNextEpisodeResult> => {
@@ -38,13 +39,26 @@ export function UpcomingActivityCard({
         throw new Error(data.error || "Failed to mark episode as watched");
       return data;
     },
-    onSuccess: () => onEpisodeWatched?.(),
+    onSuccess: () => {
+      setError("");
+      onEpisodeWatched?.();
+    },
+    onError: (err: unknown) => {
+      setError(
+        err instanceof Error ? err.message : "Failed to mark episode as watched",
+      );
+    },
     onSettled: () => setIsWatching(false),
   });
 
   const handleMarkWatched = async () => {
     setIsWatching(true);
-    await markWatchedMutation.mutateAsync();
+    setError("");
+    try {
+      await markWatchedMutation.mutateAsync();
+    } catch {
+      // Error state is handled in onError; swallow to avoid unhandled rejection
+    }
   };
 
   const posterUrl = getImageUrl(upcoming.posterPath, "w342");
@@ -56,24 +70,28 @@ export function UpcomingActivityCard({
       <Card size="sm">
         <CardContent>
           <div className="flex items-center gap-6">
-            {/* Poster left */}
-            {posterUrl ? (
-              <Image
-                src={posterUrl}
-                alt={upcoming.title}
-                width={300}
-                height={450}
-                className="w-24 h-36 sm:w-28 sm:h-40 md:w-32 md:h-48 object-cover rounded-md"
-                onClick={() => setIsModalOpen(true)}
-              />
-            ) : (
-              <div
-                className="flex items-center justify-center w-24 h-36 sm:w-28 sm:h-40 md:w-32 md:h-48 rounded-md bg-gray-700"
-                onClick={() => setIsModalOpen(true)}
-              >
-                <Play className="h-10 w-10 text-gray-400" />
-              </div>
-            )}
+            {/* Poster left. The opener is a real button rather than a click
+                handler on the image, which was unreachable by keyboard. */}
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              aria-label={`View details for ${upcoming.title}`}
+              className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+            >
+              {posterUrl ? (
+                <Image
+                  src={posterUrl}
+                  alt={upcoming.title}
+                  width={300}
+                  height={450}
+                  className="w-24 h-36 sm:w-28 sm:h-40 md:w-32 md:h-48 object-cover rounded-md"
+                />
+              ) : (
+                <div className="flex items-center justify-center w-24 h-36 sm:w-28 sm:h-40 md:w-32 md:h-48 rounded-md bg-gray-700">
+                  <Play className="h-10 w-10 text-gray-400" />
+                </div>
+              )}
+            </button>
 
             {/* Right column: prompt, title, button */}
             <div className="flex-1 flex flex-col gap-2">
@@ -91,6 +109,11 @@ export function UpcomingActivityCard({
                   </>
                 </Button>
               </div>
+              {error && (
+                <p role="alert" className="text-red-400 text-sm">
+                  {error}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>

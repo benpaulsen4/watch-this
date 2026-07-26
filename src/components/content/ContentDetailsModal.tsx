@@ -153,8 +153,8 @@ export function ContentDetailsModal({
       return response.json();
     },
     onSuccess: (_data, variables) => {
-      setWatchStatus(variables as WatchStatusEnum);
-      onShowStatusChanged?.(variables as WatchStatusEnum);
+      setWatchStatus(variables);
+      onShowStatusChanged?.(variables);
     },
   });
 
@@ -283,7 +283,7 @@ export function ContentDetailsModal({
                     value={watchStatus}
                     contentType={content.contentType}
                     onValueChange={(newStatus) =>
-                      updateStatusMutation.mutate(newStatus as WatchStatusEnum)
+                      updateStatusMutation.mutate(newStatus)
                     }
                   />
                 </div>

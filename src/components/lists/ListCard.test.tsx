@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ListListsResponse } from "@/lib/lists/types";
@@ -67,6 +68,19 @@ describe("ListCard", () => {
 
     expect(screen.getByText(/Private/i)).toBeInTheDocument();
     expect(screen.getByText(/Nothing here/i)).toBeInTheDocument();
+  });
+
+  // UI-03: opening a list was mouse-only - the card was a bare div with onClick.
+  it("can be opened from the keyboard", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(<ListCard list={makeList()} onClick={onClick} />);
+
+    const card = screen.getByRole("button", { name: /Open list Weekend Picks/i });
+    card.focus();
+    await user.keyboard("{Enter}");
+
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 
   it("shows correct type labels for movies and tv", () => {

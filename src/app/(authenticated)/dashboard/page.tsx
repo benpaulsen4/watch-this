@@ -1,5 +1,4 @@
 import { List, Search } from "lucide-react";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -9,32 +8,29 @@ import TrendingStrip from "@/components/content/TrendingStrip";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ProfileImage } from "@/components/ui/ProfileImage";
-import { getCurrentUser } from "@/lib/auth/webauthn";
+
+import { requireUser } from "../requireUser";
 
 export default async function DashboardPage() {
-  const resolvedCookies = await cookies();
-  const sessionCookie = resolvedCookies.get("session");
-  const user = await getCurrentUser(sessionCookie?.value);
-
-  if (user === null) return "Refresh if this page does not go away";
+  const user = await requireUser("/dashboard");
 
   return (
     <div className="min-h-screen bg-gray-950">
       <PageHeader>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/lists">
+          <Link href="/lists" aria-label="My Lists">
             <List className="h-4 w-4" />
             <span className="ml-2 hidden sm:block">My Lists</span>
           </Link>
         </Button>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/search">
+          <Link href="/search" aria-label="Discover">
             <Search className="h-4 w-4" />
             <span className="ml-2 hidden sm:block">Discover</span>
           </Link>
         </Button>
         <Button variant="secondary" className="px-2 h-12" asChild>
-          <Link href="/profile">
+          <Link href="/profile" aria-label={`Profile for ${user.username}`}>
             <ProfileImage
               src={user.profilePictureUrl}
               username={user.username}

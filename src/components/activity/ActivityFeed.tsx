@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Activity as ActivityIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect,useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import ListSettingsModal from "@/components/lists/ListSettingsModal";
 import { Button } from "@/components/ui/Button";
@@ -18,9 +18,21 @@ interface ActivityFeedProps {
   currentUsername: string;
 }
 
+// The feed shows one column on mobile and two from md up, so it draws half as
+// many rows' worth of entries on a narrow screen.
+const MOBILE_ACTIVITY_COUNT = 5;
+const DESKTOP_ACTIVITY_COUNT = 10;
+
 export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
   const router = useRouter();
-  const [mdUp, setMdUp] = useState(false);
+  // Resolved from matchMedia on the first client render rather than defaulted to
+  // false and corrected in the effect. It is only used to slice, so getting it
+  // right up front avoids rendering five entries and then ten.
+  const [mdUp, setMdUp] = useState(() =>
+    typeof window === "undefined"
+      ? false
+      : window.matchMedia("(min-width: 768px)").matches,
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
@@ -31,19 +43,35 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // One fixed request, sliced for the viewport. The limit used to be derived
+  // from `mdUp` and `mdUp` was part of the query key, so a desktop load fetched
+  // limit=5 under one key and then limit=10 under another: two requests for the
+  // same feed, and a visible jump between the two results.
   const {
     data: activitiesData,
     isLoading,
     error,
     refetch,
   } = useQuery<ActivityTimelineResponse>({
-    queryKey: ["activity", "feed", mdUp],
+    queryKey: ["activity", "feed"],
     queryFn: async () => {
-      const response = await fetch(`/api/activity?limit=${mdUp ? 10 : 5}`);
+      const response = await fetch(
+        `/api/activity?limit=${DESKTOP_ACTIVITY_COUNT}`,
+      );
       if (!response.ok) throw new Error("Failed to fetch activities");
       return response.json();
     },
   });
+
+  const activities = useMemo(
+    () =>
+      (activitiesData?.activities ?? []).slice(
+        0,
+        mdUp ? DESKTOP_ACTIVITY_COUNT : MOBILE_ACTIVITY_COUNT,
+      ),
+    [activitiesData?.activities, mdUp],
+  );
+  const upcoming = activitiesData?.upcoming ?? [];
 
   if (isLoading) {
     return (
@@ -105,12 +133,12 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
       </div>
 
       {/* Upcoming Activities Section */}
-      {(activitiesData?.upcoming || []).length > 0 && (
+      {upcoming.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {(activitiesData?.upcoming || []).map((upcoming, index) => (
+          {upcoming.map((item, index) => (
             <UpcomingActivityCard
-              key={`${upcoming.tmdbId}-${index}`}
-              upcoming={upcoming}
+              key={`${item.tmdbId}-${index}`}
+              upcoming={item}
               onEpisodeWatched={() => refetch()}
             />
           ))}
@@ -118,9 +146,9 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
       )}
 
       {/* Regular Activities Section */}
-      {(activitiesData?.activities || []).length > 0 ? (
+      {activities.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2">
-          {(activitiesData?.activities || []).map((activity) => (
+          {activities.map((activity) => (
             <ActivityEntry
               key={activity.id}
               activity={activity}
@@ -128,7 +156,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
             />
           ))}
         </div>
-      ) : (activitiesData?.upcoming || []).length === 0 ? (
+      ) : upcoming.length === 0 ? (
         <div className="text-center py-8">
           <ActivityIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400 mb-4">

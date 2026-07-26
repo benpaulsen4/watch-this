@@ -158,6 +158,78 @@ describe("SearchClient", () => {
     await screen.findByText(/Discover Movie 2/i);
   });
 
+  // UI-11: the list is "all" by default, so a movie and a show can appear with
+  // the same TMDB id. Keying on the id alone makes the two cards share
+  // reconciliation identity, and React warns about it.
+  it("renders both entries when a movie and a show share a tmdb id", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    vi.spyOn(global, "fetch").mockImplementation((async (
+      input: RequestInfo | URL,
+    ) => {
+      const url = String(input);
+      if (url.startsWith("/api/tmdb/discover")) {
+        return {
+          ok: true,
+          json: async () => ({
+            page: 1,
+            totalPages: 1,
+            totalResults: 2,
+            results: [
+              {
+                tmdbId: 77,
+                contentType: "movie",
+                title: "Duplicate Movie",
+                overview: "",
+                posterPath: null,
+                backdropPath: null,
+                releaseDate: "2024-01-01",
+                voteAverage: 7,
+                voteCount: 10,
+                genreIds: [],
+                popularity: 0,
+                adult: false,
+                watchStatus: null,
+                statusUpdatedAt: null,
+              },
+              {
+                tmdbId: 77,
+                contentType: "tv",
+                title: "Duplicate Show",
+                overview: "",
+                posterPath: null,
+                backdropPath: null,
+                releaseDate: "2023-01-01",
+                voteAverage: 8,
+                voteCount: 20,
+                genreIds: [],
+                popularity: 0,
+                adult: false,
+                watchStatus: null,
+                statusUpdatedAt: null,
+              },
+            ],
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({}) } as Response;
+    }) as any);
+
+    renderWithProviders(<SearchClient genres={genres}>{null}</SearchClient>);
+
+    expect(await screen.findByText("Duplicate Movie")).toBeInTheDocument();
+    expect(screen.getByText("Duplicate Show")).toBeInTheDocument();
+
+    const duplicateKeyWarning = consoleError.mock.calls.find((args) =>
+      args.some(
+        (arg) => typeof arg === "string" && arg.includes("the same key"),
+      ),
+    );
+    expect(duplicateKeyWarning).toBeUndefined();
+  });
+
   it("opens filters and clears to default params", async () => {
     renderWithProviders(<SearchClient genres={genres}>{null}</SearchClient>);
 

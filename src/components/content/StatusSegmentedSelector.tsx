@@ -5,16 +5,32 @@ import { cn } from "@/lib/utils";
 
 import { getAvailableStatuses, getStatusConfig } from "./StatusBadge";
 
-export interface StatusSegmentedSelectorProps {
-  value: WatchStatusEnum | (WatchStatusEnum | "none")[] | null;
+export type StatusSelection = WatchStatusEnum | "none";
+
+interface StatusSegmentedSelectorBaseProps {
   contentType?: ContentTypeEnum;
-  onValueChange: (status: any) => void;
   disabled?: boolean;
   className?: string;
   size?: "default" | "sm" | "lg";
-  multiple?: boolean;
   includeNone?: boolean;
 }
+
+/**
+ * `multiple` decides both what `value` holds and what `onValueChange` receives,
+ * so the two modes are separate shapes. Callers then get an exactly-typed
+ * callback instead of having to cast whatever comes back.
+ */
+export type StatusSegmentedSelectorProps =
+  | (StatusSegmentedSelectorBaseProps & {
+      multiple?: false;
+      value: WatchStatusEnum | null;
+      onValueChange: (status: WatchStatusEnum) => void;
+    })
+  | (StatusSegmentedSelectorBaseProps & {
+      multiple: true;
+      value: StatusSelection[] | null;
+      onValueChange: (statuses: StatusSelection[]) => void;
+    });
 
 /**
  * StatusSegmentedSelector component for selecting watch status with segmented radio button interface
@@ -28,17 +44,23 @@ export interface StatusSegmentedSelectorProps {
  * @param multiple - Whether to allow multiple selection
  * @param includeNone - Whether to include "None" option
  */
-export function StatusSegmentedSelector({
-  value,
-  contentType,
-  onValueChange,
-  disabled = false,
-  className,
-  size = "default",
-  multiple = false,
-  includeNone = false,
-}: StatusSegmentedSelectorProps) {
-  let availableStatuses: (WatchStatusEnum | "none")[] = contentType
+export function StatusSegmentedSelector(props: StatusSegmentedSelectorProps) {
+  // Everything except the discriminant pair is safe to destructure. `multiple`
+  // and `onValueChange` are deliberately read off `props` at the call sites
+  // below instead: narrowing on `props.multiple` keeps the correlation the union
+  // exists to enforce, whereas destructuring both would sever it and force a
+  // cast that lets the single-select branch pass an array.
+  const {
+    value,
+    contentType,
+    disabled = false,
+    className,
+    size = "default",
+    multiple = false,
+    includeNone = false,
+  } = props;
+
+  let availableStatuses: StatusSelection[] = contentType
     ? getAvailableStatuses(contentType)
     : ["planning", "watching", "paused", "completed", "dropped"];
 
@@ -74,32 +96,27 @@ export function StatusSegmentedSelector({
     },
   };
 
-  const handleStatusChange = (status: WatchStatusEnum | "none") => {
+  const handleStatusChange = (status: StatusSelection) => {
     if (disabled) return;
 
-    if (multiple) {
-      const currentValues = (Array.isArray(value) ? value : []) as (
-        | WatchStatusEnum
-        | "none"
-      )[];
+    if (props.multiple) {
+      const currentValues = props.value ?? [];
       const isSelected = currentValues.includes(status);
-      let newValues;
-      if (isSelected) {
-        newValues = currentValues.filter((v) => v !== status);
-      } else {
-        newValues = [...currentValues, status];
-      }
-      onValueChange(newValues);
-    } else {
-      if (status !== "none") {
-        onValueChange(status as WatchStatusEnum);
-      }
+      props.onValueChange(
+        isSelected
+          ? currentValues.filter((v) => v !== status)
+          : [...currentValues, status],
+      );
+    } else if (status !== "none") {
+      // `status !== "none"` narrows StatusSelection to WatchStatusEnum, which is
+      // exactly what this branch's onValueChange accepts.
+      props.onValueChange(status);
     }
   };
 
   const handleKeyDown = (
     event: React.KeyboardEvent,
-    status: WatchStatusEnum | "none"
+    status: StatusSelection
   ) => {
     if (disabled) return;
 

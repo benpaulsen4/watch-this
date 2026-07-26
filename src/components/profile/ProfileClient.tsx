@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useFragmentNavigation } from "@/hooks/useFragmentNavigation";
+import type { User } from "@/lib/auth/client";
 
 import { useAuth } from "../providers/AuthProvider";
 import { PageHeader } from "../ui/PageHeader";
@@ -18,13 +19,32 @@ import { UsernameChanger } from "./UsernameChanger";
 
 type ProfileTab = "profile" | "security" | "data" | "streaming";
 
-export function ProfileClient() {
+// Hoisted out of the component because useFragmentNavigation memoises on this
+// array's identity. An inline literal is a new array every render, so the
+// memoised callback changed identity too and the hook's popstate effect tore its
+// listener down and re-added it on every single render.
+const PROFILE_TABS: ProfileTab[] = [
+  "profile",
+  "security",
+  "data",
+  "streaming",
+];
+
+export function ProfileClient({ initialUser }: { initialUser: User }) {
   const router = useRouter();
-  const { user, refreshSession } = useAuth();
+  const { user: contextUser, refreshSession } = useAuth();
+
+  // Seeded from the server render, so there is nothing to wait on: the page has
+  // already resolved the session. The context takes over once refreshSession()
+  // lands after a username, picture or timezone change, which is the only way
+  // this data changes while the page is open. Falling back to initialUser also
+  // covers the moment after signout, when the context clears but the router has
+  // not yet navigated away.
+  const user = contextUser ?? initialUser;
 
   const { activeTab, setActiveTab } = useFragmentNavigation<ProfileTab>({
     defaultTab: "profile",
-    validTabs: ["profile", "security", "data", "streaming"],
+    validTabs: PROFILE_TABS,
   });
 
   const handleLogout = async () => {
@@ -37,8 +57,6 @@ export function ProfileClient() {
   };
 
   const handleUserUpdate = async () => await refreshSession();
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-950">

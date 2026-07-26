@@ -36,7 +36,7 @@ export function ClaimPageContent() {
     onSuccess: () => {
       router.replace("/auth?redirect=%2Fdashboard");
     },
-    onError: (e: any) => {
+    onError: (e: unknown) => {
       setError(e instanceof Error ? e.message : "Failed to add passkey");
     },
     onSettled: () => setLoading(false),

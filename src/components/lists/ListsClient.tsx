@@ -34,12 +34,15 @@ export default function ListsClient({
         {!isArchivedView && (
           <>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/lists/archived">
+              <Link href="/lists/archived" aria-label="Archive">
                 <Archive className="h-5 w-5" />
                 <span className="ml-2 hidden sm:block">Archive</span>
               </Link>
             </Button>
-            <Button onClick={() => setShowCreateModal(true)}>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              aria-label="Create List"
+            >
               <Plus className="h-5 w-5" />
               <span className="ml-2 hidden sm:block">Create List</span>
             </Button>
@@ -54,7 +57,7 @@ export default function ListsClient({
           mode="create"
           isOwner
           onListCreate={(created) => {
-            setLists((prev) => [created as any, ...prev]);
+            setLists((prev) => [created, ...prev]);
           }}
         />
 

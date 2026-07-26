@@ -225,6 +225,47 @@ describe("content-status service", () => {
     expect(typeof res.status?.createdAt).toBe("string");
   });
 
+  // SUPPLY-11: the row mapper used to be typed `any` and normalised timestamps
+  // with `toISOString?.() ?? value`, which quietly passed through a row whose
+  // timestamps were already serialised. The typed version keeps that behaviour.
+  it("getContentStatus passes through timestamps that are already strings", async () => {
+    const row = [
+      {
+        id: "cs3",
+        userId,
+        tmdbId: 21,
+        contentType: "tv",
+        status: "watching",
+        nextEpisodeDate: "2025-02-01T00:00:00.000Z",
+        createdAt: "2025-01-01T00:00:00.000Z",
+        updatedAt: "2025-01-02T00:00:00.000Z",
+      },
+    ];
+    (db as any).__setMockResults([row]);
+    const res = await getContentStatus(userId, 21, "tv");
+    expect(res.status?.nextEpisodeDate).toBe("2025-02-01T00:00:00.000Z");
+    expect(res.status?.createdAt).toBe("2025-01-01T00:00:00.000Z");
+    expect(res.status?.updatedAt).toBe("2025-01-02T00:00:00.000Z");
+  });
+
+  it("getContentStatus serialises Date timestamps", async () => {
+    const row = [
+      {
+        id: "cs4",
+        userId,
+        tmdbId: 22,
+        contentType: "tv",
+        status: "watching",
+        nextEpisodeDate: now,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    (db as any).__setMockResults([row]);
+    const res = await getContentStatus(userId, 22, "tv");
+    expect(res.status?.nextEpisodeDate).toBe("2025-01-01T00:00:00.000Z");
+  });
+
   it("updateContentStatus returns notFound when missing", async () => {
     (db as any).__setMockResults([[]]);
     const result = await updateContentStatus(userId, {

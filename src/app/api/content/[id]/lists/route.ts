@@ -19,6 +19,20 @@ async function handler(request: AuthenticatedRequest) {
       );
     }
 
+    // A TMDB id is only unique within a content type, and `list_items` is keyed
+    // on (listId, tmdbId, contentType) - so the same id legitimately appears
+    // twice in one list, once as a movie and once as a show. Matching on the id
+    // alone reported the movie's row for the show and vice versa, which showed
+    // an "Added" badge for a list the title was never in and made Remove delete
+    // the unrelated row. The caller must say which one it means.
+    const contentType = url.searchParams.get("contentType");
+    if (contentType !== "movie" && contentType !== "tv") {
+      return NextResponse.json(
+        { error: "Invalid content type" },
+        { status: 400 },
+      );
+    }
+
     // Find all lists where the user is owner or collaborator that contain this content
     const userListsWithContent = await db
       .select({
@@ -32,6 +46,7 @@ async function handler(request: AuthenticatedRequest) {
         and(
           or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
           eq(listItems.tmdbId, contentId),
+          eq(listItems.contentType, contentType),
         ),
       );
 

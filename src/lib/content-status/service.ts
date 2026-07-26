@@ -33,22 +33,39 @@ import type {
   UpdateContentStatusResult,
 } from "./types";
 
-function mapRow(row: any): ContentStatusItem {
+/**
+ * A `user_content_status` row as far as mapRow is concerned. Timestamps are Date
+ * objects straight from the driver, but rows can also arrive already serialised,
+ * so both are accepted - which is what the old `toISOString?.()` dance was for.
+ */
+interface ContentStatusRow {
+  id: string;
+  userId: string;
+  tmdbId: number;
+  contentType: string;
+  status: string;
+  nextEpisodeDate?: Date | string | null;
+  createdAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+}
+
+function toIsoString(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function mapRow(row: ContentStatusRow): ContentStatusItem {
   return {
     id: row.id,
     userId: row.userId,
     tmdbId: row.tmdbId,
-    contentType: row.contentType,
-    status: row.status,
+    // Both columns are varchars, so the row type cannot narrow them for us.
+    contentType: row.contentType as ContentStatusItem["contentType"],
+    status: row.status as ContentStatusItem["status"],
     nextEpisodeDate: row.nextEpisodeDate
-      ? row.nextEpisodeDate.toISOString?.() ?? row.nextEpisodeDate
+      ? toIsoString(row.nextEpisodeDate)
       : null,
-    createdAt: row.createdAt
-      ? row.createdAt.toISOString?.() ?? row.createdAt
-      : undefined,
-    updatedAt: row.updatedAt
-      ? row.updatedAt.toISOString?.() ?? row.updatedAt
-      : undefined,
+    createdAt: row.createdAt ? toIsoString(row.createdAt) : undefined,
+    updatedAt: row.updatedAt ? toIsoString(row.updatedAt) : undefined,
   };
 }
 
@@ -180,7 +197,9 @@ export async function updateContentStatus(
     )
     .limit(1);
   if (existing.length === 0) return "notFound";
-  const updateData: any = { updatedAt: new Date() };
+  const updateData: Partial<typeof userContentStatus.$inferInsert> = {
+    updatedAt: new Date(),
+  };
   if (status !== undefined) updateData.status = status;
 
   const clearsSchedules =

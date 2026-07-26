@@ -46,13 +46,65 @@ export interface CardProps
 }
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant, size, hover, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(cardVariants({ variant, size, hover, className }))}
-      {...props}
-    />
-  ),
+  (
+    {
+      className,
+      variant,
+      size,
+      hover,
+      onClick,
+      onKeyDown,
+      role,
+      tabIndex,
+      ...props
+    },
+    ref,
+  ) => {
+    // A Card carrying a click handler is the whole interaction target for cards
+    // like ContentCard and ListCard, so it has to be focusable and operable from
+    // the keyboard. The semantics are added only when a handler is present: a
+    // decorative Card must stay out of the tab order, and this module has no
+    // "use client" boundary, so it must not hand a function to a DOM element
+    // when it is rendered from a server component.
+    const isInteractive = typeof onClick === "function";
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          cardVariants({ variant, size, hover, className }),
+          isInteractive &&
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950",
+        )}
+        role={role ?? (isInteractive ? "button" : undefined)}
+        tabIndex={tabIndex ?? (isInteractive ? 0 : undefined)}
+        onClick={onClick}
+        onKeyDown={
+          isInteractive
+            ? (event) => {
+                onKeyDown?.(event);
+                if (event.defaultPrevented) return;
+                if (event.key !== "Enter" && event.key !== " ") return;
+                // Auto-repeat fires roughly every 30ms once a key is held.
+                // Activation below dispatches a real click, and ContentCard
+                // reads two clicks inside 300ms as a double click, which
+                // quick-completes the title -- so without this a held Enter
+                // silently marked content watched. Native buttons do not
+                // re-activate on repeat either.
+                if (event.repeat) return;
+                // preventDefault stops Space scrolling the page. Dispatching a
+                // real click rather than calling onClick directly keeps every
+                // consumer's existing handler contract intact - notably
+                // ContentCard, which counts clicks to detect a double click.
+                event.preventDefault();
+                event.currentTarget.click();
+              }
+            : onKeyDown
+        }
+        {...props}
+      />
+    );
+  },
 );
 Card.displayName = "Card";
 

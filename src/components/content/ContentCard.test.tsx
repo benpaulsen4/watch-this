@@ -158,6 +158,80 @@ describe("ContentCard", () => {
     ).toBeInTheDocument();
   });
 
+  // UI-03: the only way into the details modal was a mouse click on the card.
+  it("opens the details modal from the keyboard", async () => {
+    const user = userEvent.setup();
+    const tv: TMDBContent = {
+      tmdbId: 44,
+      contentType: "tv",
+      title: "Keyboard Show",
+      overview: "Overview",
+      posterPath: null,
+      backdropPath: null,
+      releaseDate: "2023-01-01",
+      voteAverage: 7.1,
+      voteCount: 200,
+      genreIds: [],
+      popularity: 0,
+      adult: null,
+      watchStatus: "watching",
+      statusUpdatedAt: null,
+    };
+    renderWithQuery(<ContentCard content={tv} />);
+
+    const card = screen.getByRole("button", {
+      name: /Keyboard Show, TV show/i,
+    });
+    card.focus();
+    await user.keyboard("{Enter}");
+
+    expect(
+      await screen.findByRole("tab", { name: /Overview/i }),
+    ).toBeInTheDocument();
+  });
+
+  // UI-16: the two timers that dismiss the quick-complete overlay were created
+  // with a bare setTimeout, unlike the click-detection one, so they survived
+  // unmount and fired setState on a component that was gone.
+  it("clears the quick-complete dismissal timer on unmount", async () => {
+    const setTimeoutSpy = vi.spyOn(global, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
+
+    const user = userEvent.setup();
+    const movie: TMDBContent = {
+      tmdbId: 55,
+      contentType: "movie",
+      title: "Timer Movie",
+      overview: "Overview",
+      posterPath: null,
+      backdropPath: null,
+      releaseDate: "2024-01-01",
+      voteAverage: 7.0,
+      voteCount: 300,
+      genreIds: [],
+      popularity: 0,
+      adult: false,
+      watchStatus: "planning",
+      statusUpdatedAt: null,
+    };
+
+    const { unmount } = renderWithQuery(<ContentCard content={movie} />);
+    await user.dblClick(screen.getByText(/Timer Movie/i));
+    await screen.findByText(/Movie marked as watched!/i);
+
+    // The 2s delay identifies the overlay dismissal timer among everything else
+    // the render scheduled.
+    const scheduledIndex = setTimeoutSpy.mock.calls.findIndex(
+      ([, delay]) => delay === 2000,
+    );
+    expect(scheduledIndex).toBeGreaterThanOrEqual(0);
+    const handle = setTimeoutSpy.mock.results[scheduledIndex].value;
+
+    unmount();
+
+    expect(clearTimeoutSpy.mock.calls.map(([id]) => id)).toContain(handle);
+  });
+
   it("double click triggers quick-complete overlay and updates status", async () => {
     const user = userEvent.setup();
     const movie: TMDBContent = {

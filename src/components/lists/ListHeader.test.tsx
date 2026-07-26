@@ -38,6 +38,17 @@ vi.mock("./ListSettingsModal", () => ({
     ) : null,
 }));
 
+/**
+ * Emulates the sub-640px layout. Tailwind's `hidden` is display:none, which is
+ * what drops the labels out of the accessibility tree; applying it inline is the
+ * jsdom equivalent, and unlike a stylesheet it does not outlive the render.
+ */
+function hideLabelsBelowSmBreakpoint() {
+  document
+    .querySelectorAll<HTMLElement>(".hidden")
+    .forEach((el) => (el.style.display = "none"));
+}
+
 describe("ListHeader", () => {
   const mockRouter = { push: vi.fn(), refresh: vi.fn() };
   const mockUser = { id: "user-1", username: "me" };
@@ -104,6 +115,19 @@ describe("ListHeader", () => {
     await user.click(addBtn);
 
     expect(mockRouter.push).toHaveBeenCalledWith("/search");
+  });
+
+  // UI-04: Share, Settings and Add Content are icon-only below sm, and their
+  // labels live in `hidden sm:block` spans, so they had no accessible name there.
+  it("names the header actions when their visible labels are hidden", () => {
+    render(<ListHeader initialList={initialList as any} />);
+    hideLabelsBelowSmBreakpoint();
+
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add Content" }),
+    ).toBeInTheDocument();
   });
 
   it("renders archived badge when list is archived", () => {

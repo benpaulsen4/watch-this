@@ -97,6 +97,7 @@ export function CastTab({ contentType, contentId }: CastTabProps) {
               onClick={() => setPage(page - 1)}
               disabled={page === 1}
               className="flex items-center gap-1"
+              aria-label="Previous"
             >
               <ChevronLeft className="w-4 h-4" />
               <span className="hidden sm:block">Previous</span>
@@ -110,6 +111,7 @@ export function CastTab({ contentType, contentId }: CastTabProps) {
               onClick={() => setPage(page + 1)}
               disabled={page === totalPages}
               className="flex items-center gap-1"
+              aria-label="Next"
             >
               <span className="hidden sm:block">Next</span>
               <ChevronRight className="w-4 h-4" />

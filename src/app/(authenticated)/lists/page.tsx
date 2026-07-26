@@ -1,15 +1,10 @@
-import { cookies } from "next/headers";
-
 import ListsClient from "@/components/lists/ListsClient";
-import { getCurrentUser } from "@/lib/auth/webauthn";
 import { listLists } from "@/lib/lists/service";
 
-export default async function ListsPage() {
-  const resolvedCookies = await cookies();
-  const sessionCookie = resolvedCookies.get("session");
-  const user = await getCurrentUser(sessionCookie?.value);
+import { requireUser } from "../requireUser";
 
-  if (user === null) return "Refresh if this page does not go away";
+export default async function ListsPage() {
+  const user = await requireUser("/lists");
 
   const listsWithPosters = await listLists(user.id);
 
