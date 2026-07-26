@@ -179,6 +179,15 @@ export async function PUT(request: NextRequest) {
       .where(eq(users.id, user.id))
       .returning();
 
+    // The session was valid when this request started, but the account can be
+    // deleted between authenticating and this UPDATE, leaving it matching no
+    // rows. Fall through to the catch below, which already answers 500 for this
+    // route -- the throw only replaces an opaque property-access TypeError with
+    // a message that says what actually happened.
+    if (!updatedUser) {
+      throw new Error(`Profile update matched no user row for id ${user.id}`);
+    }
+
     return NextResponse.json({
       success: true,
       user: {

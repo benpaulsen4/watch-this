@@ -60,10 +60,11 @@ export async function POST(request: NextRequest) {
         .from(users)
         .where(eq(users.username, username))
         .limit(1);
-      if (rows.length === 0) {
+      const row = rows[0];
+      if (!row) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
-      targetUserId = rows[0].id;
+      targetUserId = row.id;
     }
 
     const res = await initiateClaim(targetUserId!, "admin");

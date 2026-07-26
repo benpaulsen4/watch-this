@@ -13,6 +13,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { jwtVerify, SignJWT } from "jose";
 
 import { passkeyCredentials, type User, users } from "../db";
+import { expectRow } from "../db/expectRow";
 import { db } from "../db/index";
 
 const RP_NAME = process.env.WEBAUTHN_RP_NAME || "WatchThis";
@@ -191,26 +192,35 @@ export async function verifyPasskeyRegistration(
 
   // Create user and passkey credential in transaction
   const result = await db.transaction(async (tx) => {
-    // Create user
-    const [newUser] = await tx
-      .insert(users)
-      .values({
-        username,
-        timezone: timezone || "UTC",
-      })
-      .returning();
+    // Both of these are unconditional single-row inserts with no onConflict
+    // clause, so each returns its new row or throws and aborts the transaction.
+    // Unwrapping here keeps the function's return type free of `undefined`,
+    // which callers (the register/verify route) rely on.
+    const newUser = expectRow(
+      await tx
+        .insert(users)
+        .values({
+          username,
+          timezone: timezone || "UTC",
+        })
+        .returning(),
+      "verifyPasskeyRegistration insert users"
+    );
 
     // Create passkey credential
-    const [credential] = await tx
-      .insert(passkeyCredentials)
-      .values({
-        userId: newUser.id,
-        credentialId: credentialID,
-        publicKey: Buffer.from(credentialPublicKey).toString("base64url"),
-        counter,
-        deviceName: deviceName || "Unknown Device",
-      })
-      .returning();
+    const credential = expectRow(
+      await tx
+        .insert(passkeyCredentials)
+        .values({
+          userId: newUser.id,
+          credentialId: credentialID,
+          publicKey: Buffer.from(credentialPublicKey).toString("base64url"),
+          counter,
+          deviceName: deviceName || "Unknown Device",
+        })
+        .returning(),
+      "verifyPasskeyRegistration insert passkeyCredentials"
+    );
 
     return { user: newUser, credential };
   });
@@ -228,11 +238,10 @@ export async function generateAdditionalPasskeyRegistrationOptions(
     .where(eq(users.id, userId))
     .limit(1);
 
-  if (userData.length === 0) {
+  const u = userData[0];
+  if (!u) {
     throw new Error("User not found");
   }
-
-  const u = userData[0];
 
   const options: GenerateRegistrationOptionsOpts = {
     rpName: RP_NAME,
@@ -371,11 +380,12 @@ export async function verifyPasskeyAuthentication(
     )
     .limit(1);
 
-  if (credentialData.length === 0) {
+  const credentialRow = credentialData[0];
+  if (!credentialRow) {
     throw new Error("Credential not found");
   }
 
-  const { credential, user } = credentialData[0];
+  const { credential, user } = credentialRow;
 
   const verification = {
     response: authenticationResponse as AuthenticationResponseJSON,
