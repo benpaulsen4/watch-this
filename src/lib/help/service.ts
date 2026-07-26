@@ -199,8 +199,11 @@ export async function getHelpDocBySlug(slug: string[]): Promise<HelpDoc> {
   const raw = await fs.readFile(filePath, "utf8");
   const parsed = parseMarkdown(raw);
 
+  // Testing the looked-up segment instead of `slug.length` is the same check --
+  // the array holds plain strings -- and narrows it for titleizeSegment.
+  const lastSegment = slug[slug.length - 1];
   const fallbackTitle =
-    slug.length === 0 ? "Help Center" : titleizeSegment(slug[slug.length - 1]);
+    lastSegment === undefined ? "Help Center" : titleizeSegment(lastSegment);
 
   return {
     slug,
@@ -221,10 +224,10 @@ export async function getAllHelpDocs(): Promise<HelpDocSummary[]> {
     const raw = await fs.readFile(filePath, "utf8");
     const parsed = parseMarkdown(raw);
 
+    // As in getHelpDocBySlug: same check, but it narrows for titleizeSegment.
+    const lastSegment = slug[slug.length - 1];
     const fallbackTitle =
-      slug.length === 0
-        ? "Help Center"
-        : titleizeSegment(slug[slug.length - 1]);
+      lastSegment === undefined ? "Help Center" : titleizeSegment(lastSegment);
 
     const meta = normalizeFrontmatter(parsed.data, fallbackTitle);
     if (process.env.NODE_ENV === "production" && meta.draft) continue;

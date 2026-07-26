@@ -187,8 +187,12 @@ export function ListSelector({
 
       {filteredLists.map((list) => {
         const isCurrentList = currentListId === list.id;
-        const hasContent = Object.hasOwn(listsWithContent, list.id);
+        // `listsWithContent` is built as Record<string, string> from the API
+        // rows, so a present key always has an item id. Deriving `hasContent`
+        // from the lookup rather than a separate Object.hasOwn keeps the two in
+        // step and lets `itemId` be a plain string in the Remove branch below.
         const itemId = listsWithContent[list.id];
+        const hasContent = itemId !== undefined;
 
         return (
           <div

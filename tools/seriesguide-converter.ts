@@ -184,7 +184,10 @@ export function convertSeriesGuideToWatchThis(
 function main() {
   const args = process.argv.slice(2);
 
-  if (args.length < 1) {
+  // Checking the argument itself rather than `args.length` is the same test and
+  // narrows it to a string for the fs calls below (process.exit returns never).
+  const inputFile = args[0];
+  if (!inputFile) {
     console.error(
       "Usage: node seriesguide-converter.js <input-file> [output-file]",
     );
@@ -194,7 +197,6 @@ function main() {
     process.exit(1);
   }
 
-  const inputFile = args[0];
   const outputFile =
     args[1] || inputFile.replace(/\.json$/, "-watchthis-import.json");
 
