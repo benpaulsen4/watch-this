@@ -142,8 +142,8 @@ export async function markNextEpisodeWatched(
     .limit(1);
   let nextSeasonNumber = 1;
   let nextEpisodeNumber = 1;
-  if (watchedEpisodes.length > 0) {
-    const lastWatched = watchedEpisodes[0];
+  const lastWatched = watchedEpisodes[0];
+  if (lastWatched) {
     let seasonDetails;
     try {
       seasonDetails = await tmdbClient.getTVSeasonDetails(
@@ -203,9 +203,9 @@ export async function markNextEpisodeWatched(
       ),
     )
     .limit(1);
-  let result;
+  let resultRows;
   if (existingStatus.length > 0) {
-    [result] = await db
+    resultRows = await db
       .update(episodeWatchStatus)
       .set({ watched: true, watchedAt: new Date(), updatedAt: new Date() })
       .where(
@@ -218,7 +218,7 @@ export async function markNextEpisodeWatched(
       )
       .returning();
   } else {
-    [result] = await db
+    resultRows = await db
       .insert(episodeWatchStatus)
       .values({
         userId,
@@ -229,6 +229,16 @@ export async function markNextEpisodeWatched(
         watchedAt: new Date(),
       })
       .returning();
+  }
+  // The insert branch always returns its new row. The update branch targets the
+  // row `existingStatus` just read, so it only comes back empty if that row was
+  // deleted in between -- there is no sensible recovery here, and the message
+  // beats the "cannot read properties of undefined" that mapRow used to throw.
+  const result = resultRows[0];
+  if (!result) {
+    throw new Error(
+      `markNextEpisodeWatched wrote no row for ${tmdbId} S${nextSeasonNumber}E${nextEpisodeNumber}`
+    );
   }
   const syncedCollaboratorIds = await syncEpisodeStatusToCollaborators(
     userId,

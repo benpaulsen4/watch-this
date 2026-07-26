@@ -268,9 +268,14 @@ export async function listActivityTimeline(
       );
 
       detailsList.forEach((details, index) => {
+        // getAllCachedContent maps its input 1:1 and documents that it retains
+        // input ordering, so index `index` is the row that produced `details`.
+        const row = rowsToHydrate[index];
+        if (!row) return;
+
         upcoming.push({
           ...details,
-          scheduleId: rowsToHydrate[index].scheduleId,
+          scheduleId: row.scheduleId,
         });
       });
     } catch {
@@ -283,21 +288,22 @@ export async function listActivityTimeline(
       fallbackDetails.forEach((result, index) => {
         if (result.status !== "fulfilled") return;
 
+        // Promise.allSettled preserves the length and order of its input, so
+        // this index is always in range.
+        const row = rowsToHydrate[index];
+        if (!row) return;
+
         upcoming.push({
           ...result.value,
-          scheduleId: rowsToHydrate[index].scheduleId,
+          scheduleId: row.scheduleId,
         });
       });
     }
   }
 
+  const lastRow = resultRows[resultRows.length - 1];
   const nextCursor =
-    hasMore && resultRows.length > 0
-      ? encodeCursor(
-          resultRows[resultRows.length - 1].createdAt,
-          resultRows[resultRows.length - 1].id
-        )
-      : null;
+    hasMore && lastRow ? encodeCursor(lastRow.createdAt, lastRow.id) : null;
 
   return { activities, upcoming, hasMore, nextCursor };
 }

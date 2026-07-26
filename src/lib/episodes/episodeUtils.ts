@@ -425,10 +425,10 @@ export async function updateEpisodeWatchStatus(
     )
     .limit(1);
 
-  let result;
+  let resultRows;
   if (existingStatus.length > 0) {
     // Update existing status
-    [result] = await db
+    resultRows = await db
       .update(episodeWatchStatus)
       .set({
         watched,
@@ -446,7 +446,7 @@ export async function updateEpisodeWatchStatus(
       .returning();
   } else {
     // Create new status
-    [result] = await db
+    resultRows = await db
       .insert(episodeWatchStatus)
       .values({
         userId,
@@ -457,6 +457,17 @@ export async function updateEpisodeWatchStatus(
         watchedAt: watched ? new Date() : null,
       })
       .returning();
+  }
+
+  // The insert branch always returns its new row; the update branch targets the
+  // row `existingStatus` just read, so an empty result means it was deleted in
+  // between. Resolving it here keeps this function's return type free of
+  // `undefined` for `completeEpisodeUpdate` and the `mapRow` calls downstream.
+  const result = resultRows[0];
+  if (!result) {
+    throw new Error(
+      `updateEpisodeWatchStatus wrote no row for ${tmdbId} S${seasonNumber}E${episodeNumber}`
+    );
   }
 
   return result;
@@ -563,7 +574,11 @@ export async function updateTVShowStatus(
   const existingStatus = contentStatus[0] ?? null;
   const shouldMarkCompleted = progressState.shouldMarkCompleted;
 
-  if (contentStatus.length === 0) {
+  // Branching on `existingStatus` rather than `contentStatus.length` keeps the
+  // two in step for the compiler as well as the reader: `contentStatus[0] ?? null`
+  // is null exactly when the array is empty, and every branch below dereferences
+  // `existingStatus`.
+  if (existingStatus === null) {
     await db.insert(userContentStatus).values({
       userId,
       tmdbId,
@@ -810,9 +825,12 @@ export async function batchUpdateEpisodes(
     (episode) => !episode.watched,
   );
   const anyWatched = watchedSelections.length > 0;
+  // `targetEpisodes` is non-empty (guarded above) and these two arrays partition
+  // it on `episode.watched`, so at least one of them has a last element and the
+  // pair of lookups cannot both miss.
   const statusEpisode =
     watchedSelections[watchedSelections.length - 1] ??
-    unwatchedSelections[unwatchedSelections.length - 1];
+    unwatchedSelections[unwatchedSelections.length - 1]!;
 
   const updatedEpisodes =
     (await db
@@ -847,9 +865,11 @@ export async function batchUpdateEpisodes(
     [watchedSelections, true],
     [unwatchedSelections, false],
   ] as const) {
-    if (selections.length === 0) continue;
-
     const summaryEpisode = selections[selections.length - 1];
+    // Equivalent to the `selections.length === 0` skip this replaces, but the
+    // compiler can carry the narrowing into the call below.
+    if (!summaryEpisode) continue;
+
     await createEpisodeActivityEntry(
       userId,
       tmdbId,
