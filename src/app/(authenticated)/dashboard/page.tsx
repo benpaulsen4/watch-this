@@ -1,5 +1,4 @@
 import { List, Search } from "lucide-react";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -9,14 +8,11 @@ import TrendingStrip from "@/components/content/TrendingStrip";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ProfileImage } from "@/components/ui/ProfileImage";
-import { getCurrentUser } from "@/lib/auth/webauthn";
+
+import { requireUser } from "../requireUser";
 
 export default async function DashboardPage() {
-  const resolvedCookies = await cookies();
-  const sessionCookie = resolvedCookies.get("session");
-  const user = await getCurrentUser(sessionCookie?.value);
-
-  if (user === null) return "Refresh if this page does not go away";
+  const user = await requireUser("/dashboard");
 
   return (
     <div className="min-h-screen bg-gray-950">

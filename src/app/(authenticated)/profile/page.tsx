@@ -1,5 +1,9 @@
 import { ProfileClient } from "@/components/profile/ProfileClient";
 
-export default function ProfilePage() {
+import { requireUser } from "../requireUser";
+
+export default async function ProfilePage() {
+  await requireUser("/profile");
+
   return <ProfileClient />;
 }

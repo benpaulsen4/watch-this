@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useFragmentNavigation } from "@/hooks/useFragmentNavigation";
 
 import { useAuth } from "../providers/AuthProvider";
@@ -20,7 +21,7 @@ type ProfileTab = "profile" | "security" | "data" | "streaming";
 
 export function ProfileClient() {
   const router = useRouter();
-  const { user, refreshSession } = useAuth();
+  const { user, loading, refreshSession } = useAuth();
 
   const { activeTab, setActiveTab } = useFragmentNavigation<ProfileTab>({
     defaultTab: "profile",
@@ -37,6 +38,18 @@ export function ProfileClient() {
   };
 
   const handleUserUpdate = async () => await refreshSession();
+
+  // Unlike the rest of the authenticated pages this one renders nothing at all
+  // without the user object, and it only has it once the auth context has
+  // resolved the session client-side. Own that wait here rather than in a group
+  // layout, which would impose it on every page.
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <LoadingSpinner size="xl" variant="primary" />
+      </div>
+    );
+  }
 
   if (!user) return null;
 

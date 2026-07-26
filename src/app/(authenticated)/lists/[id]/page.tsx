@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -7,9 +6,10 @@ import { ListFilters } from "@/components/lists/ListFilters";
 import ListHeader from "@/components/lists/ListHeader";
 import ListItems from "@/components/lists/ListItems";
 import ListRecommendations from "@/components/lists/ListRecommendations";
-import { getCurrentUser } from "@/lib/auth/webauthn";
 import { WatchStatusEnum } from "@/lib/db/schema";
 import { getList } from "@/lib/lists/service";
+
+import { requireUser } from "../../requireUser";
 
 interface ListDetailsPageProps {
   params: Promise<{
@@ -29,11 +29,7 @@ export default async function ListDetailsPage({
   const { watchStatus: watchStatusParam, sortOrder: sortOrderParam } =
     await searchParams;
 
-  const resolvedCookies = await cookies();
-  const sessionCookie = resolvedCookies.get("session");
-  const user = await getCurrentUser(sessionCookie?.value);
-
-  if (user === null) return "Refresh if this page does not go away";
+  const user = await requireUser(`/lists/${id}`);
 
   const list = await getList(user.id, id);
 
