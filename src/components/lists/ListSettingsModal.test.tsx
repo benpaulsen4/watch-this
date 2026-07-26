@@ -170,6 +170,130 @@ describe("ListSettingsModal", () => {
     );
   });
 
+  // UI-01: the toggle writes the new state locally before the request, and used
+  // to leave it there when the request failed - so the button offered to
+  // "Unarchive List" for a list that was still active.
+  it("rolls the archive toggle back when the request fails", async () => {
+    const user = userEvent.setup();
+    const onListUpdate = vi.fn();
+
+    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+      if (
+        typeof input === "string" &&
+        input.includes("/api/lists/") &&
+        init?.method === "PUT"
+      ) {
+        return {
+          ok: false,
+          json: async () => ({ error: "List is locked" }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    renderWithClient(
+      <ListSettingsModal
+        isOpen
+        onClose={() => {}}
+        list={baseList}
+        isOwner
+        onListUpdate={onListUpdate}
+        onListDelete={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /Archive List/i }));
+
+    expect(await screen.findByText(/List is locked/i)).toBeInTheDocument();
+    expect(onListUpdate).not.toHaveBeenCalled();
+    // Still offering to archive, because the list is still active.
+    expect(
+      screen.getByRole("button", { name: /Archive List/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Unarchive List/i })
+    ).toBeNull();
+  });
+
+  it("keeps the sync toggle usable after a failed archive attempt", async () => {
+    const user = userEvent.setup();
+    const syncedList = { ...baseList, syncWatchStatus: true };
+
+    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+      if (
+        typeof input === "string" &&
+        input.includes("/api/lists/") &&
+        init?.method === "PUT"
+      ) {
+        return { ok: false, json: async () => ({ error: "nope" }) } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    renderWithClient(
+      <ListSettingsModal
+        isOpen
+        onClose={() => {}}
+        list={syncedList}
+        isOwner
+        onListUpdate={() => {}}
+        onListDelete={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /Archive List/i }));
+    await screen.findByText(/nope/i);
+
+    // Archiving would have turned syncing off; the rollback restores it.
+    expect(
+      screen.getByRole("switch", {
+        name: /Sync watch status & TV schedules with collaborators/i,
+      })
+    ).toBeEnabled();
+  });
+
+  it("reports a failed save instead of rejecting unhandled", async () => {
+    const user = userEvent.setup();
+    // Rejections from a click handler surface on the Node process, not as a
+    // window "unhandledrejection" event, under jsdom.
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+
+    vi.spyOn(global, "fetch").mockImplementation(async (input, init) => {
+      if (
+        typeof input === "string" &&
+        input.includes("/api/lists/") &&
+        init?.method === "PUT"
+      ) {
+        return {
+          ok: false,
+          json: async () => ({ error: "Save failed" }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    renderWithClient(
+      <ListSettingsModal
+        isOpen
+        onClose={() => {}}
+        list={baseList}
+        isOwner
+        onListUpdate={() => {}}
+        onListDelete={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /Save Changes/i }));
+
+    expect(await screen.findByText(/Save failed/i)).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    process.off("unhandledRejection", onRejection);
+
+    expect(rejections).toEqual([]);
+  });
+
   it("disables sync toggle when list is archived", async () => {
     const archivedList = { ...baseList, isArchived: true };
     renderWithClient(

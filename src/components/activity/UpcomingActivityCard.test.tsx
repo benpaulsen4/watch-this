@@ -106,4 +106,39 @@ describe("UpcomingActivityCard", () => {
     // Callback triggered after successful mutation
     expect(onEpisodeWatched).toHaveBeenCalled();
   });
+
+  // UI-06: the mutation had onSuccess and onSettled but no onError, and the
+  // handler awaited mutateAsync bare - so a failure stopped the spinner, said
+  // nothing, and produced an unhandled rejection.
+  it("reports a failed episode update instead of rejecting unhandled", async () => {
+    // Rejections from a click handler surface on the Node process, not as a
+    // window "unhandledrejection" event, under jsdom.
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+
+    // @ts-expect-error assign to global
+    global.fetch = vi.fn(async () => ({
+      ok: false,
+      json: async () => ({ error: "Episode has not aired yet" }),
+    }));
+
+    renderWithClient(
+      <UpcomingActivityCard
+        upcoming={{ tmdbId: 404, title: "Sad Show", posterPath: null } as any}
+        onEpisodeWatched={() => {}}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /Episode Watched/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /Episode has not aired yet/i,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    process.off("unhandledRejection", onRejection);
+    expect(rejections).toEqual([]);
+  });
 });

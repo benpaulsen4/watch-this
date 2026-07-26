@@ -23,6 +23,8 @@ import {
 
 type Mode = "edit" | "create";
 
+type ListFormData = UpdateListInput & { name: string };
+
 interface ListSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -46,7 +48,7 @@ export default function ListSettingsModal({
   onListCreate,
   allowedListTypes,
 }: ListSettingsModalProps) {
-  const [formData, setFormData] = useState<UpdateListInput & { name: string }>({
+  const [formData, setFormData] = useState<ListFormData>({
     name: list?.name ?? "",
     description: list?.description,
     listType: list?.listType ?? "mixed",
@@ -84,18 +86,23 @@ export default function ListSettingsModal({
     return true;
   };
 
+  // The payload is a mutation variable rather than something the mutationFn
+  // reads off `formData`. handleArchiveToggle has to send the *toggled* value
+  // while also showing it, and closing over state made that depend on React
+  // having re-rendered before the request was built. Passing it explicitly
+  // removes the ordering question altogether.
   const updateListMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload: ListFormData) => {
       const response = await fetch(`/api/lists/${list?.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formData.name.trim(),
-          description: (formData.description ?? "").trim() || null,
-          listType: formData.listType,
-          isPublic: formData.isPublic,
-          isArchived: formData.isArchived,
-          syncWatchStatus: formData.syncWatchStatus,
+          name: payload.name.trim(),
+          description: (payload.description ?? "").trim() || null,
+          listType: payload.listType,
+          isPublic: payload.isPublic,
+          isArchived: payload.isArchived,
+          syncWatchStatus: payload.syncWatchStatus,
         }),
       });
       const data = await response.json();
@@ -126,20 +133,37 @@ export default function ListSettingsModal({
     if (!validateForm()) return;
     setIsLoading(true);
     setError("");
-    await updateListMutation.mutateAsync();
+    try {
+      await updateListMutation.mutateAsync(formData);
+    } catch {
+      // Error state is handled in onError; swallow to avoid unhandled rejection
+    }
   };
 
   const handleArchiveToggle = async () => {
     if (!validateForm()) return;
+
+    const previous = formData;
+    const next: ListFormData = {
+      ...formData,
+      isArchived: !formData.isArchived,
+      // Archiving turns collaborator syncing off; the switch is disabled while
+      // archived, so the user could not turn it back on themselves.
+      syncWatchStatus: formData.isArchived ? formData.syncWatchStatus : false,
+    };
+
     setIsLoading(true);
     setError("");
-    setFormData((prev) => ({
-      ...prev,
-      isArchived: !prev.isArchived,
-      syncWatchStatus: !prev.isArchived ? false : prev.syncWatchStatus,
-    }));
+    setFormData(next);
 
-    await updateListMutation.mutateAsync();
+    try {
+      await updateListMutation.mutateAsync(next);
+    } catch {
+      // The optimistic flip above is what the Archive/Unarchive button reads,
+      // so a rejected PUT has to put it back - otherwise the button offers to
+      // "Unarchive List" for a list that is still active.
+      setFormData(previous);
+    }
   };
 
   const createListMutation = useMutation({
@@ -194,7 +218,11 @@ export default function ListSettingsModal({
   const handleDelete = async () => {
     setIsDeleting(true);
     setError("");
-    await deleteListMutation.mutateAsync();
+    try {
+      await deleteListMutation.mutateAsync();
+    } catch {
+      // Error state is handled in onError; swallow to avoid unhandled rejection
+    }
   };
 
   const handleClose = () => {
@@ -354,7 +382,11 @@ export default function ListSettingsModal({
                     if (!validateForm()) return;
                     setIsLoading(true);
                     setError("");
-                    await createListMutation.mutateAsync();
+                    try {
+                      await createListMutation.mutateAsync();
+                    } catch {
+                      // Handled in onError; swallow to avoid unhandled rejection
+                    }
                   }}
                   loading={isLoading}
                 >

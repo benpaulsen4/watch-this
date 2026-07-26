@@ -25,6 +25,7 @@ export function UpcomingActivityCard({
 }: UpcomingActivityCardProps) {
   const [isWatching, setIsWatching] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [error, setError] = useState("");
 
   const markWatchedMutation = useMutation({
     mutationFn: async (): Promise<MarkNextEpisodeResult> => {
@@ -38,13 +39,26 @@ export function UpcomingActivityCard({
         throw new Error(data.error || "Failed to mark episode as watched");
       return data;
     },
-    onSuccess: () => onEpisodeWatched?.(),
+    onSuccess: () => {
+      setError("");
+      onEpisodeWatched?.();
+    },
+    onError: (err: unknown) => {
+      setError(
+        err instanceof Error ? err.message : "Failed to mark episode as watched",
+      );
+    },
     onSettled: () => setIsWatching(false),
   });
 
   const handleMarkWatched = async () => {
     setIsWatching(true);
-    await markWatchedMutation.mutateAsync();
+    setError("");
+    try {
+      await markWatchedMutation.mutateAsync();
+    } catch {
+      // Error state is handled in onError; swallow to avoid unhandled rejection
+    }
   };
 
   const posterUrl = getImageUrl(upcoming.posterPath, "w342");
@@ -95,6 +109,11 @@ export function UpcomingActivityCard({
                   </>
                 </Button>
               </div>
+              {error && (
+                <p role="alert" className="text-red-400 text-sm">
+                  {error}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
