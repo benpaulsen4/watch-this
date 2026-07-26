@@ -1332,7 +1332,7 @@ describe("Profile Data Service", () => {
       // `user_content_status.nextEpisodeDate` is populated in the source row
       // but never exported, so it cannot be re-imported. It is recomputed from
       // TMDB on the next episode write.
-      expect(dbContentStatus[0].nextEpisodeDate).not.toBeNull();
+      expect(dbContentStatus[0]!.nextEpisodeDate).not.toBeNull();
       expect(parsed.contentStatus[0]).not.toHaveProperty("nextEpisodeDate");
       for (const payload of writes.byTable().contentStatus) {
         expect(payload).not.toHaveProperty("nextEpisodeDate");

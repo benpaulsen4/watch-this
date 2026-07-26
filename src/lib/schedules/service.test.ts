@@ -123,10 +123,10 @@ describe("schedules service", () => {
 
     const res = await listSchedules(userId);
     expect(res.totalShows).toBe(4);
-    expect(res.schedules[1].length).toBe(2);
-    expect(res.schedules[2].length).toBe(2);
-    expect(res.schedules[1][0].title).toBe("Show-1");
-    expect(res.schedules[2][1].title).toBeNull();
+    expect(res.schedules[1]!.length).toBe(2);
+    expect(res.schedules[2]!.length).toBe(2);
+    expect(res.schedules[1]![0]!.title).toBe("Show-1");
+    expect(res.schedules[2]![1]!.title).toBeNull();
   });
 
   // LOGIC-05: `schedulesByDay` is pre-seeded with keys 0-6 only. An import
@@ -147,7 +147,7 @@ describe("schedules service", () => {
 
     // The good row still renders; the bad rows are dropped, not fatal.
     expect(res.schedules[3]).toHaveLength(1);
-    expect(res.schedules[3][0].id).toBe("ok");
+    expect(res.schedules[3]![0]!.id).toBe("ok");
     expect(Object.keys(res.schedules).sort()).toEqual([
       "0",
       "1",
@@ -375,8 +375,8 @@ describe("schedules service", () => {
     const res = await deleteSchedules(userId, 10);
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.message).toMatch(/Removed 2 schedule/);
-    expect(res.deletedSchedules[0].id).toBe("x");
-    expect(typeof res.deletedSchedules[0].createdAt).toBe("string");
+    expect(res.deletedSchedules[0]!.id).toBe("x");
+    expect(typeof res.deletedSchedules[0]!.createdAt).toBe("string");
   });
 
   it("deleteSchedules syncs deletions to collaborators on sync-enabled lists", async () => {

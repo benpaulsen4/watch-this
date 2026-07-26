@@ -26,7 +26,7 @@ describe("Modal", () => {
     );
     const buttons = screen.getAllByRole("button");
     // Click the visible close button (second one)
-    await user.click(buttons[1]);
+    await user.click(buttons[1]!);
     expect(onClose).toHaveBeenCalled();
   });
 

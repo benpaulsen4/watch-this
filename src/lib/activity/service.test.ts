@@ -234,10 +234,10 @@ describe("activity service", () => {
     expect(res.activities.length).toBe(2);
     expect(res.hasMore).toBe(true);
     expect(typeof res.nextCursor).toBe("string");
-    const first = res.activities[0];
+    const first = res.activities[0]!;
     expect(first.id).toBe("a1");
     expect(first.user.username).toBe("alice");
-    expect(first.collaborators?.[0].username).toBe("bob");
+    expect(first.collaborators?.[0]!.username).toBe("bob");
     expect(typeof first.createdAt).toBe("string");
   });
 
@@ -258,9 +258,9 @@ describe("activity service", () => {
     const res = await listActivityTimeline(userId, tz, { limit: 10 });
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.upcoming.length).toBe(1);
-    expect(res.upcoming[0].tmdbId).toBe(400);
-    expect(res.upcoming[0].scheduleId).toBe("s2");
-    expect(res.upcoming[0].watchStatus).toBe("planning");
+    expect(res.upcoming[0]!.tmdbId).toBe(400);
+    expect(res.upcoming[0]!.scheduleId).toBe("s2");
+    expect(res.upcoming[0]!.watchStatus).toBe("planning");
     expect(getAllCachedContent as any).toHaveBeenCalledTimes(1);
     expect((getAllCachedContent as any).mock.calls[0][0]).toEqual([
       { tmdbId: 400, contentType: "tv" },
@@ -312,7 +312,7 @@ describe("activity service", () => {
 
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.upcoming).toHaveLength(1);
-    expect(res.upcoming[0].tmdbId).toBe(600);
+    expect(res.upcoming[0]!.tmdbId).toBe(600);
     expect(getAllCachedContent as any).toHaveBeenCalledTimes(1);
   });
 
@@ -345,7 +345,7 @@ describe("activity service", () => {
 
     if (typeof res === "string") throw new Error("unexpected error");
     expect(res.activities).toHaveLength(1);
-    expect(res.activities[0].id).toBe("a1");
+    expect(res.activities[0]!.id).toBe("a1");
     expect(res.upcoming).toEqual([]);
   });
 
@@ -441,6 +441,6 @@ describe("activity service", () => {
     const userJoins = joins.filter((join) => join.table === users);
     expect(userJoins).toHaveLength(1);
     // `activity_feed.user_id` is NOT NULL with a cascading FK.
-    expect(userJoins[0].type).toBe("inner");
+    expect(userJoins[0]!.type).toBe("inner");
   });
 });

@@ -139,7 +139,7 @@ describe("claim verify route atomicity (AUTH-03)", () => {
     expect(call[4]).toBe(db.__tx);
 
     // Success commits: claim consumed and credential persisted.
-    expect(db.__state.claims[0].status).toBe("consumed");
+    expect(db.__state.claims[0]!.status).toBe("consumed");
     expect(db.__state.credentials).toHaveLength(1);
   });
 
@@ -152,7 +152,7 @@ describe("claim verify route atomicity (AUTH-03)", () => {
 
     // Whole unit rolled back: claim is active again (retryable) and no orphan
     // credential was persisted.
-    expect(db.__state.claims[0].status).toBe("active");
+    expect(db.__state.claims[0]!.status).toBe("active");
     expect(db.__state.credentials).toHaveLength(0);
   });
 });

@@ -147,8 +147,8 @@ describe("episodes service", () => {
     ];
     (db as any).__setMockResults([rows]);
     const res = await listEpisodeStatuses(userId, 100);
-    expect(res.episodes[0].id).toBe("e10");
-    expect(typeof res.episodes[0].watchedAt).toBe("string");
+    expect(res.episodes[0]!.id).toBe("e10");
+    expect(typeof res.episodes[0]!.watchedAt).toBe("string");
   });
 
   // SUPPLY-11: as above - the mapper accepts both a driver Date and an already
@@ -169,8 +169,8 @@ describe("episodes service", () => {
     ];
     (db as any).__setMockResults([rows]);
     const res = await listEpisodeStatuses(userId, 101);
-    expect(res.episodes[0].watchedAt).toBe("2025-03-01T00:00:00.000Z");
-    expect(res.episodes[0].updatedAt).toBe("2025-03-02T00:00:00.000Z");
+    expect(res.episodes[0]!.watchedAt).toBe("2025-03-01T00:00:00.000Z");
+    expect(res.episodes[0]!.updatedAt).toBe("2025-03-02T00:00:00.000Z");
   });
 
   it("listEpisodeStatuses serialises Date timestamps", async () => {
@@ -189,7 +189,7 @@ describe("episodes service", () => {
     ];
     (db as any).__setMockResults([rows]);
     const res = await listEpisodeStatuses(userId, 102);
-    expect(res.episodes[0].watchedAt).toBe("2025-01-01T00:00:00.000Z");
+    expect(res.episodes[0]!.watchedAt).toBe("2025-01-01T00:00:00.000Z");
   });
 
   it("updateEpisodeStatus uses completeEpisodeUpdate and maps result", async () => {
@@ -207,7 +207,7 @@ describe("episodes service", () => {
     const res = await batchUpdateEpisodeStatuses(userId, 2, [
       { seasonNumber: 1, episodeNumber: 1, watched: true },
     ]);
-    expect(res.episodes[0].id).toBe("e2");
+    expect(res.episodes[0]!.id).toBe("e2");
     expect(res.syncedCollaboratorIds).toEqual(["c2"]);
   });
 

@@ -125,8 +125,8 @@ describe("syncStatusToCollaborators", () => {
     }>;
 
     expect(updateCalls.length).toBe(1);
-    expect(updateCalls[0].table).toBe(userContentStatus);
-    expect(updateCalls[0].payload.status).toBe("completed");
+    expect(updateCalls[0]!.table).toBe(userContentStatus);
+    expect(updateCalls[0]!.payload.status).toBe("completed");
 
     expect(
       insertCalls.some(

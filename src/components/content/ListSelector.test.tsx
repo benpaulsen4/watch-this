@@ -62,7 +62,7 @@ describe("ListSelector", () => {
         }
         const addMatch = url.match(/\/api\/lists\/(.+)\/items$/);
         if (addMatch && method === "POST") {
-          const listId = addMatch[1];
+          const listId = addMatch[1]!;
           listsWithContent[listId] = `item-${Date.now()}`;
           return {
             ok: true,
@@ -71,7 +71,7 @@ describe("ListSelector", () => {
         }
         const removeMatch = url.match(/\/api\/lists\/(.+)\/items\/(.+)$/);
         if (removeMatch && method === "DELETE") {
-          const listId = removeMatch[1];
+          const listId = removeMatch[1]!;
           delete listsWithContent[listId];
           return { ok: true, json: async () => ({}) } as Response;
         }
@@ -111,14 +111,14 @@ describe("ListSelector", () => {
     // Add to Mixed List
     const addButtons = screen.getAllByRole("button", { name: /Add/i });
     expect(addButtons.length).toBeGreaterThan(0);
-    await user.click(addButtons[0]);
+    await user.click(addButtons[0]!);
     await waitFor(() =>
       expect(screen.getAllByText(/Added/i).length).toBeGreaterThan(1),
     );
 
     // Remove from TV Shows list
     const removeButtons = screen.getAllByRole("button", { name: /Remove/i });
-    await user.click(removeButtons[0]);
+    await user.click(removeButtons[0]!);
     await waitFor(() => {
       // Only one 'Added' badge remains (the mixed list we added)
       expect(screen.getAllByText(/Added/i).length).toBe(1);
@@ -179,7 +179,7 @@ describe("ListSelector", () => {
         }
         const addMatch = url.match(/\/api\/lists\/(.+)\/items$/);
         if (addMatch && method === "POST") {
-          const listId = addMatch[1];
+          const listId = addMatch[1]!;
           listsWithContent[listId] = `item-${Date.now()}`;
           return {
             ok: true,

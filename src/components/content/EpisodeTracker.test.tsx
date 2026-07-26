@@ -118,7 +118,7 @@ describe("EpisodeTracker", () => {
       "button.w-6.h-6.rounded-full",
     ) as NodeListOf<HTMLButtonElement>;
     expect(toggles.length).toBeGreaterThan(0);
-    const toggleBtn = toggles[0];
+    const toggleBtn = toggles[0]!;
     expect(toggleBtn).not.toBeDisabled();
 
     // Toggle watch status

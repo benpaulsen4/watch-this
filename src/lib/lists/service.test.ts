@@ -582,7 +582,7 @@ describe("lists service", () => {
     (db as any).__setMockResults([listRow, collabRows]);
     const res = await listListCollaborators(userId, "list-6");
     if (typeof res === "string") throw new Error("unexpected error");
-    expect(res.collaborators[0].username).toBe("alice");
+    expect(res.collaborators[0]!.username).toBe("alice");
   });
 
   it("createListCollaborator returns success", async () => {
@@ -711,8 +711,8 @@ describe("lists service", () => {
     ];
     (db as any).__setMockResults([base, posters]);
     const res = await listLists(userId);
-    expect(res[0].posterPaths).toEqual(["/p1.jpg", "/p2.jpg"]);
-    expect(res[1].posterPaths).toEqual(["/q1.jpg"]);
+    expect(res[0]!.posterPaths).toEqual(["/p1.jpg", "/p2.jpg"]);
+    expect(res[1]!.posterPaths).toEqual(["/q1.jpg"]);
   });
 
   it("listLists issues a bounded number of queries regardless of list count (DATA-06)", async () => {
@@ -805,8 +805,8 @@ describe("lists service", () => {
 
     const res = await listArchivedLists(userId);
     expect(res).toHaveLength(1);
-    expect(res[0].isArchived).toBe(true);
-    expect(res[0].name).toBe("Archived List");
+    expect(res[0]!.isArchived).toBe(true);
+    expect(res[0]!.name).toBe("Archived List");
   });
 
   // Tests for getListItems
@@ -829,9 +829,9 @@ describe("lists service", () => {
 
     if (res === "notFound") throw new Error("unexpected error");
     expect(res.items).toHaveLength(1);
-    expect(res.items[0].listItemId).toBe("itm-1");
+    expect(res.items[0]!.listItemId).toBe("itm-1");
     // enriched data
-    expect(res.items[0].title).toBe("Movie");
+    expect(res.items[0]!.title).toBe("Movie");
   });
 
   it("getListItems returns notFound if list does not exist", async () => {

@@ -45,7 +45,7 @@ describe("db client (DATA-03)", () => {
     await import("./index");
 
     expect(postgresMock).toHaveBeenCalledTimes(1);
-    const options = postgresMock.mock.calls[0][1];
+    const options = postgresMock.mock.calls[0]![1];
     expect(options).toBeDefined();
     if (!options) throw new Error("no pool options passed");
     expect(typeof options.max).toBe("number");
@@ -93,7 +93,7 @@ describe("db client (DATA-03)", () => {
       vi.stubEnv("NODE_ENV", "production");
       process.env.DATABASE_URL = url;
       await import("./index");
-      const options = postgresMock.mock.calls[0][1];
+      const options = postgresMock.mock.calls[0]![1];
       if (!options) throw new Error("no pool options passed");
       return options;
     };
@@ -158,7 +158,7 @@ describe("db client (DATA-03)", () => {
       vi.resetModules();
       vi.stubEnv("NODE_ENV", "development");
       await import("./index");
-      expect(postgresMock.mock.calls[0][1]).not.toHaveProperty("ssl");
+      expect(postgresMock.mock.calls[0]![1]).not.toHaveProperty("ssl");
     });
   });
 });

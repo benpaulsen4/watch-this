@@ -137,7 +137,7 @@ describe("ActivityFeed", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(String(fetchMock.mock.calls[0][0])).toBe("/api/activity?limit=10");
+      expect(String(fetchMock.mock.calls[0]![0])).toBe("/api/activity?limit=10");
       // Narrow viewport draws one column, so it shows half the entries.
       expect(screen.queryByText(/created list "List 5"/)).toBeInTheDocument();
       expect(screen.queryByText(/created list "List 6"/)).toBeNull();

@@ -167,7 +167,7 @@ describe("PasskeyDevicesViewer", () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       { ok: true, json: async () => ({}) },
     );
-    const deleteBtn = screen.getAllByRole("button", { name: /delete/i })[0];
+    const deleteBtn = screen.getAllByRole("button", { name: /delete/i })[0]!;
     expect(deleteBtn).not.toBeDisabled();
     fireEvent.click(deleteBtn);
     await waitFor(() => {

@@ -95,7 +95,7 @@ describe("ScheduleManager", () => {
     const user = userEvent.setup();
     const addButtons = await screen.findAllByRole("button", { name: /Add/i });
     expect(addButtons.length).toBeGreaterThan(0);
-    await user.click(addButtons[0]);
+    await user.click(addButtons[0]!);
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /Remove/i }).length,
@@ -104,7 +104,7 @@ describe("ScheduleManager", () => {
 
     // Now remove and expect Add to reappear
     const removeButtons = screen.getAllByRole("button", { name: /Remove/i });
-    await user.click(removeButtons[0]);
+    await user.click(removeButtons[0]!);
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /Add/i }).length,
