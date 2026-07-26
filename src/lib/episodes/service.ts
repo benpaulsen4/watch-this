@@ -24,7 +24,28 @@ import type {
   UpdateEpisodeStatusResult,
 } from "./types";
 
-function mapRow(row: any): EpisodeStatusItem {
+/**
+ * An `episode_watch_status` row as far as mapRow is concerned. Timestamps come
+ * back as Date objects from the driver but may already be serialised, so both
+ * are accepted.
+ */
+interface EpisodeStatusRow {
+  id: string;
+  userId: string;
+  tmdbId: number;
+  seasonNumber: number;
+  episodeNumber: number;
+  watched: boolean;
+  watchedAt?: Date | string | null;
+  createdAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+}
+
+function toIsoString(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function mapRow(row: EpisodeStatusRow): EpisodeStatusItem {
   return {
     id: row.id,
     userId: row.userId,
@@ -32,15 +53,9 @@ function mapRow(row: any): EpisodeStatusItem {
     seasonNumber: row.seasonNumber,
     episodeNumber: row.episodeNumber,
     watched: row.watched,
-    watchedAt: row.watchedAt
-      ? (row.watchedAt.toISOString?.() ?? row.watchedAt)
-      : null,
-    createdAt: row.createdAt
-      ? (row.createdAt.toISOString?.() ?? row.createdAt)
-      : undefined,
-    updatedAt: row.updatedAt
-      ? (row.updatedAt.toISOString?.() ?? row.updatedAt)
-      : undefined,
+    watchedAt: row.watchedAt ? toIsoString(row.watchedAt) : null,
+    createdAt: row.createdAt ? toIsoString(row.createdAt) : undefined,
+    updatedAt: row.updatedAt ? toIsoString(row.updatedAt) : undefined,
   };
 }
 

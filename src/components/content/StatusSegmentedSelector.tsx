@@ -5,16 +5,32 @@ import { cn } from "@/lib/utils";
 
 import { getAvailableStatuses, getStatusConfig } from "./StatusBadge";
 
-export interface StatusSegmentedSelectorProps {
-  value: WatchStatusEnum | (WatchStatusEnum | "none")[] | null;
+export type StatusSelection = WatchStatusEnum | "none";
+
+interface StatusSegmentedSelectorBaseProps {
   contentType?: ContentTypeEnum;
-  onValueChange: (status: any) => void;
   disabled?: boolean;
   className?: string;
   size?: "default" | "sm" | "lg";
-  multiple?: boolean;
   includeNone?: boolean;
 }
+
+/**
+ * `multiple` decides both what `value` holds and what `onValueChange` receives,
+ * so the two modes are separate shapes. Callers then get an exactly-typed
+ * callback instead of having to cast whatever comes back.
+ */
+export type StatusSegmentedSelectorProps =
+  | (StatusSegmentedSelectorBaseProps & {
+      multiple?: false;
+      value: WatchStatusEnum | null;
+      onValueChange: (status: WatchStatusEnum) => void;
+    })
+  | (StatusSegmentedSelectorBaseProps & {
+      multiple: true;
+      value: StatusSelection[] | null;
+      onValueChange: (statuses: StatusSelection[]) => void;
+    });
 
 /**
  * StatusSegmentedSelector component for selecting watch status with segmented radio button interface
@@ -38,7 +54,14 @@ export function StatusSegmentedSelector({
   multiple = false,
   includeNone = false,
 }: StatusSegmentedSelectorProps) {
-  let availableStatuses: (WatchStatusEnum | "none")[] = contentType
+  // Destructuring a discriminated union loses the correlation between `multiple`
+  // and `onValueChange`, so the two branches below are re-widened once here
+  // rather than at each call.
+  const emit = onValueChange as (
+    selection: WatchStatusEnum | StatusSelection[],
+  ) => void;
+
+  let availableStatuses: StatusSelection[] = contentType
     ? getAvailableStatuses(contentType)
     : ["planning", "watching", "paused", "completed", "dropped"];
 
@@ -74,32 +97,27 @@ export function StatusSegmentedSelector({
     },
   };
 
-  const handleStatusChange = (status: WatchStatusEnum | "none") => {
+  const handleStatusChange = (status: StatusSelection) => {
     if (disabled) return;
 
     if (multiple) {
-      const currentValues = (Array.isArray(value) ? value : []) as (
-        | WatchStatusEnum
-        | "none"
-      )[];
+      const currentValues = Array.isArray(value) ? value : [];
       const isSelected = currentValues.includes(status);
-      let newValues;
-      if (isSelected) {
-        newValues = currentValues.filter((v) => v !== status);
-      } else {
-        newValues = [...currentValues, status];
-      }
-      onValueChange(newValues);
+      emit(
+        isSelected
+          ? currentValues.filter((v) => v !== status)
+          : [...currentValues, status],
+      );
     } else {
       if (status !== "none") {
-        onValueChange(status as WatchStatusEnum);
+        emit(status);
       }
     }
   };
 
   const handleKeyDown = (
     event: React.KeyboardEvent,
-    status: WatchStatusEnum | "none"
+    status: StatusSelection
   ) => {
     if (disabled) return;
 

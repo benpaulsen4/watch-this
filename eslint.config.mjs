@@ -32,9 +32,23 @@ const config = [
     },
   },
   {
+    // Scoped to TypeScript files because that is where eslint-config-next
+    // registers the @typescript-eslint plugin; referencing the rule for .mjs
+    // config files, where the plugin is absent, is a configuration error.
+    files: ["**/*.ts", "**/*.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
+  {
     files: ["**/*.test.tsx", "**/*.test.ts"],
     rules: {
       "@next/next/no-img-element": "off",
+      // The DB and fetch doubles lean on `(db as any)` and friends throughout;
+      // there are ~800 occurrences across the suites. `lint:ci` runs with
+      // --max-warnings=0, so this has to be off rather than a warning. The rule
+      // is enabled for production code above, which is where it buys something.
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   {

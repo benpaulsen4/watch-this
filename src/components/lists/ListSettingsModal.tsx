@@ -15,6 +15,7 @@ import Dropdown from "@/components/ui/Dropdown";
 import { Input, Textarea } from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { Switch } from "@/components/ui/Switch";
+import { ListTypeEnum } from "@/lib/db/schema";
 import {
   GetListResponse,
   ListListsResponse,
@@ -95,7 +96,7 @@ export default function ListSettingsModal({
     if (
       mode === "create" &&
       allowedListTypes &&
-      !allowedListTypes.includes(formData.listType as any)
+      !allowedListTypes.includes(formData.listType as ListTypeEnum)
     ) {
       setError("Invalid list type for this action");
       return false;
@@ -133,7 +134,8 @@ export default function ListSettingsModal({
       onListUpdate?.({
         name: updated.name,
         description: updated.description,
-        listType: updated.listType as any,
+        // The column is a varchar, so the response type is a plain string.
+        listType: updated.listType as ListTypeEnum,
         isPublic: updated.isPublic,
         isArchived: updated.isArchived,
         syncWatchStatus: updated.syncWatchStatus,

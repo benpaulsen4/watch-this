@@ -57,7 +57,7 @@ export default function ListsClient({
           mode="create"
           isOwner
           onListCreate={(created) => {
-            setLists((prev) => [created as any, ...prev]);
+            setLists((prev) => [created, ...prev]);
           }}
         />
 

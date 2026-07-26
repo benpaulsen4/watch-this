@@ -205,13 +205,17 @@ export async function exportUserData(
   const zip = new JSZip();
 
   // Helper to convert array of objects to CSV
-  const toCSV = (data: any[]) => {
+  // `object[]` rather than Record<string, unknown>[]: the export row types are
+  // interfaces, which have no implicit index signature, so they would not be
+  // assignable.
+  const toCSV = (data: object[]) => {
     if (data.length === 0) return "";
     const headers = Object.keys(data[0]);
     const csvRows = [
       headers.join(","),
-      ...data.map((row) =>
-        headers
+      ...data.map((entry) => {
+        const row = entry as Record<string, unknown>;
+        return headers
           .map((fieldName) => {
             const val =
               row[fieldName] === null || row[fieldName] === undefined
@@ -219,8 +223,8 @@ export async function exportUserData(
                 : row[fieldName];
             return JSON.stringify(val); // Handles escaping quotes and commas
           })
-          .join(",")
-      ),
+          .join(",");
+      }),
     ];
     return csvRows.join("\n");
   };

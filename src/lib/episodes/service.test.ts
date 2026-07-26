@@ -151,6 +151,47 @@ describe("episodes service", () => {
     expect(typeof res.episodes[0].watchedAt).toBe("string");
   });
 
+  // SUPPLY-11: as above - the mapper accepts both a driver Date and an already
+  // serialised string, and typing it must not change that.
+  it("listEpisodeStatuses passes through timestamps that are already strings", async () => {
+    const rows = [
+      {
+        id: "e11",
+        userId,
+        tmdbId: 101,
+        seasonNumber: 1,
+        episodeNumber: 2,
+        watched: true,
+        watchedAt: "2025-03-01T00:00:00.000Z",
+        createdAt: "2025-03-01T00:00:00.000Z",
+        updatedAt: "2025-03-02T00:00:00.000Z",
+      },
+    ];
+    (db as any).__setMockResults([rows]);
+    const res = await listEpisodeStatuses(userId, 101);
+    expect(res.episodes[0].watchedAt).toBe("2025-03-01T00:00:00.000Z");
+    expect(res.episodes[0].updatedAt).toBe("2025-03-02T00:00:00.000Z");
+  });
+
+  it("listEpisodeStatuses serialises Date timestamps", async () => {
+    const rows = [
+      {
+        id: "e12",
+        userId,
+        tmdbId: 102,
+        seasonNumber: 1,
+        episodeNumber: 3,
+        watched: true,
+        watchedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    (db as any).__setMockResults([rows]);
+    const res = await listEpisodeStatuses(userId, 102);
+    expect(res.episodes[0].watchedAt).toBe("2025-01-01T00:00:00.000Z");
+  });
+
   it("updateEpisodeStatus uses completeEpisodeUpdate and maps result", async () => {
     const res = await updateEpisodeStatus(userId, {
       tmdbId: 1,
