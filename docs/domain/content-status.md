@@ -47,7 +47,14 @@ The main table is `user_content_status` ([schema.ts](../../src/lib/db/schema.ts)
   - `nextEpisodeDate` (timestamp, TV-oriented; see below)
   - `createdAt`, `updatedAt`
 
-`nextEpisodeDate` is used as a hint when a show is marked `completed` via episode progress: it stores the next known episode air date (if any), `null` if the show ended, or a placeholder date if TMDB indicates the show is continuing but does not provide a next air date.
+`nextEpisodeDate` is a hint maintained by the episode-progress path ([episodeUtils.ts](../../src/lib/episodes/episodeUtils.ts)). It only ever holds one of two things:
+
+- TMDB’s `next_episode_to_air.air_date`, parsed, for a show the user is caught up on; or
+- `null` — when TMDB knows of no next episode, or when the user is not caught up (a stale hint would suppress the show from the activity feed’s “upcoming”).
+
+**No placeholder date is ever written.** A “one month out” figure does appear in the episode logic, but purely as a comparison threshold deciding whether a known future episode is near enough to keep the show `watching`; it never becomes a stored value. See [episodes.md](./episodes.md) for the rule.
+
+`nextEpisodeDate` is not part of the profile export model ([profile/data/types.ts](../../src/lib/profile/data/types.ts)), so it does not survive an export/import round trip — it is recomputed from TMDB on the next episode write.
 
 ### `episode_watch_status` (TV only)
 
@@ -176,21 +183,31 @@ sequenceDiagram
 
 ## Episode → Status Flow (TV)
 
-Marking episodes watched can update the show-level status ([episodeUtils.ts](../../src/lib/episodes/episodeUtils.ts)).
+Episode writes recompute the show-level status ([episodeUtils.ts](../../src/lib/episodes/episodeUtils.ts)). Completion is evaluated *before* a transition is chosen, from aired/unwatched episode counters rather than from an exact match against TMDB’s last-aired episode — so a show can reach `completed` directly. Un-marking an episode also recomputes, and downgrades a `completed` show back to `watching`. The full rules live in [episodes.md](./episodes.md).
 
 ```mermaid
 sequenceDiagram
   participant UI as Episode UI
-  participant API as /api/episodes/* (varies)
+  participant API as /api/status/episodes
   participant Episodes as Episode Utils
+  participant Episodes_DB as episode_watch_status
   participant Status as user_content_status
   participant Schedules as show_schedules
   participant TMDB as TMDB API
 
-  UI->>API: Mark episode watched
-  API->>Episodes: completeEpisodeUpdate(...)
-  Episodes->>Status: upsert/update "watching"
-  Episodes->>TMDB: Load show details
-  Episodes->>Status: if last aired episode watched -> set "completed" + nextEpisodeDate
-  Episodes->>Schedules: delete schedules for show (on completion)
+  UI->>API: Mark / un-mark episode(s)
+  API->>Episodes: completeEpisodeUpdate(...) or batchUpdateEpisodes(...)
+  Episodes->>Episodes_DB: upsert episode row(s)
+  Episodes->>Episodes: updateTVShowStatus(...)
+  Episodes->>Status: read existing status row
+  Episodes->>TMDB: show details + episode lists for target seasons
+  Episodes->>Episodes_DB: read all watched episodes
+  Note over Episodes: complete = every aired episode watched<br/>AND (no next air date OR it is > 1 month out)
+  alt complete
+    Episodes->>Status: set "completed" + real nextEpisodeDate (or null)
+    Episodes->>Schedules: delete schedules for show
+  else not complete
+    Episodes->>Status: set "watching" if marked watched, or if it was "completed"
+    Episodes->>Status: refresh nextEpisodeDate when it changed
+  end
 ```
