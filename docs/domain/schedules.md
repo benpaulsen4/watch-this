@@ -148,9 +148,12 @@ Sync errors are caught and logged so they do not fail the initiating user’s re
 Schedules feed the “upcoming” section of the activity feed. The activity service:
 
 - Computes “today” based on the user’s configured timezone (not the server timezone)
-- Selects the user’s scheduled shows for the computed day-of-week
+- Selects the user’s scheduled shows for the computed day-of-week, inner-joined to `user_content_status` for `contentType="tv"`
+- Filters out any show whose `nextEpisodeDate` is still in the future in that timezone — a show the user is caught up on stays out of “upcoming” until its next episode actually airs
 - Filters out any show where the user has already watched an episode “today” in that timezone
 - Hydrates show details from the TMDB cache and returns `UpcomingActivity[]`
+
+See [activity.md](./activity.md) for the exact filter order and why the `nextEpisodeDate` check exists.
 
 In the UI, upcoming suggestions render as cards at the top of the activity feed and typically offer a one-click action to mark the “next episode” watched.
 
@@ -166,6 +169,13 @@ Schedules are managed from the content details experience:
 ## Automatic Cleanup
 
 Schedules are deleted when a show becomes `completed` or `dropped`, to keep the schedule set focused on actively watched/planned shows. This cleanup happens in the content status and episode flows (see [content-status/service.ts](../../src/lib/content-status/service.ts) and [episodeUtils.ts](../../src/lib/episodes/episodeUtils.ts)).
+
+`completed` is not only reachable by the user picking it in the UI. `updateTVShowStatus` in [episodeUtils.ts](../../src/lib/episodes/episodeUtils.ts) recomputes the show status on every episode write and sets `completed` on its own once every aired episode is watched and TMDB reports no next episode within a month — so simply ticking off a finale deletes that show’s schedules. That is what makes the completion rules in [episodes.md](./episodes.md) and [content-status.md](./content-status.md) user-visible rather than academic: an over-eager completion silently costs the user their schedule.
+
+Two consequences worth knowing:
+
+- The deletion is a hard `DELETE` and `createSchedule` refuses `completed` shows, so the schedule cannot be restored while the show stays completed. This is tracked as a follow-up in `episodeUtils.ts` (LOGIC-06): schedules should be soft-disabled so re-opening a show restores them. Until then, un-marking an episode downgrades the show back to `watching` (LOGIC-02) but the user has to recreate the schedule by hand.
+- Cleanup is best-effort. A failure to delete schedules is logged and does not fail the episode write, so a schedule can briefly outlive the completion that should have removed it.
 
 ## Flow
 

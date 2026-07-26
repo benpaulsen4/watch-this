@@ -919,4 +919,456 @@ describe("Profile Data Service", () => {
       errorSpy.mockRestore();
     });
   });
+
+  // The two halves of the export/import boundary are written independently, so
+  // a field dropped on either side is invisible to tests that only exercise one
+  // of them. These feed a real `exportUserData` document straight back into
+  // `importUserData` and assert on the values that come out the far end.
+  describe("export → import round trip", () => {
+    // Deliberately not `mockDate`: `importUserData` substitutes the import time
+    // (which *is* `mockDate` here) for any timestamp it cannot use, so
+    // asserting against `mockDate` would pass even if the real values were
+    // dropped. Distinct historical dates make the substitution detectable.
+    const listCreatedAt = new Date("2021-03-04T05:06:07.000Z");
+    const listUpdatedAt = new Date("2021-05-06T07:08:09.000Z");
+    const itemCreatedAt = new Date("2021-07-08T09:10:11.000Z");
+    const statusCreatedAt = new Date("2021-09-10T11:12:13.000Z");
+    const statusUpdatedAt = new Date("2021-11-12T13:14:15.000Z");
+    const episodeWatchedAt = new Date("2022-01-02T03:04:05.000Z");
+    const scheduleCreatedAt = new Date("2022-03-04T05:06:07.000Z");
+    const scheduleUpdatedAt = new Date("2022-05-06T07:08:09.000Z");
+
+    const dbLists = [
+      {
+        id: "list-active",
+        ownerId: userId,
+        name: "Active List",
+        description: "Still watching these",
+        listType: "mixed",
+        isPublic: true,
+        isArchived: false,
+        syncWatchStatus: true,
+        createdAt: listCreatedAt,
+        updatedAt: listUpdatedAt,
+      },
+      {
+        id: "list-archived",
+        ownerId: userId,
+        name: "Archived List",
+        description: null,
+        listType: "movies",
+        isPublic: false,
+        isArchived: true,
+        syncWatchStatus: false,
+        createdAt: listCreatedAt,
+        updatedAt: listUpdatedAt,
+      },
+    ];
+
+    const dbListItems = [
+      {
+        id: "item-1",
+        listId: "list-active",
+        tmdbId: 11,
+        contentType: "movie",
+        createdAt: itemCreatedAt,
+        title: "A Movie",
+        releaseDate: itemCreatedAt,
+      },
+      {
+        id: "item-2",
+        listId: "list-active",
+        tmdbId: 22,
+        contentType: "tv",
+        createdAt: itemCreatedAt,
+        title: "A Show",
+        releaseDate: itemCreatedAt,
+      },
+      {
+        id: "item-3",
+        listId: "list-archived",
+        tmdbId: 33,
+        contentType: "movie",
+        createdAt: itemCreatedAt,
+        title: "An Old Movie",
+        releaseDate: null,
+      },
+    ];
+
+    const dbContentStatus = [
+      {
+        id: "cs-1",
+        userId,
+        tmdbId: 22,
+        contentType: "tv",
+        status: "watching",
+        nextEpisodeDate: new Date("2026-08-01T00:00:00.000Z"),
+        createdAt: statusCreatedAt,
+        updatedAt: statusUpdatedAt,
+      },
+      {
+        id: "cs-2",
+        userId,
+        tmdbId: 33,
+        contentType: "movie",
+        status: "completed",
+        nextEpisodeDate: null,
+        createdAt: statusCreatedAt,
+        updatedAt: statusUpdatedAt,
+      },
+    ];
+
+    const dbEpisodeStatus = [
+      {
+        id: "ep-1",
+        userId,
+        tmdbId: 22,
+        seasonNumber: 2,
+        episodeNumber: 7,
+        watched: true,
+        watchedAt: episodeWatchedAt,
+        createdAt: statusCreatedAt,
+        updatedAt: statusUpdatedAt,
+      },
+      {
+        // An explicitly *unwatched* row: `watched: false` and a null
+        // `watchedAt` both have to survive, not be coerced.
+        id: "ep-2",
+        userId,
+        tmdbId: 22,
+        seasonNumber: 2,
+        episodeNumber: 8,
+        watched: false,
+        watchedAt: null,
+        createdAt: statusCreatedAt,
+        updatedAt: statusUpdatedAt,
+      },
+    ];
+
+    const dbSchedules = [
+      {
+        id: "sched-1",
+        userId,
+        tmdbId: 22,
+        dayOfWeek: 0, // Sunday — the falsy boundary
+        createdAt: scheduleCreatedAt,
+        updatedAt: scheduleUpdatedAt,
+      },
+      {
+        id: "sched-2",
+        userId,
+        tmdbId: 22,
+        dayOfWeek: 6,
+        createdAt: scheduleCreatedAt,
+        updatedAt: scheduleUpdatedAt,
+      },
+    ];
+
+    // Order in exportUserData: lists -> listItems -> contentStatus ->
+    // episodeStatus -> schedules.
+    const mockExportReads = () => {
+      const whereMock = vi.fn();
+      const leftJoinMock = vi.fn();
+      (mockedDb.select as any).mockImplementation(() => ({
+        from: vi.fn().mockImplementation(() => ({
+          where: whereMock,
+          leftJoin: leftJoinMock.mockReturnValue({ where: whereMock }),
+        })),
+      }));
+
+      whereMock
+        .mockResolvedValueOnce(dbLists)
+        .mockResolvedValueOnce(dbListItems)
+        .mockResolvedValueOnce(dbContentStatus)
+        .mockResolvedValueOnce(dbEpisodeStatus)
+        .mockResolvedValueOnce(dbSchedules);
+    };
+
+    // Captures every insert payload so the round-tripped values can be
+    // asserted on, and hands each list a distinct DB-generated id so nested
+    // items can be checked against the correct parent.
+    const mockImportWrites = () => {
+      const payloads: any[] = [];
+      let generatedListCount = 0;
+
+      (mockedDb.insert as any).mockReturnValue({
+        values: vi.fn().mockImplementation((payload: any) => {
+          payloads.push(payload);
+          return {
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            returning: vi.fn().mockImplementation(() => {
+              generatedListCount++;
+              return Promise.resolve([
+                { id: `generated-list-${generatedListCount}` },
+              ]);
+            }),
+          };
+        }),
+      });
+
+      return {
+        payloads,
+        // Payload shapes are disjoint enough to attribute by field presence.
+        byTable: () => ({
+          lists: payloads.filter((p) => p.ownerId !== undefined),
+          listItems: payloads.filter((p) => p.listId !== undefined),
+          contentStatus: payloads.filter((p) => p.status !== undefined),
+          episodeStatus: payloads.filter((p) => p.seasonNumber !== undefined),
+          schedules: payloads.filter((p) => p.dayOfWeek !== undefined),
+          activity: payloads.filter((p) => p.activityType !== undefined),
+        }),
+      };
+    };
+
+    const roundTrip = async () => {
+      mockExportReads();
+      const exported = await exportUserData(userId, "json");
+
+      const writes = mockImportWrites();
+      (addToCache as any).mockResolvedValue({});
+      // The exporter's output, verbatim — no hand-built payload in between.
+      const result = await importUserData(userId, exported.data);
+      // Assert here rather than in each test. Eight of the tests below opened
+      // with `if (typeof result === "string") return;`, which turns a failed
+      // import into a silent pass -- exactly the regression a round-trip test
+      // exists to catch. Throwing narrows `result` for every caller too.
+      if (typeof result === "string") {
+        throw new Error(`round trip failed at import: ${result}`);
+      }
+
+      return { exported, result, writes };
+    };
+
+    it("preserves every section through export and back in", async () => {
+      const { result } = await roundTrip();
+
+      expect(result).not.toBe("parseError");
+      expect(result).not.toBe("tooLarge");
+
+      expect(result.errors).toEqual([]);
+      expect(result.imported).toEqual({
+        lists: 2,
+        listItems: 3,
+        contentStatus: 2,
+        episodeStatus: 2,
+        tvShowSchedules: 2,
+      });
+    });
+
+    it("preserves list fields, including the archived flag", async () => {
+      const { writes } = await roundTrip();
+
+      const { lists: listWrites } = writes.byTable();
+      expect(listWrites).toHaveLength(2);
+
+      expect(listWrites[0]).toEqual({
+        ownerId: userId,
+        name: "Active List",
+        description: "Still watching these",
+        listType: "mixed",
+        isPublic: true,
+        isArchived: false,
+        syncWatchStatus: true,
+        createdAt: listCreatedAt,
+        updatedAt: listUpdatedAt,
+      });
+
+      // The archived flag is the one most easily lost: it is a non-default
+      // boolean that no other code path sets on insert.
+      expect(listWrites[1]).toEqual({
+        ownerId: userId,
+        name: "Archived List",
+        description: null,
+        listType: "movies",
+        isPublic: false,
+        isArchived: true,
+        syncWatchStatus: false,
+        createdAt: listCreatedAt,
+        updatedAt: listUpdatedAt,
+      });
+
+      // Real timestamps survived rather than being replaced by the import time.
+      expect(listWrites[0].createdAt).not.toEqual(mockDate);
+    });
+
+    it("reattaches list items to the correct newly-created list", async () => {
+      const { writes } = await roundTrip();
+
+      const { listItems: itemWrites } = writes.byTable();
+      expect(itemWrites).toEqual([
+        {
+          listId: "generated-list-1",
+          tmdbId: 11,
+          contentType: "movie",
+          createdAt: itemCreatedAt,
+        },
+        {
+          listId: "generated-list-1",
+          tmdbId: 22,
+          contentType: "tv",
+          createdAt: itemCreatedAt,
+        },
+        {
+          // The archived list's item lands on the archived list, not the first.
+          listId: "generated-list-2",
+          tmdbId: 33,
+          contentType: "movie",
+          createdAt: itemCreatedAt,
+        },
+      ]);
+
+      // One cache warm per unique (tmdbId, contentType) in the export.
+      expect(addToCache).toHaveBeenCalledTimes(3);
+    });
+
+    it("preserves content statuses", async () => {
+      const { writes } = await roundTrip();
+
+      const { contentStatus: statusWrites } = writes.byTable();
+      expect(statusWrites).toEqual([
+        {
+          userId,
+          tmdbId: 22,
+          contentType: "tv",
+          status: "watching",
+          createdAt: statusCreatedAt,
+          updatedAt: statusUpdatedAt,
+        },
+        {
+          userId,
+          tmdbId: 33,
+          contentType: "movie",
+          status: "completed",
+          createdAt: statusCreatedAt,
+          updatedAt: statusUpdatedAt,
+        },
+      ]);
+    });
+
+    it("preserves episode statuses, including an unwatched row", async () => {
+      const { writes } = await roundTrip();
+
+      const { episodeStatus: episodeWrites } = writes.byTable();
+      expect(episodeWrites).toEqual([
+        {
+          userId,
+          tmdbId: 22,
+          seasonNumber: 2,
+          episodeNumber: 7,
+          watched: true,
+          watchedAt: episodeWatchedAt,
+          createdAt: statusCreatedAt,
+          updatedAt: statusUpdatedAt,
+        },
+        {
+          userId,
+          tmdbId: 22,
+          seasonNumber: 2,
+          episodeNumber: 8,
+          watched: false,
+          // A null `watchedAt` must stay null, not become the import time.
+          watchedAt: null,
+          createdAt: statusCreatedAt,
+          updatedAt: statusUpdatedAt,
+        },
+      ]);
+    });
+
+    it("preserves schedules, including dayOfWeek 0", async () => {
+      const { writes } = await roundTrip();
+
+      const { schedules: scheduleWrites } = writes.byTable();
+      expect(scheduleWrites).toEqual([
+        {
+          userId,
+          tmdbId: 22,
+          // Sunday is 0; a falsy-check anywhere on this path would drop it and
+          // the row would be rejected by the LOGIC-05 range guard.
+          dayOfWeek: 0,
+          createdAt: scheduleCreatedAt,
+          updatedAt: scheduleUpdatedAt,
+        },
+        {
+          userId,
+          tmdbId: 22,
+          dayOfWeek: 6,
+          createdAt: scheduleCreatedAt,
+          updatedAt: scheduleUpdatedAt,
+        },
+      ]);
+    });
+
+    it("does not carry any exported primary key into the re-import", async () => {
+      const { writes } = await roundTrip();
+
+      // The export includes every row's `id`; the import must ignore all of
+      // them (API-01 / LOGIC-04). This is the one field the round trip is
+      // *meant* to lose.
+      const exportedIds = [
+        "list-active",
+        "list-archived",
+        "item-1",
+        "cs-1",
+        "ep-1",
+        "sched-1",
+      ];
+      for (const payload of writes.payloads) {
+        expect(payload).not.toHaveProperty("id");
+        for (const value of Object.values(payload)) {
+          expect(exportedIds).not.toContain(value);
+        }
+      }
+    });
+
+    // Documents current behaviour, not desired behaviour: these fields exist
+    // in the database but are absent from the export model
+    // (src/lib/profile/data/types.ts), so a round trip cannot restore them.
+    it("does not round-trip nextEpisodeDate or the tmdb_cache join fields", async () => {
+      const { exported, writes } = await roundTrip();
+
+      const parsed = JSON.parse(exported.data);
+
+      // `user_content_status.nextEpisodeDate` is populated in the source row
+      // but never exported, so it cannot be re-imported. It is recomputed from
+      // TMDB on the next episode write.
+      expect(dbContentStatus[0].nextEpisodeDate).not.toBeNull();
+      expect(parsed.contentStatus[0]).not.toHaveProperty("nextEpisodeDate");
+      for (const payload of writes.byTable().contentStatus) {
+        expect(payload).not.toHaveProperty("nextEpisodeDate");
+      }
+
+      // `title`/`releaseDate` are exported for human readability but are
+      // joined from `tmdb_cache`, not owned by `list_items`, so the importer
+      // drops them and re-warms the cache instead.
+      expect(parsed.lists[0].items[0]).toMatchObject({
+        title: "A Movie",
+        releaseDate: itemCreatedAt.toISOString(),
+      });
+      for (const payload of writes.byTable().listItems) {
+        expect(payload).not.toHaveProperty("title");
+        expect(payload).not.toHaveProperty("releaseDate");
+      }
+    });
+
+    it("records the round trip in the activity feed", async () => {
+      const { writes } = await roundTrip();
+
+      const { activity } = writes.byTable();
+      expect(activity).toHaveLength(1);
+      expect(activity[0]).toMatchObject({
+        activityType: "profile_import",
+        userId,
+        metadata: {
+          lists: 2,
+          listItems: 3,
+          contentStatus: 2,
+          episodeStatus: 2,
+          tvShowSchedules: 2,
+          errors: 0,
+        },
+      });
+    });
+  });
+
 });
