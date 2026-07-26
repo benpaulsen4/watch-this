@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import JSZip from "jszip";
 
 import { db } from "@/lib/db";
+import { expectRow } from "@/lib/db/expectRow";
 import {
   activityFeed,
   ActivityType,
@@ -209,8 +210,9 @@ export async function exportUserData(
   // interfaces, which have no implicit index signature, so they would not be
   // assignable.
   const toCSV = (data: object[]) => {
-    if (data.length === 0) return "";
-    const headers = Object.keys(data[0]);
+    const firstRow = data[0];
+    if (firstRow === undefined) return "";
+    const headers = Object.keys(firstRow);
     const csvRows = [
       headers.join(","),
       ...data.map((entry) => {
@@ -347,7 +349,11 @@ export async function importUserData(
       chunk.map((pair) => addToCache(pair.tmdbId, pair.contentType))
     );
     settled.forEach((outcome, idx) => {
+      // Promise.allSettled preserves the length and order of its input, so this
+      // index is always in range.
       const pair = chunk[idx];
+      if (!pair) return;
+
       if (outcome.status === "fulfilled") {
         cachedContentKeys.add(`${pair.contentType}:${pair.tmdbId}`);
       } else {
@@ -374,20 +380,25 @@ export async function importUserData(
     for (const [listIndex, list] of importModel.lists.entries()) {
       const listNumber = listIndex + 1;
       try {
-        const [insertedList] = await db
-          .insert(lists)
-          .values({
-            ownerId: userId,
-            name: list.name,
-            description: list.description,
-            listType: list.listType,
-            isPublic: list.isPublic,
-            isArchived: list.isArchived,
-            syncWatchStatus: list.syncWatchStatus,
-            createdAt: toImportDate(list.createdAt) ?? importedAt,
-            updatedAt: toImportDate(list.updatedAt) ?? importedAt,
-          })
-          .returning({ id: lists.id });
+        // Unconditional single-row insert with no onConflict clause: it returns
+        // the new row or throws into the catch below.
+        const insertedList = expectRow(
+          await db
+            .insert(lists)
+            .values({
+              ownerId: userId,
+              name: list.name,
+              description: list.description,
+              listType: list.listType,
+              isPublic: list.isPublic,
+              isArchived: list.isArchived,
+              syncWatchStatus: list.syncWatchStatus,
+              createdAt: toImportDate(list.createdAt) ?? importedAt,
+              updatedAt: toImportDate(list.updatedAt) ?? importedAt,
+            })
+            .returning({ id: lists.id }),
+          `importData insert lists (list ${listNumber})`
+        );
         const newListId = insertedList.id;
         result.imported.lists++;
 

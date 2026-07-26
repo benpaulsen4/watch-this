@@ -28,6 +28,7 @@ import {
   userContentStatus,
   users,
 } from "../db";
+import { expectRow } from "../db/expectRow";
 import {
   addToCache,
   getAllCachedContent,
@@ -364,17 +365,22 @@ export async function createList(
   userId: string,
   input: CreateListInput
 ): Promise<ListResponse> {
-  const [newList] = await db
-    .insert(lists)
-    .values({
-      ownerId: userId,
-      name: input.name.trim(),
-      description: input.description?.trim() || null,
-      listType: input.listType ?? "mixed",
-      isPublic: Boolean(input.isPublic ?? false),
-      syncWatchStatus: Boolean(input.syncWatchStatus ?? false),
-    })
-    .returning();
+  // Unconditional single-row insert with no onConflict clause: it returns the
+  // new row or throws, so the result array is never empty.
+  const newList = expectRow(
+    await db
+      .insert(lists)
+      .values({
+        ownerId: userId,
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        listType: input.listType ?? "mixed",
+        isPublic: Boolean(input.isPublic ?? false),
+        syncWatchStatus: Boolean(input.syncWatchStatus ?? false),
+      })
+      .returning(),
+    "createList insert lists"
+  );
 
   try {
     await db.insert(activityFeed).values({
@@ -446,6 +452,12 @@ export async function updateList(
     .set(updateData)
     .where(eq(lists.id, listId))
     .returning();
+
+  // The ownership check above proved the list existed, but that read and this
+  // write are not in one transaction: a concurrent deleteList can land in
+  // between, in which case the UPDATE matches nothing and returns []. Report it
+  // as the same "notFound" the ownership check would have returned.
+  if (!updated) return "notFound";
 
   const [itemCountResult, collaboratorCountResult] = await Promise.all([
     db
@@ -790,14 +802,19 @@ export async function createListCollaborator(
     .limit(1);
   if (existingCollaborator) return "conflict";
 
-  const [newCollaborator] = await db
-    .insert(listCollaborators)
-    .values({
-      listId,
-      userId: targetUser.id,
-      permissionLevel: input.permissionLevel,
-    })
-    .returning();
+  // Unconditional single-row insert with no onConflict clause: it returns the
+  // new row or throws, so the result array is never empty.
+  const newCollaborator = expectRow(
+    await db
+      .insert(listCollaborators)
+      .values({
+        listId,
+        userId: targetUser.id,
+        permissionLevel: input.permissionLevel,
+      })
+      .returning(),
+    "createListCollaborator insert listCollaborators"
+  );
 
   try {
     await db.insert(activityFeed).values({
@@ -860,6 +877,11 @@ export async function updateListCollaborator(
     .set({ permissionLevel: input.permissionLevel })
     .where(eq(listCollaborators.id, existingCollaborator.id))
     .returning();
+
+  // As in updateList: the collaborator lookup above is a separate statement, so
+  // a concurrent deleteListCollaborator can remove the row before this UPDATE
+  // runs and leave it matching nothing.
+  if (!updated) return "notFound";
 
   const [userInfo] = await db
     .select({ username: users.username })
