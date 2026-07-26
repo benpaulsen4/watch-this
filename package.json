@@ -70,6 +70,24 @@
     "vitest": "^3.2.6"
   },
   "//overrides": [
+    "Every entry below must earn its place: an override silently violates what a",
+    "dependency declared it can work with, so it is only worth it to reach a",
+    "patched version the tree cannot otherwise resolve.",
+    "",
+    "postcss ^8.5.18 -- load-bearing. Without it the tree also resolves 8.4.31",
+    "and 8.5.15, both inside GHSA-r28c-9q8g-f849 (high, <=8.5.17).",
+    "sharp ^0.35.3 -- load-bearing. Without it sharp drops to 0.34.5, inside",
+    "GHSA-f88m-g3jw-g9cj (high, <0.35.0).",
+    "@types/react, @types/react-dom -- pinned to match the react/react-dom",
+    "versions exactly; React 19 types are not compatible across minors.",
+    "",
+    "SUPPLY-04: ajv, @babel/core, flatted, ws and js-yaml were removed because",
+    "the tree resolves to the same patched versions without them. picomatch was",
+    "removed for a stronger reason: it forced micromatch (which declares ^2.3.1)",
+    "across two majors to 4.0.4, and micromatch's own resolution is 2.3.2 --",
+    "already the patched version, since the advisories are ranged <2.3.2. It",
+    "bought nothing and violated a declared range.",
+    "",
     "SUPPLY-05: esbuild is deliberately NOT overridden. Four consumers declare",
     "mutually disjoint ranges (vite ^0.27.0, tsx ~0.28.0, drizzle-kit ^0.25.4,",
     "@esbuild-kit/core-utils ~0.18.20), so no single version satisfies them and",
@@ -83,16 +101,10 @@
     "clear them would reintroduce exactly the semver violation removed here."
   ],
   "overrides": {
-    "@babel/core": "^7.29.7",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
-    "ajv": "^6.15.0",
     "brace-expansion": "^2.1.2",
-    "flatted": "^3.4.2",
-    "js-yaml": "^4.3.0",
-    "picomatch": "^4.0.4",
     "postcss": "^8.5.18",
-    "sharp": "^0.35.3",
-    "ws": "^8.21.0"
+    "sharp": "^0.35.3"
   }
 }
