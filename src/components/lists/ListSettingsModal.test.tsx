@@ -314,6 +314,98 @@ describe("ListSettingsModal", () => {
     expect(syncSwitch).toBeDisabled();
   });
 
+  // UI-12: every call site renders this modal unconditionally and toggles
+  // `isOpen`, so it never unmounts and the state initialiser never re-runs.
+  describe("reopening", () => {
+    it("discards edits that were not saved", async () => {
+      const user = userEvent.setup();
+      const props = {
+        onClose: () => {},
+        list: baseList,
+        isOwner: true,
+        onListUpdate: () => {},
+        onListDelete: () => {},
+      };
+
+      const { rerender } = renderWithClient(
+        <ListSettingsModal isOpen {...props} />
+      );
+
+      const nameInput = screen.getByLabelText(/List Name/i);
+      await user.clear(nameInput);
+      await user.type(nameInput, "Abandoned name");
+      expect(screen.getByLabelText(/List Name/i)).toHaveValue("Abandoned name");
+
+      // Closed without saving, then reopened.
+      rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <ListSettingsModal isOpen={false} {...props} />
+        </QueryClientProvider>
+      );
+      rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <ListSettingsModal isOpen {...props} />
+        </QueryClientProvider>
+      );
+
+      expect(screen.getByLabelText(/List Name/i)).toHaveValue("My List");
+    });
+
+    it("does not pre-fill the create form with the previous entry", async () => {
+      const user = userEvent.setup();
+
+      const { rerender } = renderWithClient(
+        <ListSettingsModal isOpen onClose={() => {}} mode="create" isOwner />
+      );
+
+      await user.type(screen.getByLabelText(/List Name/i), "First List");
+
+      rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <ListSettingsModal
+            isOpen={false}
+            onClose={() => {}}
+            mode="create"
+            isOwner
+          />
+        </QueryClientProvider>
+      );
+      rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <ListSettingsModal isOpen onClose={() => {}} mode="create" isOwner />
+        </QueryClientProvider>
+      );
+
+      expect(screen.getByLabelText(/List Name/i)).toHaveValue("");
+    });
+
+    it("picks up a list that changed while it was closed", () => {
+      const props = {
+        onClose: () => {},
+        isOwner: true,
+        onListUpdate: () => {},
+        onListDelete: () => {},
+      };
+
+      const { rerender } = renderWithClient(
+        <ListSettingsModal isOpen={false} list={baseList} {...props} />
+      );
+      rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <ListSettingsModal
+            isOpen
+            list={{ ...baseList, name: "Renamed elsewhere" }}
+            {...props}
+          />
+        </QueryClientProvider>
+      );
+
+      expect(screen.getByLabelText(/List Name/i)).toHaveValue(
+        "Renamed elsewhere"
+      );
+    });
+  });
+
   it("creates a list in create mode and calls onListCreate", async () => {
     const user = userEvent.setup();
     const onListCreate = vi.fn();

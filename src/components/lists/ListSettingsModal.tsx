@@ -48,7 +48,7 @@ export default function ListSettingsModal({
   onListCreate,
   allowedListTypes,
 }: ListSettingsModalProps) {
-  const [formData, setFormData] = useState<ListFormData>({
+  const formDataFromProps = (): ListFormData => ({
     name: list?.name ?? "",
     description: list?.description,
     listType: list?.listType ?? "mixed",
@@ -56,10 +56,27 @@ export default function ListSettingsModal({
     syncWatchStatus: list?.syncWatchStatus ?? false,
     isArchived: list?.isArchived ?? false,
   });
+
+  const [formData, setFormData] = useState<ListFormData>(formDataFromProps);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // All four call sites render this modal unconditionally and toggle `isOpen` as
+  // a prop, so it never unmounts and the state initialiser above runs exactly
+  // once for the lifetime of the page. Reseed on the transition to open, or a
+  // name typed and then abandoned is still sitting there next time - and in
+  // create mode the form pre-fills with the last list that was created.
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setFormData(formDataFromProps());
+      setError("");
+      setShowDeleteConfirm(false);
+    }
+  }
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
