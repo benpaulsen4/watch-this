@@ -86,4 +86,30 @@ describe("Vercel preview deployments", () => {
     expect(getRpId()).toBe("watch-this-abc123.vercel.app");
     expect(getWebAuthnOrigin()).toBe("https://watch-this-abc123.vercel.app");
   });
+
+  // The getOrigin() this consolidated away guarded on VERCEL_URL being truthy
+  // and fell back to WEBAUTHN_ORIGIN when it was not. Without that guard the
+  // origin becomes the literal string "https://undefined" -- a silently wrong
+  // expected origin, which is the failure mode this whole change exists to
+  // remove, reintroduced through the preview branch.
+  it("never builds an origin from a missing VERCEL_URL", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_URL", "");
+    vi.stubEnv("WEBAUTHN_ORIGIN", "https://watchthis.example");
+
+    expect(getWebAuthnOrigin()).toBe("https://watchthis.example");
+    expect(getWebAuthnOrigin()).not.toContain("undefined");
+  });
+
+  // Same path with nothing to fall back to: it must fail closed rather than
+  // hand back a broken string.
+  it("throws when a preview has neither VERCEL_URL nor WEBAUTHN_ORIGIN", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_URL", "");
+    vi.stubEnv("WEBAUTHN_ORIGIN", "");
+
+    expect(() => getWebAuthnOrigin()).toThrow(/WEBAUTHN_ORIGIN/);
+  });
 });

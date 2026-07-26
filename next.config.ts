@@ -31,8 +31,13 @@ const ENFORCED_CSP = [
 // is no way to prove it complete from source alone. Report-only lets a real
 // deploy tell us what we missed before it is enforced.
 //
-// FOLLOW-UP: once a deploy has run long enough to show no violation reports,
-// fold these directives into ENFORCED_CSP above.
+// FOLLOW-UP: fold these into ENFORCED_CSP above once they are known to be
+// complete. Note there is deliberately no `report-to`/`report-uri` and no
+// collection endpoint, so "known to be complete" means someone walking the app
+// with the browser console open -- violations surface there and nowhere else.
+// Adding a reporting endpoint would make this self-verifying; until then the
+// report-only half is a safety net for manual checking, not a signal that
+// arrives on its own.
 const REPORT_ONLY_CSP = [
   "default-src 'self'",
   // 'unsafe-inline' is required, not lazy: Next injects its own inline

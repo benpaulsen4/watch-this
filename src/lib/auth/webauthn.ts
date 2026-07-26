@@ -28,7 +28,7 @@ const RP_NAME = process.env.WEBAUTHN_RP_NAME || "WatchThis";
 // Read on each call rather than cached at module scope: these are plain env
 // reads with nothing to memoise, and a module-scope throw would crash at import
 // time during `next build`, which evaluates route modules without runtime env.
-function requireOutsideDevelopment(
+function requireInProduction(
   name: "WEBAUTHN_RP_ID" | "WEBAUTHN_ORIGIN",
   value: string | undefined,
   developmentDefault: string
@@ -46,7 +46,7 @@ function requireOutsideDevelopment(
 export function getRpId(): string {
   return process.env.VERCEL_ENV === "preview"
     ? process.env.VERCEL_URL!
-    : requireOutsideDevelopment(
+    : requireInProduction(
         "WEBAUTHN_RP_ID",
         process.env.WEBAUTHN_RP_ID,
         "localhost"
@@ -57,13 +57,25 @@ export function getRpId(): string {
 // the device-claim service builds magic links from the same value and used to
 // derive it independently, which let the two drift apart.
 export function getWebAuthnOrigin(): string {
-  return process.env.VERCEL_ENV === "preview"
-    ? `https://${process.env.VERCEL_URL}`
-    : requireOutsideDevelopment(
-        "WEBAUTHN_ORIGIN",
-        process.env.WEBAUTHN_ORIGIN,
-        "http://localhost:3000"
-      );
+  // The `&& VERCEL_URL` is not redundant. The getOrigin() this replaced in
+  // devices/service.ts guarded on it and fell through to WEBAUTHN_ORIGIN when it
+  // was absent; without the guard a preview deployment missing VERCEL_URL would
+  // build the literal string "https://undefined" and hand it to the ceremony as
+  // the expected origin -- silently wrong, which is the exact failure this
+  // change exists to remove.
+  //
+  // getRpId above deliberately keeps its unguarded `VERCEL_URL!`: that, and the
+  // instability of a deployment-specific RP ID, are AUTH-07, which the owner has
+  // decided not to address. This function is only restoring a guard that existed
+  // on master.
+  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return requireInProduction(
+    "WEBAUTHN_ORIGIN",
+    process.env.WEBAUTHN_ORIGIN,
+    "http://localhost:3000"
+  );
 }
 
 let jwtSecretCache: Uint8Array | null = null;

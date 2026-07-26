@@ -30,10 +30,11 @@ export default defineConfig({
         "src/app/**/layout.tsx",
         "src/app/**/{sitemap,robots,opengraph-image,twitter-image}.ts?(x)",
       ],
-      // SUPPLY-12: floors, not targets. Set just below the measured numbers at
-      // the time of writing (60.15 / 77.09 / 68.71 / 60.15) so ordinary churn
-      // does not fail CI, and a real drop still does. Raise them when coverage
-      // genuinely improves; do not lower them to make a red build green.
+      // SUPPLY-12: floors, not targets. Set just below the numbers actually
+      // measured on this branch -- statements 60.35, branches 76.9,
+      // functions 70.41, lines 60.35 -- so ordinary churn does not fail CI and a
+      // real drop still does. Raise them when coverage genuinely improves; do
+      // not lower them to make a red build green.
       thresholds: {
         statements: 58,
         branches: 75,
