@@ -53,6 +53,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       useState<string>("");
 
     const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const clickCountRef = useRef(0);
 
     const completeMovieMutation = useMutation({
@@ -101,6 +102,20 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       },
     });
 
+    // Held in a ref so the unmount cleanup can cancel it. A card that is
+    // unmounted while the overlay is up - navigating away, or a list re-render
+    // after the status change it just made - would otherwise set state on a
+    // component that is gone.
+    const dismissOverlayAfter = (delayMs: number) => {
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current);
+      }
+      messageTimeoutRef.current = setTimeout(() => {
+        setShowTickAnimation(false);
+        setQuickCompleteMessage("");
+      }, delayMs);
+    };
+
     const handleQuickComplete = async () => {
       if (isQuickCompleting) return;
       setIsQuickCompleting(true);
@@ -111,19 +126,13 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
         } else {
           await completeNextEpisodeMutation.mutateAsync();
         }
-        setTimeout(() => {
-          setShowTickAnimation(false);
-          setQuickCompleteMessage("");
-        }, 2000);
+        dismissOverlayAfter(2000);
       } catch (error) {
         console.error("Quick complete error:", error);
         setQuickCompleteMessage(
           error instanceof Error ? error.message : "Failed to update status",
         );
-        setTimeout(() => {
-          setShowTickAnimation(false);
-          setQuickCompleteMessage("");
-        }, 3000);
+        dismissOverlayAfter(3000);
       } finally {
         setIsQuickCompleting(false);
       }
@@ -153,11 +162,14 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       }, 300); // 300ms delay to detect double clicks
     };
 
-    // Cleanup timeout on unmount
+    // Cleanup timeouts on unmount
     useEffect(() => {
       return () => {
         if (clickTimeoutRef.current) {
           clearTimeout(clickTimeoutRef.current);
+        }
+        if (messageTimeoutRef.current) {
+          clearTimeout(messageTimeoutRef.current);
         }
       };
     }, []);

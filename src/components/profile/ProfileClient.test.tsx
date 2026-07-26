@@ -91,6 +91,30 @@ describe("ProfileClient", () => {
     expect(screen.getByText("StreamingPreferences")).toBeInTheDocument();
   });
 
+  // UI-14: `validTabs` was an inline array literal, so useFragmentNavigation's
+  // memoised getter changed identity every render and its popstate effect tore
+  // the listener down and re-added it continuously.
+  it("does not re-subscribe its popstate listener on re-render", () => {
+    const addSpy = vi.spyOn(window, "addEventListener");
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+
+    render(<ProfileClient />);
+
+    const popstateAdds = () =>
+      addSpy.mock.calls.filter(([type]) => type === "popstate").length;
+    const popstateRemoves = () =>
+      removeSpy.mock.calls.filter(([type]) => type === "popstate").length;
+
+    expect(popstateAdds()).toBe(1);
+
+    // Any state change re-renders the component.
+    fireEvent.click(screen.getByRole("button", { name: /security/i }));
+    fireEvent.click(screen.getByRole("button", { name: /data management/i }));
+
+    expect(popstateAdds()).toBe(1);
+    expect(popstateRemoves()).toBe(0);
+  });
+
   it("logs out and navigates to /auth", async () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       { ok: true, json: async () => ({}) },

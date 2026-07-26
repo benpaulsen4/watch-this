@@ -19,13 +19,24 @@ import { UsernameChanger } from "./UsernameChanger";
 
 type ProfileTab = "profile" | "security" | "data" | "streaming";
 
+// Hoisted out of the component because useFragmentNavigation memoises on this
+// array's identity. An inline literal is a new array every render, so the
+// memoised callback changed identity too and the hook's popstate effect tore its
+// listener down and re-added it on every single render.
+const PROFILE_TABS: ProfileTab[] = [
+  "profile",
+  "security",
+  "data",
+  "streaming",
+];
+
 export function ProfileClient() {
   const router = useRouter();
   const { user, loading, refreshSession } = useAuth();
 
   const { activeTab, setActiveTab } = useFragmentNavigation<ProfileTab>({
     defaultTab: "profile",
-    validTabs: ["profile", "security", "data", "streaming"],
+    validTabs: PROFILE_TABS,
   });
 
   const handleLogout = async () => {
