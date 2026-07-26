@@ -202,7 +202,7 @@ sequenceDiagram
   Episodes->>Status: read existing status row
   Episodes->>TMDB: show details + episode lists for target seasons
   Episodes->>Episodes_DB: read all watched episodes
-  Note over Episodes: complete = every aired episode watched<br/>AND (no next air date OR it is > 1 month out)
+  Note over Episodes: complete = every aired episode watched<br/>AND (no next air date OR it is more than a month away)
   alt complete
     Episodes->>Status: set "completed" + real nextEpisodeDate (or null)
     Episodes->>Schedules: delete schedules for show
