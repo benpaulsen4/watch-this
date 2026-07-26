@@ -61,8 +61,11 @@ jobs:
           cache-dependency-path: "package-lock.json"
       - name: Install
         run: npm ci
+      # Runs the suite with coverage so the thresholds in vitest.config.mts are
+      # actually enforced somewhere. They are floors just under current
+      # coverage, so this fails on a real regression, not on ordinary churn.
       - name: Test
-        run: npm run test
+        run: npm run test:coverage
         env:
           CI: true
 

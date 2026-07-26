@@ -106,6 +106,7 @@ validating passkey ceremonies against `localhost`.
 | `npm run start`       | Start production server      |
 | `npm run lint`        | Run ESLint                   |
 | `npm run test`        | Run tests once (CI-friendly) |
+| `npm run test:coverage` | Run tests with a v8 coverage report and thresholds |
 | `npm run test:watch`  | Run tests in watch mode      |
 | `npm run test:ui`     | Run tests with Vitest UI     |
 | `npm run db:generate` | Generate Drizzle migrations  |
