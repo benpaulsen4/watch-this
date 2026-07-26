@@ -44,22 +44,21 @@ export type StatusSegmentedSelectorProps =
  * @param multiple - Whether to allow multiple selection
  * @param includeNone - Whether to include "None" option
  */
-export function StatusSegmentedSelector({
-  value,
-  contentType,
-  onValueChange,
-  disabled = false,
-  className,
-  size = "default",
-  multiple = false,
-  includeNone = false,
-}: StatusSegmentedSelectorProps) {
-  // Destructuring a discriminated union loses the correlation between `multiple`
-  // and `onValueChange`, so the two branches below are re-widened once here
-  // rather than at each call.
-  const emit = onValueChange as (
-    selection: WatchStatusEnum | StatusSelection[],
-  ) => void;
+export function StatusSegmentedSelector(props: StatusSegmentedSelectorProps) {
+  // Everything except the discriminant pair is safe to destructure. `multiple`
+  // and `onValueChange` are deliberately read off `props` at the call sites
+  // below instead: narrowing on `props.multiple` keeps the correlation the union
+  // exists to enforce, whereas destructuring both would sever it and force a
+  // cast that lets the single-select branch pass an array.
+  const {
+    value,
+    contentType,
+    disabled = false,
+    className,
+    size = "default",
+    multiple = false,
+    includeNone = false,
+  } = props;
 
   let availableStatuses: StatusSelection[] = contentType
     ? getAvailableStatuses(contentType)
@@ -100,18 +99,18 @@ export function StatusSegmentedSelector({
   const handleStatusChange = (status: StatusSelection) => {
     if (disabled) return;
 
-    if (multiple) {
-      const currentValues = Array.isArray(value) ? value : [];
+    if (props.multiple) {
+      const currentValues = props.value ?? [];
       const isSelected = currentValues.includes(status);
-      emit(
+      props.onValueChange(
         isSelected
           ? currentValues.filter((v) => v !== status)
           : [...currentValues, status],
       );
-    } else {
-      if (status !== "none") {
-        emit(status);
-      }
+    } else if (status !== "none") {
+      // `status !== "none"` narrows StatusSelection to WatchStatusEnum, which is
+      // exactly what this branch's onValueChange accepts.
+      props.onValueChange(status);
     }
   };
 

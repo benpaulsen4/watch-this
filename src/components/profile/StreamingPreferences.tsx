@@ -320,9 +320,27 @@ export function StreamingPreferences() {
       </div>
 
       {/* A load failure in the auth context used to be swallowed entirely - the
-          panel just came up empty as if nothing were saved. */}
+          panel just came up empty as if nothing were saved. The retry matters
+          because the `streamingLoaded` guard that stops the request looping only
+          clears when the session resolves to a different user: without a way to
+          ask again, one transient 500 left this panel broken until a full page
+          reload. */}
       {(error || streamingError) && (
-        <div className="text-red-400 text-sm">{error || streamingError}</div>
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-red-400">{error || streamingError}</span>
+          {streamingError && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setError("");
+                refreshStreamingPreferences();
+              }}
+            >
+              Retry
+            </Button>
+          )}
+        </div>
       )}
 
       <div className="flex justify-end">

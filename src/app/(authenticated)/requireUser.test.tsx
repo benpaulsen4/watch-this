@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -113,5 +116,71 @@ describe("authenticated pages with no session", () => {
     await expect(run()).rejects.toThrow(
       `NEXT_REDIRECT:/auth?redirect=${encodedPath}`,
     );
+  });
+
+  // Deleting the client-gated group layout removed the only group-wide gate:
+  // `src/middleware.ts` rate-limits /api/auth and /api/admin and does not touch
+  // page routes, so every page in this group is now individually responsible for
+  // calling requireUser. The `cases` list above is hand-written, so an eighth
+  // page would ship unguarded and nothing above would fail.
+  //
+  // This walks the group and fails if it finds a page the list does not cover.
+  // It turns "someone remembered" into something CI checks.
+  it("covers every page in the route group", () => {
+    const groupRoot = __dirname;
+
+    const pageFiles: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name === "page.tsx") pageFiles.push(full);
+      }
+    };
+    walk(groupRoot);
+
+    // Normalise to a route path: strip the group root, drop "/page.tsx", and
+    // leave dynamic segments as their bracket form.
+    const discovered = pageFiles
+      .map((file) =>
+        file
+          .slice(groupRoot.length)
+          .replace(/\\/g, "/")
+          .replace(/\/page\.tsx$/, ""),
+      )
+      .map((route) => (route === "" ? "/" : route))
+      .sort();
+
+    const covered = [
+      "/activity",
+      "/dashboard",
+      "/lists",
+      "/lists/[id]",
+      "/lists/archived",
+      "/profile",
+      "/search",
+    ].sort();
+
+    expect(discovered).toEqual(covered);
+  });
+
+  // The same guarantee from the other direction: a page could call requireUser
+  // and ignore what it returns (which /profile did until it started passing the
+  // user down), but a page that never calls it at all cannot be guarded.
+  it("calls requireUser from every page in the route group", () => {
+    const groupRoot = __dirname;
+
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) return walk(full);
+        return entry.name === "page.tsx" ? [full] : [];
+      });
+
+    const missing = walk(groupRoot).filter(
+      (file) => !readFileSync(file, "utf8").includes("requireUser("),
+    );
+
+    expect(missing).toEqual([]);
   });
 });

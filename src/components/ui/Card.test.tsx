@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect,it, vi } from "vitest";
 
@@ -59,6 +59,30 @@ describe("Card", () => {
 
       screen.getByRole("button").focus();
       await user.keyboard(" ");
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
+    // Holding a key down produces one keydown, then a stream of repeats every
+    // ~30ms. Because activation dispatches a real click, an unguarded handler
+    // turns a held key into a click storm -- and ContentCard reads two clicks
+    // inside 300ms as a double click, which quick-completes the title. So
+    // holding Enter on a focused card silently marked it watched. A native
+    // <button> does not re-activate on repeat either.
+    it("does not re-activate while a key is held down", () => {
+      const onClick = vi.fn();
+      render(<Card onClick={onClick}>Clickable</Card>);
+
+      const card = screen.getByRole("button");
+      card.focus();
+
+      fireEvent.keyDown(card, { key: "Enter" });
+      expect(onClick).toHaveBeenCalledTimes(1);
+
+      // Everything the OS sends for the rest of the hold.
+      fireEvent.keyDown(card, { key: "Enter", repeat: true });
+      fireEvent.keyDown(card, { key: "Enter", repeat: true });
+      fireEvent.keyDown(card, { key: "Enter", repeat: true });
+
       expect(onClick).toHaveBeenCalledTimes(1);
     });
 

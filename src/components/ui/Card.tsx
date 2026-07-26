@@ -85,6 +85,13 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
                 onKeyDown?.(event);
                 if (event.defaultPrevented) return;
                 if (event.key !== "Enter" && event.key !== " ") return;
+                // Auto-repeat fires roughly every 30ms once a key is held.
+                // Activation below dispatches a real click, and ContentCard
+                // reads two clicks inside 300ms as a double click, which
+                // quick-completes the title -- so without this a held Enter
+                // silently marked content watched. Native buttons do not
+                // re-activate on repeat either.
+                if (event.repeat) return;
                 // preventDefault stops Space scrolling the page. Dispatching a
                 // real click rather than calling onClick directly keeps every
                 // consumer's existing handler contract intact - notably
