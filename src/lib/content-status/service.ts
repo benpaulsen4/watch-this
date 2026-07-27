@@ -593,7 +593,8 @@ async function mapTVShowWithNewEpisode(
       // call above, so this UPDATE normally matches it. If the user cleared
       // their status during that network round trip the UPDATE matches nothing,
       // and the content genuinely has no status any more -- the same shape
-      // `enrichWithContentStatus` returns when it finds no row at all.
+      // `mapAllWithContentStatus`, the caller, returns when it finds no row at
+      // all. (Not `enrichWithContentStatus`, which returns `content` untouched.)
       if (!statusData) {
         return mapContentToDomainModel(content, ContentType.TV, null, null);
       }

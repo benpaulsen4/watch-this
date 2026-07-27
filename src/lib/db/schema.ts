@@ -447,3 +447,7 @@ export type TVWatchStatusEnum =
   (typeof TVWatchStatus)[keyof typeof TVWatchStatus];
 export type PermissionLevelEnum =
   (typeof PermissionLevel)[keyof typeof PermissionLevel];
+// Unreferenced today, kept for the same reason as the $inferSelect/$inferInsert
+// pairs above: one derived type per `as const` object, so a missing one reads as
+// an oversight and gets re-added the first time someone types an activity.
+export type ActivityTypeEnum = (typeof ActivityType)[keyof typeof ActivityType];
