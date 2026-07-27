@@ -63,7 +63,6 @@ const config = [
   {
     files: [
       "src/components/profile/StreamingPreferences.tsx",
-      "src/components/search/SearchClient.tsx",
       "src/hooks/useFragmentNavigation.ts",
     ],
     rules: {
