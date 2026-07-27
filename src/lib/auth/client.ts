@@ -171,20 +171,6 @@ export async function verifyClaimRegistration({
   return await response.json();
 }
 
-// Sign out user
-export async function signOut() {
-  try {
-    await fetch("/api/auth/signout", {
-      method: "POST",
-    });
-  } catch (error) {
-    console.error("Sign out error:", error);
-  } finally {
-    // Redirect to auth page
-    window.location.href = "/auth";
-  }
-}
-
 // Get current user session
 export async function getCurrentSession(): Promise<{ user: User } | null> {
   try {

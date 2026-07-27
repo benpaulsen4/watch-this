@@ -90,7 +90,7 @@ Single episode update flow:
 Operational notes:
 
 - Collaboration sync and activity writes are best-effort. Failures are logged but do not fail the main episode write. Both helpers deliberately take no executor: they swallow their own errors, and a swallowed error inside a caller’s transaction would abort that transaction and turn its `COMMIT` into a silent `ROLLBACK`.
-- Show-level status updates run for `watched=false` as well — see “Show-Level Status Coupling”. `completeEpisodeUpdate` accepts a `skipShowStatus` option that suppresses them, but no caller currently sets it.
+- Show-level status updates run for `watched=false` as well — see “Show-Level Status Coupling”. They are unconditional; `newStatus` can still come back `null`, because `updateTVShowStatus` returns `null` when there is no status row to promote.
 
 ## Workflow: batchUpdateEpisodes
 

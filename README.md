@@ -128,11 +128,11 @@ Completed highlights:
 - Activity feed and recommendations
 - JustWatch integration + per-user streaming preferences
 - Import/export of user data for easy transfer
+- Public splash page
 
 Planned:
 
 - Trial accounts with no initial passkeys (7-day window)
-- Public splash page
 - Recently-returned section & home page recommendations
 - “Wrapped”-style stats for seasons/years
 - Optional \*arr stack integration when content is unavailable

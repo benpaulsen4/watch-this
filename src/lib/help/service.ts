@@ -212,7 +212,7 @@ export async function getHelpDocBySlug(slug: string[]): Promise<HelpDoc> {
   };
 }
 
-export async function getAllHelpDocs(): Promise<HelpDocSummary[]> {
+async function getAllHelpDocs(): Promise<HelpDocSummary[]> {
   if (!(await pathExists(HELP_CONTENT_ROOT))) return [];
 
   const filePaths = await walkMarkdownFiles(HELP_CONTENT_ROOT);

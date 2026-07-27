@@ -95,9 +95,10 @@ The content status service ([service.ts](../../src/lib/content-status/service.ts
 
 Enrichment attaches watch status to content in the `TMDBContent` domain model ([types.ts](../../src/lib/content-status/types.ts)):
 
-- `mapWithContentStatus(content, userId)` / `mapAllWithContentStatus(contents, userId)`:
-  - Map TMDB API result shapes into the domain `TMDBContent`
-  - Bulk-load statuses for the result set to avoid N+1 queries
+- `mapAllWithContentStatus(contents, userId)`:
+  - Maps TMDB API result shapes into the domain `TMDBContent`
+  - Bulk-loads statuses for the result set to avoid N+1 queries
+  - Used by the search, discover and trending routes
 - `enrichWithContentStatus(content, userId)` / `enrichAllWithContentStatus(contents, userId)`:
   - Attach status onto already-mapped `TMDBContent` items (used by cache/list flows)
 

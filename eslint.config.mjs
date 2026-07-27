@@ -61,11 +61,11 @@ const config = [
     },
   },
   {
-    files: [
-      "src/components/profile/StreamingPreferences.tsx",
-      "src/components/search/SearchClient.tsx",
-      "src/hooks/useFragmentNavigation.ts",
-    ],
+    // Verified live, not a blanket disable: unexempting this file produces two
+    // real react-hooks/set-state-in-effect errors. useFragmentNavigation.ts was
+    // also listed here and did not need it -- its only setState runs inside a
+    // popstate handler, not in an effect body.
+    files: ["src/components/profile/StreamingPreferences.tsx"],
     rules: {
       "react-hooks/set-state-in-effect": "off",
     },
