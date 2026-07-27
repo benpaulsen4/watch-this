@@ -70,7 +70,7 @@ The root layout wraps all routes with the global providers:
 This means any client component can:
 
 - Use React Query (`useQuery`, `useMutation`, etc.)
-- Consume auth state (`useAuth`, `useUser`, `useIsAuthenticated`)
+- Consume auth state (`useAuth`, `useUser`, `useStreamingPreferences`)
 
 ## Auth & Session Flow
 

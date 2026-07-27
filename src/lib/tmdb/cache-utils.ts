@@ -122,7 +122,7 @@ export async function addToCache(
   return mapToContent(existingData);
 }
 
-export async function updateCache(
+async function updateCache(
   tmdbId: number,
   contentType: ContentTypeEnum,
   cacheId: string
@@ -316,7 +316,7 @@ export async function getAllCachedContent(
   return enrichAllWithContentStatus(allItemsInOrder, userId);
 }
 
-export function mapToContent(cacheData: CachedContentRow): TMDBContent {
+function mapToContent(cacheData: CachedContentRow): TMDBContent {
   return {
     tmdbId: cacheData.tmdbId,
     contentType: cacheData.contentType as ContentTypeEnum,

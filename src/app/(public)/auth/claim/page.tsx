@@ -13,7 +13,7 @@ import {
   verifyClaimRegistration,
 } from "@/lib/auth/client";
 
-export function ClaimPageContent() {
+function ClaimPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [error, setError] = useState("");

@@ -183,16 +183,6 @@ export function useUser() {
   return user;
 }
 
-export function useAuthLoading() {
-  const { loading } = useAuth();
-  return loading;
-}
-
-export function useIsAuthenticated() {
-  const { user, loading } = useAuth();
-  return { isAuthenticated: !!user, loading };
-}
-
 export function useStreamingPreferences() {
   const {
     streamingPreferences,

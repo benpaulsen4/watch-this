@@ -327,56 +327,6 @@ export async function deleteContentStatus(
   return { message: "Content status removed successfully" };
 }
 
-export async function mapWithContentStatus(
-  content: TMDBMovie | TMDBTVShow | TMDBSearchItem,
-  userId: string
-): Promise<TMDBContent> {
-  const contentType =
-    "media_type" in content
-      ? content.media_type
-      : "title" in content
-      ? "movie"
-      : "tv";
-  let [statusData] = await db
-    .select({
-      status: userContentStatus.status,
-      nextEpisodeDate: userContentStatus.nextEpisodeDate,
-      updatedAt: userContentStatus.updatedAt,
-    })
-    .from(userContentStatus)
-    .where(
-      and(
-        eq(userContentStatus.userId, userId),
-        eq(userContentStatus.tmdbId, content.id),
-        eq(userContentStatus.contentType, contentType)
-      )
-    )
-    .limit(1);
-
-  if (!statusData) {
-    return mapContentToDomainModel(content, contentType, null, null);
-  }
-
-  if (
-    contentType === ContentType.TV &&
-    statusData.status === WatchStatus.COMPLETED &&
-    statusData.nextEpisodeDate &&
-    statusData.nextEpisodeDate < new Date()
-  ) {
-    return mapTVShowWithNewEpisode(
-      content as TMDBTVShow,
-      userId,
-      statusData.updatedAt
-    );
-  }
-  return mapContentToDomainModel(
-    content,
-    contentType,
-    statusData.status as WatchStatusEnum,
-    statusData.updatedAt
-  );
-}
-
 export async function mapAllWithContentStatus(
   contents: (TMDBMovie | TMDBTVShow | TMDBSearchItem)[],
   userId: string
@@ -643,7 +593,7 @@ async function mapTVShowWithNewEpisode(
       // call above, so this UPDATE normally matches it. If the user cleared
       // their status during that network round trip the UPDATE matches nothing,
       // and the content genuinely has no status any more -- the same shape
-      // `mapWithContentStatus` returns when it finds no row at all.
+      // `enrichWithContentStatus` returns when it finds no row at all.
       if (!statusData) {
         return mapContentToDomainModel(content, ContentType.TV, null, null);
       }
@@ -744,7 +694,7 @@ async function enrichTVShowWithNewEpisode(
   };
 }
 
-export function mapContentToDomainModel(
+function mapContentToDomainModel(
   content: TMDBMovie | TMDBTVShow | TMDBSearchItem,
   contentType: ContentTypeEnum,
   watchStatus: WatchStatusEnum | null,

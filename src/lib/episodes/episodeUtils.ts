@@ -404,7 +404,7 @@ export async function syncEpisodeStatusToCollaborators(
 /**
  * Update or create episode watch status
  */
-export async function updateEpisodeWatchStatus(
+async function updateEpisodeWatchStatus(
   userId: string,
   tmdbId: number,
   seasonNumber: number,
@@ -708,7 +708,6 @@ export async function completeEpisodeUpdate(
   watched: boolean,
   episodeName?: string,
   options?: {
-    skipShowStatus?: boolean;
     timeZone?: string;
   },
 ) {
@@ -741,17 +740,16 @@ export async function completeEpisodeUpdate(
     episodeName,
   );
 
-  // Update show status
-  const newStatus = options?.skipShowStatus
-    ? null
-    : await updateTVShowStatus(
-        userId,
-        tmdbId,
-        seasonNumber,
-        episodeNumber,
-        watched,
-        { timeZone: options?.timeZone },
-      );
+  // Update show status. This can still come back null -- updateTVShowStatus
+  // returns null when the show has no status row to promote.
+  const newStatus = await updateTVShowStatus(
+    userId,
+    tmdbId,
+    seasonNumber,
+    episodeNumber,
+    watched,
+    { timeZone: options?.timeZone },
+  );
 
   return {
     episode: episodeResult,
