@@ -141,12 +141,14 @@ export function ActivityEntry({
       mainUser = mainUser.charAt(0).toUpperCase() + mainUser.slice(1);
 
       if (collaborators.length === 1) {
-        return `${mainUser} and ${replaceWithYou(collaborators[0].username)}`;
+        // Length is exactly 1, checked on the line above.
+        return `${mainUser} and ${replaceWithYou(collaborators[0]!.username)}`;
       }
 
       if (collaborators.length <= 3) {
         const lastCollaborator = replaceWithYou(
-          collaborators[collaborators.length - 1].username
+          // Non-empty: entering this branch required collaborators.length > 0.
+          collaborators[collaborators.length - 1]!.username
         );
         const otherCollaborators = collaborators
           .slice(0, -1)

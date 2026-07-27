@@ -9,6 +9,7 @@ import {
   passkeyCredentials,
   users,
 } from "@/lib/db";
+import { expectRow } from "@/lib/db/expectRow";
 
 import type {
   ClaimInitiateResponse,
@@ -101,10 +102,15 @@ export async function initiateClaim(
 
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
   const claimCode = generateClaimCode();
-  const [claim] = await db
-    .insert(passkeyClaims)
-    .values({ userId, claimCode, status: "active", initiator, expiresAt })
-    .returning();
+  // Unconditional single-row insert with no onConflict clause: it returns the
+  // new row or throws.
+  const claim = expectRow(
+    await db
+      .insert(passkeyClaims)
+      .values({ userId, claimCode, status: "active", initiator, expiresAt })
+      .returning(),
+    "initiateClaim insert passkeyClaims"
+  );
 
   await db.insert(activityFeed).values({
     userId,

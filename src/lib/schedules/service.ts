@@ -9,6 +9,7 @@ import {
   showSchedules,
   userContentStatus,
 } from "../db";
+import { expectRow } from "../db/expectRow";
 import { getAllCachedContent, getCachedContent } from "../tmdb/cache-utils";
 import {
   CreateScheduleInput,
@@ -273,9 +274,10 @@ export async function createSchedule(
       )
     )
     .limit(1);
-  if (contentStatus.length === 0) return "notFound";
+  const currentStatus = contentStatus[0];
+  if (!currentStatus) return "notFound";
 
-  const status = contentStatus[0].status;
+  const status = currentStatus.status;
   if (status === "completed" || status === "dropped") return "invalidStatus";
 
   const existing = await db
@@ -291,10 +293,15 @@ export async function createSchedule(
     .limit(1);
   if (existing.length > 0) return "duplicate";
 
-  const [created] = await db
-    .insert(showSchedules)
-    .values({ userId, tmdbId, dayOfWeek })
-    .returning();
+  // Unconditional single-row insert with no onConflict clause: it returns the
+  // new row or throws.
+  const created = expectRow(
+    await db
+      .insert(showSchedules)
+      .values({ userId, tmdbId, dayOfWeek })
+      .returning(),
+    "createSchedule insert showSchedules"
+  );
 
   await syncScheduleCreateToCollaborators(userId, tmdbId, dayOfWeek);
 

@@ -225,7 +225,7 @@ describe("ContentCard", () => {
       ([, delay]) => delay === 2000,
     );
     expect(scheduledIndex).toBeGreaterThanOrEqual(0);
-    const handle = setTimeoutSpy.mock.results[scheduledIndex].value;
+    const handle = setTimeoutSpy.mock.results[scheduledIndex]!.value;
 
     unmount();
 

@@ -103,7 +103,7 @@ describe("ListFilters", () => {
     // createQueryString with null value deletes the key.
 
     // We expect the URL NOT to have watchStatus
-    const callArg = mockRouter.push.mock.calls[0][0];
+    const callArg = mockRouter.push.mock.calls[0]![0];
     expect(callArg).not.toContain("watchStatus=");
   });
 });

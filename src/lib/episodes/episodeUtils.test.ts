@@ -84,7 +84,7 @@ vi.mock("../db", () => {
       Array<{ inTransaction: boolean }>
     >) {
       for (let index = calls.length - 1; index >= 0; index -= 1) {
-        if (calls[index].inTransaction) calls.splice(index, 1);
+        if (calls[index]!.inTransaction) calls.splice(index, 1);
       }
     }
   };

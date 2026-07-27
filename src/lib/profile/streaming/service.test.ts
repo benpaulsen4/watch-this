@@ -115,7 +115,7 @@ describe("streaming service", () => {
     if (res !== "dbError") {
       expect(res.country).toBe("US");
       expect(res.providers.length).toBe(1);
-      expect(res.providers[0].id).toBe(1);
+      expect(res.providers[0]!.id).toBe(1);
     }
   });
 
@@ -133,7 +133,7 @@ describe("streaming service", () => {
     if (res !== "dbError" && res !== "invalidRegion") {
       expect(res.country).toBe("CA");
       expect(res.providers.length).toBe(2);
-      expect(res.providers[0].id).toBe(2);
+      expect(res.providers[0]!.id).toBe(2);
     }
   });
 

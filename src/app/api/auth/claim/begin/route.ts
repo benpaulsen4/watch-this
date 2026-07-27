@@ -26,11 +26,11 @@ export async function GET(request: NextRequest) {
       .where(eq(passkeyClaims.id, verified.claimId))
       .limit(1);
 
-    if (claimRows.length === 0) {
+    const claim = claimRows[0];
+    if (!claim) {
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });
     }
 
-    const claim = claimRows[0];
     if (claim.status !== "active") {
       return NextResponse.json({ error: "Claim not active" }, { status: 400 });
     }

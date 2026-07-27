@@ -21,7 +21,7 @@ export function useInfiniteScroll({
   const handleIntersection = useCallback(
     (entries: IntersectionObserverEntry[]) => {
       const [entry] = entries;
-      if (entry.isIntersecting && hasMore && !loading) {
+      if (entry?.isIntersecting && hasMore && !loading) {
         const now = Date.now();
         if (now - lastExecutionRef.current >= debounceMs) {
           lastExecutionRef.current = now;
