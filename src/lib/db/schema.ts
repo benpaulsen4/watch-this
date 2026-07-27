@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -340,128 +340,6 @@ export const tmdbCache = pgTable(
 );
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
-  passkeyCredentials: many(passkeyCredentials),
-  passkeyClaims: many(passkeyClaims),
-  ownedLists: many(lists),
-  collaborations: many(listCollaborators),
-  contentStatuses: many(userContentStatus),
-  episodeStatuses: many(episodeWatchStatus),
-  activities: many(activityFeed),
-  showSchedules: many(showSchedules),
-  streamingProviders: many(userStreamingProviders),
-}));
-
-export const passkeyCredentialsRelations = relations(
-  passkeyCredentials,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [passkeyCredentials.userId],
-      references: [users.id],
-    }),
-  }),
-);
-
-export const listsRelations = relations(lists, ({ one, many }) => ({
-  owner: one(users, {
-    fields: [lists.ownerId],
-    references: [users.id],
-  }),
-  collaborators: many(listCollaborators),
-  items: many(listItems),
-  recommendationsCache: one(listRecommendationsCache, {
-    fields: [lists.id],
-    references: [listRecommendationsCache.listId],
-  }),
-  activities: many(activityFeed),
-}));
-
-export const listCollaboratorsRelations = relations(
-  listCollaborators,
-  ({ one }) => ({
-    list: one(lists, {
-      fields: [listCollaborators.listId],
-      references: [lists.id],
-    }),
-    user: one(users, {
-      fields: [listCollaborators.userId],
-      references: [users.id],
-    }),
-  }),
-);
-
-export const listItemsRelations = relations(listItems, ({ one }) => ({
-  list: one(lists, {
-    fields: [listItems.listId],
-    references: [lists.id],
-  }),
-}));
-
-export const listRecommendationsCacheRelations = relations(
-  listRecommendationsCache,
-  ({ one }) => ({
-    list: one(lists, {
-      fields: [listRecommendationsCache.listId],
-      references: [lists.id],
-    }),
-  }),
-);
-
-export const userContentStatusRelations = relations(
-  userContentStatus,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [userContentStatus.userId],
-      references: [users.id],
-    }),
-  }),
-);
-
-export const episodeWatchStatusRelations = relations(
-  episodeWatchStatus,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [episodeWatchStatus.userId],
-      references: [users.id],
-    }),
-  }),
-);
-
-export const activityFeedRelations = relations(activityFeed, ({ one }) => ({
-  user: one(users, {
-    fields: [activityFeed.userId],
-    references: [users.id],
-  }),
-  list: one(lists, {
-    fields: [activityFeed.listId],
-    references: [lists.id],
-  }),
-}));
-
-export const passkeyClaimsRelations = relations(passkeyClaims, ({ one }) => ({
-  user: one(users, {
-    fields: [passkeyClaims.userId],
-    references: [users.id],
-  }),
-}));
-
-export const showSchedulesRelations = relations(showSchedules, ({ one }) => ({
-  user: one(users, {
-    fields: [showSchedules.userId],
-    references: [users.id],
-  }),
-}));
-
-export const userStreamingProvidersRelations = relations(
-  userStreamingProviders,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [userStreamingProviders.userId],
-      references: [users.id],
-    }),
-  }),
-);
-
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -569,4 +447,3 @@ export type TVWatchStatusEnum =
   (typeof TVWatchStatus)[keyof typeof TVWatchStatus];
 export type PermissionLevelEnum =
   (typeof PermissionLevel)[keyof typeof PermissionLevel];
-export type ActivityTypeEnum = (typeof ActivityType)[keyof typeof ActivityType];
