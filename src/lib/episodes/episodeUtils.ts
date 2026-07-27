@@ -425,7 +425,9 @@ export async function updateEpisodeWatchStatus(
     )
     .limit(1);
 
-  let resultRows;
+  // Explicit rather than relying on evolving-let inference: both branches
+  // assign a `.returning()` result and the reader should not have to find them.
+  let resultRows: (typeof episodeWatchStatus.$inferSelect)[];
   if (existingStatus.length > 0) {
     // Update existing status
     resultRows = await db
@@ -829,8 +831,7 @@ export async function batchUpdateEpisodes(
   // it on `episode.watched`, so at least one of them has a last element and the
   // pair of lookups cannot both miss.
   const statusEpisode =
-    watchedSelections[watchedSelections.length - 1] ??
-    unwatchedSelections[unwatchedSelections.length - 1]!;
+    watchedSelections.at(-1) ?? unwatchedSelections.at(-1)!;
 
   const updatedEpisodes =
     (await db

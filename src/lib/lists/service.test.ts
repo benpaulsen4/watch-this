@@ -264,6 +264,22 @@ describe("lists service", () => {
     expect(result).toBe("notFound");
   });
 
+  // The ownership read and the UPDATE are separate statements, so a concurrent
+  // deleteList lands in between and the UPDATE matches nothing. Before
+  // noUncheckedIndexedAccess this dereferenced undefined and threw a 500.
+  it("updateList returns notFound when the list is deleted mid-request", async () => {
+    (db as any).__setMockResults([
+      // Ownership check passes...
+      [{ ownerId: userId }],
+      // ...then the UPDATE matches nothing.
+      [],
+    ]);
+
+    const result = await updateList(userId, "list-vanished", { name: "X" });
+
+    expect(result).toBe("notFound");
+  });
+
   it("updateList returns updated list with counts", async () => {
     const existing = [{ ownerId: userId }];
     const updated = [
@@ -619,6 +635,26 @@ describe("lists service", () => {
     const res = await updateListCollaborator(userId, "list-8", "u9", {
       permissionLevel: "viewer" as any,
     });
+    expect(res).toBe("notFound");
+  });
+
+  // Same shape as updateList: the collaborator lookup and the UPDATE are
+  // separate statements, so a concurrent deleteListCollaborator empties the
+  // UPDATE.
+  it("updateListCollaborator returns notFound when the row is deleted mid-request", async () => {
+    (db as any).__setMockResults([
+      // List exists and is owned by the caller...
+      [{ ownerId: userId, name: "List" }],
+      // ...collaborator lookup succeeds...
+      [{ id: "collab-1" }],
+      // ...then the UPDATE matches nothing.
+      [],
+    ]);
+
+    const res = await updateListCollaborator(userId, "list-9", "u9", {
+      permissionLevel: "viewer" as any,
+    });
+
     expect(res).toBe("notFound");
   });
 

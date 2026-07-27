@@ -203,7 +203,9 @@ export async function markNextEpisodeWatched(
       ),
     )
     .limit(1);
-  let resultRows;
+  // Explicit rather than relying on evolving-let inference: both branches
+  // assign a `.returning()` result and the reader should not have to find them.
+  let resultRows: (typeof episodeWatchStatus.$inferSelect)[];
   if (existingStatus.length > 0) {
     resultRows = await db
       .update(episodeWatchStatus)

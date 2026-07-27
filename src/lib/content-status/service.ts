@@ -239,6 +239,19 @@ export async function updateContentStatus(
       )
       .returning();
 
+    // Bail before the cleanup, not after the commit. The existence check at the
+    // top of this function and the UPDATE above are separate statements with a
+    // TMDB network call between them, so a concurrent deleteContentStatus can
+    // remove the row and leave the UPDATE matching nothing. Deleting the
+    // schedules anyway would commit a cleanup for a status change that never
+    // happened -- and `deleteContentStatus` does not clear schedules itself, so
+    // the racing delete has not done it either. The user would lose their
+    // schedules for the show and still be told nothing happened.
+    //
+    // No rollback is needed: the UPDATE matched no rows, so returning here
+    // leaves the transaction a genuine no-op.
+    if (!row) return undefined;
+
     if (clearsSchedules) {
       await tx
         .delete(showSchedules)
@@ -253,10 +266,7 @@ export async function updateContentStatus(
     return row;
   });
 
-  // The existence check at the top of this function and the UPDATE above are
-  // separate statements with a TMDB network call between them, so a concurrent
-  // deleteContentStatus can remove the row and leave the UPDATE matching
-  // nothing. Report the same "notFound" the existence check would have.
+  // Report the same "notFound" the existence check at the top would have.
   if (!result) return "notFound";
 
   if (clearsSchedules) {

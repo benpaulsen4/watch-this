@@ -13,10 +13,7 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     const { searchParams, pathname } = new URL(request.url);
     // Extract ID from pathname: /api/tmdb/episodes/[id]
     const pathSegments = pathname.split("/");
-    // A missing segment cannot happen for a matched route, but `?? ""` keeps it
-    // flowing into the isNaN check below rather than relying on parseInt's
-    // coercion of undefined.
-    const tvId = parseInt(pathSegments[pathSegments.length - 1] ?? "");
+    const tvId = parseInt(pathSegments.at(-1) ?? "");
     const seasonNumber = searchParams.get("season");
     const episodeNumber = searchParams.get("episode");
 

@@ -6,6 +6,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // these tests pin what happens then. The mock therefore only needs to answer a
 // short, ordered queue of statements.
 vi.mock("@/lib/db", () => {
+  // CONSTRAINT: one shared FIFO, consumed at `await` time, plus one shared
+  // `chain` object across select/update/insert. That is only deterministic while
+  // at most ONE path in a given test actually touches the database. The batch
+  // test below satisfies this because its second show has status `watching` and
+  // returns before any query.
+  //
+  // If you add a second DB-touching show to a batch test, `Promise.all`
+  // interleaving will make queue consumption order-dependent and the failure
+  // will look like flake rather than a mock limitation. Key results by statement
+  // before doing that.
   const resultsQueue: any[] = [];
 
   const chain: any = {
@@ -81,6 +91,7 @@ vi.mock("@/lib/db/schema", () => ({
 }));
 
 import { db } from "@/lib/db";
+import { userContentStatus } from "@/lib/db/schema";
 import { tmdbClient } from "@/lib/tmdb/client";
 
 import {
@@ -149,6 +160,12 @@ describe("status enrichment when the status row disappears mid-request", () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.tmdbId).toBe(1);
     expect(result[0]!.watchStatus).toBeNull();
+
+    // Without this, a refactor that stopped issuing the promote-to-watching
+    // UPDATE altogether would still satisfy the assertions above -- the test
+    // would be pinning "no status" rather than "the UPDATE ran and matched
+    // nothing", which is a different thing.
+    expect(db.update).toHaveBeenCalledWith(userContentStatus);
   });
 
   it("still enriches the other items in the same batch", async () => {

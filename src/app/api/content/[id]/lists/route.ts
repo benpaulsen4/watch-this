@@ -11,9 +11,6 @@ async function handler(request: AuthenticatedRequest) {
     const url = new URL(request.url);
     const id = url.pathname.split("/").slice(-2, -1)[0]; // Get the [id] part from /api/content/[id]/lists
 
-    // A missing segment cannot happen for a matched route, but `?? ""` keeps it
-    // flowing into the isNaN check below rather than relying on parseInt's
-    // coercion of undefined.
     const contentId = parseInt(id ?? "");
     if (isNaN(contentId)) {
       return NextResponse.json(

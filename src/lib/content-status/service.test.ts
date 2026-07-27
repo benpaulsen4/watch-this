@@ -340,6 +340,34 @@ describe("content-status service", () => {
     expect((db as any).transaction).toHaveBeenCalledTimes(1);
   });
 
+  // The existence check and the UPDATE are separate statements with a TMDB call
+  // between them, so a concurrent deleteContentStatus can empty the UPDATE. The
+  // schedule cleanup must not commit in that case: it would destroy the user's
+  // schedules for the show while the caller is told nothing happened -- and
+  // deleteContentStatus does not clear schedules itself, so nothing else has.
+  it("updateContentStatus does not clear schedules when the row vanished mid-request", async () => {
+    (db as any).__setMockResults([
+      // The existence check still sees the row...
+      [{ id: "cs-race" }],
+      // ...but the UPDATE inside the transaction matches nothing.
+      [],
+    ]);
+
+    const result = await updateContentStatus(userId, {
+      tmdbId: 42,
+      contentType: "tv",
+      status: "completed",
+    } as any);
+
+    expect(result).toBe("notFound");
+
+    const ops = (db as any).__getOpLog();
+    const scheduleDelete = ops.find(
+      (o: any) => o.op === "delete" && o.table === showSchedules
+    );
+    expect(scheduleDelete).toBeUndefined();
+  });
+
   it("updateContentStatus surfaces a failed schedule cleanup instead of swallowing it", async () => {
     (db as any).__setMockResults([
       [{ id: "cs6" }],
