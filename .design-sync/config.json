@@ -1,0 +1,87 @@
+{
+  "projectId": "994c1924-28c5-464b-a52e-79ad39fd3596",
+  "shape": "package",
+  "pkg": "watch-this",
+  "globalName": "WatchThis",
+  "srcDir": "src/components",
+  "tsconfig": "tsconfig.json",
+  "entry": ".design-sync/entry.tsx",
+  "buildCmd": "node .design-sync/build-css.mjs",
+  "cssEntry": ".design-sync/.cache/tailwind.css",
+  "provider": {
+    "component": "WatchThisPreviewRoot"
+  },
+  "componentSrcMap": {
+    "Badge": "src/components/ui/Badge.tsx",
+    "Button": "src/components/ui/Button.tsx",
+    "Card": "src/components/ui/Card.tsx",
+    "CardContent": "src/components/ui/Card.tsx",
+    "CardDescription": "src/components/ui/Card.tsx",
+    "CardFooter": "src/components/ui/Card.tsx",
+    "CardHeader": "src/components/ui/Card.tsx",
+    "CardTitle": "src/components/ui/Card.tsx",
+    "Dropdown": "src/components/ui/Dropdown.tsx",
+    "Input": "src/components/ui/Input.tsx",
+    "Textarea": "src/components/ui/Input.tsx",
+    "LoadingSpinner": "src/components/ui/LoadingSpinner.tsx",
+    "Modal": "src/components/ui/Modal.tsx",
+    "PageHeader": "src/components/ui/PageHeader.tsx",
+    "ProfileImage": "src/components/ui/ProfileImage.tsx",
+    "QRCode": "src/components/ui/QRCode.tsx",
+    "Switch": "src/components/ui/Switch.tsx",
+    "ActivityEntry": "src/components/activity/ActivityEntry.tsx",
+    "ContentCard": "src/components/content/ContentCard.tsx",
+    "ContentCardSkeleton": "src/components/content/ContentCardSkeleton.tsx",
+    "StatusBadge": "src/components/content/StatusBadge.tsx",
+    "StatusSegmentedSelector": "src/components/content/StatusSegmentedSelector.tsx",
+    "Markdown": "src/components/help/Markdown.tsx",
+    "LandingSpotlightClient": "src/components/landing/LandingSpotlightClient.tsx",
+    "ListCard": "src/components/lists/ListCard.tsx",
+    "SearchInput": "src/components/search/SearchInput.tsx"
+  },
+  "extraFonts": [
+    ".design-sync/fonts/geist.css"
+  ],
+  "docsMap": {
+    "Badge": ".design-sync/docs/Badge.md",
+    "Button": ".design-sync/docs/Button.md",
+    "Input": ".design-sync/docs/Input.md",
+    "Textarea": ".design-sync/docs/Textarea.md",
+    "Switch": ".design-sync/docs/Switch.md",
+    "LoadingSpinner": ".design-sync/docs/LoadingSpinner.md",
+    "ProfileImage": ".design-sync/docs/ProfileImage.md",
+    "QRCode": ".design-sync/docs/QRCode.md",
+    "Card": ".design-sync/docs/Card.md",
+    "CardHeader": ".design-sync/docs/CardHeader.md",
+    "CardTitle": ".design-sync/docs/CardTitle.md",
+    "CardDescription": ".design-sync/docs/CardDescription.md",
+    "CardContent": ".design-sync/docs/CardContent.md",
+    "CardFooter": ".design-sync/docs/CardFooter.md",
+    "PageHeader": ".design-sync/docs/PageHeader.md",
+    "Modal": ".design-sync/docs/Modal.md",
+    "Dropdown": ".design-sync/docs/Dropdown.md"
+  },
+  "runtimeFontPrefixes": [
+    "Geist Fallback"
+  ],
+  "overrides": {
+    "Modal": {
+      "cardMode": "single",
+      "primaryStory": "ConfirmDialog",
+      "viewport": "900x620"
+    },
+    "PageHeader": {
+      "cardMode": "column"
+    },
+    "ProfileImage": {
+      "cardMode": "column"
+    },
+    "QRCode": {
+      "cardMode": "column"
+    },
+    "LandingSpotlightClient": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

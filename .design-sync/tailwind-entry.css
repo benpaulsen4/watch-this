@@ -1,0 +1,40 @@
+/* Design-sync stylesheet entry.
+   Compiles the app's real globals.css (which is only `@import "tailwindcss"`
+   plus keyframes) into a static utility sheet covering every class the
+   synced components and authored previews actually use. */
+@import "../src/app/globals.css";
+
+@source "../src";
+@source "./previews";
+@source "./preview-root.tsx";
+
+/* globals.css sets `body { font-family: var(--font-geist-sans) }`, but the
+   variable is injected by next/font at runtime and does not exist outside the
+   Next app. Define it here so synced cards render in Geist, not a fallback. */
+:root {
+  --font-geist-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Tailwind only emits classes it finds in the scanned sources, so out of the box
+   this sheet contains just the utilities THIS repo happens to use. A design
+   agent writing its own layout glue would silently get nothing. Safelist the
+   brand palette and the common layout/spacing scale so generated designs
+   actually render. Keep this list tight — every entry is emitted CSS. */
+@source inline("{bg,text,border}-{gray,red,purple,orange,green,blue,yellow}-{50,100,200,300,400,500,600,700,800,900,950}");
+@source inline("{bg,text,border}-{white,black,transparent}");
+@source inline("{p,px,py,pt,pb,pl,pr,m,mx,my,mt,mb,gap}-{0,1,2,3,4,5,6,8,10,12,16,20,24}");
+@source inline("{w,h}-{full,screen,auto,fit}");
+@source inline("max-w-{xs,sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl,full,none}");
+@source inline("grid-cols-{1,2,3,4,5,6,12}");
+@source inline("{flex,inline-flex,grid,block,inline-block,hidden}");
+@source inline("flex-{row,col,wrap,nowrap,1,none}");
+@source inline("items-{start,center,end,stretch,baseline}");
+@source inline("justify-{start,center,end,between,around,evenly}");
+@source inline("text-{xs,sm,base,lg,xl,2xl,3xl,4xl,5xl}");
+@source inline("font-{normal,medium,semibold,bold}");
+@source inline("rounded{,-sm,-md,-lg,-xl,-2xl,-3xl,-full,-none}");
+@source inline("{text-left,text-center,text-right,truncate,relative,absolute,sticky,fixed}");
+@source inline("{shadow,shadow-sm,shadow-md,shadow-lg,shadow-xl,shadow-2xl,shadow-none}");
+@source inline("{space-x,space-y}-{1,2,3,4,6,8}");
+@source inline("{border,border-0,border-2,border-t,border-b,border-l,border-r}");
+@source inline("overflow-{hidden,auto,x-auto,y-auto}");
