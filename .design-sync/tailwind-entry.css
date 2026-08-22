@@ -7,6 +7,7 @@
 @source "../src";
 @source "./previews";
 @source "./preview-root.tsx";
+@source "./brand";
 
 /* globals.css sets `body { font-family: var(--font-geist-sans) }`, but the
    variable is injected by next/font at runtime and does not exist outside the
@@ -38,3 +39,57 @@
 @source inline("{space-x,space-y}-{1,2,3,4,6,8}");
 @source inline("{border,border-0,border-2,border-t,border-b,border-l,border-r}");
 @source inline("overflow-{hidden,auto,x-auto,y-auto}");
+
+/* Brand tokens.
+   The app has no token layer of its own — the design language lives in raw
+   Tailwind palette classes. These name the roles those classes actually play,
+   so a design can reference intent (`var(--wt-accent)`) instead of memorising
+   which grey is a card. They resolve to Tailwind's own theme variables, so they
+   track the palette rather than pinning a hex that could drift.
+   Defined here because they must reach rendered designs, and designs receive
+   only the styles.css @import closure. */
+:root {
+  /* Surfaces — darkest to lightest */
+  --wt-surface-page: var(--color-gray-950);
+  --wt-surface-raised: var(--color-gray-900);
+  --wt-surface-card: var(--color-gray-800);
+  --wt-surface-input: var(--color-gray-700);
+
+  /* Text */
+  --wt-text-heading: var(--color-white);
+  --wt-text-body: var(--color-gray-100);
+  --wt-text-secondary: var(--color-gray-300);
+  --wt-text-muted: var(--color-gray-400);
+  --wt-text-placeholder: var(--color-gray-500);
+
+  /* Borders */
+  --wt-border-subtle: var(--color-gray-800);
+  --wt-border-default: var(--color-gray-700);
+  --wt-border-strong: var(--color-gray-600);
+
+  /* Brand accent */
+  --wt-accent: var(--color-red-600);
+  --wt-accent-hover: var(--color-red-700);
+  --wt-accent-text: var(--color-red-400);
+  --wt-accent-ring: var(--color-red-500);
+
+  /* Semantic — these map 1:1 onto watch statuses */
+  --wt-success: var(--color-green-600);
+  --wt-info: var(--color-blue-600);
+  --wt-warning: var(--color-yellow-600);
+  --wt-paused: var(--color-orange-600);
+  --wt-danger: var(--color-red-600);
+
+  /* Gradients (Button variant="gradient" / "entertainment", and the logo) */
+  --wt-gradient-primary: linear-gradient(
+    to right,
+    var(--color-red-600),
+    var(--color-orange-500)
+  );
+  --wt-gradient-entertainment: linear-gradient(
+    to right,
+    var(--color-purple-600),
+    var(--color-red-500),
+    var(--color-orange-500)
+  );
+}

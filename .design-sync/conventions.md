@@ -58,6 +58,38 @@ for any panel, `Button` for any action, `Badge` for any chip, `Input`/`Textarea`
 between** components, not to re-style them — variants already cover the looks
 (`Button` alone has 8 variants × 7 sizes; `Badge` has 15).
 
+### Brand
+
+Dark only — there is no light theme, and nothing should assume one.
+
+**Logo.** Use `<BrandLogo height={40} />`; width follows the aspect ratio. It
+carries the brand gradient and is built for dark ground — place it on
+`bg-gray-950`/`bg-gray-900`, never on light, never recoloured or stretched.
+Clear space of half its height on all sides; minimum height 24px. `PageHeader`
+renders it automatically when you omit `title`.
+
+`<BrandLogo mark="tmdb" />` and `mark="justwatch"` are other companies' marks,
+shipped because attribution is a condition of using their data — show them
+wherever film metadata or streaming availability appears, unrestyled.
+
+**Gradients are rationed.** `Button variant="gradient"` (red → orange) is the
+single strongest action on a screen; `variant="entertainment"`
+(purple → red → orange) is for marketing surfaces. Never more than one per view.
+
+**Voice** is plain and slightly wry — "Never argue about what to watch again",
+"Nothing here". No exclamation marks, no marketing-speak in product UI. Empty
+states say what is missing and what to do next.
+
+**Tokens.** Every role above also exists as a custom property —
+`--wt-surface-page`, `--wt-surface-card`, `--wt-text-body`, `--wt-text-muted`,
+`--wt-accent`, `--wt-accent-text`, `--wt-success`, `--wt-gradient-primary`, and
+the rest. They resolve to Tailwind's own theme variables. Use either the class
+or the token; the tokens are there for when intent reads better than a shade.
+
+The `BrandColors`, `BrandTypography` and `BrandFoundations` cards enumerate the
+full system. They are **reference cards — never compose with them**; they
+document the classes and tokens to use directly.
+
 ### Where the truth lives
 
 Read `_ds/<folder>/styles.css` and the files it imports for the compiled

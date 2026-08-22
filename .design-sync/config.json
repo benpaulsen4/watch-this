@@ -37,7 +37,11 @@
     "Markdown": "src/components/help/Markdown.tsx",
     "LandingSpotlightClient": "src/components/landing/LandingSpotlightClient.tsx",
     "ListCard": "src/components/lists/ListCard.tsx",
-    "SearchInput": "src/components/search/SearchInput.tsx"
+    "SearchInput": "src/components/search/SearchInput.tsx",
+    "BrandLogo": ".design-sync/brand/BrandLogo.tsx",
+    "BrandColors": ".design-sync/brand/BrandColors.tsx",
+    "BrandTypography": ".design-sync/brand/BrandTypography.tsx",
+    "BrandFoundations": ".design-sync/brand/BrandFoundations.tsx"
   },
   "extraFonts": [
     ".design-sync/fonts/geist.css"
@@ -59,7 +63,11 @@
     "CardFooter": ".design-sync/docs/CardFooter.md",
     "PageHeader": ".design-sync/docs/PageHeader.md",
     "Modal": ".design-sync/docs/Modal.md",
-    "Dropdown": ".design-sync/docs/Dropdown.md"
+    "Dropdown": ".design-sync/docs/Dropdown.md",
+    "BrandLogo": ".design-sync/docs/BrandLogo.md",
+    "BrandColors": ".design-sync/docs/BrandColors.md",
+    "BrandTypography": ".design-sync/docs/BrandTypography.md",
+    "BrandFoundations": ".design-sync/docs/BrandFoundations.md"
   },
   "runtimeFontPrefixes": [
     "Geist Fallback"
@@ -80,6 +88,21 @@
       "cardMode": "column"
     },
     "LandingSpotlightClient": {
+      "cardMode": "column"
+    },
+    "BrandColors": {
+      "cardMode": "single",
+      "viewport": "900x840"
+    },
+    "BrandTypography": {
+      "cardMode": "single",
+      "viewport": "900x900"
+    },
+    "BrandFoundations": {
+      "cardMode": "single",
+      "viewport": "900x560"
+    },
+    "BrandLogo": {
       "cardMode": "column"
     }
   },

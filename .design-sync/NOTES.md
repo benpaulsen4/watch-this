@@ -53,6 +53,58 @@ machine-readable side.
   A real fix belongs in the component (give `SelectValue` children, or drop the
   extra span).
 
+## The brand layer
+
+The repo is an app, so it never packaged a brand layer. Four components under
+`.design-sync/brand/` supply one. They are **authored for the design system and
+do not exist in `src/`** — that is deliberate, and the only place in this sync
+where something is not lifted from the repo.
+
+- `BrandLogo` is a real, usable component. It inlines `public/logo-master.svg`
+  plus `tmdb.svg` and `justwatch.svg` as data URIs (`brand/logo-data.ts`).
+  This also fixes a live gap: `PageHeader` with no `title` renders
+  `<Image src="/logo-master.svg">`, which 404s in every generated design because
+  rendered designs get only the bundle and the styles.css closure.
+- `BrandColors`, `BrandTypography`, `BrandFoundations` are **reference cards**.
+  Their `.prompt.md` says so explicitly — the design agent should read them, not
+  compose with them.
+- Regenerate `logo-data.ts` if `public/*.svg` changes; the base64 is a snapshot.
+
+### Why foundations had to be components
+
+`package-validate.mjs` walks `ds-bundle/components/` and hard-fails when the
+`.html` count differs from `componentCount` (`count mismatch`), and the app
+registers cards from `components/`. So anything that shows up as a card in the
+DS pane must be a real component in the bundle. Hand-authored HTML dropped
+elsewhere is not counted but also is not registered.
+
+### Why brand guidance lives in conventions.md, not guidelines/
+
+`guidelinesGlob` only accepts `.md`/`.mdx`, and `emitGuidelines` copies files
+preserving their path **relative to the package** — so a source under
+`.design-sync/` lands at `guidelines/.design-sync/...`, a dot segment that glob
+uploads may skip. More to the point, `conventions.md` is inlined into the design
+agent's system prompt while `guidelines/` is merely uploaded, so the brand
+section belongs there.
+
+### Brand tokens
+
+`--wt-*` custom properties are defined in `.design-sync/tailwind-entry.css`
+(surfaces, text, borders, accent, semantic, gradients). They resolve to
+Tailwind's own `--color-*` theme variables rather than pinned hex, so they track
+the palette. They must stay in that file: rendered designs receive only the
+`styles.css` @import closure, and `tokensGlob` cannot be used here because
+`copyTokens` requires a `tokensPkg` under `node_modules`.
+
+### Card viewports are grade-keyed
+
+`cfg.overrides.<Name>.viewport` changes trip `[CONFIG_STALE]` on
+`preview-rebuild.mjs` — they need a full `package-build.mjs`. The three
+reference cards use `cardMode: "single"` with explicit viewports sized to their
+content (Colors 900x840, Typography 900x900, Foundations 900x560). Shrink one
+too far and the card silently crops; verify against the review sheet after any
+change.
+
 ## Known render warns
 
 - `[GRID_OVERFLOW]` is *resolved*, not suppressed: `PageHeader`, `ProfileImage`,
@@ -62,7 +114,7 @@ machine-readable side.
 - Console noise under the render harness, expected and harmless: AuthProvider's
   session fetch fails with `Fetch API cannot load file:///.../api/auth/session`.
   It is caught inside the provider and yields `user: null`. Not a render failure.
-- Final state at first sync: **26/26 previews render cleanly**, 0 bad, 0 thin,
+- Final state: **30/30 previews render cleanly**, 0 bad, 0 thin,
   0 identical-variant, 0 floor cards.
 
 ## Re-sync risks — read this first

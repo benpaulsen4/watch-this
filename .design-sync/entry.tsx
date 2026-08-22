@@ -32,6 +32,14 @@ export * from "../src/components/landing/LandingSpotlightClient";
 export * from "../src/components/lists/ListCard";
 export * from "../src/components/search/SearchInput";
 
+// Brand foundations. Authored for the design system, not present in src/:
+// this repo is an app, so it never packaged its own brand layer. BrandLogo
+// is usable in designs; the other three are reference cards.
+export * from "./brand/BrandColors";
+export * from "./brand/BrandFoundations";
+export * from "./brand/BrandLogo";
+export * from "./brand/BrandTypography";
+
 export * from "../src/components/providers/AuthProvider";
 export * from "../src/components/providers/ReactQueryProvider";
 export * from "./preview-root";
