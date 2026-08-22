@@ -60,15 +60,23 @@ The repo is an app, so it never packaged a brand layer. Four components under
 do not exist in `src/`** — that is deliberate, and the only place in this sync
 where something is not lifted from the repo.
 
-- `BrandLogo` is a real, usable component. It inlines `public/logo-master.svg`
-  plus `tmdb.svg` and `justwatch.svg` as data URIs (`brand/logo-data.ts`).
+- `BrandLogo` is a real, usable component, carrying five marks (`brand/logo-data.ts`):
+  the `wordmark` lockup, the standalone `icon` glyph, the shipped `appIcon`
+  artwork, and the `tmdb`/`justwatch` attribution marks — all as data URIs.
   This also fixes a live gap: `PageHeader` with no `title` renders
   `<Image src="/logo-master.svg">`, which 404s in every generated design because
   rendered designs get only the bundle and the styles.css closure.
+- **`logo-data.ts` and `mark.svg` are generated** — run
+  `node .design-sync/brand/regenerate.mjs` (see `brand/README.md`) after any
+  change to `public/*.svg` or `src/app/icon192.png`. Never hand-edit them.
+  The `icon` mark is the `layer1` group lifted out of the wordmark and cropped
+  by **rasterising and scanning the alpha channel**: its drop-shadow filter has
+  asymmetric margins, so computing the viewBox arithmetically leaves the glyph
+  floating in dead space. Aspect ratios are measured from each source, not
+  eyeballed — the first pass guessed TMDB at 3.06 when it is really 7.70.
 - `BrandColors`, `BrandTypography`, `BrandFoundations` are **reference cards**.
   Their `.prompt.md` says so explicitly — the design agent should read them, not
   compose with them.
-- Regenerate `logo-data.ts` if `public/*.svg` changes; the base64 is a snapshot.
 
 ### Why foundations had to be components
 

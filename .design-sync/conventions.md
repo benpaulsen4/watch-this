@@ -62,11 +62,18 @@ between** components, not to re-style them — variants already cover the looks
 
 Dark only — there is no light theme, and nothing should assume one.
 
-**Logo.** Use `<BrandLogo height={40} />`; width follows the aspect ratio. It
-carries the brand gradient and is built for dark ground — place it on
-`bg-gray-950`/`bg-gray-900`, never on light, never recoloured or stretched.
-Clear space of half its height on all sides; minimum height 24px. `PageHeader`
-renders it automatically when you omit `title`.
+**Logo.** `<BrandLogo height={40} />` is the wordmark lockup; width follows the
+aspect ratio. Where there is no horizontal room — compact headers, nav rails,
+tab bars — use `<BrandLogo mark="icon" />`, the glyph alone and the same mark
+the favicon and mobile icons use. `mark="appIcon"` is the finished home-screen
+artwork (glyph on its dark circle) and is only for depicting the installed app,
+never as an inline logo.
+
+Both marks carry the brand gradient and are built for dark ground — place them
+on `bg-gray-950`/`bg-gray-900`, never on light, never recoloured or stretched.
+Clear space of half the mark's height on all sides; minimum height 24px for the
+wordmark, 16px for the icon. `PageHeader` renders the wordmark automatically
+when you omit `title`.
 
 `<BrandLogo mark="tmdb" />` and `mark="justwatch"` are other companies' marks,
 shipped because attribution is a condition of using their data — show them
