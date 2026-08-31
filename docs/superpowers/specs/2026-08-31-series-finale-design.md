@@ -258,15 +258,18 @@ exact `watched_at`. A batch write is one `INSERT` carrying one `new Date()`, so 
 member of a batch collides. A one-episode batch is indistinguishable from a solo
 tick, which is correct — it is one.
 
-```sql
--- solo ticks for a user within a period
-SELECT e.* FROM episode_watch_status e
-WHERE e.user_id = $1 AND e.watched AND e.watched_at >= $2 AND e.watched_at < $3
-  AND NOT EXISTS (
-    SELECT 1 FROM episode_watch_status o
-    WHERE o.user_id = e.user_id AND o.watched_at = e.watched_at AND o.id <> e.id
-  )
+Detection happens **in memory, in the pure aggregation layer**, not in SQL. The
+engine already loads every watched episode for the period — it needs them for
+totals, monthly buckets, weekday distribution and streaks — so grouping those
+rows by timestamp is strictly cheaper than a second correlated `NOT EXISTS`
+query, and it is unit-testable without a database.
+
+```ts
+partitionSoloTicks(episodes): { solo: WatchedEpisodeRow[]; batched: WatchedEpisodeRow[] }
 ```
+
+A row is solo when no other row in the set shares its `watchedAt` to the
+millisecond.
 
 **Applies to:** `bigDay.timeline`, `rhythm.lateShare`, archetype rule 5.
 **Does not apply to:** episode totals, monthly buckets, weekday distribution,
