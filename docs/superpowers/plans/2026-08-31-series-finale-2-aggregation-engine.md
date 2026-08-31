@@ -131,6 +131,11 @@ export interface CrewMemberTotals {
   username: string;
   episodes: number;
   hours: number;
+  /**
+   * Their most-watched show for the period, used to fill `topShow.alsoTopFor`.
+   * Crew data, so it is stripped along with the rest before any share render.
+   */
+  topShowTmdbId: number | null;
 }
 
 export interface ComparePeer {
@@ -1506,6 +1511,8 @@ export function buildTopShow(
     episodes: topRows.length,
     minutes,
     finishedAt: getTimezoneDateKey(latest.watchedAt, timeZone),
+    // Filled by the service in plan 3, which is the only layer that knows about
+    // other users. The pure engine stays free of cross-user concerns.
     alsoTopFor: [],
   };
 }

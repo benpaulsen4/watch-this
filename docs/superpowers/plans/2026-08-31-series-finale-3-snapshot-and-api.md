@@ -869,11 +869,30 @@ export async function loadCrew(
     const lookup = await loadEpisodeRuntimes(rows.episodes);
     const { minutes } = summariseEpisodeRuntimes(rows.episodes, lookup);
 
+    // Their most-watched show, for the "also number one for" line on the
+    // viewer's top-show card.
+    const episodeCounts = new Map<number, number>();
+    for (const episode of rows.episodes) {
+      episodeCounts.set(
+        episode.tmdbId,
+        (episodeCounts.get(episode.tmdbId) ?? 0) + 1,
+      );
+    }
+    let topShowTmdbId: number | null = null;
+    let topCount = 0;
+    for (const [tmdbId, count] of episodeCounts) {
+      if (count > topCount) {
+        topShowTmdbId = tmdbId;
+        topCount = count;
+      }
+    }
+
     crew.push({
       userId: collaboratorId,
       username: profile[0].username,
       episodes: rows.episodes.length,
       hours: Math.round(minutes / 60),
+      topShowTmdbId,
     });
   }
 
@@ -1159,6 +1178,21 @@ Append to `src/lib/series-finale/service.test.ts`:
 import { getOrGenerateSnapshot } from "./service";
 import { SERIES_FINALE_SCHEMA_VERSION } from "./types";
 
+describe("alsoTopFor", () => {
+  it("names only crew members whose top show matches the viewer's", () => {
+    const crew = [
+      { userId: "u1", username: "ana", episodes: 10, hours: 5, topShowTmdbId: 1 },
+      { userId: "u2", username: "marcus", episodes: 10, hours: 5, topShowTmdbId: 2 },
+    ];
+
+    const matching = crew
+      .filter((member) => member.topShowTmdbId === 1)
+      .map((member) => member.username);
+
+    expect(matching).toEqual(["ana"]);
+  });
+});
+
 describe("getOrGenerateSnapshot", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -1280,6 +1314,16 @@ export async function generateSnapshot(
         await loadCohortMinutes(period),
       ),
     },
+    // The pure engine cannot know about other users, so the cross-user line on
+    // the top-show card is filled here.
+    topShow: draft.topShow
+      ? {
+          ...draft.topShow,
+          alsoTopFor: crew
+            .filter((member) => member.topShowTmdbId === draft.topShow?.tmdbId)
+            .map((member) => member.username),
+        }
+      : null,
     compare: buildCompare(rows, peers, period),
   };
 
