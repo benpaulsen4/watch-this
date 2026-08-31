@@ -357,8 +357,10 @@ All are `withAuth`, consistent with the rest of the app. The card route runs on 
 **Node runtime** — `postgres-js` cannot run on edge, so it cannot copy
 `opengraph-image.tsx`.
 
-The crew opt-out folds into the existing profile PATCH rather than getting its own
-endpoint.
+The crew opt-out folds into the existing `PUT /api/auth/session` handler, which is
+already where `username`, `profilePictureUrl` and `timezone` are updated. There is no
+`/api/profile` route — `src/app/api/profile/` contains only the `devices`, `export`,
+`import` and `streaming` subroutes.
 
 ## UI surface
 
