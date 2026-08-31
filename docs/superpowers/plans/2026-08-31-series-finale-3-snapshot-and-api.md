@@ -320,7 +320,9 @@ git commit -m "feat: Series Finale period derivation"
 **Interfaces:**
 - Consumes: `Period` from Task 2; schema tables; `TitleMeta`,
   `WatchedEpisodeRow`, `ContentStatusRow`, `titleKey` from plan 2 Task 1
-- Produces: `async function loadUserRows(userId: string, period: Period): Promise<{ episodes: WatchedEpisodeRow[]; statuses: ContentStatusRow[]; titles: Map<string, TitleMeta>; genreNames: Map<number, string> }>`
+- Produces:
+  - `async function loadGenreNames(): Promise<Map<number, string>>`
+  - `async function loadUserRows(userId: string, period: Period): Promise<{ episodes: WatchedEpisodeRow[]; statuses: ContentStatusRow[]; titles: Map<string, TitleMeta>; genreNames: Map<number, string> }>`
 
 **Loading rules:**
 - Episodes: `episode_watch_status` where `user_id = $1`, `watched = true`,
@@ -387,9 +389,20 @@ vi.mock("../db/schema", () => ({
   ContentType: { MOVIE: "movie", TV: "tv" },
 }));
 
+const getMovieGenres = vi.fn().mockResolvedValue({ genres: [] });
+const getTVGenres = vi.fn().mockResolvedValue({ genres: [] });
+vi.mock("../tmdb/client", () => ({
+  tmdbClient: {
+    getMovieGenres: () => getMovieGenres(),
+    getTVGenres: () => getTVGenres(),
+    getTVSeasonDetails: vi.fn(),
+    getMovieDetails: vi.fn(),
+  },
+}));
+
 import { db } from "../db";
 import { calendarYearPeriod } from "./periods";
-import { loadUserRows } from "./service";
+import { loadGenreNames, loadUserRows } from "./service";
 
 const setResults = (rows: unknown[]) =>
   (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults(rows);
@@ -459,6 +472,29 @@ describe("loadUserRows", () => {
     const result = await loadUserRows("user-1", calendarYearPeriod(2026));
 
     expect(result.titles.get("movie:1")?.popularity).toBe(2.1);
+  });
+});
+
+describe("loadGenreNames", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("maps ids to names across both movie and TV lists", async () => {
+    getMovieGenres.mockResolvedValue({ genres: [{ id: 18, name: "Drama" }] });
+    getTVGenres.mockResolvedValue({
+      genres: [{ id: 10765, name: "Sci-Fi & Fantasy" }],
+    });
+
+    const names = await loadGenreNames();
+
+    expect(names.get(18)).toBe("Drama");
+    expect(names.get(10765)).toBe("Sci-Fi & Fantasy");
+  });
+
+  it("returns an empty map rather than throwing when TMDB is unreachable", async () => {
+    getMovieGenres.mockRejectedValue(new Error("503"));
+    getTVGenres.mockRejectedValue(new Error("503"));
+
+    await expect(loadGenreNames()).resolves.toBeInstanceOf(Map);
   });
 });
 ```
@@ -586,14 +622,63 @@ export async function loadUserRows(
     }
   }
 
-  return { episodes, statuses, titles, genreNames: new Map() };
+  return {
+    episodes,
+    statuses,
+    titles,
+    genreNames: await loadGenreNames(),
+  };
+}
+
+/**
+ * TMDB genre id to display name, across both movie and TV lists.
+ *
+ * Without this the genres card renders every slice as "Unknown" -- `genre_ids`
+ * in `tmdb_cache` are numbers, and nothing else in the codebase resolves them
+ * server-side.
+ *
+ * Best-effort: TMDB being unreachable during generation should cost the genre
+ * labels, not the whole recap. An empty map degrades the card, and `buildGenres`
+ * already falls back to "Unknown" per id.
+ */
+export async function loadGenreNames(): Promise<Map<number, string>> {
+  try {
+    const [movieGenres, tvGenres] = await Promise.all([
+      tmdbClient.getMovieGenres(),
+      tmdbClient.getTVGenres(),
+    ]);
+
+    return new Map(
+      [...movieGenres.genres, ...tvGenres.genres].map((genre) => [
+        genre.id,
+        genre.name,
+      ]),
+    );
+  } catch (error) {
+    console.error("Series Finale: failed to load TMDB genre names", error);
+    return new Map();
+  }
 }
 ```
+
+Add `import { tmdbClient } from "../tmdb/client";` to the top of the file.
+
+**Call-count note:** `loadUserRows` is called once per crew member as well as for
+the viewer, so this would hit TMDB once per collaborator. Memoise it at module
+scope for the lifetime of the process — the genre list changes perhaps once a
+year:
+
+```ts
+let genreNameCache: Map<number, string> | null = null;
+```
+
+Return the cache when set, populate it on the first successful load, and leave
+it null on failure so a transient error is retried rather than cached.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/lib/series-finale/service.test.ts`
-Expected: PASS, 2 tests.
+Expected: PASS, 4 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -887,7 +972,7 @@ import type { ComparePeer, CrewMemberTotals, SeriesFinalePayload } from "./types
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/lib/series-finale/service.test.ts`
-Expected: PASS, 6 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1033,7 +1118,7 @@ the types import.
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/lib/series-finale/service.test.ts`
-Expected: PASS, 11 tests.
+Expected: PASS, 13 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1307,7 +1392,7 @@ Add to the imports: `buildPayload` from `./aggregate`, and
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/lib/series-finale/service.test.ts`
-Expected: PASS, 13 tests.
+Expected: PASS, 15 tests.
 
 - [ ] **Step 5: Commit**
 
