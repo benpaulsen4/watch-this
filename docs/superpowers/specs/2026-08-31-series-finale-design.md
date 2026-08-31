@@ -233,11 +233,23 @@ Unless stated otherwise, every date bucket is computed in the user's
 ### The percentile
 
 `headline.percentile` requires a cohort. Because generation is lazy, the first user
-to generate has none. It is computed from the totals of **existing snapshots for the
-same period**, and is `null` until at least 20 such snapshots exist. The Hours card
-drops the "Top 4% of everyone on WatchThis" line entirely when it is null rather than
-showing a placeholder. Snapshots are not retroactively updated as the cohort grows;
-the value reflects the cohort at generation time.
+to generate has none.
+
+The cohort is drawn from the totals of **existing snapshots across all periods**, not
+only the period being generated — a year is a year, so restricting to one period
+starves the cohort for no benefit. `percentile` is `null` until at least **10**
+snapshots qualify.
+
+Cohort membership is guarded by period length: a snapshot joins the cohort only when
+its `period_end - period_start` is within 10% of the period being generated. Without
+this, the seasonal cut on the roadmap would silently pool three-month totals with
+twelve-month ones and make the percentile meaningless. The guard is inert while every
+period is a calendar year.
+
+The Hours card drops the "Top 4% of everyone on WatchThis" line entirely when
+`percentile` is null rather than showing a placeholder. Snapshots are not
+retroactively updated as the cohort grows; the value reflects the cohort at
+generation time.
 
 ## The solo-tick filter
 
@@ -434,7 +446,9 @@ its reason.
    popularity drifts, so "most obscure film" reflects today's obscurity.
 4. **First watches only.** There is no rewatch UI, so every count is first watches.
 5. **The percentile reflects the cohort at generation time** and is not recomputed as
-   more users generate snapshots.
+   more users generate snapshots. The cohort spans periods of comparable length, so
+   an early-adopter cohort of 10 is a much weaker claim than a mature one, and the
+   figure is not comparable between users generated years apart.
 
 ## Out of scope
 
