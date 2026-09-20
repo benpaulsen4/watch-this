@@ -44,11 +44,14 @@ describe("useInfiniteScroll", () => {
     ) => void;
     capturedOptions = undefined;
 
+    // vitest 4 derives the mock's shape from its implementation, and an arrow
+    // function cannot be called with `new`. The hook constructs its observer,
+    // so this implementation has to be a `function`.
     IOConstructorMock = vi.fn(
-      (
+      function (
         cb: (entries: IntersectionObserverEntry[]) => void,
         options?: IntersectionObserverInit,
-      ) => {
+      ) {
         capturedCallback = cb;
         capturedOptions = options;
         return {

@@ -26,3 +26,9 @@ Scripts are defined in [package.json](../../package.json):
 
 - Prefer testing behavior over implementation details (user-event over internal state).
 - Keep domain logic testable by keeping heavy logic in `src/lib/*` instead of component bodies.
+- Every mock is reset before each test (`mockReset: true`), so give `vi.fn()` its
+  implementation inline: `vi.fn(async () => x)` is restored by the reset, while a
+  `vi.fn().mockResolvedValue(x)` written outside a test is blanked by it.
+- A mock that is constructed with `new` needs a `function` or `class`
+  implementation; Vitest builds the mock from the shape of what you pass, and an
+  arrow function is not constructible.
