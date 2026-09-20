@@ -78,9 +78,6 @@
     "",
     "postcss ^8.5.18 -- load-bearing. Without it the tree also resolves 8.4.31",
     "and 8.5.15, both inside GHSA-r28c-9q8g-f849 (high, <=8.5.17).",
-    "sharp ^0.35.4 -- load-bearing. Without it sharp drops to 0.34.5, inside",
-    "GHSA-f88m-g3jw-g9cj (high, <0.35.0). The floor is 0.35.4 rather than",
-    "0.35.3 because of GHSA-rgj7-g3m4-5g8c (high, <0.35.4, bundled libheif).",
     "@types/react, @types/react-dom -- pinned to match the react/react-dom",
     "versions exactly; React 19 types are not compatible across minors.",
     "",
@@ -95,7 +92,14 @@
     "let each consumer resolve the API it declares.",
     "",
     "SUPPLY-04: ajv, @babel/core, flatted, ws and js-yaml were removed because",
-    "the tree resolves to the same patched versions without them. picomatch was",
+    "the tree resolves to the same patched versions without them. sharp was",
+    "removed for the same reason, but only just: it was load-bearing against",
+    "next 16.2, which declares sharp ^0.34.5 and so resolved 0.34.5, inside",
+    "GHSA-f88m-g3jw-g9cj (high, <0.35.0). next 16.3 declares ^0.35.4 itself,",
+    "next is sharp's only consumer here, and 0.35.4 is also the floor for",
+    "GHSA-rgj7-g3m4-5g8c (high, <0.35.4, bundled libheif) -- so the override no",
+    "longer changes the resolution and cannot earn its place. It has to come",
+    "back if next is ever pinned below 16.3. picomatch was",
     "removed for a stronger reason: it forced micromatch (which declares ^2.3.1)",
     "across two majors to 4.0.4, and micromatch's own resolution is 2.3.2 --",
     "already the patched version, since the advisories are ranged <2.3.2. It",
@@ -117,9 +121,24 @@
     "to 0.18.1. The override is safe because drizzle-kit 0.31 declares",
     "@esbuild-kit/esm-loader but never imports it -- it loads configs through",
     "tsx -- and because the transform API core-utils calls is unchanged between",
-    "0.18 and 0.25. ^0.25.12 also dedupes onto the esbuild drizzle-kit already",
-    "resolves, and stays clear of GHSA-g7r4-m6w7-qqqr (0.27.3 - 0.28.0).",
-    "Drop the override once drizzle-kit 1.0 is stable."
+    "0.18 and 0.25. It does NOT dedupe onto the 0.25.12 drizzle-kit resolves --",
+    "that copy is nested under drizzle-kit while core-utils is hoisted -- so it",
+    "costs a second set of esbuild platform binaries, ~11 MB in node_modules,",
+    "for a package nothing loads. Drop it once drizzle-kit 1.0 is stable; the",
+    "1.0.0-rc line no longer depends on @esbuild-kit at all.",
+    "",
+    "GHSA-g7r4-m6w7-qqqr (low, 0.27.3 - 0.28.0) is held closed on vite's path",
+    "by the LOCKFILE only, not by anything declared here. vite declares",
+    "^0.27.0 and every 0.27.x above 0.27.2 is inside the advisory, so",
+    "`npm audit fix` resolved vite onto esbuild 0.27.2 and `npm ci` reproduces",
+    "it -- but an unconstrained `npm install`/`npm update` can refloat vite to",
+    "0.27.7 and silently reopen it. A scoped override was tried and reverted:",
+    "npm leaks `\"vite\": { \"esbuild\": ... }` onto tsx as well (both spellings,",
+    "with and without a version on the key), which pulled tsx's esbuild to",
+    "0.27.2 against its declared ~0.28.0 -- the exact semver violation this",
+    "section exists to avoid, traded for a low, dev-only advisory. Re-check",
+    "this path after any dependency update; it is the one advisory in the tree",
+    "that nothing in package.json is holding shut."
   ],
   "overrides": {
     "@types/react": "19.2.2",
@@ -127,7 +146,6 @@
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.12"
     },
-    "postcss": "^8.5.18",
-    "sharp": "^0.35.4"
+    "postcss": "^8.5.18"
   }
 }

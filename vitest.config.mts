@@ -47,11 +47,22 @@ export default defineConfig({
       // not lower them to make a red build green.
       //
       // Re-baselined for vitest 4, which made coverage-v8's AST-aware
-      // remapping the default: the percentages moved because the denominators
-      // are now source constructs rather than raw v8 ranges, not because the
-      // suite got weaker. On the same tests, v3 reported 1723/2217 branches
-      // and v4 reports 1784/3434 -- more branches are covered than before,
-      // measured against a denominator half again as large.
+      // remapping the default: the numbers are no longer counted in the same
+      // unit, so the old floors could not be carried over. v4 has no option to
+      // restore the old unit -- experimentalAstAwareRemapping is gone from the
+      // provider entirely -- so the only choice was to re-derive them. The
+      // headroom here (1.9 - 2.3 points on each metric) is the same as the old
+      // floors carried, so this is a re-baseline and not a relaxation.
+      //
+      // For anyone re-deriving it: running THIS tree under both majors gives
+      // v3 63.83% statements (10418/16320) and 77.71% branches (1723/2217)
+      // against v4's 56.93% (2627/4614) and 51.95% (1784/3434). Both
+      // percentages fall, but the statement denominator shrank 3.5x while the
+      // branch denominator grew 1.5x: the denominators are source constructs
+      // now rather than raw v8 ranges, so the two pairs are not the same
+      // measurement and neither ratio is comparable to the other. The
+      // 60.35/76.9 figures this comment used to quote predate later tests and
+      // no longer reproduce under either version.
       thresholds: {
         statements: 55,
         branches: 50,
