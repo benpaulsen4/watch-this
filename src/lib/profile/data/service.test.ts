@@ -72,10 +72,17 @@ vi.mock("@/lib/tmdb/cache-utils", () => ({
 vi.mock("jszip", () => {
   const mZip = {
     file: vi.fn(),
-    generateAsync: vi.fn().mockResolvedValue("mock-zip-content"),
+    // The implementation belongs inside vi.fn() so that the suite-wide
+    // mockReset restores it before each test instead of blanking it.
+    generateAsync: vi.fn(async () => "mock-zip-content"),
   };
   return {
-    default: vi.fn(() => mZip),
+    // vitest 4 derives the mock's shape from its implementation, and an arrow
+    // function cannot be called with `new`. The service does `new JSZip()`, so
+    // this implementation has to be a `function`.
+    default: vi.fn(function () {
+      return mZip;
+    }),
   };
 });
 
