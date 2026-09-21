@@ -20,6 +20,27 @@ export function episodeKeyOf(key: EpisodeKey): string {
   return `${key.tmdbId}:${key.seasonNumber}:${key.episodeNumber}`;
 }
 
+// Shared walk-and-accumulate behind summariseEpisodeRuntimes and
+// summariseFilmRuntimes -- they differ only in how a runtime is looked up.
+function summariseRuntimes<T>(
+  items: T[],
+  runtimeOf: (item: T) => number | null | undefined,
+): { minutes: number; unknownCount: number } {
+  let minutes = 0;
+  let unknownCount = 0;
+
+  for (const item of items) {
+    const runtime = runtimeOf(item);
+    if (typeof runtime === "number") {
+      minutes += runtime;
+    } else {
+      unknownCount += 1;
+    }
+  }
+
+  return { minutes, unknownCount };
+}
+
 /**
  * Total known minutes across `episodes`, plus a count of those whose runtime is
  * unknown.
@@ -33,19 +54,9 @@ export function summariseEpisodeRuntimes(
   episodes: EpisodeKey[],
   lookup: RuntimeLookup,
 ): { minutes: number; unknownCount: number } {
-  let minutes = 0;
-  let unknownCount = 0;
-
-  for (const episode of episodes) {
-    const runtime = lookup.get(episodeKeyOf(episode));
-    if (typeof runtime === "number") {
-      minutes += runtime;
-    } else {
-      unknownCount += 1;
-    }
-  }
-
-  return { minutes, unknownCount };
+  return summariseRuntimes(episodes, (episode) =>
+    lookup.get(episodeKeyOf(episode)),
+  );
 }
 
 /**
@@ -89,11 +100,12 @@ export interface SeasonKey {
  * Make sure every given (show, season) has been asked for at least once,
  * fetching and persisting per-episode runtimes for those that have not.
  *
- * Best-effort by design: a TMDB failure must not cost the caller its whole
- * generation run. A season that fails is still recorded as fetched, because
- * the alternative is retrying a permanently-404ing season on every generation
- * for every user, forever. Re-running the backfill script is the deliberate
- * way to retry.
+ * Best-effort by design: a failure either to fetch a season from TMDB or to
+ * persist what was fetched -- both caught by the same try/catch -- must not
+ * cost the caller its whole generation run. A season that fails either way is
+ * still recorded as fetched, because the alternative is retrying a
+ * permanently failing season on every generation for every user, forever.
+ * Re-running the backfill script is the deliberate way to retry.
  */
 export async function ensureSeasonsCached(pairs: SeasonKey[]): Promise<void> {
   if (pairs.length === 0) return;
@@ -190,17 +202,5 @@ export function summariseFilmRuntimes(
   tmdbIds: number[],
   lookup: Map<number, number | null>,
 ): { minutes: number; unknownCount: number } {
-  let minutes = 0;
-  let unknownCount = 0;
-
-  for (const tmdbId of tmdbIds) {
-    const runtime = lookup.get(tmdbId);
-    if (typeof runtime === "number") {
-      minutes += runtime;
-    } else {
-      unknownCount += 1;
-    }
-  }
-
-  return { minutes, unknownCount };
+  return summariseRuntimes(tmdbIds, (tmdbId) => lookup.get(tmdbId));
 }

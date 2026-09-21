@@ -6,10 +6,14 @@ vi.mock("../db", async () => {
 
   const resultsQueue: unknown[] = [];
   const chain: Record<string, unknown> = {};
+  // A vi.fn(), not a plain arrow function: `db.insert` alone being called says
+  // nothing about *what* was inserted, and a test asserting on values passed to
+  // `.values(...)` needs those calls recorded somewhere it can reach.
+  const valuesMock = vi.fn((_values: unknown) => chain);
   Object.assign(chain, {
     from: () => chain,
     where: () => chain,
-    values: () => chain,
+    values: valuesMock,
     onConflictDoNothing: () => chain,
     onConflictDoUpdate: () => chain,
     then: (resolve: (v: unknown) => unknown) =>
@@ -23,6 +27,7 @@ vi.mock("../db", async () => {
       resultsQueue.length = 0;
       resultsQueue.push(...rows);
     },
+    __valuesCalls: () => valuesMock.mock.calls,
   };
 
   // Real tables, not stubs: drizzle's operators need actual Column objects,
@@ -161,7 +166,16 @@ describe("ensureSeasonsCached", () => {
     await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
 
     expect(getTVSeasonDetails).toHaveBeenCalledWith(1, 1);
-    expect(db.insert).toHaveBeenCalled();
+    // Not just "an insert happened" -- the episode insert is the first call to
+    // `.values(...)` in this run (the season-fetch insert follows it), so its
+    // first argument must be both episodes, nulls included, correctly mapped.
+    const [firstValuesCall] = (
+      db as unknown as { __valuesCalls: () => unknown[][] }
+    ).__valuesCalls();
+    expect(firstValuesCall?.[0]).toEqual([
+      { tmdbId: 1, seasonNumber: 1, episodeNumber: 1, runtime: 42 },
+      { tmdbId: 1, seasonNumber: 1, episodeNumber: 2, runtime: null },
+    ]);
   });
 
   it("records the season fetch even when TMDB throws, so a broken season is not retried forever", async () => {
