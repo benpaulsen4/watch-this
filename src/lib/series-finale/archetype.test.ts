@@ -48,6 +48,13 @@ describe("maxWindowShare", () => {
     expect(maxWindowShare([23, 0, 1], 3)).toBe(1);
   });
 
+  it("honours the window width, not just its placement", () => {
+    // 20, 22 and 23 span four hours, so no 3-hour window holds more than two of
+    // them. Kills an off-by-one that widened the window (`offset <= windowSize`),
+    // which every other case here would return the same value under.
+    expect(maxWindowShare([20, 22, 23], 3)).toBe(2 / 3);
+  });
+
   it("returns 0 for no hours", () => {
     expect(maxWindowShare([], 3)).toBe(0);
   });
@@ -298,6 +305,23 @@ describe("classifyArchetype", () => {
         topGenreShare: 0.9,
       }),
     ).toBe("serial-abandoner");
+  });
+
+  it("resolves a middle-rule collision to the earlier rule", () => {
+    // Rules 3 and 4 both fire: Sunday holds 60 of 120 episodes (0.50) at a
+    // median of 5, and a single 120-episode month against eleven empty ones
+    // gives a coefficient of variation of 3.32. Rule 3 is first, so it wins.
+    // Pins the order of two adjacent middle rules, which a rule-1-versus-rule-6
+    // test cannot reach.
+    expect(
+      classifyArchetype({
+        ...base(),
+        weekdayCounts: [10, 10, 10, 10, 10, 10, 60],
+        medianEpisodesPerActiveDayByWeekday: [1, 1, 1, 1, 1, 1, 5],
+        monthlyEpisodeCounts: [120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        totalEpisodes: 120,
+      }),
+    ).toBe("weekday-marathoner");
   });
 
   it("lets a later rule win when the skipped rule 5 would have matched", () => {
