@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildGenres,
   buildMonths,
+  buildNiche,
+  buildTopShow,
   countDropped,
   countFinished,
   episodesPerDay,
+  median,
 } from "./aggregate";
-import type { ContentStatusRow, WatchedEpisodeRow } from "./types";
+import type { ContentStatusRow, TitleMeta, WatchedEpisodeRow } from "./types";
 
 const PERIOD = {
   start: new Date("2026-01-01T00:00:00Z"),
@@ -156,5 +160,187 @@ describe("episodesPerDay", () => {
     expect(episodesPerDay(10, { start: PERIOD.start, end: PERIOD.start })).toBe(
       0,
     );
+  });
+});
+
+const title = (
+  overrides: Partial<TitleMeta> & { tmdbId: number },
+): TitleMeta => ({
+  contentType: "tv",
+  title: `Title ${overrides.tmdbId}`,
+  posterPath: null,
+  genreIds: [],
+  popularity: 50,
+  runtime: null,
+  ...overrides,
+});
+
+const titleMap = (metas: TitleMeta[]) =>
+  new Map(metas.map((m) => [`${m.contentType}:${m.tmdbId}`, m]));
+
+describe("median", () => {
+  it("returns the middle value for an odd count", () => {
+    expect(median([3, 1, 2])).toBe(2);
+  });
+
+  it("averages the middle pair for an even count", () => {
+    expect(median([1, 2, 3, 4])).toBe(2.5);
+  });
+
+  it("returns null for no values", () => {
+    expect(median([])).toBeNull();
+  });
+});
+
+describe("buildTopShow", () => {
+  it("picks the show with the most watched episodes", () => {
+    const result = buildTopShow(
+      [
+        {
+          tmdbId: 1,
+          seasonNumber: 1,
+          episodeNumber: 1,
+          watchedAt: new Date("2026-01-01T00:00:00Z"),
+        },
+        {
+          tmdbId: 1,
+          seasonNumber: 1,
+          episodeNumber: 2,
+          watchedAt: new Date("2026-01-02T00:00:00Z"),
+        },
+        {
+          tmdbId: 2,
+          seasonNumber: 1,
+          episodeNumber: 1,
+          watchedAt: new Date("2026-01-03T00:00:00Z"),
+        },
+      ],
+      titleMap([title({ tmdbId: 1 }), title({ tmdbId: 2 })]),
+      new Map([
+        ["1:1:1", 42],
+        ["1:1:2", 45],
+      ]),
+      "UTC",
+    );
+
+    expect(result?.tmdbId).toBe(1);
+    expect(result?.episodes).toBe(2);
+    expect(result?.minutes).toBe(87);
+  });
+
+  it("dates the finish from the latest watchedAt, not a status column", () => {
+    const result = buildTopShow(
+      [
+        {
+          tmdbId: 1,
+          seasonNumber: 1,
+          episodeNumber: 1,
+          watchedAt: new Date("2026-01-01T00:00:00Z"),
+        },
+        {
+          tmdbId: 1,
+          seasonNumber: 1,
+          episodeNumber: 2,
+          watchedAt: new Date("2026-04-04T00:00:00Z"),
+        },
+      ],
+      titleMap([title({ tmdbId: 1 })]),
+      new Map(),
+      "UTC",
+    );
+
+    expect(result?.finishedAt).toBe("2026-04-04");
+  });
+
+  it("returns null when there are no episodes", () => {
+    expect(buildTopShow([], new Map(), new Map(), "UTC")).toBeNull();
+  });
+
+  it("returns null when the top show has no cached metadata", () => {
+    const result = buildTopShow(
+      [
+        {
+          tmdbId: 99,
+          seasonNumber: 1,
+          episodeNumber: 1,
+          watchedAt: new Date("2026-01-01T00:00:00Z"),
+        },
+      ],
+      new Map(),
+      new Map(),
+      "UTC",
+    );
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("buildNiche", () => {
+  it("picks the least popular completed film and reports the median of the rest", () => {
+    const statuses = [
+      status({ tmdbId: 1, contentType: "movie" }),
+      status({ tmdbId: 2, contentType: "movie" }),
+      status({ tmdbId: 3, contentType: "movie" }),
+    ];
+    const titles = titleMap([
+      title({ tmdbId: 1, contentType: "movie", popularity: 2.1 }),
+      title({ tmdbId: 2, contentType: "movie", popularity: 68 }),
+      title({ tmdbId: 3, contentType: "movie", popularity: 412 }),
+    ]);
+
+    const result = buildNiche(statuses, titles, PERIOD);
+
+    expect(result?.tmdbId).toBe(1);
+    expect(result?.popularity).toBe(2.1);
+    expect(result?.medianPopularity).toBe(240);
+    expect(result?.mostPopular?.tmdbId).toBe(3);
+  });
+
+  it("returns null when no films were completed", () => {
+    expect(buildNiche([], new Map(), PERIOD)).toBeNull();
+  });
+});
+
+describe("buildGenres", () => {
+  it("returns the top five plus a remainder bucket", () => {
+    const statuses = Array.from({ length: 6 }, (_, i) =>
+      status({ tmdbId: i + 1 }),
+    );
+    const titles = titleMap(
+      Array.from({ length: 6 }, (_, i) =>
+        title({ tmdbId: i + 1, genreIds: [i + 1] }),
+      ),
+    );
+    const names = new Map([
+      [1, "Sci-Fi & Fantasy"],
+      [2, "Drama"],
+      [3, "Comedy"],
+      [4, "Thriller"],
+      [5, "Documentary"],
+      [6, "Western"],
+    ]);
+
+    const result = buildGenres(statuses, titles, names, PERIOD);
+
+    expect(result).toHaveLength(6);
+    expect(result[5]?.name).toBe("Everything else");
+  });
+
+  it("omits the remainder bucket when there are five or fewer genres", () => {
+    const statuses = [status({ tmdbId: 1 })];
+    const titles = titleMap([title({ tmdbId: 1, genreIds: [1] })]);
+
+    const result = buildGenres(
+      statuses,
+      titles,
+      new Map([[1, "Drama"]]),
+      PERIOD,
+    );
+
+    expect(result).toEqual([{ name: "Drama", percent: 100 }]);
+  });
+
+  it("returns an empty list when nothing was completed", () => {
+    expect(buildGenres([], new Map(), new Map(), PERIOD)).toEqual([]);
   });
 });

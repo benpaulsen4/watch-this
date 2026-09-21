@@ -1,5 +1,15 @@
 import { getTimezoneDateKey } from "../time";
-import type { ContentStatusRow, WatchedEpisodeRow } from "./types";
+// From `./runtime-math`, never `./runtime`: the loader module imports `../db`,
+// which throws at module scope without a DATABASE_URL, and this engine is pure
+// by design -- its tests set no such variable and mock nothing.
+import { type RuntimeLookup, summariseEpisodeRuntimes } from "./runtime-math";
+import {
+  type ContentStatusRow,
+  type SeriesFinalePayload,
+  titleKey,
+  type TitleMeta,
+  type WatchedEpisodeRow,
+} from "./types";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -92,4 +102,178 @@ export function episodesPerDay(
   const days = (period.end.getTime() - period.start.getTime()) / MS_PER_DAY;
   if (days <= 0) return 0;
   return total / days;
+}
+
+/** Median of `values`, or null when there are none. */
+export function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+
+  // Both indices are in range once the empty case is gone -- `middle` always
+  // is, and `middle - 1` whenever the count is even -- but
+  // `noUncheckedIndexedAccess` types them as possibly-undefined. Falling back
+  // to the null this function already returns for no values keeps the contract
+  // honest without a non-null assertion papering over a real index bug.
+  const upper = sorted[middle];
+  if (upper === undefined) return null;
+  if (sorted.length % 2 !== 0) return upper;
+
+  const lower = sorted[middle - 1];
+  return lower === undefined ? upper : (lower + upper) / 2;
+}
+
+/**
+ * The show with the most episodes watched in the period.
+ *
+ * `finishedAt` comes from the latest `watchedAt` rather than a status column,
+ * because that is a real event with a real timestamp -- unlike film completion,
+ * which has to be inferred.
+ */
+export function buildTopShow(
+  episodes: WatchedEpisodeRow[],
+  titles: Map<string, TitleMeta>,
+  episodeRuntimeLookup: RuntimeLookup,
+  timeZone: string,
+): SeriesFinalePayload["topShow"] {
+  if (episodes.length === 0) return null;
+
+  const byShow = new Map<number, WatchedEpisodeRow[]>();
+  for (const row of episodes) {
+    const existing = byShow.get(row.tmdbId);
+    if (existing) existing.push(row);
+    else byShow.set(row.tmdbId, [row]);
+  }
+
+  let topId: number | null = null;
+  let topRows: WatchedEpisodeRow[] = [];
+  for (const [tmdbId, rows] of byShow) {
+    if (rows.length > topRows.length) {
+      topId = tmdbId;
+      topRows = rows;
+    }
+  }
+
+  if (topId === null) return null;
+
+  const meta = titles.get(titleKey(topId, "tv"));
+  if (!meta) return null;
+
+  const { minutes } = summariseEpisodeRuntimes(topRows, episodeRuntimeLookup);
+  const latest = topRows.reduce((newest, row) =>
+    row.watchedAt > newest.watchedAt ? row : newest,
+  );
+
+  return {
+    tmdbId: topId,
+    title: meta.title,
+    posterPath: meta.posterPath,
+    episodes: topRows.length,
+    minutes,
+    finishedAt: getTimezoneDateKey(latest.watchedAt, timeZone),
+    // Filled by the service in plan 3, which is the only layer that knows about
+    // other users. The pure engine stays free of cross-user concerns.
+    alsoTopFor: [],
+  };
+}
+
+/**
+ * The least popular film completed in the period, against the median of the
+ * others.
+ *
+ * Popularity is the currently-cached TMDB value, not the value at watch time --
+ * TMDB popularity drifts, so this reflects today's obscurity. Accepted and
+ * documented in the spec.
+ */
+export function buildNiche(
+  statuses: ContentStatusRow[],
+  titles: Map<string, TitleMeta>,
+  period: { start: Date; end: Date },
+): SeriesFinalePayload["niche"] {
+  const films = statuses
+    .filter(
+      (row) =>
+        row.contentType === "movie" &&
+        row.status === "completed" &&
+        isWithin(row.updatedAt, period),
+    )
+    .map((row) => titles.get(titleKey(row.tmdbId, "movie")))
+    .filter((meta): meta is TitleMeta => meta !== undefined);
+
+  if (films.length === 0) return null;
+
+  const least = films.reduce((lowest, meta) =>
+    meta.popularity < lowest.popularity ? meta : lowest,
+  );
+  const most = films.reduce((highest, meta) =>
+    meta.popularity > highest.popularity ? meta : highest,
+  );
+
+  const others = films
+    .filter((meta) => meta.tmdbId !== least.tmdbId)
+    .map((meta) => meta.popularity);
+
+  return {
+    tmdbId: least.tmdbId,
+    title: least.title,
+    posterPath: least.posterPath,
+    popularity: least.popularity,
+    medianPopularity: median(others) ?? least.popularity,
+    mostPopular:
+      most.tmdbId === least.tmdbId
+        ? null
+        : {
+            tmdbId: most.tmdbId,
+            title: most.title,
+            popularity: most.popularity,
+          },
+    filmPopularities: films.map((meta) => meta.popularity),
+  };
+}
+
+/** Share of completed titles per genre: top five, remainder folded together. */
+export function buildGenres(
+  statuses: ContentStatusRow[],
+  titles: Map<string, TitleMeta>,
+  genreNames: Map<number, string>,
+  period: { start: Date; end: Date },
+): { name: string; percent: number }[] {
+  const completed = statuses
+    .filter(
+      (row) => row.status === "completed" && isWithin(row.updatedAt, period),
+    )
+    .map((row) => titles.get(titleKey(row.tmdbId, row.contentType)))
+    .filter((meta): meta is TitleMeta => meta !== undefined);
+
+  if (completed.length === 0) return [];
+
+  const counts = new Map<number, number>();
+  for (const meta of completed) {
+    for (const genreId of meta.genreIds) {
+      counts.set(genreId, (counts.get(genreId) ?? 0) + 1);
+    }
+  }
+
+  const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
+  if (total === 0) return [];
+
+  const ranked = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  const top = ranked.slice(0, 5);
+  const rest = ranked.slice(5);
+
+  const result = top.map(([genreId, count]) => ({
+    name: genreNames.get(genreId) ?? "Unknown",
+    percent: Math.round((count / total) * 100),
+  }));
+
+  if (rest.length > 0) {
+    const restCount = rest.reduce((sum, [, count]) => sum + count, 0);
+    result.push({
+      name: "Everything else",
+      percent: Math.round((restCount / total) * 100),
+    });
+  }
+
+  return result;
 }
