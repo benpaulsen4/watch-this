@@ -3,7 +3,9 @@
  *
  * Run before generating any snapshot. Re-run safe: `ensureSeasonsCached`
  * skips seasons already recorded in `tmdb_season_fetch`, and film lookups skip
- * rows that already carry a runtime.
+ * rows that already carry a runtime. A film with no `tmdb_cache` row at all is
+ * a third case -- not a cache hit, not fetchable either -- and is reported
+ * separately rather than retried forever; see the comment in `backfillFilms`.
  *
  * Usage: npm run backfill:runtimes
  */
@@ -26,7 +28,7 @@ const REQUEST_GAP_MS = 250;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function backfillSeasons(): Promise<void> {
+async function backfillSeasons(): Promise<{ considered: number }> {
   const pairs = await db
     .selectDistinct({
       tmdbId: episodeWatchStatus.tmdbId,
@@ -43,15 +45,31 @@ async function backfillSeasons(): Promise<void> {
       console.log(`  ...${index + 1}/${pairs.length}`);
     }
   }
+
+  return { considered: pairs.length };
 }
 
-async function backfillFilms(): Promise<void> {
+interface FilmBackfillCounts {
+  fetched: number;
+  alreadyCached: number;
+  noCacheRow: number;
+  failed: number;
+}
+
+async function backfillFilms(): Promise<FilmBackfillCounts> {
   const films = await db
     .selectDistinct({ tmdbId: userContentStatus.tmdbId })
     .from(userContentStatus)
     .where(eq(userContentStatus.contentType, ContentType.MOVIE));
 
   console.log(`Films to consider: ${films.length}`);
+
+  const counts: FilmBackfillCounts = {
+    fetched: 0,
+    alreadyCached: 0,
+    noCacheRow: 0,
+    failed: 0,
+  };
 
   for (const [index, film] of films.entries()) {
     const cached = await db
@@ -61,7 +79,23 @@ async function backfillFilms(): Promise<void> {
         sql`${tmdbCache.tmdbId} = ${film.tmdbId} AND ${tmdbCache.contentType} = ${ContentType.MOVIE}`,
       );
 
-    if (cached[0]?.runtime != null) continue;
+    if (cached[0]?.runtime != null) {
+      counts.alreadyCached += 1;
+      continue;
+    }
+
+    // A film can be in `userContentStatus` with no matching `tmdb_cache` row
+    // at all -- the bulk profile importer writes straight into
+    // `userContentStatus` without also populating the cache. `UPDATE ...
+    // WHERE tmdb_id = x` against a row that doesn't exist affects zero rows
+    // and raises nothing, so writing the fetched runtime here would silently
+    // discard it on every run, forever, with no error to notice. Skip before
+    // spending the TMDB request; the app's own caching path is what creates
+    // the row this script then fills in.
+    if (cached.length === 0) {
+      counts.noCacheRow += 1;
+      continue;
+    }
 
     try {
       const details = await tmdbClient.getMovieDetails(film.tmdbId);
@@ -71,7 +105,9 @@ async function backfillFilms(): Promise<void> {
         .where(
           sql`${tmdbCache.tmdbId} = ${film.tmdbId} AND ${tmdbCache.contentType} = ${ContentType.MOVIE}`,
         );
+      counts.fetched += 1;
     } catch (error) {
+      counts.failed += 1;
       console.error(`  film ${film.tmdbId} failed`, error);
     }
 
@@ -80,13 +116,29 @@ async function backfillFilms(): Promise<void> {
       console.log(`  ...${index + 1}/${films.length}`);
     }
   }
+
+  if (counts.noCacheRow > 0) {
+    console.log(
+      `Skipped ${counts.noCacheRow} film(s) with no tmdb_cache row -- ` +
+        "nothing to attach a runtime to yet. Run the app's own caching " +
+        "path for these (e.g. view or add them) and re-run this script.",
+    );
+  }
+
+  return counts;
 }
 
 async function main(): Promise<void> {
   console.log("Backfilling Series Finale runtime caches");
-  await backfillSeasons();
-  await backfillFilms();
+  const seasonCounts = await backfillSeasons();
+  const filmCounts = await backfillFilms();
   console.log("Done");
+  console.log(
+    `Summary: ${seasonCounts.considered} season(s) considered; films -- ` +
+      `${filmCounts.fetched} fetched, ${filmCounts.alreadyCached} already ` +
+      `cached, ${filmCounts.noCacheRow} skipped (no cache row), ` +
+      `${filmCounts.failed} failed.`,
+  );
   process.exit(0);
 }
 

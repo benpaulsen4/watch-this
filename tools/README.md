@@ -112,6 +112,14 @@ it hasn't recorded yet. Film lookups skip any `tmdb_cache` row that already
 has a runtime. The practical effect: a season or film that failed the first
 time gets retried on the next run, and everything else is a no-op.
 
+One film case is not a no-op on re-run: a film can sit in a user's watch
+history with no `tmdb_cache` row at all (the profile bulk importer writes
+`userContentStatus` without populating the cache). There's no row for this
+script to attach a runtime to, so it counts and skips these rather than
+fetching a runtime it would have nowhere to put. The end-of-run summary
+reports how many; get the app's own caching path to run for them first
+(viewing or adding the title works), then re-run this script.
+
 ### Before enabling Series Finale
 
 Run this once over the existing watch history before turning Series Finale
