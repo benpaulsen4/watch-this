@@ -10,12 +10,16 @@ vi.mock("../db", async () => {
   // nothing about *what* was inserted, and a test asserting on values passed to
   // `.values(...)` needs those calls recorded somewhere it can reach.
   const valuesMock = vi.fn((_values: unknown) => chain);
+  // Recorded for the same reason as `values`: whether a refetched season's
+  // `fetched_at` actually advances lives entirely in the conflict clause, and
+  // a test that cannot see it can only assert that *an* insert happened.
+  const conflictUpdateMock = vi.fn((_config: unknown) => chain);
   Object.assign(chain, {
     from: () => chain,
     where: () => chain,
     values: valuesMock,
     onConflictDoNothing: () => chain,
-    onConflictDoUpdate: () => chain,
+    onConflictDoUpdate: conflictUpdateMock,
     then: (resolve: (v: unknown) => unknown) =>
       Promise.resolve(resultsQueue.shift() ?? []).then(resolve),
   });
@@ -28,6 +32,7 @@ vi.mock("../db", async () => {
       resultsQueue.push(...rows);
     },
     __valuesCalls: () => valuesMock.mock.calls,
+    __conflictUpdateCalls: () => conflictUpdateMock.mock.calls,
   };
 
   // Real tables, not stubs: drizzle's operators need actual Column objects,
@@ -36,13 +41,25 @@ vi.mock("../db", async () => {
 });
 
 const getTVSeasonDetails = vi.fn();
-vi.mock("../tmdb/client", () => ({
-  tmdbClient: {
-    getTVSeasonDetails: (...args: unknown[]) => getTVSeasonDetails(...args),
-  },
-}));
+vi.mock("../tmdb/client", async () => {
+  // Spread the real module rather than returning a bare stub: only the
+  // network-touching client needs replacing, and `ensureSeasonsCached` decides
+  // whether a failure is definitive with the real `isTMDBHttpError`. A
+  // hand-written stand-in would let that logic drift from the client that
+  // throws the errors it inspects.
+  const actual =
+    await vi.importActual<typeof import("../tmdb/client")>("../tmdb/client");
+
+  return {
+    ...actual,
+    tmdbClient: {
+      getTVSeasonDetails: (...args: unknown[]) => getTVSeasonDetails(...args),
+    },
+  };
+});
 
 import { db } from "../db";
+import { type TMDBHttpError } from "../tmdb/client";
 import {
   ensureSeasonsCached,
   type EpisodeKey,
@@ -50,6 +67,8 @@ import {
   loadEpisodeRuntimes,
   loadFilmRuntimes,
   type RuntimeLookup,
+  SEASON_FETCH_GAP_MS,
+  SEASON_FETCH_STALE_AFTER_MS,
   summariseEpisodeRuntimes,
   summariseFilmRuntimes,
 } from "./runtime";
@@ -59,6 +78,39 @@ const ep = (
   seasonNumber: number,
   episodeNumber: number,
 ): EpisodeKey => ({ tmdbId, seasonNumber, episodeNumber });
+
+const mockDb = db as unknown as {
+  __setResults: (rows: unknown[]) => void;
+  __valuesCalls: () => unknown[][];
+  __conflictUpdateCalls: () => unknown[][];
+};
+
+// `vi.clearAllMocks()` does NOT empty the mock db's shared results queue --
+// only `__setResults` does, and a test that never calls it inherits whatever
+// the previous test left behind. The hazard is worse than it looks: the queue
+// is drained by the chain's `then`, which every awaited statement hits, so an
+// awaited *insert* shifts it exactly like a select does. A function issuing
+// two queries in one test would therefore silently feed the second one another
+// test's leftovers. Reset it here instead of relying on the queue happening to
+// have degraded to empty at the right moment.
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockDb.__setResults([]);
+});
+
+const httpError = (status: number): TMDBHttpError => {
+  const error = new Error(`TMDB API error: ${status}`) as TMDBHttpError;
+  error.status = status;
+  return error;
+};
+
+const tmdbEpisode = (episodeNumber: number, runtime: number | null) => ({
+  air_date: "2026-01-01",
+  episode_number: episodeNumber,
+  name: `Episode ${episodeNumber}`,
+  overview: "",
+  runtime,
+});
 
 describe("episodeKeyOf", () => {
   it("builds a stable composite key", () => {
@@ -101,6 +153,17 @@ describe("summariseEpisodeRuntimes", () => {
     );
   });
 
+  it("counts a cached zero as unknown, not as an episode that lasted no time", () => {
+    const lookup: RuntimeLookup = new Map([
+      ["1:1:1", 42],
+      ["1:1:2", 0],
+    ]);
+
+    expect(summariseEpisodeRuntimes([ep(1, 1, 1), ep(1, 1, 2)], lookup)).toEqual(
+      { minutes: 42, unknownCount: 1 },
+    );
+  });
+
   it("returns zeroes for no episodes", () => {
     expect(summariseEpisodeRuntimes([], new Map())).toEqual({
       minutes: 0,
@@ -110,10 +173,6 @@ describe("summariseEpisodeRuntimes", () => {
 });
 
 describe("loadEpisodeRuntimes", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("returns an empty lookup without querying when given no episodes", async () => {
     const lookup = await loadEpisodeRuntimes([]);
 
@@ -122,7 +181,7 @@ describe("loadEpisodeRuntimes", () => {
   });
 
   it("maps returned rows onto composite keys", async () => {
-    (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults([
+    mockDb.__setResults([
       [
         { tmdbId: 1, seasonNumber: 1, episodeNumber: 1, runtime: 42 },
         { tmdbId: 1, seasonNumber: 1, episodeNumber: 2, runtime: null },
@@ -138,53 +197,204 @@ describe("loadEpisodeRuntimes", () => {
 
 describe("ensureSeasonsCached", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     getTVSeasonDetails.mockReset();
   });
 
+  // The season-fetch insert is the *last* `.values(...)` of a run, so its
+  // presence is what "this season was recorded as asked about" means.
+  const seasonFetchRecords = () =>
+    mockDb
+      .__valuesCalls()
+      .map((call) => call[0])
+      .filter(
+        (value): value is { tmdbId: number; seasonNumber: number } =>
+          !Array.isArray(value) &&
+          typeof value === "object" &&
+          value !== null &&
+          "seasonNumber" in value,
+      );
+
   it("does not refetch a season already recorded in tmdb_season_fetch", async () => {
-    (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults([
-      [{ tmdbId: 1, seasonNumber: 1 }],
+    mockDb.__setResults([
+      [{ tmdbId: 1, seasonNumber: 1, fetchedAt: new Date() }],
     ]);
 
-    await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
+    const summary = await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
 
     expect(getTVSeasonDetails).not.toHaveBeenCalled();
+    expect(summary).toEqual({ fetched: 0, skipped: 1, failed: 0 });
   });
 
   it("fetches an unrecorded season and persists every episode, nulls included", async () => {
-    (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults([[]]);
+    mockDb.__setResults([[]]);
     getTVSeasonDetails.mockResolvedValue({
       name: "Season 1",
       season_number: 1,
-      episodes: [
-        { air_date: "2026-01-01", episode_number: 1, name: "A", overview: "", runtime: 42 },
-        { air_date: "2026-01-08", episode_number: 2, name: "B", overview: "", runtime: null },
-      ],
+      episodes: [tmdbEpisode(1, 42), tmdbEpisode(2, null)],
     });
 
-    await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
+    const summary = await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
 
     expect(getTVSeasonDetails).toHaveBeenCalledWith(1, 1);
     // Not just "an insert happened" -- the episode insert is the first call to
     // `.values(...)` in this run (the season-fetch insert follows it), so its
     // first argument must be both episodes, nulls included, correctly mapped.
-    const [firstValuesCall] = (
-      db as unknown as { __valuesCalls: () => unknown[][] }
-    ).__valuesCalls();
+    const [firstValuesCall] = mockDb.__valuesCalls();
     expect(firstValuesCall?.[0]).toEqual([
       { tmdbId: 1, seasonNumber: 1, episodeNumber: 1, runtime: 42 },
       { tmdbId: 1, seasonNumber: 1, episodeNumber: 2, runtime: null },
     ]);
+    expect(summary).toEqual({ fetched: 1, skipped: 0, failed: 0 });
   });
 
-  it("records the season fetch even when TMDB throws, so a broken season is not retried forever", async () => {
-    (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults([[]]);
-    getTVSeasonDetails.mockRejectedValue(new Error("404"));
+  it("deduplicates repeated episode numbers before inserting", async () => {
+    mockDb.__setResults([[]]);
+    // Season 0 (specials) is where TMDB's data is messiest, and a repeated
+    // episode_number makes Postgres raise "ON CONFLICT DO UPDATE command
+    // cannot affect row a second time" -- which used to be caught and
+    // recorded as a permanently empty season.
+    getTVSeasonDetails.mockResolvedValue({
+      name: "Specials",
+      season_number: 0,
+      episodes: [tmdbEpisode(1, 42), tmdbEpisode(1, 45), tmdbEpisode(2, 30)],
+    });
 
-    await expect(
-      ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]),
-    ).resolves.toBeUndefined();
+    await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 0 }]);
+
+    const [firstValuesCall] = mockDb.__valuesCalls();
+    expect(firstValuesCall?.[0]).toEqual([
+      { tmdbId: 1, seasonNumber: 0, episodeNumber: 1, runtime: 45 },
+      { tmdbId: 1, seasonNumber: 0, episodeNumber: 2, runtime: 30 },
+    ]);
+  });
+
+  it("records the season fetch on a 404, which is TMDB answering that the season does not exist", async () => {
+    mockDb.__setResults([[]]);
+    getTVSeasonDetails.mockRejectedValue(httpError(404));
+
+    const summary = await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
+
+    expect(seasonFetchRecords()).toEqual([{ tmdbId: 1, seasonNumber: 1 }]);
+    expect(summary).toEqual({ fetched: 0, skipped: 0, failed: 1 });
+  });
+
+  it.each([
+    ["a rate limit", httpError(429)],
+    ["a server error", httpError(500)],
+    ["a network failure", new Error("fetch failed")],
+  ])(
+    "does not record the season fetch after %s, so the next run retries it",
+    async (_label, error) => {
+      mockDb.__setResults([[]]);
+      getTVSeasonDetails.mockRejectedValue(error);
+
+      const summary = await ensureSeasonsCached([
+        { tmdbId: 1, seasonNumber: 1 },
+      ]);
+
+      // Recording a transient blip would freeze it into "asked, nothing
+      // there" for every user, forever, with no retry path anywhere.
+      expect(seasonFetchRecords()).toEqual([]);
+      expect(summary).toEqual({ fetched: 0, skipped: 0, failed: 1 });
+    },
+  );
+
+  it("skips a season fetched inside the staleness window", async () => {
+    mockDb.__setResults([
+      [
+        {
+          tmdbId: 1,
+          seasonNumber: 1,
+          fetchedAt: new Date(Date.now() - SEASON_FETCH_STALE_AFTER_MS / 2),
+        },
+      ],
+    ]);
+
+    const summary = await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
+
+    expect(getTVSeasonDetails).not.toHaveBeenCalled();
+    expect(summary).toEqual({ fetched: 0, skipped: 1, failed: 0 });
+  });
+
+  it("refetches a season whose record has gone stale, and advances fetched_at", async () => {
+    // A currently-airing season fetched in January holds only the episodes
+    // that had aired by then; without a refresh the rest never get runtimes
+    // for anyone, which undercounts exactly the shows a heavy user watches.
+    mockDb.__setResults([
+      [
+        {
+          tmdbId: 1,
+          seasonNumber: 1,
+          fetchedAt: new Date(Date.now() - SEASON_FETCH_STALE_AFTER_MS - 1000),
+        },
+      ],
+    ]);
+    getTVSeasonDetails.mockResolvedValue({
+      name: "Season 1",
+      season_number: 1,
+      episodes: [tmdbEpisode(1, 42)],
+    });
+
+    const summary = await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
+
+    expect(getTVSeasonDetails).toHaveBeenCalledWith(1, 1);
+    expect(summary).toEqual({ fetched: 1, skipped: 0, failed: 0 });
+    // Leaving the original timestamp in place would keep the row stale
+    // forever, refetching the same season on every single run.
+    const conflictSets = mockDb
+      .__conflictUpdateCalls()
+      .map((call) => call[0] as { set?: Record<string, unknown> });
+    const fetchedAtUpdate = conflictSets.find(
+      (config) => config.set && "fetchedAt" in config.set,
+    );
+    expect(fetchedAtUpdate?.set?.fetchedAt).toBeInstanceOf(Date);
+  });
+
+  it("waits between fetches, but not before the first", async () => {
+    mockDb.__setResults([[]]);
+    getTVSeasonDetails.mockResolvedValue({
+      name: "Season 1",
+      season_number: 1,
+      episodes: [],
+    });
+
+    const startedAt = Date.now();
+    await ensureSeasonsCached([
+      { tmdbId: 1, seasonNumber: 1 },
+      { tmdbId: 2, seasonNumber: 1 },
+    ]);
+    const elapsed = Date.now() - startedAt;
+
+    // Two fetches means exactly one gap. Without this throttle, a generation
+    // run handing the whole deduped array to this function would fire dozens
+    // of TMDB requests back to back.
+    expect(getTVSeasonDetails).toHaveBeenCalledTimes(2);
+    expect(elapsed).toBeGreaterThanOrEqual(SEASON_FETCH_GAP_MS);
+    expect(elapsed).toBeLessThan(SEASON_FETCH_GAP_MS * 2);
+  });
+
+  it("does not wait at all when every season is already cached", async () => {
+    mockDb.__setResults([
+      [
+        { tmdbId: 1, seasonNumber: 1, fetchedAt: new Date() },
+        { tmdbId: 2, seasonNumber: 1, fetchedAt: new Date() },
+      ],
+    ]);
+
+    const startedAt = Date.now();
+    await ensureSeasonsCached([
+      { tmdbId: 1, seasonNumber: 1 },
+      { tmdbId: 2, seasonNumber: 1 },
+    ]);
+
+    expect(Date.now() - startedAt).toBeLessThan(SEASON_FETCH_GAP_MS);
+  });
+
+  it("returns a zero summary for no pairs, without querying", async () => {
+    const summary = await ensureSeasonsCached([]);
+
+    expect(summary).toEqual({ fetched: 0, skipped: 0, failed: 0 });
+    expect(db.select).not.toHaveBeenCalled();
   });
 });
 
@@ -219,13 +429,25 @@ describe("summariseFilmRuntimes", () => {
       unknownCount: 1,
     });
   });
+
+  it("counts a stored zero as unknown, not as a film that lasted no time", () => {
+    // Write sites normalise TMDB's 0 to null, but the column can still hold a
+    // 0 written before that existed or by anything else that touches the
+    // cache. A known zero is the silent understatement this module's whole
+    // unknown-count contract exists to prevent.
+    const lookup = new Map<number, number | null>([
+      [1, 164],
+      [2, 0],
+    ]);
+
+    expect(summariseFilmRuntimes([1, 2], lookup)).toEqual({
+      minutes: 164,
+      unknownCount: 1,
+    });
+  });
 });
 
 describe("loadFilmRuntimes", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("returns an empty map without querying when given no ids", async () => {
     const lookup = await loadFilmRuntimes([]);
 
