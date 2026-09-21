@@ -329,6 +329,10 @@ export const tmdbCache = pgTable(
     castIds: integer("cast_ids").array().notNull().default([]),
     keywordIds: integer("keyword_ids").array().notNull().default([]),
     adult: boolean("adult"),
+    // Films only; TV rows leave this null and use `tmdb_episode_runtime`
+    // instead, because a series-level average is wrong for any show whose
+    // episodes vary in length -- which is most of them.
+    runtime: integer("runtime"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -337,6 +341,48 @@ export const tmdbCache = pgTable(
       .notNull(),
   },
   (table) => [unique().on(table.tmdbId, table.contentType)],
+);
+
+// Per-episode runtimes from TMDB. Global and user-independent: one fetch of a
+// season serves every user forever.
+export const tmdbEpisodeRuntime = pgTable(
+  "tmdb_episode_runtime",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tmdbId: integer("tmdb_id").notNull(),
+    seasonNumber: integer("season_number").notNull(),
+    episodeNumber: integer("episode_number").notNull(),
+    // Nullable: TMDB genuinely has no runtime for some episodes. A null here
+    // means "asked, and TMDB does not know", which is different from an
+    // absent row meaning "never asked".
+    runtime: integer("runtime"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique().on(table.tmdbId, table.seasonNumber, table.episodeNumber),
+  ],
+);
+
+// Records which (show, season) pairs have been fetched from TMDB. Exists only
+// to distinguish "TMDB has no runtime for these episodes" from "we never
+// asked" -- without it, a season whose episodes all lack runtimes is refetched
+// on every generation, forever.
+export const tmdbSeasonFetch = pgTable(
+  "tmdb_season_fetch",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tmdbId: integer("tmdb_id").notNull(),
+    seasonNumber: integer("season_number").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [unique().on(table.tmdbId, table.seasonNumber)],
 );
 
 // Relations
@@ -381,6 +427,12 @@ export type NewUserStreamingProvider =
 
 export type TMDBCache = typeof tmdbCache.$inferSelect;
 export type NewTMDBCache = typeof tmdbCache.$inferInsert;
+
+export type TmdbEpisodeRuntime = typeof tmdbEpisodeRuntime.$inferSelect;
+export type NewTmdbEpisodeRuntime = typeof tmdbEpisodeRuntime.$inferInsert;
+
+export type TmdbSeasonFetch = typeof tmdbSeasonFetch.$inferSelect;
+export type NewTmdbSeasonFetch = typeof tmdbSeasonFetch.$inferInsert;
 
 // Enums for type safety
 export const ListType = {
