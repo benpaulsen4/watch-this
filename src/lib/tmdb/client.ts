@@ -64,7 +64,26 @@ export interface TMDBGenre {
 
 export interface TMDBMovieDetails extends Omit<TMDBMovie, "genre_ids"> {
   genres: TMDBGenre[];
-  runtime: number;
+  // TMDB returns null for films it has no runtime for, and 0 for others. The
+  // Series Finale runtime cache depends on telling "unknown" apart from
+  // "zero", so this must not be narrowed back to `number` -- and anything
+  // stored from it goes through `normaliseFilmRuntime` first.
+  runtime: number | null;
+}
+
+/**
+ * Normalise a film runtime for storage.
+ *
+ * TMDB reports "no runtime" as `0` about as often as it reports it as `null`,
+ * and a stored `0` is indistinguishable from a film that genuinely lasts no
+ * time: it gets summed as a *known* zero minutes instead of being counted as
+ * unknown, silently understating "hours watched". Anything non-positive
+ * becomes null, which is the cache's word for "asked, and TMDB does not know".
+ */
+export function normaliseFilmRuntime(
+  runtime: number | null | undefined,
+): number | null {
+  return typeof runtime === "number" && runtime > 0 ? runtime : null;
 }
 
 export interface ExtendedTMDBMovieDetails extends TMDBMovieDetails {
@@ -183,6 +202,25 @@ export interface TMDBSeason {
 
 export type ContentType = "movie" | "tv";
 
+/**
+ * An error from a TMDB response that came back non-2xx, carrying the status.
+ *
+ * The status used to survive only as text inside the message, which made a
+ * permanent 404 and a transient 429 or 5xx indistinguishable to any caller
+ * unwilling to parse an error message. Callers that cache the *absence* of
+ * data have to tell those apart, so the status is a real property.
+ */
+export interface TMDBHttpError extends Error {
+  status: number;
+}
+
+export function isTMDBHttpError(error: unknown): error is TMDBHttpError {
+  return (
+    error instanceof Error &&
+    typeof (error as Partial<TMDBHttpError>).status === "number"
+  );
+}
+
 class TMDBClient {
   private async request<T>(
     endpoint: string,
@@ -218,9 +256,13 @@ class TMDBClient {
     );
 
     if (!response.ok) {
-      throw new Error(
+      // Same Error and same message as before -- the status is added, not
+      // moved, so nothing that already catches this changes behaviour.
+      const error = new Error(
         `TMDB API error: ${response.status} ${response.statusText}`,
-      );
+      ) as TMDBHttpError;
+      error.status = response.status;
+      throw error;
     }
 
     const data = await response.json();
