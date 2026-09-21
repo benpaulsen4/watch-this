@@ -9,6 +9,7 @@ import { ContentType, ContentTypeEnum, db, TMDBCache, tmdbCache } from "../db";
 import {
   ExtendedTMDBMovieDetails,
   ExtendedTMDBTVShowDetails,
+  normaliseFilmRuntime,
   tmdbClient,
 } from "./client";
 
@@ -99,6 +100,17 @@ export async function addToCache(
       castIds,
       keywordIds,
       adult: "adult" in contentDetails! ? contentDetails.adult : null,
+      // The details call above already carries this for films, and dropping it
+      // meant nothing but the one-shot backfill ever filled the column: every
+      // film cached afterwards had a permanently null runtime, so the film
+      // half of Series Finale's "hours watched" decayed as the catalogue grew.
+      // TV rows stay null deliberately -- a series-level average is wrong for
+      // any show whose episodes vary in length, which is what
+      // `tmdb_episode_runtime` exists for.
+      runtime:
+        "runtime" in contentDetails!
+          ? normaliseFilmRuntime(contentDetails.runtime)
+          : null,
     })
     .onConflictDoNothing()
     .returning(cacheColumns);
@@ -173,6 +185,12 @@ async function updateCache(
       castIds,
       keywordIds,
       adult: "adult" in contentDetails! ? contentDetails.adult : null,
+      // `runtime` is deliberately NOT refreshed here, unlike every field
+      // above. This is a blind overwrite of a row it does not read first, and
+      // TMDB reports "no runtime" as 0 or null often enough that one such
+      // response would replace a good cached runtime with "unknown" for every
+      // user. A film's length does not change; the value only needs writing
+      // once, which `addToCache` and the backfill both do.
       updatedAt: new Date(),
     })
     .where(eq(tmdbCache.id, cacheId))

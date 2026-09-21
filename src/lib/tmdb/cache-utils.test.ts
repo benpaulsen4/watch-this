@@ -71,12 +71,20 @@ vi.mock("../content-status/service", () => ({
   enrichAllWithContentStatus: vi.fn(async (c: any[]) => c),
 }));
 
-vi.mock("./client", () => ({
-  tmdbClient: {
-    getExtendedMovieDetails: vi.fn(),
-    getExtendedTVShowDetails: vi.fn(),
-  },
-}));
+// Spread the real module: only the network-touching client needs replacing,
+// and `addToCache` normalises a film runtime with the client's own helper. A
+// bare stub would drop it and fail at call time rather than at type-check.
+vi.mock("./client", async () => {
+  const actual = await vi.importActual<typeof import("./client")>("./client");
+
+  return {
+    ...actual,
+    tmdbClient: {
+      getExtendedMovieDetails: vi.fn(),
+      getExtendedTVShowDetails: vi.fn(),
+    },
+  };
+});
 
 import { db } from "../db";
 import { addToCache, getAllCachedContent, getCachedContent } from "./cache-utils";
@@ -84,7 +92,7 @@ import { tmdbClient } from "./client";
 
 const anyDb = db as any;
 
-function movieDetails(releaseDate: string) {
+function movieDetails(releaseDate: string, runtime: number | null = 164) {
   return {
     id: 501,
     title: "Untitled Sequel",
@@ -97,6 +105,7 @@ function movieDetails(releaseDate: string) {
     popularity: 0,
     genres: [{ id: 28 }],
     adult: false,
+    runtime,
     credits: { cast: [{ id: 1 }] },
     keywords: { keywords: [{ id: 2 }] },
   };
@@ -186,6 +195,53 @@ describe("cache-utils", () => {
       expect(payload.releaseDate.toISOString()).toBe(
         new Date("2024-05-17").toISOString(),
       );
+    });
+  });
+
+  describe("film runtimes are cached on the way in", () => {
+    it("stores the runtime the details call already fetched", async () => {
+      (tmdbClient.getExtendedMovieDetails as any).mockResolvedValue(
+        movieDetails("2024-05-17", 164),
+      );
+      anyDb.__setMockResults([[cacheRow()]]);
+
+      await addToCache(501, "movie");
+
+      // Without this, the only thing that ever filled `tmdb_cache.runtime` was
+      // the one-shot backfill, so every film cached afterwards had a null
+      // runtime and the film half of "hours watched" decayed as the catalogue
+      // grew.
+      const [payload] = anyDb.__getInsertPayloads();
+      expect(payload.runtime).toBe(164);
+    });
+
+    it("stores null rather than zero when TMDB has no runtime", async () => {
+      (tmdbClient.getExtendedMovieDetails as any).mockResolvedValue(
+        movieDetails("2024-05-17", 0),
+      );
+      anyDb.__setMockResults([[cacheRow()]]);
+
+      await addToCache(501, "movie");
+
+      // A stored 0 collides with a genuinely known zero-minute film and gets
+      // summed as one; null is the cache's word for "asked, and TMDB does not
+      // know".
+      const [payload] = anyDb.__getInsertPayloads();
+      expect(payload.runtime).toBeNull();
+    });
+
+    it("leaves a TV row's runtime null", async () => {
+      (tmdbClient.getExtendedTVShowDetails as any).mockResolvedValue(
+        tvDetails("2024-05-17"),
+      );
+      anyDb.__setMockResults([[cacheRow({ tmdbId: 502, contentType: "tv" })]]);
+
+      await addToCache(502, "tv");
+
+      // A series-level average is wrong for any show whose episodes vary in
+      // length, which is what `tmdb_episode_runtime` exists for.
+      const [payload] = anyDb.__getInsertPayloads();
+      expect(payload.runtime).toBeNull();
     });
   });
 
