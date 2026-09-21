@@ -1,6 +1,6 @@
-import { inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
-import { db, tmdbEpisodeRuntime, tmdbSeasonFetch } from "../db";
+import { ContentType, db, tmdbCache, tmdbEpisodeRuntime, tmdbSeasonFetch } from "../db";
 import { tmdbClient } from "../tmdb/client";
 
 export interface EpisodeKey {
@@ -160,4 +160,47 @@ export async function ensureSeasonsCached(pairs: SeasonKey[]): Promise<void> {
       .values({ tmdbId: season.tmdbId, seasonNumber: season.seasonNumber })
       .onConflictDoNothing();
   }
+}
+
+/** Read cached film runtimes from `tmdb_cache`. */
+export async function loadFilmRuntimes(
+  tmdbIds: number[],
+): Promise<Map<number, number | null>> {
+  if (tmdbIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({ tmdbId: tmdbCache.tmdbId, runtime: tmdbCache.runtime })
+    .from(tmdbCache)
+    .where(
+      and(
+        inArray(tmdbCache.tmdbId, tmdbIds),
+        eq(tmdbCache.contentType, ContentType.MOVIE),
+      ),
+    );
+
+  return new Map(rows.map((row) => [row.tmdbId, row.runtime]));
+}
+
+/**
+ * Total known minutes across `tmdbIds`, plus a count of those whose runtime is
+ * unknown. Same contract as `summariseEpisodeRuntimes`, and unknown is counted
+ * for the same reason: a silent zero would understate the headline.
+ */
+export function summariseFilmRuntimes(
+  tmdbIds: number[],
+  lookup: Map<number, number | null>,
+): { minutes: number; unknownCount: number } {
+  let minutes = 0;
+  let unknownCount = 0;
+
+  for (const tmdbId of tmdbIds) {
+    const runtime = lookup.get(tmdbId);
+    if (typeof runtime === "number") {
+      minutes += runtime;
+    } else {
+      unknownCount += 1;
+    }
+  }
+
+  return { minutes, unknownCount };
 }

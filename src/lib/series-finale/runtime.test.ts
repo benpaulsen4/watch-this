@@ -43,8 +43,10 @@ import {
   type EpisodeKey,
   episodeKeyOf,
   loadEpisodeRuntimes,
+  loadFilmRuntimes,
   type RuntimeLookup,
   summariseEpisodeRuntimes,
+  summariseFilmRuntimes,
 } from "./runtime";
 
 const ep = (
@@ -169,5 +171,51 @@ describe("ensureSeasonsCached", () => {
     await expect(
       ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("summariseFilmRuntimes", () => {
+  it("sums known film runtimes", () => {
+    const lookup = new Map<number, number | null>([
+      [1, 164],
+      [2, 120],
+    ]);
+
+    expect(summariseFilmRuntimes([1, 2], lookup)).toEqual({
+      minutes: 284,
+      unknownCount: 0,
+    });
+  });
+
+  it("counts a null runtime as unknown", () => {
+    const lookup = new Map<number, number | null>([
+      [1, 164],
+      [2, null],
+    ]);
+
+    expect(summariseFilmRuntimes([1, 2], lookup)).toEqual({
+      minutes: 164,
+      unknownCount: 1,
+    });
+  });
+
+  it("counts an absent film as unknown", () => {
+    expect(summariseFilmRuntimes([1], new Map())).toEqual({
+      minutes: 0,
+      unknownCount: 1,
+    });
+  });
+});
+
+describe("loadFilmRuntimes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns an empty map without querying when given no ids", async () => {
+    const lookup = await loadFilmRuntimes([]);
+
+    expect(lookup.size).toBe(0);
+    expect(db.select).not.toHaveBeenCalled();
   });
 });
