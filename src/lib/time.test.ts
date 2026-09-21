@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_TIME_ZONE, getTimezoneDateKey, resolveTimeZone } from "./time";
+import {
+  DEFAULT_TIME_ZONE,
+  getTimezoneDateKey,
+  getTimezoneHour,
+  getTimezoneWeekday,
+  resolveTimeZone,
+} from "./time";
 
 describe("resolveTimeZone", () => {
   // LOGIC-12 / DATA-10: `Intl.DateTimeFormat` throws `RangeError` on an unknown
@@ -34,6 +40,49 @@ describe("getTimezoneDateKey", () => {
   it("zero-pads so keys sort lexicographically", () => {
     expect(getTimezoneDateKey(new Date("2026-01-02T12:00:00Z"), "UTC")).toBe(
       "2026-01-02",
+    );
+  });
+});
+
+describe("getTimezoneWeekday", () => {
+  it("returns 0 for Monday", () => {
+    // 2026-03-16T12:00:00Z is a Monday
+    expect(getTimezoneWeekday(new Date("2026-03-16T12:00:00Z"), "UTC")).toBe(0);
+  });
+
+  it("returns 6 for Sunday", () => {
+    // 2026-03-15T12:00:00Z is a Sunday
+    expect(getTimezoneWeekday(new Date("2026-03-15T12:00:00Z"), "UTC")).toBe(6);
+  });
+
+  it("uses the caller's timezone, not the server's", () => {
+    // 23:30 Sunday UTC is already Monday in Sydney
+    const at = new Date("2026-03-15T23:30:00Z");
+    expect(getTimezoneWeekday(at, "UTC")).toBe(6);
+    expect(getTimezoneWeekday(at, "Australia/Sydney")).toBe(0);
+  });
+
+  it("falls back to UTC for an unknown zone rather than throwing", () => {
+    expect(
+      getTimezoneWeekday(new Date("2026-03-16T12:00:00Z"), "Mars/Olympus"),
+    ).toBe(0);
+  });
+});
+
+describe("getTimezoneHour", () => {
+  it("returns the hour observed in the zone", () => {
+    const at = new Date("2026-03-16T21:30:00Z");
+    expect(getTimezoneHour(at, "UTC")).toBe(21);
+    expect(getTimezoneHour(at, "America/New_York")).toBe(17);
+  });
+
+  it("returns 0 for midnight rather than 24", () => {
+    expect(getTimezoneHour(new Date("2026-03-16T00:15:00Z"), "UTC")).toBe(0);
+  });
+
+  it("falls back to UTC for an unknown zone", () => {
+    expect(getTimezoneHour(new Date("2026-03-16T21:30:00Z"), "Mars/Olympus")).toBe(
+      21,
     );
   });
 });
