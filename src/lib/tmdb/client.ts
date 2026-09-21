@@ -113,7 +113,10 @@ export interface TMDBEpisode {
   episode_number: number;
   name: string;
   overview: string;
-  runtime: number;
+  // TMDB returns null for episodes it has no runtime for. The Series Finale
+  // runtime cache depends on telling "unknown" apart from "zero", so this
+  // must not be narrowed back to `number`.
+  runtime: number | null;
 }
 
 export interface TMDBWatchProvider {
