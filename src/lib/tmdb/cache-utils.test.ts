@@ -123,6 +123,10 @@ function tvDetails(firstAirDate: string) {
     vote_count: 0,
     popularity: 0,
     genres: [{ id: 18 }],
+    // Not a field the TV endpoint returns today. It is here to prove the
+    // write is gated on our content type rather than on the payload shape:
+    // a series-level runtime must never reach a TV row.
+    runtime: 45,
     aggregate_credits: { cast: [{ id: 3 }] },
     keywords: { results: [{ id: 4 }] },
   };

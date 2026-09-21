@@ -106,9 +106,11 @@ export async function addToCache(
       // half of Series Finale's "hours watched" decayed as the catalogue grew.
       // TV rows stay null deliberately -- a series-level average is wrong for
       // any show whose episodes vary in length, which is what
-      // `tmdb_episode_runtime` exists for.
+      // `tmdb_episode_runtime` exists for. Gated on our own content type, not
+      // just on the payload carrying the key, so a TV row stays null even if
+      // TMDB starts returning a `runtime` on the series endpoint.
       runtime:
-        "runtime" in contentDetails!
+        contentType === ContentType.MOVIE && "runtime" in contentDetails!
           ? normaliseFilmRuntime(contentDetails.runtime)
           : null,
     })
