@@ -1,10 +1,42 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../db", async () => {
+  const actual =
+    await vi.importActual<typeof import("../db/schema")>("../db/schema");
+
+  const resultsQueue: unknown[] = [];
+  const chain: Record<string, unknown> = {};
+  Object.assign(chain, {
+    from: () => chain,
+    where: () => chain,
+    values: () => chain,
+    onConflictDoNothing: () => chain,
+    onConflictDoUpdate: () => chain,
+    then: (resolve: (v: unknown) => unknown) =>
+      Promise.resolve(resultsQueue.shift() ?? []).then(resolve),
+  });
+
+  const db = {
+    select: vi.fn(() => chain),
+    insert: vi.fn(() => chain),
+    __setResults: (rows: unknown[]) => {
+      resultsQueue.length = 0;
+      resultsQueue.push(...rows);
+    },
+  };
+
+  // Real tables, not stubs: drizzle's operators need actual Column objects,
+  // and later tests in this file import `tmdbCache` and `ContentType` too.
+  return { ...actual, db };
+});
+
+import { db } from "../db";
 import {
-  episodeKeyOf,
-  summariseEpisodeRuntimes,
   type EpisodeKey,
+  episodeKeyOf,
+  loadEpisodeRuntimes,
   type RuntimeLookup,
+  summariseEpisodeRuntimes,
 } from "./runtime";
 
 const ep = (
@@ -59,5 +91,32 @@ describe("summariseEpisodeRuntimes", () => {
       minutes: 0,
       unknownCount: 0,
     });
+  });
+});
+
+describe("loadEpisodeRuntimes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns an empty lookup without querying when given no episodes", async () => {
+    const lookup = await loadEpisodeRuntimes([]);
+
+    expect(lookup.size).toBe(0);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it("maps returned rows onto composite keys", async () => {
+    (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults([
+      [
+        { tmdbId: 1, seasonNumber: 1, episodeNumber: 1, runtime: 42 },
+        { tmdbId: 1, seasonNumber: 1, episodeNumber: 2, runtime: null },
+      ],
+    ]);
+
+    const lookup = await loadEpisodeRuntimes([ep(1, 1, 1), ep(1, 1, 2)]);
+
+    expect(lookup.get("1:1:1")).toBe(42);
+    expect(lookup.get("1:1:2")).toBeNull();
   });
 });

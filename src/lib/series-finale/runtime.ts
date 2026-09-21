@@ -1,3 +1,7 @@
+import { inArray } from "drizzle-orm";
+
+import { db, tmdbEpisodeRuntime } from "../db";
+
 export interface EpisodeKey {
   tmdbId: number;
   seasonNumber: number;
@@ -41,4 +45,36 @@ export function summariseEpisodeRuntimes(
   }
 
   return { minutes, unknownCount };
+}
+
+/**
+ * Read cached runtimes for the given episodes.
+ *
+ * Queries by distinct show so the predicate stays a small set of
+ * `tmdb_id IN (...)` rather than one clause per episode; a heavy user has
+ * thousands of episodes but only dozens of shows.
+ */
+export async function loadEpisodeRuntimes(
+  episodes: EpisodeKey[],
+): Promise<RuntimeLookup> {
+  if (episodes.length === 0) return new Map();
+
+  const showIds = Array.from(new Set(episodes.map((e) => e.tmdbId)));
+
+  const rows = await db
+    .select({
+      tmdbId: tmdbEpisodeRuntime.tmdbId,
+      seasonNumber: tmdbEpisodeRuntime.seasonNumber,
+      episodeNumber: tmdbEpisodeRuntime.episodeNumber,
+      runtime: tmdbEpisodeRuntime.runtime,
+    })
+    .from(tmdbEpisodeRuntime)
+    .where(inArray(tmdbEpisodeRuntime.tmdbId, showIds));
+
+  const lookup: RuntimeLookup = new Map();
+  for (const row of rows) {
+    lookup.set(episodeKeyOf(row), row.runtime);
+  }
+
+  return lookup;
 }
