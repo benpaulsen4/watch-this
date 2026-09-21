@@ -88,14 +88,8 @@ database; everything else here is a standalone converter.
 npm run backfill:runtimes
 ```
 
-The npm script runs the file through `tsx`, which today resolves from
-`node_modules/.bin` as a transitive dependency rather than one this project
-installs directly. If that ever stops being true and the script can't find
-`tsx`, fall back to:
-
-```bash
-npx tsx tools/backfill-runtimes.ts
-```
+The npm script runs the file through `tsx`, which this project now declares as
+a devDependency, so `npm install` is all it takes to have it.
 
 ### Environment
 
@@ -105,12 +99,20 @@ requires them. The script imports `src/lib/db`, which throws immediately if
 
 ### Re-run safety
 
-Safe to run more than once, and safe to stop partway through. Every season it
-looks at gets recorded in `tmdb_season_fetch` as soon as it's attempted,
-whether the TMDB call succeeded or not, so a re-run only asks about seasons
-it hasn't recorded yet. Film lookups skip any `tmdb_cache` row that already
-has a runtime. The practical effect: a season or film that failed the first
-time gets retried on the next run, and everything else is a no-op.
+Safe to run more than once, and safe to stop partway through. A season is
+recorded in `tmdb_season_fetch` only when TMDB gave a definitive answer:
+either the season came back, or TMDB returned a 404 saying there is no such
+season. A rate limit, a server error or a dropped connection records nothing,
+so the next run asks again -- that is the retry path, and it happens by
+itself rather than being something you have to arrange. Film lookups skip
+any `tmdb_cache` row that already has a runtime, and a film that failed is
+retried the same way.
+
+Recorded seasons are re-asked about after 30 days. A season that was still
+airing when it was first fetched only had some of its episodes then, and
+without a refresh the rest would never get runtimes for anyone. The cost is
+bounded by shows x seasons rather than by episodes, so a monthly re-ask is
+cheap next to a permanent undercount.
 
 One film case is not a no-op on re-run: a film can sit in a user's watch
 history with no `tmdb_cache` row at all (the profile bulk importer writes
@@ -119,6 +121,13 @@ script to attach a runtime to, so it counts and skips these rather than
 fetching a runtime it would have nowhere to put. The end-of-run summary
 reports how many; get the app's own caching path to run for them first
 (viewing or adding the title works), then re-run this script.
+
+### What it reports
+
+The end-of-run summary counts both halves: seasons considered, fetched,
+already cached and failed, then the same for films plus the no-cache-row
+skips. Seasons are the slow half and report only when they finish; films
+print a progress line every 25 titles considered, cached or not.
 
 ### Before enabling Series Finale
 
