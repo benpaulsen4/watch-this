@@ -1,6 +1,7 @@
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 
-import { db, tmdbEpisodeRuntime } from "../db";
+import { db, tmdbEpisodeRuntime, tmdbSeasonFetch } from "../db";
+import { tmdbClient } from "../tmdb/client";
 
 export interface EpisodeKey {
   tmdbId: number;
@@ -77,4 +78,86 @@ export async function loadEpisodeRuntimes(
   }
 
   return lookup;
+}
+
+export interface SeasonKey {
+  tmdbId: number;
+  seasonNumber: number;
+}
+
+/**
+ * Make sure every given (show, season) has been asked for at least once,
+ * fetching and persisting per-episode runtimes for those that have not.
+ *
+ * Best-effort by design: a TMDB failure must not cost the caller its whole
+ * generation run. A season that fails is still recorded as fetched, because
+ * the alternative is retrying a permanently-404ing season on every generation
+ * for every user, forever. Re-running the backfill script is the deliberate
+ * way to retry.
+ */
+export async function ensureSeasonsCached(pairs: SeasonKey[]): Promise<void> {
+  if (pairs.length === 0) return;
+
+  const unique = new Map<string, SeasonKey>();
+  for (const pair of pairs) {
+    unique.set(`${pair.tmdbId}:${pair.seasonNumber}`, pair);
+  }
+
+  const showIds = Array.from(new Set(pairs.map((p) => p.tmdbId)));
+  const fetched = await db
+    .select({
+      tmdbId: tmdbSeasonFetch.tmdbId,
+      seasonNumber: tmdbSeasonFetch.seasonNumber,
+    })
+    .from(tmdbSeasonFetch)
+    .where(inArray(tmdbSeasonFetch.tmdbId, showIds));
+
+  const alreadyFetched = new Set(
+    fetched.map((row) => `${row.tmdbId}:${row.seasonNumber}`),
+  );
+
+  for (const [key, season] of unique) {
+    if (alreadyFetched.has(key)) continue;
+
+    try {
+      const details = await tmdbClient.getTVSeasonDetails(
+        season.tmdbId,
+        season.seasonNumber,
+      );
+
+      if (details.episodes.length > 0) {
+        await db
+          .insert(tmdbEpisodeRuntime)
+          .values(
+            details.episodes.map((episode) => ({
+              tmdbId: season.tmdbId,
+              seasonNumber: season.seasonNumber,
+              episodeNumber: episode.episode_number,
+              runtime: episode.runtime,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [
+              tmdbEpisodeRuntime.tmdbId,
+              tmdbEpisodeRuntime.seasonNumber,
+              tmdbEpisodeRuntime.episodeNumber,
+            ],
+            set: {
+              runtime: sql`excluded.runtime`,
+              updatedAt: new Date(),
+            },
+          });
+      }
+    } catch (error) {
+      console.error(
+        `Series Finale: failed to fetch season ${season.tmdbId}/${season.seasonNumber}`,
+        error,
+      );
+    }
+
+    await db
+      .insert(tmdbSeasonFetch)
+      .values({ tmdbId: season.tmdbId, seasonNumber: season.seasonNumber })
+      .onConflictDoNothing();
+  }
 }

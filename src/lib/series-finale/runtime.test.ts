@@ -30,8 +30,16 @@ vi.mock("../db", async () => {
   return { ...actual, db };
 });
 
+const getTVSeasonDetails = vi.fn();
+vi.mock("../tmdb/client", () => ({
+  tmdbClient: {
+    getTVSeasonDetails: (...args: unknown[]) => getTVSeasonDetails(...args),
+  },
+}));
+
 import { db } from "../db";
 import {
+  ensureSeasonsCached,
   type EpisodeKey,
   episodeKeyOf,
   loadEpisodeRuntimes,
@@ -118,5 +126,48 @@ describe("loadEpisodeRuntimes", () => {
 
     expect(lookup.get("1:1:1")).toBe(42);
     expect(lookup.get("1:1:2")).toBeNull();
+  });
+});
+
+describe("ensureSeasonsCached", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getTVSeasonDetails.mockReset();
+  });
+
+  it("does not refetch a season already recorded in tmdb_season_fetch", async () => {
+    (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults([
+      [{ tmdbId: 1, seasonNumber: 1 }],
+    ]);
+
+    await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
+
+    expect(getTVSeasonDetails).not.toHaveBeenCalled();
+  });
+
+  it("fetches an unrecorded season and persists every episode, nulls included", async () => {
+    (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults([[]]);
+    getTVSeasonDetails.mockResolvedValue({
+      name: "Season 1",
+      season_number: 1,
+      episodes: [
+        { air_date: "2026-01-01", episode_number: 1, name: "A", overview: "", runtime: 42 },
+        { air_date: "2026-01-08", episode_number: 2, name: "B", overview: "", runtime: null },
+      ],
+    });
+
+    await ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]);
+
+    expect(getTVSeasonDetails).toHaveBeenCalledWith(1, 1);
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it("records the season fetch even when TMDB throws, so a broken season is not retried forever", async () => {
+    (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults([[]]);
+    getTVSeasonDetails.mockRejectedValue(new Error("404"));
+
+    await expect(
+      ensureSeasonsCached([{ tmdbId: 1, seasonNumber: 1 }]),
+    ).resolves.toBeUndefined();
   });
 });
