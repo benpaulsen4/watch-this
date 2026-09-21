@@ -15,7 +15,13 @@ import {
 } from "../db";
 import { getList } from "./service";
 
-type CacheEquivalent = Omit<TMDBCache, "id" | "createdAt" | "updatedAt">;
+// `runtime` is deliberately optional here. The recommendations writer has no
+// reason to know a film's length, and the Series Finale runtime cache is
+// warmed by its own backfill, which looks for exactly these null rows.
+type CacheEquivalent = Omit<
+  TMDBCache,
+  "id" | "createdAt" | "updatedAt" | "runtime"
+> & { runtime?: number | null };
 type RecommendationKey = { tmdbId: number; contentType: ContentTypeEnum };
 
 function pickTopIdsByCount(tally: Map<number, number>): number[] {
