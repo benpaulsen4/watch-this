@@ -928,6 +928,29 @@ describe("buildPayload", () => {
     expect(payload.bigDay?.soloTickCount).toBe(1);
   });
 
+  it("classifies one-genre-only from the share of titles, not of genre tags", () => {
+    // Ten completed titles, every one of them tagged Drama -- and, as TMDB
+    // titles usually are, tagged two other things alongside. That is 100% of
+    // the titles and 33% of the tags, so reading the rounded tag percent off
+    // the genres card leaves the archetype unreachable for a user who watched
+    // nothing but one genre.
+    const statuses = Array.from({ length: 10 }, (_, i) =>
+      status({ tmdbId: i + 1 }),
+    );
+    const titles = titleMap(
+      Array.from({ length: 10 }, (_, i) =>
+        title({ tmdbId: i + 1, genreIds: [1, 2, 3] }),
+      ),
+    );
+
+    const payload = buildPayload(input({ statuses, titles }), NOW);
+
+    expect(payload.rhythm.archetype).toBe("one-genre-only");
+    // The display card keeps its own denominator: a tag share, not a title
+    // share. The two answer different questions and must not be collapsed.
+    expect(payload.genres[0]?.percent).toBe(33);
+  });
+
   it("routes each statistic to the field named for it", () => {
     // Every other test in this block leaves `statuses` empty, which makes
     // `titlesDropped`, `titlesCompleted` and `finished.total` all zero -- so

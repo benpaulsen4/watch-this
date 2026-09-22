@@ -28,6 +28,12 @@ export interface ArchetypeInput {
    * same name, different denominator, and one caller wires up both.
    */
   soloTickCount: number;
+  /**
+   * Share of completed TITLES carrying the most common genre tag, unrounded.
+   * Not the share of genre tags that `SeriesFinalePayload["genres"]` reports:
+   * titles usually carry two or three tags, so the two differ by roughly that
+   * factor and only this one answers "how much of your year was one genre".
+   */
   topGenreShare: number;
   medianPopularity: number | null;
   collaborativeCompletedShare: number;

@@ -304,6 +304,10 @@ export function buildNiche(
  * renderer that assumes the list sums to 100 -- a stacked bar drawn to a fixed
  * width, say -- will overflow. Treat the percents as labels and compute any
  * geometry from the shares themselves.
+ *
+ * Deliberately NOT the number the `one-genre-only` archetype reads: that one is
+ * `topGenreTitleShare` below, over a different denominator. Do not collapse the
+ * two -- see its comment for why they answer different questions.
  */
 export function buildGenres(
   statuses: ContentStatusRow[],
@@ -348,6 +352,48 @@ export function buildGenres(
   }
 
   return result;
+}
+
+/**
+ * Share of completed titles carrying the single most common genre tag, for the
+ * `one-genre-only` archetype.
+ *
+ * Computed here rather than read off `buildGenres`, for two reasons.
+ *
+ * The denominators differ, and both are right for their own question.
+ * `buildGenres` divides by the number of genre TAGS, because a breakdown of
+ * "what your year looked like" should let one title speak for each label it
+ * carries. This divides by the number of TITLES, because the archetype asks
+ * "how much of what you finished was this one genre" -- and a TMDB title
+ * usually carries two or three tags, so the tag denominator drags the answer
+ * down by exactly that factor. Ten titles all tagged Drama/Thriller/Crime are
+ * 100% Drama by title and 33% by tag; against a 0.4 threshold the rule could
+ * not fire for a user watching nothing but that one genre. Neither figure is
+ * wrong; they are answers to different questions, so leave them apart.
+ *
+ * It is also unrounded. `buildGenres` rounds for display, and a classification
+ * threshold reading a display percent moves whenever the rounding does -- 0.395
+ * would classify, 0.404 might not.
+ */
+function topGenreTitleShare(completed: TitleMeta[]): number {
+  if (completed.length === 0) return 0;
+
+  const titlesPerGenre = new Map<number, number>();
+  for (const meta of completed) {
+    // Deduplicated per title: a row listing the same genre twice is a data
+    // problem, and counting it twice could push a share above 1.
+    for (const genreId of new Set(meta.genreIds)) {
+      titlesPerGenre.set(genreId, (titlesPerGenre.get(genreId) ?? 0) + 1);
+    }
+  }
+
+  const best = Math.max(0, ...titlesPerGenre.values());
+
+  // Divided by the titles whose genres are actually known -- the caller passes
+  // only resolvable metadata. A title with no cached row has unknown genres,
+  // not zero genres, so counting it in the denominator would read as evidence
+  // against the archetype when it is really absence of evidence.
+  return best / completed.length;
 }
 
 function groupByDateKey(
@@ -704,11 +750,10 @@ export function buildPayload(
       getTimezoneWeekday(row.watchedAt, zone),
     ),
     soloTickCount: solo.length,
-    // `buildGenres` returns its buckets ranked, so the first is the top genre.
-    // Optional-chained rather than length-guarded: under
-    // `noUncheckedIndexedAccess` a `.length` check does not narrow an index
-    // access, and 0 is the same share an empty list already means.
-    topGenreShare: (genres[0]?.percent ?? 0) / 100,
+    // Not `genres[0].percent / 100`: that is a share of genre TAGS, rounded
+    // for display, and both of those are wrong for a classification threshold.
+    // See `topGenreTitleShare`.
+    topGenreShare: topGenreTitleShare(completedMetas),
     medianPopularity: median(completedMetas.map((meta) => meta.popularity)),
     collaborativeCompletedShare:
       finished.total === 0 ? 0 : collaborativeCount / finished.total,
