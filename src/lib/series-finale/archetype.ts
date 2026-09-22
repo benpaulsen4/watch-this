@@ -17,6 +17,11 @@ export interface ArchetypeInput {
   monthlyEpisodeCounts: number[];
   soloTickHours: number[];
   soloTickWeekdays: number[];
+  /**
+   * Individually-ticked episodes across the whole period. Not
+   * `SeriesFinalePayload["bigDay"].soloTickCount`, which counts one day --
+   * same name, different denominator, and one caller wires up both.
+   */
   soloTickCount: number;
   topGenreShare: number;
   medianPopularity: number | null;

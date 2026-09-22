@@ -143,7 +143,22 @@ export interface SeriesFinalePayload {
     date: string;
     episodes: number;
     minutes: number;
+    /**
+     * Individually-ticked episodes on `date`, in time order, or null when the
+     * period as a whole has too few of them to describe a time of day.
+     *
+     * The floor is a period-level gate, not a per-day one, so a non-null
+     * timeline may still hold very few points -- one is possible, for a user
+     * who ticks episodes individually all year but happened to bulk-mark their
+     * biggest day. Renderers should check the length before drawing anything
+     * that implies a session, rather than assuming non-null means chartable.
+     */
     timeline: { at: string }[] | null;
+    /**
+     * Solo ticks on `date` only. Not the period-wide count that gates
+     * `timeline` and feeds `ArchetypeInput.soloTickCount` -- same name, and
+     * deliberately different denominators.
+     */
     soloTickCount: number;
     streak: { days: number; start: string; end: string } | null;
   } | null;

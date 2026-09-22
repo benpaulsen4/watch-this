@@ -447,8 +447,8 @@ export function buildBigDay(
 }
 
 /**
- * Weekday distribution over every episode, plus the share of solo ticks after
- * 21:00.
+ * Weekday distribution over every episode, plus the share of solo ticks from
+ * 21:00 onwards -- the 21:00 hour itself counts, so a 21:30 episode is late.
  *
  * Weekday counts use all episodes: a batch write still lands on the right day.
  * `lateShare` uses solo ticks only and is null below the floor, because
