@@ -30,6 +30,42 @@ function isWithin(at: Date, period: { start: Date; end: Date }): boolean {
 }
 
 /**
+ * Status rows that entered `status` inside the period.
+ *
+ * `AggregationInput.statuses` is all-time by contract, so every aggregator
+ * that wants the period applies this. Dated by `updatedAt`, which is what
+ * "entered this status" means for a row that carries no history -- see
+ * `countFinished` for what that costs.
+ */
+function statusesInPeriod(
+  statuses: ContentStatusRow[],
+  period: { start: Date; end: Date },
+  status: string,
+): ContentStatusRow[] {
+  return statuses.filter(
+    (row) => row.status === status && isWithin(row.updatedAt, period),
+  );
+}
+
+/**
+ * Cached metadata for `rows`, dropping any row there is none for.
+ *
+ * Dropping is right for the statistics that use this -- they describe a
+ * population, so one unresolvable row makes the answer slightly less complete
+ * rather than wrong. It is NOT right where a single title is being named:
+ * `buildTopShow` returns null instead, and `buildShame` keeps the row's id
+ * alongside its metadata, so neither goes through here.
+ */
+function resolveMetas(
+  rows: ContentStatusRow[],
+  titles: Map<string, TitleMeta>,
+): TitleMeta[] {
+  return rows
+    .map((row) => titles.get(titleKey(row.tmdbId, row.contentType)))
+    .filter((meta): meta is TitleMeta => meta !== undefined);
+}
+
+/**
  * Completed titles in the period, split by content type.
  *
  * Films carry no per-watch timestamp, so completion is dated by
@@ -45,10 +81,7 @@ export function countFinished(
   let films = 0;
   let shows = 0;
 
-  for (const row of statuses) {
-    if (row.status !== "completed") continue;
-    if (!isWithin(row.updatedAt, period)) continue;
-
+  for (const row of statusesInPeriod(statuses, period, "completed")) {
     if (row.contentType === "movie") films += 1;
     else shows += 1;
   }
@@ -61,9 +94,7 @@ export function countDropped(
   statuses: ContentStatusRow[],
   period: { start: Date; end: Date },
 ): number {
-  return statuses.filter(
-    (row) => row.status === "dropped" && isWithin(row.updatedAt, period),
-  ).length;
+  return statusesInPeriod(statuses, period, "dropped").length;
 }
 
 /**
@@ -249,15 +280,12 @@ export function buildNiche(
   titles: Map<string, TitleMeta>,
   period: { start: Date; end: Date },
 ): SeriesFinalePayload["niche"] {
-  const films = statuses
-    .filter(
-      (row) =>
-        row.contentType === "movie" &&
-        row.status === "completed" &&
-        isWithin(row.updatedAt, period),
-    )
-    .map((row) => titles.get(titleKey(row.tmdbId, "movie")))
-    .filter((meta): meta is TitleMeta => meta !== undefined);
+  const films = resolveMetas(
+    statusesInPeriod(statuses, period, "completed").filter(
+      (row) => row.contentType === "movie",
+    ),
+    titles,
+  );
 
   if (films.length === 0) return null;
 
@@ -315,12 +343,10 @@ export function buildGenres(
   genreNames: Map<number, string>,
   period: { start: Date; end: Date },
 ): { name: string; percent: number }[] {
-  const completed = statuses
-    .filter(
-      (row) => row.status === "completed" && isWithin(row.updatedAt, period),
-    )
-    .map((row) => titles.get(titleKey(row.tmdbId, row.contentType)))
-    .filter((meta): meta is TitleMeta => meta !== undefined);
+  const completed = resolveMetas(
+    statusesInPeriod(statuses, period, "completed"),
+    titles,
+  );
 
   if (completed.length === 0) return [];
 
@@ -622,8 +648,11 @@ export function buildShame(
     if (isLater) lastEpisodeByShow.set(row.tmdbId, row);
   }
 
-  const dropped = statuses
-    .filter((row) => row.status === "dropped" && isWithin(row.updatedAt, period))
+  // Resolved inline rather than through `resolveMetas`: this list keeps the
+  // row's `tmdbId` alongside the title, so it needs the pair, not the metadata
+  // alone. Forcing it through a helper that returns only metas would mean
+  // looking each row up twice or zipping two arrays back together.
+  const dropped = statusesInPeriod(statuses, period, "dropped")
     .map((row) => {
       const meta = titles.get(titleKey(row.tmdbId, row.contentType));
       // A title with no cached metadata is dropped from the list rather than
@@ -721,24 +750,17 @@ export function buildPayload(
   // the two typechecks silently.
   const { solo } = partitionSoloTicks(episodes);
 
-  const completedMetas = statuses
-    .filter((row) => row.status === "completed" && isWithin(row.updatedAt, period))
-    .map((row) => titles.get(titleKey(row.tmdbId, row.contentType)))
-    .filter((meta): meta is TitleMeta => meta !== undefined);
+  const completedInPeriod = statusesInPeriod(statuses, period, "completed");
+  const completedMetas = resolveMetas(completedInPeriod, titles);
 
-  const collaborativeCount = statuses.filter(
-    (row) =>
-      row.status === "completed" &&
-      isWithin(row.updatedAt, period) &&
-      input.collaborativeCompletedKeys.has(titleKey(row.tmdbId, row.contentType)),
+  const collaborativeCount = completedInPeriod.filter((row) =>
+    input.collaborativeCompletedKeys.has(titleKey(row.tmdbId, row.contentType)),
   ).length;
 
   const archetype = classifyArchetype({
     completedTitles: finished.total,
     droppedShows: titlesDropped,
-    pausedTitles: statuses.filter(
-      (row) => row.status === "paused" && isWithin(row.updatedAt, period),
-    ).length,
+    pausedTitles: statusesInPeriod(statuses, period, "paused").length,
     weekdayCounts: rhythm.weekdayCounts,
     medianEpisodesPerActiveDayByWeekday: medianEpisodesPerActiveDayByWeekday(
       episodes,
