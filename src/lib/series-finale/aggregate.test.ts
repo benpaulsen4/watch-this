@@ -870,6 +870,22 @@ describe("buildPayload", () => {
     expect(payload.period.label).toBe("2026");
   });
 
+  it("degrades to UTC instead of throwing on a zone the ICU database no longer knows", () => {
+    // `getTimezoneDateKey` hands its zone straight to `Intl.DateTimeFormat`,
+    // which throws `RangeError` on an unknown zone -- so a profile holding a
+    // renamed or retired IANA name used to fail the whole recap rather than
+    // one card of it.
+    const episodes = [episode("2026-03-14T12:00:00.000Z", 1)];
+
+    const payload = buildPayload(
+      input({ episodes, timeZone: "Mars/Olympus" }),
+      NOW,
+    );
+
+    expect(payload.bigDay?.date).toBe("2026-03-14");
+    expect(payload.months[2]?.episodes).toBe(1);
+  });
+
   it("keeps the period-wide solo-tick count apart from the big day's", () => {
     // Sixty solo ticks, all at 21:00, five per month on distinct days so no
     // month dominates and no day holds more than one. The archetype reads the

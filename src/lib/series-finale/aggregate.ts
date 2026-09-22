@@ -2,6 +2,7 @@ import {
   getTimezoneDateKey,
   getTimezoneHour,
   getTimezoneWeekday,
+  resolveTimeZone,
 } from "../time";
 import { classifyArchetype } from "./archetype";
 // From `./runtime-math`, never `./runtime`: the loader module imports `../db`,
@@ -634,14 +635,26 @@ export function buildPayload(
   input: AggregationInput,
   now: Date,
 ): SeriesFinalePayload {
-  const { period, timeZone, episodes, statuses, titles } = input;
+  const { period, episodes, statuses, titles } = input;
+
+  // Resolved once, here at the boundary, and it is the resolved value that
+  // every builder below receives. `getTimezoneWeekday` and `getTimezoneHour`
+  // resolve internally, but `getTimezoneDateKey` does not -- it hands the zone
+  // straight to `Intl.DateTimeFormat`, which throws `RangeError` for a zone no
+  // longer in the ICU database. A profile holding a renamed or retired IANA
+  // name would therefore fail a whole recap, contradicting this module's own
+  // promise that one thin slice of data cannot. Resolving here rather than
+  // inside `getTimezoneDateKey` keeps that helper's app-wide behaviour where
+  // its own callers decide it, and costs one validation rather than one per
+  // formatter call.
+  const zone = resolveTimeZone(input.timeZone);
 
   const finished = countFinished(statuses, period);
   const titlesDropped = countDropped(statuses, period);
   const minutes = input.episodeMinutes.minutes + input.filmMinutes.minutes;
 
-  const rhythm = buildRhythm(episodes, timeZone);
-  const months = buildMonths(episodes, statuses, timeZone, period);
+  const rhythm = buildRhythm(episodes, zone);
+  const months = buildMonths(episodes, statuses, zone, period);
   const genres = buildGenres(statuses, titles, input.genreNames, period);
 
   // The period's solo ticks. `bigDay.soloTickCount` below counts one day's,
@@ -670,12 +683,12 @@ export function buildPayload(
     weekdayCounts: rhythm.weekdayCounts,
     medianEpisodesPerActiveDayByWeekday: medianEpisodesPerActiveDayByWeekday(
       episodes,
-      timeZone,
+      zone,
     ),
     monthlyEpisodeCounts: months.map((m) => m.episodes),
-    soloTickHours: solo.map((row) => getTimezoneHour(row.watchedAt, timeZone)),
+    soloTickHours: solo.map((row) => getTimezoneHour(row.watchedAt, zone)),
     soloTickWeekdays: solo.map((row) =>
-      getTimezoneWeekday(row.watchedAt, timeZone),
+      getTimezoneWeekday(row.watchedAt, zone),
     ),
     soloTickCount: solo.length,
     // `buildGenres` returns its buckets ranked, so the first is the top genre.
@@ -712,11 +725,11 @@ export function buildPayload(
       perDay: episodesPerDay(episodes.length, period),
     },
     finished,
-    topShow: buildTopShow(episodes, titles, input.episodeRuntimeLookup, timeZone),
+    topShow: buildTopShow(episodes, titles, input.episodeRuntimeLookup, zone),
     niche: buildNiche(statuses, titles, period),
     genres,
     months,
-    bigDay: buildBigDay(episodes, timeZone, input.episodeRuntimeLookup),
+    bigDay: buildBigDay(episodes, zone, input.episodeRuntimeLookup),
     rhythm: { archetype, ...rhythm },
     shame: buildShame(statuses, titles, episodes, period, now),
     crew: input.crew,
