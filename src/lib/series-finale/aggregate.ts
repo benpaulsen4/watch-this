@@ -58,27 +58,40 @@ export function countDropped(
  * Twelve zero-filled monthly buckets combining episodes (dated by `watchedAt`)
  * and completed films (dated by `updatedAt`), both bucketed in the user's
  * timezone so the months match the calendar they experienced.
+ *
+ * The year every row is checked against is derived here, from `period.start`
+ * in `timeZone`, rather than taken as a number from the caller. A caller
+ * holding a `period` naturally reaches for `period.start.getUTCFullYear()`,
+ * and that is wrong for every zone east of UTC: Auckland's local 2026-01-01
+ * 00:00 is `2025-12-31T11:00Z`, so the year would come back 2025, every row of
+ * a 2026 recap would fail the check, all twelve buckets would return zero, and
+ * nothing would throw. Deriving it in-zone makes that unrepresentable instead
+ * of merely documented.
  */
 export function buildMonths(
   episodes: WatchedEpisodeRow[],
   statuses: ContentStatusRow[],
   timeZone: string,
-  periodStartYear: number,
+  period: { start: Date; end: Date },
 ): { month: number; episodes: number }[] {
   const buckets = Array.from({ length: 12 }, (_, index) => ({
     month: index + 1,
     episodes: 0,
   }));
 
+  // Compared as the four-character prefix of the same "YYYY-MM-DD" shape every
+  // row produces, so the two sides cannot disagree about how a year is read.
+  const periodYear = getTimezoneDateKey(period.start, timeZone).slice(0, 4);
+
   const add = (at: Date) => {
     const key = getTimezoneDateKey(at, timeZone);
     // Destructured with defaults rather than indexed: under
     // `noUncheckedIndexedAccess` a split part is `string | undefined`, and the
-    // empty defaults parse to NaN, which fails the year check and drops the
-    // row. That is the right outcome for a date key this helper could not
-    // read -- silently charging it to month NaN would corrupt a bucket.
+    // empty defaults match no year and parse to NaN, which drops the row. That
+    // is the right outcome for a date key this helper could not read --
+    // silently charging it to month NaN would corrupt a bucket.
     const [year = "", month = ""] = key.split("-");
-    if (Number.parseInt(year, 10) !== periodStartYear) return;
+    if (year !== periodYear) return;
 
     const bucket = buckets[Number.parseInt(month, 10) - 1];
     if (bucket) bucket.episodes += 1;

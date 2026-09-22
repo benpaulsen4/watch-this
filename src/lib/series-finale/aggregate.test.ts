@@ -100,7 +100,7 @@ describe("countDropped", () => {
 
 describe("buildMonths", () => {
   it("returns twelve zero-filled buckets", () => {
-    const result = buildMonths([], [], "UTC", 2026);
+    const result = buildMonths([], [], "UTC", PERIOD);
 
     expect(result).toHaveLength(12);
     expect(result.every((m) => m.episodes === 0)).toBe(true);
@@ -110,16 +110,44 @@ describe("buildMonths", () => {
   });
 
   it("buckets episodes by the month observed in the user's timezone", () => {
-    // 2026-04-01T00:30Z is still March in New York
+    // 2026-04-01T00:30Z is still March in New York. The period starts at New
+    // York's local midnight on 1 January, which is 05:00Z -- a real caller
+    // builds the period in the viewer's zone, and the year check reads it
+    // back in that same zone.
     const result = buildMonths(
       [episode("2026-04-01T00:30:00Z")],
       [],
       "America/New_York",
-      2026,
+      {
+        start: new Date("2026-01-01T05:00:00Z"),
+        end: new Date("2027-01-01T05:00:00Z"),
+      },
     );
 
     expect(result[2]?.episodes).toBe(1);
     expect(result[3]?.episodes).toBe(0);
+  });
+
+  it("derives the year in the viewer's timezone, not from UTC", () => {
+    // Auckland is UTC+13 in December, so 2025-12-31T11:00Z is local
+    // 2026-01-01 -- January of the recap year, on both sides of the check.
+    // Taking the year from `period.start.getUTCFullYear()` would read 2025
+    // here, match nothing, and return twelve empty buckets for every user east
+    // of UTC without throwing.
+    const period = {
+      start: new Date("2025-12-31T11:00:00Z"),
+      end: new Date("2026-12-31T11:00:00Z"),
+    };
+
+    const result = buildMonths(
+      [episode("2025-12-31T11:00:00Z")],
+      [],
+      "Pacific/Auckland",
+      period,
+    );
+
+    expect(result[0]?.episodes).toBe(1);
+    expect(result.reduce((sum, m) => sum + m.episodes, 0)).toBe(1);
   });
 
   it("includes completed films dated by updatedAt", () => {
@@ -133,7 +161,7 @@ describe("buildMonths", () => {
         }),
       ],
       "UTC",
-      2026,
+      PERIOD,
     );
 
     expect(result[2]?.episodes).toBe(1);
@@ -144,7 +172,7 @@ describe("buildMonths", () => {
       [episode("2025-03-14T12:00:00Z")],
       [],
       "UTC",
-      2026,
+      PERIOD,
     );
 
     expect(result.every((m) => m.episodes === 0)).toBe(true);
