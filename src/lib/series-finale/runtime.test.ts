@@ -346,13 +346,22 @@ describe("ensureSeasonsCached", () => {
     // absence is the property, and a busy machine cannot fake it either way.
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
 
-    const summary = await ensureSeasonsCached([
-      { tmdbId: 1, seasonNumber: 1 },
-      { tmdbId: 2, seasonNumber: 1 },
-    ]);
+    // Restored in `finally` rather than left to the suite: this patches a
+    // global, `restoreMocks` is not set in `vitest.config.ts`, and the
+    // `clearAllMocks` in `beforeEach` clears call history without unpatching.
+    // Harmless while the tests below are timer-free, but the next timer test
+    // added under this one would silently inherit a patched `setTimeout`.
+    try {
+      const summary = await ensureSeasonsCached([
+        { tmdbId: 1, seasonNumber: 1 },
+        { tmdbId: 2, seasonNumber: 1 },
+      ]);
 
-    expect(setTimeoutSpy).not.toHaveBeenCalled();
-    expect(summary).toEqual({ fetched: 0, skipped: 2, failed: 0 });
+      expect(setTimeoutSpy).not.toHaveBeenCalled();
+      expect(summary).toEqual({ fetched: 0, skipped: 2, failed: 0 });
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
   });
 
   it("returns a zero summary for no pairs, without querying", async () => {

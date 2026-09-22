@@ -115,10 +115,17 @@ export function countDropped(
  *   is 2025-12-31 in Los Angeles, so the year comes back 2025 again.
  *
  * Either way every row of a 2026 recap fails the check, all twelve buckets
- * return zero, and nothing throws. The midpoint is the only point that is
- * boundary-independent: it sits roughly half a period away from both edges, so
- * no offset in the +14/-12 IANA range (nor any DST shift) can push it out of
- * the intended year for any period at least a day long.
+ * return zero, and nothing throws. The midpoint is boundary-independent for the
+ * period this function is shaped for: a calendar year, whose midpoint sits six
+ * months from either edge, so no offset in the +14/-12 IANA range (nor any DST
+ * shift) can drag it into a neighbouring year.
+ *
+ * That guarantee is about the calendar year specifically, not about periods in
+ * general. It needs the midpoint to sit at least 14h inside the year's start
+ * and 12h inside its end, so a one-day period of 2026-12-31 would still read
+ * 2027 in Kiritimati. Twelve fixed buckets and a single `periodYear` mean this
+ * function only ever sees a calendar year, so that case is unreachable -- but
+ * the wider claim would be false if it ever stopped being true.
  */
 export function buildMonths(
   episodes: WatchedEpisodeRow[],
@@ -522,11 +529,14 @@ export function buildBigDay(
   const { solo } = partitionSoloTicks(episodes);
   // Intersected by identity against the rows already bucketed into the big
   // day, rather than re-deriving a date key for every solo tick in the period.
-  // `getTimezoneDateKey` builds an `Intl.DateTimeFormat` per call, so the
-  // obvious filter costs a second formatter pass over the whole year to
-  // recompute keys `groupByDateKey` has just produced. Both arrays hold the
-  // same row objects from `episodes` in the same relative order, so this
-  // selects exactly the same rows.
+  // The obvious filter would re-derive a date key for every solo tick to
+  // recompute keys `groupByDateKey` has just produced -- a second formatting
+  // pass over the whole year. `getTimezoneDateKey` now reuses a memoized
+  // formatter, so that pass is far cheaper than it once was and this is no
+  // longer a large win; it is kept because not repeating work you already have
+  // is simply the clearer code here, not because the cost is dramatic. Both
+  // arrays hold the same row objects from `episodes` in the same relative
+  // order, so this selects exactly the same rows.
   const soloRows = new Set(solo);
   const soloOnBestDay = bestRows.filter((row) => soloRows.has(row));
 
