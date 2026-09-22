@@ -79,10 +79,41 @@ export interface ComparePeer {
   droppedKeys: string[];
 }
 
+/**
+ * What the loader hands the engine.
+ *
+ * The two row arrays are deliberately scoped differently, and nothing in the
+ * types can enforce it -- see the notes on each. Getting either wrong produces
+ * a plausible-looking recap rather than an error.
+ */
 export interface AggregationInput {
   period: { start: Date; end: Date; label: string };
   timeZone: string;
+  /**
+   * Episodes watched **inside the period**, and only those.
+   *
+   * Nothing downstream re-filters them: `headline.episodes`, `episodes.total`,
+   * `episodes.perDay`, `topShow`, `bigDay`, `rhythm`, `months` and the
+   * archetype's solo-tick inputs all consume this array whole. Hand it a
+   * user's entire history and every one of those silently describes their
+   * lifetime instead of their year -- a bigger `bigDay` than the year held, a
+   * streak that never happened, and a `perDay` computed over the wrong
+   * numerator. Nothing throws.
+   */
   episodes: WatchedEpisodeRow[];
+  /**
+   * Status rows for **every title the user has**, all-time, not scoped to the
+   * period.
+   *
+   * The aggregators that want the period apply their own `isWithin` on
+   * `updatedAt` (`countFinished`, `countDropped`, `buildNiche`, `buildGenres`,
+   * `buildShame`'s dropped list, the paused count), so pre-filtering buys them
+   * nothing. One consumer deliberately wants everything: `buildShame`'s
+   * `stillPlanning`, which is there to name the film added three years ago and
+   * never watched. A period-scoped array keeps only the rows touched this
+   * year, so exactly the worst offenders vanish and the list comes back short
+   * but well-formed -- again without throwing.
+   */
   statuses: ContentStatusRow[];
   titles: Map<string, TitleMeta>;
   genreNames: Map<number, string>;
@@ -171,7 +202,19 @@ export interface SeriesFinalePayload {
   };
 
   shame: {
-    dropped: { tmdbId: number; title: string; lastEpisode: string | null }[];
+    dropped: {
+      tmdbId: number;
+      title: string;
+      /**
+       * Furthest episode reached, in season/episode order, **drawn only from
+       * `AggregationInput.episodes`** -- which is period-scoped. A show
+       * dropped in the period but last actually watched in an earlier one
+       * therefore reports null rather than the episode the user stopped on.
+       * Accepted: the alternative is loading an all-time episode map for a
+       * single line of copy. A caller that wants it can supply one.
+       */
+      lastEpisode: string | null;
+    }[];
     stillPlanning: {
       tmdbId: number;
       title: string;
