@@ -77,6 +77,18 @@ describe("countFinished", () => {
 
     expect(result.total).toBe(0);
   });
+
+  it("treats period start as inclusive", () => {
+    // The other half of the boundary the exclusive end implies. Without this,
+    // `isWithin` could silently become `> start` -- four aggregators share it,
+    // so the first instant of the year would vanish from all of them at once.
+    const result = countFinished(
+      [status({ tmdbId: 1, updatedAt: new Date("2026-01-01T00:00:00Z") })],
+      PERIOD,
+    );
+
+    expect(result.total).toBe(1);
+  });
 });
 
 describe("countDropped", () => {
@@ -322,6 +334,22 @@ describe("buildNiche", () => {
     expect(result?.popularity).toBe(2.1);
     expect(result?.medianPopularity).toBe(240);
     expect(result?.mostPopular?.tmdbId).toBe(3);
+  });
+
+  it("falls back to the film's own popularity when it is the only one", () => {
+    // A real first year on the app, and the only case that exercises both the
+    // `median(others) ?? least.popularity` fallback -- `others` is empty, so
+    // the median is null -- and the `mostPopular: null` path, where the least
+    // and most popular film are the same row and naming it twice would read
+    // as a bug.
+    const result = buildNiche(
+      [status({ tmdbId: 1, contentType: "movie" })],
+      titleMap([title({ tmdbId: 1, contentType: "movie", popularity: 2.1 })]),
+      PERIOD,
+    );
+
+    expect(result?.medianPopularity).toBe(2.1);
+    expect(result?.mostPopular).toBeNull();
   });
 
   it("returns null when no films were completed", () => {

@@ -143,6 +143,15 @@ export function median(values: number[]): number | null {
  * `finishedAt` comes from the latest `watchedAt` rather than a status column,
  * because that is a real event with a real timestamp -- unlike film completion,
  * which has to be inferred.
+ *
+ * When the top show has no cached metadata the whole statistic returns null
+ * rather than falling through to the runner-up. That is deliberate, and it is
+ * why this differs from `buildNiche` and `buildGenres`, which drop an
+ * unresolvable row and carry on: those two describe a population, so one
+ * missing title makes them slightly less complete, while this one names a
+ * single show. Silently promoting second place would tell the user their most
+ * watched show of the year was something it was not, and nothing in the
+ * rendering would reveal the substitution.
  */
 export function buildTopShow(
   episodes: WatchedEpisodeRow[],
@@ -245,7 +254,21 @@ export function buildNiche(
   };
 }
 
-/** Share of completed titles per genre: top five, remainder folded together. */
+/**
+ * Share of genre *tags* across the titles completed in the period: top five,
+ * remainder folded together.
+ *
+ * The denominator is the number of genre assignments, not the number of
+ * titles -- a title tagged Drama, Thriller and Crime contributes three. So a
+ * percent here reads "this share of the genre labels on what you finished",
+ * not "this share of your finished titles".
+ *
+ * Each bucket is also rounded independently, so the values need not total 100:
+ * six genres at one tag each come out as 17% six times, which is 102. A
+ * renderer that assumes the list sums to 100 -- a stacked bar drawn to a fixed
+ * width, say -- will overflow. Treat the percents as labels and compute any
+ * geometry from the shares themselves.
+ */
 export function buildGenres(
   statuses: ContentStatusRow[],
   titles: Map<string, TitleMeta>,
