@@ -152,6 +152,24 @@ describe("buildMonths", () => {
     expect(result[3]?.episodes).toBe(0);
   });
 
+  it("derives the year from the period midpoint, not from its start, west of UTC", () => {
+    // The western mirror of the test below. A caller that builds the period
+    // from UTC midnights hands an LA user 2026-01-01T00:00Z, which reads as
+    // local 2025-12-31 -- so a year taken from `period.start` in-zone comes
+    // back "2025", every 2026 row fails the check, and all twelve buckets
+    // return zero without anything throwing. The midpoint is inside 2026 for
+    // both hemispheres.
+    const result = buildMonths(
+      [episode("2026-03-14T12:00:00Z")],
+      [],
+      "America/Los_Angeles",
+      PERIOD,
+    );
+
+    expect(result[2]?.episodes).toBe(1);
+    expect(result.reduce((sum, m) => sum + m.episodes, 0)).toBe(1);
+  });
+
   it("derives the year in the viewer's timezone, not from UTC", () => {
     // Auckland is UTC+13 in December, so 2025-12-31T11:00Z is local
     // 2026-01-01 -- January of the recap year, on both sides of the check.

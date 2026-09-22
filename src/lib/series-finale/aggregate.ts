@@ -70,14 +70,23 @@ export function countDropped(
  * and completed films (dated by `updatedAt`), both bucketed in the user's
  * timezone so the months match the calendar they experienced.
  *
- * The year every row is checked against is derived here, from `period.start`
- * in `timeZone`, rather than taken as a number from the caller. A caller
- * holding a `period` naturally reaches for `period.start.getUTCFullYear()`,
- * and that is wrong for every zone east of UTC: Auckland's local 2026-01-01
- * 00:00 is `2025-12-31T11:00Z`, so the year would come back 2025, every row of
- * a 2026 recap would fail the check, all twelve buckets would return zero, and
- * nothing would throw. Deriving it in-zone makes that unrepresentable instead
- * of merely documented.
+ * The year every row is checked against is derived here, in `timeZone`, from
+ * the period's MIDPOINT rather than either of its edges, and never taken as a
+ * number from the caller. Both edges are wrong, in opposite directions, and
+ * which one bites depends on how the caller built the period:
+ *
+ * - Read `period.start` as UTC (`getUTCFullYear()`) and every zone EAST of UTC
+ *   breaks: Auckland's local 2026-01-01 00:00 is `2025-12-31T11:00Z`, so the
+ *   year comes back 2025.
+ * - Read `period.start` in-zone and every zone WEST of UTC breaks instead,
+ *   whenever the caller built the period from UTC midnights: `2026-01-01T00:00Z`
+ *   is 2025-12-31 in Los Angeles, so the year comes back 2025 again.
+ *
+ * Either way every row of a 2026 recap fails the check, all twelve buckets
+ * return zero, and nothing throws. The midpoint is the only point that is
+ * boundary-independent: it sits roughly half a period away from both edges, so
+ * no offset in the +14/-12 IANA range (nor any DST shift) can push it out of
+ * the intended year for any period at least a day long.
  */
 export function buildMonths(
   episodes: WatchedEpisodeRow[],
@@ -92,7 +101,10 @@ export function buildMonths(
 
   // Compared as the four-character prefix of the same "YYYY-MM-DD" shape every
   // row produces, so the two sides cannot disagree about how a year is read.
-  const periodYear = getTimezoneDateKey(period.start, timeZone).slice(0, 4);
+  const midpoint = new Date(
+    (period.start.getTime() + period.end.getTime()) / 2,
+  );
+  const periodYear = getTimezoneDateKey(midpoint, timeZone).slice(0, 4);
 
   const add = (at: Date) => {
     const key = getTimezoneDateKey(at, timeZone);
