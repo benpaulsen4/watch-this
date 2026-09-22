@@ -418,9 +418,15 @@ export function buildBigDay(
   }
 
   const { solo } = partitionSoloTicks(episodes);
-  const soloOnBestDay = solo.filter(
-    (row) => getTimezoneDateKey(row.watchedAt, timeZone) === bestKey,
-  );
+  // Intersected by identity against the rows already bucketed into the big
+  // day, rather than re-deriving a date key for every solo tick in the period.
+  // `getTimezoneDateKey` builds an `Intl.DateTimeFormat` per call, so the
+  // obvious filter costs a second formatter pass over the whole year to
+  // recompute keys `groupByDateKey` has just produced. Both arrays hold the
+  // same row objects from `episodes` in the same relative order, so this
+  // selects exactly the same rows.
+  const soloRows = new Set(solo);
+  const soloOnBestDay = bestRows.filter((row) => soloRows.has(row));
 
   const { minutes } = summariseEpisodeRuntimes(bestRows, episodeRuntimeLookup);
 
@@ -558,7 +564,11 @@ export function buildShame(
           : null,
       };
     })
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    // Ordered by `tmdbId` rather than left in whatever order the caller's
+    // query returned. Nothing here ranks shows against each other, so the only
+    // requirement is that the same year renders the same way twice.
+    .sort((a, b) => a.tmdbId - b.tmdbId);
 
   // Deliberately not filtered by the period: a film added three years ago and
   // never watched is exactly what this list is for, and dating it by the
@@ -573,15 +583,23 @@ export function buildShame(
         tmdbId: row.tmdbId,
         title: meta.title,
         // Floored, so a film added earlier today has waited zero days rather
-        // than being rounded up into a day it has not finished.
-        days: Math.floor(
-          (now.getTime() - row.createdAt.getTime()) / MS_PER_DAY,
+        // than being rounded up into a day it has not finished. Clamped at 0
+        // because a negative can only mean `createdAt` is ahead of `now` --
+        // clock skew between the row's writer and this caller -- and `days`
+        // is rendered as copy, where "-1 days" reads as a broken recap rather
+        // than as the sub-second skew it actually is.
+        days: Math.max(
+          0,
+          Math.floor((now.getTime() - row.createdAt.getTime()) / MS_PER_DAY),
         ),
         runtime: meta.runtime,
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .sort((a, b) => b.days - a.days);
+    // `tmdbId` breaks the tie, because films added on the same day are common
+    // -- one evening's worth of watchlisting shares a date -- and `days` alone
+    // would leave their order to the caller's query. Same data, same list.
+    .sort((a, b) => b.days - a.days || a.tmdbId - b.tmdbId);
 
   return { dropped, stillPlanning };
 }

@@ -694,6 +694,71 @@ describe("buildShame", () => {
     expect(result.stillPlanning.map((f) => f.tmdbId)).toEqual([2, 1]);
   });
 
+  it("orders both lists the same way whatever order the rows arrive in", () => {
+    // Two dropped shows, and two films added on the same day so `days` ties.
+    // Neither list ranks its entries against each other, so without an
+    // explicit order both would fall back to the caller's query order and the
+    // same year would render differently on a query change.
+    const sameDay = new Date("2026-12-01T00:00:00Z");
+    const statuses = [
+      status({ tmdbId: 1, status: "dropped" }),
+      status({ tmdbId: 2, status: "dropped" }),
+      status({
+        tmdbId: 3,
+        contentType: "movie",
+        status: "planning",
+        createdAt: sameDay,
+      }),
+      status({
+        tmdbId: 4,
+        contentType: "movie",
+        status: "planning",
+        createdAt: sameDay,
+      }),
+    ];
+    const titles = titleMap([
+      title({ tmdbId: 1 }),
+      title({ tmdbId: 2 }),
+      title({ tmdbId: 3, contentType: "movie" }),
+      title({ tmdbId: 4, contentType: "movie" }),
+    ]);
+
+    const forwards = buildShame(statuses, titles, [], PERIOD, NOW);
+    const backwards = buildShame(
+      [...statuses].reverse(),
+      titles,
+      [],
+      PERIOD,
+      NOW,
+    );
+
+    expect(forwards).toEqual(backwards);
+    expect(forwards.dropped.map((s) => s.tmdbId)).toEqual([1, 2]);
+    expect(forwards.stillPlanning.map((f) => f.tmdbId)).toEqual([3, 4]);
+  });
+
+  it("never reports negative days when a row is written ahead of the clock", () => {
+    // Clock skew between the row's writer and this caller. A raw floor would
+    // give -1 here, which renders as a broken recap rather than as the
+    // sub-second skew it is.
+    const result = buildShame(
+      [
+        status({
+          tmdbId: 2,
+          contentType: "movie",
+          status: "planning",
+          createdAt: new Date("2026-12-31T00:00:01Z"),
+        }),
+      ],
+      titleMap([title({ tmdbId: 2, contentType: "movie" })]),
+      [],
+      PERIOD,
+      NOW,
+    );
+
+    expect(result.stillPlanning[0]?.days).toBe(0);
+  });
+
   it("returns empty lists when there is nothing to report", () => {
     expect(buildShame([], new Map(), [], PERIOD, NOW)).toEqual({
       dropped: [],
