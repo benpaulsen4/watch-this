@@ -5,6 +5,7 @@ import {
   buildGenres,
   buildMonths,
   buildNiche,
+  buildPayload,
   buildRhythm,
   buildShame,
   buildTopShow,
@@ -15,7 +16,13 @@ import {
   median,
   medianEpisodesPerActiveDayByWeekday,
 } from "./aggregate";
-import type { ContentStatusRow, TitleMeta, WatchedEpisodeRow } from "./types";
+import {
+  type AggregationInput,
+  type ContentStatusRow,
+  SERIES_FINALE_SCHEMA_VERSION,
+  type TitleMeta,
+  type WatchedEpisodeRow,
+} from "./types";
 
 const PERIOD = {
   start: new Date("2026-01-01T00:00:00Z"),
@@ -764,5 +771,90 @@ describe("buildShame", () => {
       dropped: [],
       stillPlanning: [],
     });
+  });
+});
+
+const input = (overrides: Partial<AggregationInput> = {}): AggregationInput => ({
+  period: { start: PERIOD.start, end: PERIOD.end, label: "2026" },
+  timeZone: "UTC",
+  episodes: [],
+  statuses: [],
+  titles: new Map(),
+  genreNames: new Map(),
+  episodeMinutes: { minutes: 0, unknownCount: 0 },
+  filmMinutes: { minutes: 0, unknownCount: 0 },
+  episodeRuntimeLookup: new Map(),
+  collaborativeCompletedKeys: new Set(),
+  crew: [],
+  peers: [],
+  percentile: null,
+  ...overrides,
+});
+
+describe("buildPayload", () => {
+  const NOW = new Date("2026-12-31T00:00:00Z");
+
+  it("stamps the current schema version", () => {
+    expect(buildPayload(input(), NOW).schemaVersion).toBe(
+      SERIES_FINALE_SCHEMA_VERSION,
+    );
+  });
+
+  it("combines episode and film minutes into the headline hours", () => {
+    const payload = buildPayload(
+      input({
+        episodeMinutes: { minutes: 24_000, unknownCount: 3 },
+        filmMinutes: { minutes: 720, unknownCount: 1 },
+      }),
+      NOW,
+    );
+
+    expect(payload.headline.minutes).toBe(24_720);
+    expect(payload.headline.hours).toBe(412);
+    expect(payload.headline.unknownRuntimeEpisodes).toBe(4);
+  });
+
+  it("marks a thin period", () => {
+    expect(buildPayload(input(), NOW).thin).toBe(true);
+  });
+
+  it("does not mark a substantial period as thin", () => {
+    const episodes = Array.from({ length: 40 }, (_, i) =>
+      episode(`2026-03-${String((i % 28) + 1).padStart(2, "0")}T12:00:00.000Z`, i + 1),
+    );
+
+    expect(buildPayload(input({ episodes }), NOW).thin).toBe(false);
+  });
+
+  it("passes the percentile through unchanged", () => {
+    expect(buildPayload(input({ percentile: 4 }), NOW).headline.percentile).toBe(4);
+  });
+
+  it("serialises the period as ISO strings", () => {
+    const payload = buildPayload(input(), NOW);
+
+    expect(payload.period.start).toBe(PERIOD.start.toISOString());
+    expect(payload.period.label).toBe("2026");
+  });
+
+  it("keeps the period-wide solo-tick count apart from the big day's", () => {
+    // Sixty solo ticks, all at 21:00, five per month on distinct days so no
+    // month dominates and no day holds more than one. The archetype reads the
+    // period's count (60, clearing the floor, so rule 5 runs and lands on
+    // nightly-ritualist) while `bigDay.soloTickCount` reads one day's (1).
+    // Cross the two -- they share a name and both are in scope -- and this
+    // payload still typechecks: the archetype falls through to null because 1
+    // is below the floor, or the big day claims all sixty ticks.
+    const episodes = Array.from({ length: 60 }, (_, i) =>
+      episode(
+        `2026-${String(Math.floor(i / 5) + 1).padStart(2, "0")}-0${(i % 5) + 1}T21:00:00.000Z`,
+        i + 1,
+      ),
+    );
+
+    const payload = buildPayload(input({ episodes }), NOW);
+
+    expect(payload.rhythm.archetype).toBe("nightly-ritualist");
+    expect(payload.bigDay?.soloTickCount).toBe(1);
   });
 });

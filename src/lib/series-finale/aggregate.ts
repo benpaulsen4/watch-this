@@ -3,15 +3,20 @@ import {
   getTimezoneHour,
   getTimezoneWeekday,
 } from "../time";
+import { classifyArchetype } from "./archetype";
 // From `./runtime-math`, never `./runtime`: the loader module imports `../db`,
 // which throws at module scope without a DATABASE_URL, and this engine is pure
 // by design -- its tests set no such variable and mock nothing.
 import { type RuntimeLookup, summariseEpisodeRuntimes } from "./runtime-math";
 import { partitionSoloTicks } from "./solo-ticks";
 import {
+  type AggregationInput,
   type ContentStatusRow,
+  SERIES_FINALE_SCHEMA_VERSION,
   type SeriesFinalePayload,
   SOLO_TICK_FLOOR,
+  THIN_YEAR_EPISODES,
+  THIN_YEAR_TITLES,
   titleKey,
   type TitleMeta,
   type WatchedEpisodeRow,
@@ -602,4 +607,111 @@ export function buildShame(
     .sort((a, b) => b.days - a.days || a.tmdbId - b.tmdbId);
 
   return { dropped, stillPlanning };
+}
+
+/**
+ * Assemble the full payload.
+ *
+ * Every card is computed independently and nullable cards return null rather
+ * than throwing, so one thin slice of data cannot fail a whole recap.
+ *
+ * `now` is a parameter rather than `new Date()` so the whole engine stays pure
+ * and the "days in planning" counts are deterministic under test.
+ */
+export function buildPayload(
+  input: AggregationInput,
+  now: Date,
+): SeriesFinalePayload {
+  const { period, timeZone, episodes, statuses, titles } = input;
+
+  const finished = countFinished(statuses, period);
+  const titlesDropped = countDropped(statuses, period);
+  const minutes = input.episodeMinutes.minutes + input.filmMinutes.minutes;
+
+  const rhythm = buildRhythm(episodes, timeZone);
+  const months = buildMonths(episodes, statuses, timeZone, period);
+  const genres = buildGenres(statuses, titles, input.genreNames, period);
+
+  // The period's solo ticks. `bigDay.soloTickCount` below counts one day's,
+  // from `buildBigDay`'s own pass -- same name, different denominator, and
+  // crossing the two typechecks silently.
+  const { solo } = partitionSoloTicks(episodes);
+
+  const completedMetas = statuses
+    .filter((row) => row.status === "completed" && isWithin(row.updatedAt, period))
+    .map((row) => titles.get(titleKey(row.tmdbId, row.contentType)))
+    .filter((meta): meta is TitleMeta => meta !== undefined);
+
+  const collaborativeCount = statuses.filter(
+    (row) =>
+      row.status === "completed" &&
+      isWithin(row.updatedAt, period) &&
+      input.collaborativeCompletedKeys.has(titleKey(row.tmdbId, row.contentType)),
+  ).length;
+
+  const archetype = classifyArchetype({
+    completedTitles: finished.total,
+    droppedShows: titlesDropped,
+    pausedTitles: statuses.filter(
+      (row) => row.status === "paused" && isWithin(row.updatedAt, period),
+    ).length,
+    weekdayCounts: rhythm.weekdayCounts,
+    medianEpisodesPerActiveDayByWeekday: medianEpisodesPerActiveDayByWeekday(
+      episodes,
+      timeZone,
+    ),
+    monthlyEpisodeCounts: months.map((m) => m.episodes),
+    soloTickHours: solo.map((row) => getTimezoneHour(row.watchedAt, timeZone)),
+    soloTickWeekdays: solo.map((row) =>
+      getTimezoneWeekday(row.watchedAt, timeZone),
+    ),
+    soloTickCount: solo.length,
+    // `buildGenres` returns its buckets ranked, so the first is the top genre.
+    // Optional-chained rather than length-guarded: under
+    // `noUncheckedIndexedAccess` a `.length` check does not narrow an index
+    // access, and 0 is the same share an empty list already means.
+    topGenreShare: (genres[0]?.percent ?? 0) / 100,
+    medianPopularity: median(completedMetas.map((meta) => meta.popularity)),
+    collaborativeCompletedShare:
+      finished.total === 0 ? 0 : collaborativeCount / finished.total,
+    totalEpisodes: episodes.length,
+    totalTitles: finished.total,
+  });
+
+  return {
+    schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
+    period: {
+      start: period.start.toISOString(),
+      end: period.end.toISOString(),
+      label: period.label,
+    },
+    headline: {
+      hours: Math.round(minutes / 60),
+      minutes,
+      episodes: episodes.length,
+      titlesCompleted: finished.total,
+      titlesDropped,
+      unknownRuntimeEpisodes:
+        input.episodeMinutes.unknownCount + input.filmMinutes.unknownCount,
+      percentile: input.percentile,
+    },
+    episodes: {
+      total: episodes.length,
+      perDay: episodesPerDay(episodes.length, period),
+    },
+    finished,
+    topShow: buildTopShow(episodes, titles, input.episodeRuntimeLookup, timeZone),
+    niche: buildNiche(statuses, titles, period),
+    genres,
+    months,
+    bigDay: buildBigDay(episodes, timeZone, input.episodeRuntimeLookup),
+    rhythm: { archetype, ...rhythm },
+    shame: buildShame(statuses, titles, episodes, period, now),
+    crew: input.crew,
+    // Assembled in plan 3, where the peer completed/planning sets are loaded.
+    // Empty here is what keeps this engine free of cross-user concerns.
+    compare: [],
+    thin:
+      episodes.length < THIN_YEAR_EPISODES && finished.total < THIN_YEAR_TITLES,
+  };
 }
