@@ -195,7 +195,19 @@ export function buildTopShow(
   let topId: number | null = null;
   let topRows: WatchedEpisodeRow[] = [];
   for (const [tmdbId, rows] of byShow) {
-    if (rows.length > topRows.length) {
+    // A tie resolves to the lower `tmdbId` rather than to whichever show the
+    // input happened to mention first -- the same correction `buildBigDay`
+    // carries for its date. `episodes` arrives in whatever order the caller's
+    // query produced, and "your most watched show" silently changing because
+    // an ORDER BY changed is a bug nobody would think to look for. The id is
+    // arbitrary as a ranking, which is the point: nothing here ranks two
+    // equally-watched shows against each other, so the only requirement is
+    // that the same year renders the same way twice.
+    const better =
+      rows.length > topRows.length ||
+      (rows.length === topRows.length && topId !== null && tmdbId < topId);
+
+    if (better) {
       topId = tmdbId;
       topRows = rows;
     }

@@ -322,6 +322,27 @@ describe("buildTopShow", () => {
     expect(result?.finishedAt).toBe("2026-04-04");
   });
 
+  it("breaks a tie on the lower tmdbId, whatever order the rows arrive in", () => {
+    // Two shows on two episodes each. Resolving the tie by iteration order
+    // would make "your most watched show of the year" depend on the caller's
+    // ORDER BY.
+    const show = (tmdbId: number): WatchedEpisodeRow[] =>
+      [1, 2].map((episodeNumber) => ({
+        tmdbId,
+        seasonNumber: 1,
+        episodeNumber,
+        watchedAt: new Date(`2026-01-0${episodeNumber}T00:00:00Z`),
+      }));
+    const titles = titleMap([title({ tmdbId: 7 }), title({ tmdbId: 9 })]);
+
+    expect(
+      buildTopShow([...show(9), ...show(7)], titles, new Map(), "UTC")?.tmdbId,
+    ).toBe(7);
+    expect(
+      buildTopShow([...show(7), ...show(9)], titles, new Map(), "UTC")?.tmdbId,
+    ).toBe(7);
+  });
+
   it("returns null when there are no episodes", () => {
     expect(buildTopShow([], new Map(), new Map(), "UTC")).toBeNull();
   });
