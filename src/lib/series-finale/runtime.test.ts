@@ -289,27 +289,48 @@ describe("ensureSeasonsCached", () => {
     expect(fetchedAtUpdate?.set?.fetchedAt).toBeInstanceOf(Date);
   });
 
+  // Both throttle tests used to measure `Date.now()` deltas around the call
+  // and assert the elapsed wall clock landed in a window. That failed about
+  // two runs in three hundred under load -- a scheduler hiccup is
+  // indistinguishable from a broken throttle when the only instrument is the
+  // clock -- and a suite that goes red on its own trains people to retry
+  // instead of read. The properties are unchanged; they are now read off the
+  // throttle's own timer rather than off the machine.
   it("waits between fetches, but not before the first", async () => {
-    mockDb.__setResults([[]]);
-    getTVSeasonDetails.mockResolvedValue({
-      name: "Season 1",
-      season_number: 1,
-      episodes: [],
-    });
+    vi.useFakeTimers();
+    try {
+      mockDb.__setResults([[]]);
+      getTVSeasonDetails.mockResolvedValue({
+        name: "Season 1",
+        season_number: 1,
+        episodes: [],
+      });
 
-    const startedAt = Date.now();
-    await ensureSeasonsCached([
-      { tmdbId: 1, seasonNumber: 1 },
-      { tmdbId: 2, seasonNumber: 1 },
-    ]);
-    const elapsed = Date.now() - startedAt;
+      let settled = false;
+      const run = ensureSeasonsCached([
+        { tmdbId: 1, seasonNumber: 1 },
+        { tmdbId: 2, seasonNumber: 1 },
+      ]).then((summary) => {
+        settled = true;
+        return summary;
+      });
 
-    // Two fetches means exactly one gap. Without this throttle, a generation
-    // run handing the whole deduped array to this function would fire dozens
-    // of TMDB requests back to back.
-    expect(getTVSeasonDetails).toHaveBeenCalledTimes(2);
-    expect(elapsed).toBeGreaterThanOrEqual(SEASON_FETCH_GAP_MS);
-    expect(elapsed).toBeLessThan(SEASON_FETCH_GAP_MS * 2);
+      // One millisecond short of the gap. The first fetch has already gone out
+      // -- nothing is waited before it -- and the second has not.
+      await vi.advanceTimersByTimeAsync(SEASON_FETCH_GAP_MS - 1);
+      expect(getTVSeasonDetails).toHaveBeenCalledTimes(1);
+      expect(settled).toBe(false);
+
+      // Two fetches means exactly one gap, and that last millisecond is what
+      // releases it. Without this throttle, a generation run handing the whole
+      // deduped array to this function would fire dozens of TMDB requests back
+      // to back.
+      await vi.advanceTimersByTimeAsync(1);
+      expect(getTVSeasonDetails).toHaveBeenCalledTimes(2);
+      expect(await run).toEqual({ fetched: 2, skipped: 0, failed: 0 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not wait at all when every season is already cached", async () => {
@@ -320,13 +341,18 @@ describe("ensureSeasonsCached", () => {
       ],
     ]);
 
-    const startedAt = Date.now();
-    await ensureSeasonsCached([
+    // Asserted as "no gap was ever scheduled" rather than as "the clock did not
+    // move much": the sleep is the only `setTimeout` on this path, so its
+    // absence is the property, and a busy machine cannot fake it either way.
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+    const summary = await ensureSeasonsCached([
       { tmdbId: 1, seasonNumber: 1 },
       { tmdbId: 2, seasonNumber: 1 },
     ]);
 
-    expect(Date.now() - startedAt).toBeLessThan(SEASON_FETCH_GAP_MS);
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+    expect(summary).toEqual({ fetched: 0, skipped: 2, failed: 0 });
   });
 
   it("returns a zero summary for no pairs, without querying", async () => {
