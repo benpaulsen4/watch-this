@@ -1,11 +1,17 @@
-import { getTimezoneDateKey } from "../time";
+import {
+  getTimezoneDateKey,
+  getTimezoneHour,
+  getTimezoneWeekday,
+} from "../time";
 // From `./runtime-math`, never `./runtime`: the loader module imports `../db`,
 // which throws at module scope without a DATABASE_URL, and this engine is pure
 // by design -- its tests set no such variable and mock nothing.
 import { type RuntimeLookup, summariseEpisodeRuntimes } from "./runtime-math";
+import { partitionSoloTicks } from "./solo-ticks";
 import {
   type ContentStatusRow,
   type SeriesFinalePayload,
+  SOLO_TICK_FLOOR,
   titleKey,
   type TitleMeta,
   type WatchedEpisodeRow,
@@ -312,4 +318,193 @@ export function buildGenres(
   }
 
   return result;
+}
+
+function groupByDateKey(
+  episodes: WatchedEpisodeRow[],
+  timeZone: string,
+): Map<string, WatchedEpisodeRow[]> {
+  const byDay = new Map<string, WatchedEpisodeRow[]>();
+  for (const row of episodes) {
+    const key = getTimezoneDateKey(row.watchedAt, timeZone);
+    const existing = byDay.get(key);
+    if (existing) existing.push(row);
+    else byDay.set(key, [row]);
+  }
+  return byDay;
+}
+
+/** Longest run of consecutive calendar days present in `dateKeys`. */
+export function longestStreak(
+  dateKeys: string[],
+): { days: number; start: string; end: string } | null {
+  const unique = Array.from(new Set(dateKeys)).sort();
+
+  // Destructured rather than indexed: `noUncheckedIndexedAccess` types
+  // `unique[0]` as possibly-undefined, and the check that narrows it is the
+  // same check that rejects an empty input, so one guard covers both.
+  const [firstDay] = unique;
+  if (firstDay === undefined) return null;
+
+  let bestLength = 1;
+  let bestStart = firstDay;
+  let bestEnd = firstDay;
+
+  let runLength = 1;
+  let runStart = firstDay;
+
+  // Walked as a pair of values rather than by index for the same reason:
+  // `unique[i]` and `unique[i - 1]` are both possibly-undefined, and carrying
+  // the previous day forward removes the indexing instead of asserting it away.
+  let previousDay = firstDay;
+  for (const currentDay of unique.slice(1)) {
+    // Compared as UTC midnights, so a run never breaks or merges on a DST
+    // shift: local midnights 23 and 25 hours apart are both one calendar day.
+    const previous = Date.parse(`${previousDay}T00:00:00Z`);
+    const current = Date.parse(`${currentDay}T00:00:00Z`);
+    const consecutive = current - previous === MS_PER_DAY;
+
+    if (consecutive) {
+      runLength += 1;
+    } else {
+      runLength = 1;
+      runStart = currentDay;
+    }
+
+    if (runLength > bestLength) {
+      bestLength = runLength;
+      bestStart = runStart;
+      bestEnd = currentDay;
+    }
+
+    previousDay = currentDay;
+  }
+
+  return { days: bestLength, start: bestStart, end: bestEnd };
+}
+
+/**
+ * The day with the most episodes.
+ *
+ * The date, count and minutes use every episode. The `timeline` uses only solo
+ * ticks and is null below the floor -- a batch of eleven episodes shares one
+ * timestamp, so charting it would draw a single spike and describe it as an
+ * eight-hour session.
+ */
+export function buildBigDay(
+  episodes: WatchedEpisodeRow[],
+  timeZone: string,
+  episodeRuntimeLookup: RuntimeLookup,
+): SeriesFinalePayload["bigDay"] {
+  if (episodes.length === 0) return null;
+
+  const byDay = groupByDateKey(episodes, timeZone);
+
+  let bestKey = "";
+  let bestRows: WatchedEpisodeRow[] = [];
+  for (const [key, rows] of byDay) {
+    // A tie resolves to the earlier date rather than to whichever day the
+    // input happened to mention first. `episodes` arrives in whatever order
+    // the caller's query produced, and "your biggest day" silently changing
+    // because an ORDER BY changed is a bug nobody would think to look for.
+    const better =
+      rows.length > bestRows.length ||
+      (rows.length === bestRows.length && key < bestKey);
+
+    if (better) {
+      bestKey = key;
+      bestRows = rows;
+    }
+  }
+
+  const { solo } = partitionSoloTicks(episodes);
+  const soloOnBestDay = solo.filter(
+    (row) => getTimezoneDateKey(row.watchedAt, timeZone) === bestKey,
+  );
+
+  const { minutes } = summariseEpisodeRuntimes(bestRows, episodeRuntimeLookup);
+
+  return {
+    date: bestKey,
+    episodes: bestRows.length,
+    minutes,
+    timeline:
+      solo.length >= SOLO_TICK_FLOOR
+        ? soloOnBestDay
+            .slice()
+            .sort((a, b) => a.watchedAt.getTime() - b.watchedAt.getTime())
+            .map((row) => ({ at: row.watchedAt.toISOString() }))
+        : null,
+    soloTickCount: soloOnBestDay.length,
+    streak: longestStreak(Array.from(byDay.keys())),
+  };
+}
+
+/**
+ * Weekday distribution over every episode, plus the share of solo ticks after
+ * 21:00.
+ *
+ * Weekday counts use all episodes: a batch write still lands on the right day.
+ * `lateShare` uses solo ticks only and is null below the floor, because
+ * time-of-day over batched rows is an artefact of when someone bulk-marked.
+ */
+export function buildRhythm(
+  episodes: WatchedEpisodeRow[],
+  timeZone: string,
+): {
+  weekdayCounts: number[];
+  topWeekday: number | null;
+  lateShare: number | null;
+} {
+  const weekdayCounts = Array.from({ length: 7 }, () => 0);
+  for (const row of episodes) {
+    const weekday = getTimezoneWeekday(row.watchedAt, timeZone);
+    // `?? 0` only to satisfy `noUncheckedIndexedAccess`: `getTimezoneWeekday`
+    // is documented 0-6 and falls back to 0 itself, so the default is
+    // unreachable and no count can be lost to it.
+    weekdayCounts[weekday] = (weekdayCounts[weekday] ?? 0) + 1;
+  }
+
+  const total = weekdayCounts.reduce((a, b) => a + b, 0);
+  const topWeekday =
+    total === 0 ? null : weekdayCounts.indexOf(Math.max(...weekdayCounts));
+
+  const { solo } = partitionSoloTicks(episodes);
+  const lateShare =
+    solo.length >= SOLO_TICK_FLOOR
+      ? solo.filter((row) => getTimezoneHour(row.watchedAt, timeZone) >= 21)
+          .length / solo.length
+      : null;
+
+  return { weekdayCounts, topWeekday, lateShare };
+}
+
+/**
+ * For each weekday, the median episode count across the days that weekday was
+ * actually active. Feeds archetype rule 3, which distinguishes "watches a bit
+ * every Sunday" from "marathons on Sundays".
+ */
+export function medianEpisodesPerActiveDayByWeekday(
+  episodes: WatchedEpisodeRow[],
+  timeZone: string,
+): number[] {
+  const byDay = groupByDateKey(episodes, timeZone);
+  const perWeekday: number[][] = Array.from({ length: 7 }, () => []);
+
+  for (const rows of byDay.values()) {
+    // Every group is created holding a row, so the guard never fires; it is
+    // how `noUncheckedIndexedAccess` is satisfied without an assertion. All
+    // rows in a group share a date key, so any of them gives the same weekday.
+    const [first] = rows;
+    if (first === undefined) continue;
+
+    const bucket = perWeekday[getTimezoneWeekday(first.watchedAt, timeZone)];
+    if (bucket) bucket.push(rows.length);
+  }
+
+  // Only active days are in each bucket, so a quiet Tuesday contributes
+  // nothing rather than a zero -- counting absent days as zeros would drag
+  // every median toward zero and make rule 3 unreachable. A weekday that was
+  // never active has no median at all, and reports 0.
+  return perWeekday.map((counts) => median(counts) ?? 0);
 }

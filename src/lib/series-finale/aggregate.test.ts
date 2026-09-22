@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildBigDay,
   buildGenres,
   buildMonths,
   buildNiche,
+  buildRhythm,
   buildTopShow,
   countDropped,
   countFinished,
   episodesPerDay,
+  longestStreak,
   median,
+  medianEpisodesPerActiveDayByWeekday,
 } from "./aggregate";
 import type { ContentStatusRow, TitleMeta, WatchedEpisodeRow } from "./types";
 
@@ -398,5 +402,199 @@ describe("buildGenres", () => {
 
   it("returns an empty list when nothing was completed", () => {
     expect(buildGenres([], new Map(), new Map(), PERIOD)).toEqual([]);
+  });
+});
+
+/** N episodes sharing one instant -- i.e. a batch write. */
+const batch = (iso: string, count: number): WatchedEpisodeRow[] =>
+  Array.from({ length: count }, (_, i) => episode(iso, i + 1));
+
+/** N episodes at distinct instants on the same day -- i.e. solo ticks. */
+const soloDay = (day: string, hours: number[]): WatchedEpisodeRow[] =>
+  hours.map((hour, i) =>
+    episode(`${day}T${String(hour).padStart(2, "0")}:00:00.000Z`, i + 1),
+  );
+
+/**
+ * One solo tick per entry at the given hour, each on its own day so no two
+ * share an instant. Lets a test clear `SOLO_TICK_FLOOR` and still control the
+ * hour distribution exactly.
+ */
+const soloTicksAtHours = (hours: number[]): WatchedEpisodeRow[] =>
+  hours.map((hour, i) =>
+    episode(
+      `2026-${String(Math.floor(i / 28) + 1).padStart(2, "0")}-${String(
+        (i % 28) + 1,
+      ).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00:00.000Z`,
+      i + 1,
+    ),
+  );
+
+describe("longestStreak", () => {
+  it("finds the longest run of consecutive days", () => {
+    expect(
+      longestStreak(["2026-01-02", "2026-01-03", "2026-01-04", "2026-02-01"]),
+    ).toEqual({ days: 3, start: "2026-01-02", end: "2026-01-04" });
+  });
+
+  it("runs a streak across a month boundary", () => {
+    // The classic off-by-one: day-of-month arithmetic breaks the run at the
+    // end of January, reporting two streaks of two instead of one of four.
+    expect(
+      longestStreak(["2026-01-30", "2026-01-31", "2026-02-01", "2026-02-02"]),
+    ).toEqual({ days: 4, start: "2026-01-30", end: "2026-02-02" });
+  });
+
+  it("handles a single day", () => {
+    expect(longestStreak(["2026-01-02"])).toEqual({
+      days: 1,
+      start: "2026-01-02",
+      end: "2026-01-02",
+    });
+  });
+
+  it("deduplicates repeated days", () => {
+    expect(longestStreak(["2026-01-02", "2026-01-02"])?.days).toBe(1);
+  });
+
+  it("returns null for no days", () => {
+    expect(longestStreak([])).toBeNull();
+  });
+});
+
+describe("buildBigDay", () => {
+  it("picks the day with the most episodes and counts all of them", () => {
+    const result = buildBigDay(
+      [...batch("2026-03-14T12:00:00.000Z", 11), ...soloDay("2026-03-15", [20])],
+      "UTC",
+      new Map(),
+    );
+
+    expect(result?.date).toBe("2026-03-14");
+    expect(result?.episodes).toBe(11);
+  });
+
+  it("returns a null timeline when solo ticks are below the floor", () => {
+    const result = buildBigDay(batch("2026-03-14T12:00:00.000Z", 11), "UTC", new Map());
+
+    expect(result?.timeline).toBeNull();
+    expect(result?.soloTickCount).toBe(0);
+  });
+
+  it("returns a timeline once solo ticks clear the floor", () => {
+    // 60 solo ticks across 60 distinct hours, all on distinct days
+    const solo = Array.from({ length: 60 }, (_, i) =>
+      episode(
+        `2026-0${Math.floor(i / 28) + 1}-${String((i % 28) + 1).padStart(2, "0")}T21:00:00.000Z`,
+        i + 1,
+      ),
+    );
+
+    const result = buildBigDay(solo, "UTC", new Map());
+
+    expect(result?.timeline).not.toBeNull();
+  });
+
+  it("breaks a tie on the earlier date, whatever order the rows arrive in", () => {
+    // Two days of two episodes each. Resolving the tie by iteration order
+    // would make the answer depend on the caller's ORDER BY.
+    const march = soloDay("2026-03-03", [10, 11]);
+    const september = soloDay("2026-09-09", [10, 11]);
+
+    expect(buildBigDay([...september, ...march], "UTC", new Map())?.date).toBe(
+      "2026-03-03",
+    );
+    expect(buildBigDay([...march, ...september], "UTC", new Map())?.date).toBe(
+      "2026-03-03",
+    );
+  });
+
+  it("returns null for no episodes", () => {
+    expect(buildBigDay([], "UTC", new Map())).toBeNull();
+  });
+});
+
+describe("buildRhythm", () => {
+  it("counts weekdays Monday-first over every episode, batched included", () => {
+    // 2026-03-16 is a Monday
+    const result = buildRhythm(batch("2026-03-16T12:00:00.000Z", 3), "UTC");
+
+    expect(result.weekdayCounts[0]).toBe(3);
+    expect(result.topWeekday).toBe(0);
+  });
+
+  it("returns a null lateShare below the solo-tick floor", () => {
+    expect(buildRhythm(batch("2026-03-16T22:00:00.000Z", 3), "UTC").lateShare).toBeNull();
+  });
+
+  it("counts 21:00 onwards as late and divides by solo ticks alone", () => {
+    // 40 ticks at 20:00 and 10 from 21:00 on. The hour-20 rows are the
+    // boundary: counting them would give 1, not 0.2. The 100-episode batch
+    // is excluded from both halves of the fraction, so it cannot dilute it.
+    const rows = [
+      ...soloTicksAtHours([
+        ...Array.from({ length: 40 }, () => 20),
+        ...Array.from({ length: 4 }, () => 21),
+        ...Array.from({ length: 3 }, () => 22),
+        ...Array.from({ length: 3 }, () => 23),
+      ]),
+      ...batch("2026-06-06T12:00:00.000Z", 100),
+    ];
+
+    expect(buildRhythm(rows, "UTC").lateShare).toBe(0.2);
+  });
+
+  it("separates no late ticks from too few ticks to say", () => {
+    // One row either side of the floor, so "nothing to divide by" reads as
+    // null and a genuine zero share reads as 0.
+    const noon = (count: number) =>
+      soloTicksAtHours(Array.from({ length: count }, () => 12));
+
+    expect(buildRhythm(noon(49), "UTC").lateShare).toBeNull();
+    expect(buildRhythm(noon(50), "UTC").lateShare).toBe(0);
+  });
+
+  it("returns zero counts for no episodes", () => {
+    const result = buildRhythm([], "UTC");
+
+    expect(result.weekdayCounts).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(result.topWeekday).toBeNull();
+  });
+});
+
+describe("medianEpisodesPerActiveDayByWeekday", () => {
+  it("computes the median only over days that weekday was active", () => {
+    // Two Sundays: one with 4 episodes, one with 6. Median is 5.
+    const result = medianEpisodesPerActiveDayByWeekday(
+      [
+        ...batch("2026-03-15T12:00:00.000Z", 4),
+        ...batch("2026-03-22T12:00:00.000Z", 6),
+      ],
+      "UTC",
+    );
+
+    expect(result[6]).toBe(5);
+  });
+
+  it("leaves days that weekday was quiet out of the median entirely", () => {
+    // Three active Sundays of 1, 1 and 9 episodes -- median 1. The other
+    // forty-nine Sundays of the year must not enter as zeros, or every median
+    // collapses toward zero and archetype rule 3 becomes unreachable.
+    const result = medianEpisodesPerActiveDayByWeekday(
+      [
+        ...batch("2026-03-01T12:00:00.000Z", 1),
+        ...batch("2026-03-08T12:00:00.000Z", 1),
+        ...batch("2026-03-15T12:00:00.000Z", 9),
+      ],
+      "UTC",
+    );
+
+    expect(result[6]).toBe(1);
+  });
+
+  it("returns zero for a weekday with no activity", () => {
+    expect(medianEpisodesPerActiveDayByWeekday([], "UTC")).toEqual([
+      0, 0, 0, 0, 0, 0, 0,
+    ]);
   });
 });
