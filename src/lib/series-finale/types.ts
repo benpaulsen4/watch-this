@@ -170,6 +170,20 @@ export interface SeriesFinalePayload {
   genres: { name: string; percent: number }[];
   months: { month: number; episodes: number }[];
 
+  /**
+   * Individually-ticked episodes across the **whole period**.
+   *
+   * The third site of a name that means three different denominators, and the
+   * two payload-facing ones sit next to each other on purpose:
+   * `bigDay.soloTickCount` below counts one day's, this counts the year's, and
+   * `ArchetypeInput.soloTickCount` is this one. Disclosure copy explaining why
+   * an intra-day statistic is missing has to quote the period total -- it is
+   * the number `SOLO_TICK_FLOOR` is actually compared against -- so reaching
+   * for `bigDay.soloTickCount` instead would understate it, typecheck, and
+   * render.
+   */
+  soloTickTotal: number;
+
   bigDay: {
     date: string;
     episodes: number;

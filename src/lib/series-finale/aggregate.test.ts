@@ -1001,5 +1001,13 @@ describe("buildPayload", () => {
     expect(payload.topShow?.tmdbId).toBe(1);
     expect(payload.topShow?.episodes).toBe(2);
     expect(payload.niche?.tmdbId).toBe(4);
+
+    // Two solo ticks in the period, one per day, so the biggest day holds one
+    // of them. Deliberately different values: wiring `soloTickTotal` to
+    // `bigDay.soloTickCount` -- the same name, one day's denominator --
+    // typechecks, and equal numbers here would prove nothing about which was
+    // read.
+    expect(payload.soloTickTotal).toBe(2);
+    expect(payload.bigDay?.soloTickCount).toBe(1);
   });
 });

@@ -669,9 +669,10 @@ export function buildPayload(
   const months = buildMonths(episodes, statuses, zone, period);
   const genres = buildGenres(statuses, titles, input.genreNames, period);
 
-  // The period's solo ticks. `bigDay.soloTickCount` below counts one day's,
-  // from `buildBigDay`'s own pass -- same name, different denominator, and
-  // crossing the two typechecks silently.
+  // The period's solo ticks. They reach the payload as `soloTickTotal` and the
+  // archetype as `soloTickCount`; `bigDay.soloTickCount` counts one day's, from
+  // `buildBigDay`'s own pass -- same name, different denominator, and crossing
+  // the two typechecks silently.
   const { solo } = partitionSoloTicks(episodes);
 
   const completedMetas = statuses
@@ -741,6 +742,7 @@ export function buildPayload(
     niche: buildNiche(statuses, titles, period),
     genres,
     months,
+    soloTickTotal: solo.length,
     bigDay: buildBigDay(episodes, zone, input.episodeRuntimeLookup),
     rhythm: { archetype, ...rhythm },
     shame: buildShame(statuses, titles, episodes, period, now),
