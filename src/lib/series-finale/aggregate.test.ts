@@ -804,14 +804,29 @@ describe("buildPayload", () => {
     const payload = buildPayload(
       input({
         episodeMinutes: { minutes: 24_000, unknownCount: 3 },
-        filmMinutes: { minutes: 720, unknownCount: 1 },
+        filmMinutes: { minutes: 750, unknownCount: 1 },
       }),
       NOW,
     );
 
-    expect(payload.headline.minutes).toBe(24_720);
-    expect(payload.headline.hours).toBe(412);
+    expect(payload.headline.minutes).toBe(24_750);
+    // 412.5 hours, deliberately not a whole number: an exact multiple of 60
+    // reads the same under floor, ceil and round, so it would pin the sum and
+    // say nothing about the rounding.
+    expect(payload.headline.hours).toBe(413);
     expect(payload.headline.unknownRuntimeEpisodes).toBe(4);
+  });
+
+  it("rounds the headline hours down when the remainder is under half", () => {
+    // The other direction. A remainder over half also passes under `Math.ceil`
+    // and one under half also passes under `Math.floor`, so only the pair pins
+    // `Math.round`.
+    const payload = buildPayload(
+      input({ episodeMinutes: { minutes: 24_730, unknownCount: 0 } }),
+      NOW,
+    );
+
+    expect(payload.headline.hours).toBe(412);
   });
 
   it("marks a thin period", () => {
@@ -842,9 +857,9 @@ describe("buildPayload", () => {
     // month dominates and no day holds more than one. The archetype reads the
     // period's count (60, clearing the floor, so rule 5 runs and lands on
     // nightly-ritualist) while `bigDay.soloTickCount` reads one day's (1).
-    // Cross the two -- they share a name and both are in scope -- and this
-    // payload still typechecks: the archetype falls through to null because 1
-    // is below the floor, or the big day claims all sixty ticks.
+    // The same name on two payload-facing fields with different denominators,
+    // so crossing them typechecks: the archetype falls through to null because
+    // 1 is below the floor, or the big day claims all sixty ticks.
     const episodes = Array.from({ length: 60 }, (_, i) =>
       episode(
         `2026-${String(Math.floor(i / 5) + 1).padStart(2, "0")}-0${(i % 5) + 1}T21:00:00.000Z`,
@@ -856,5 +871,80 @@ describe("buildPayload", () => {
 
     expect(payload.rhythm.archetype).toBe("nightly-ritualist");
     expect(payload.bigDay?.soloTickCount).toBe(1);
+  });
+
+  it("routes each statistic to the field named for it", () => {
+    // Every other test in this block leaves `statuses` empty, which makes
+    // `titlesDropped`, `titlesCompleted` and `finished.total` all zero -- so
+    // `titlesDropped: finished.total`, the crossing that typechecks silently,
+    // passes every one of them. Here the three hold different values, and the
+    // same fixture populates the months, genre and shame cards so their wiring
+    // is pinned too.
+    const statuses = [
+      status({ tmdbId: 1, status: "dropped" }),
+      status({ tmdbId: 2, status: "dropped" }),
+      status({ tmdbId: 3, status: "dropped" }),
+      status({ tmdbId: 4, contentType: "movie" }),
+      status({ tmdbId: 5 }),
+      status({
+        tmdbId: 6,
+        contentType: "movie",
+        status: "planning",
+        createdAt: new Date("2026-12-01T00:00:00Z"),
+      }),
+    ];
+    const titles = titleMap([
+      title({ tmdbId: 1, title: "Foundation" }),
+      title({ tmdbId: 2 }),
+      title({ tmdbId: 3 }),
+      title({ tmdbId: 4, contentType: "movie", genreIds: [1] }),
+      title({ tmdbId: 5, genreIds: [1, 2] }),
+      title({ tmdbId: 6, contentType: "movie" }),
+    ]);
+    const episodes = [
+      episode("2026-03-14T12:00:00.000Z", 1),
+      episode("2026-03-15T12:00:00.000Z", 2),
+    ];
+
+    const payload = buildPayload(
+      input({
+        statuses,
+        titles,
+        episodes,
+        genreNames: new Map([
+          [1, "Drama"],
+          [2, "Comedy"],
+        ]),
+      }),
+      NOW,
+    );
+
+    expect(payload.headline.titlesDropped).toBe(3);
+    expect(payload.headline.titlesCompleted).toBe(2);
+    expect(payload.headline.episodes).toBe(2);
+    expect(payload.finished).toEqual({ films: 1, shows: 1, total: 2 });
+
+    // March holds the two episodes; April holds the completed film, dated by
+    // `updatedAt`. The completed show contributes to neither -- only films are
+    // bucketed that way, because only films lack a per-watch timestamp.
+    expect(payload.months[2]?.episodes).toBe(2);
+    expect(payload.months[3]?.episodes).toBe(1);
+
+    // Three genre tags across the two completed titles, Drama carrying two of
+    // them. Tags, not titles: the denominator is 3, not 2.
+    expect(payload.genres).toEqual([
+      { name: "Drama", percent: 67 },
+      { name: "Comedy", percent: 33 },
+    ]);
+
+    expect(payload.shame.dropped.map((show) => show.tmdbId)).toEqual([1, 2, 3]);
+    expect(payload.shame.dropped[0]?.lastEpisode).toBe("S1E02");
+    expect(payload.shame.stillPlanning).toEqual([
+      { tmdbId: 6, title: "Title 6", days: 30, runtime: null },
+    ]);
+
+    expect(payload.topShow?.tmdbId).toBe(1);
+    expect(payload.topShow?.episodes).toBe(2);
+    expect(payload.niche?.tmdbId).toBe(4);
   });
 });

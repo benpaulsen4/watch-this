@@ -13,7 +13,12 @@ export interface ArchetypeInput {
   weekdayCounts: number[];
   /** Median episodes on the days that weekday was active, Monday-first. */
   medianEpisodesPerActiveDayByWeekday: number[];
-  /** Episode counts per calendar month, 12 entries. */
+  /**
+   * Episodes and completed films per calendar month, 12 entries. Films count
+   * despite the name -- `buildMonths` buckets both -- so a year spent on films
+   * varies month to month here rather than arriving as twelve zeros, which
+   * would put the feast-or-famine rule permanently out of reach for that user.
+   */
   monthlyEpisodeCounts: number[];
   soloTickHours: number[];
   soloTickWeekdays: number[];
