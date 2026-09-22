@@ -508,3 +508,80 @@ export function medianEpisodesPerActiveDayByWeekday(
   // never active has no median at all, and reports 0.
   return perWeekday.map((counts) => median(counts) ?? 0);
 }
+
+/**
+ * Shows abandoned in the period, and films still sitting in "planning".
+ *
+ * Only shows can be dropped -- `MovieWatchStatus` is planning-or-completed --
+ * so the two lists are genuinely different things rather than one filtered
+ * two ways.
+ *
+ * `now` is a parameter rather than `new Date()` so the day counts are
+ * deterministic under test.
+ */
+export function buildShame(
+  statuses: ContentStatusRow[],
+  titles: Map<string, TitleMeta>,
+  episodes: WatchedEpisodeRow[],
+  period: { start: Date; end: Date },
+  now: Date,
+): SeriesFinalePayload["shame"] {
+  const lastEpisodeByShow = new Map<number, WatchedEpisodeRow>();
+  for (const row of episodes) {
+    const current = lastEpisodeByShow.get(row.tmdbId);
+    // "Last" in season/episode order, not in `watchedAt` order: someone who
+    // circles back to mop up an episode they skipped did not un-abandon the
+    // show at the point they stopped.
+    const isLater =
+      !current ||
+      row.seasonNumber > current.seasonNumber ||
+      (row.seasonNumber === current.seasonNumber &&
+        row.episodeNumber > current.episodeNumber);
+    if (isLater) lastEpisodeByShow.set(row.tmdbId, row);
+  }
+
+  const dropped = statuses
+    .filter((row) => row.status === "dropped" && isWithin(row.updatedAt, period))
+    .map((row) => {
+      const meta = titles.get(titleKey(row.tmdbId, row.contentType));
+      // A title with no cached metadata is dropped from the list rather than
+      // named "Unknown". This describes a population, so one unresolvable row
+      // makes it slightly less complete; a placeholder would make it wrong.
+      if (!meta) return null;
+
+      const last = lastEpisodeByShow.get(row.tmdbId);
+      return {
+        tmdbId: row.tmdbId,
+        title: meta.title,
+        lastEpisode: last
+          ? `S${last.seasonNumber}E${String(last.episodeNumber).padStart(2, "0")}`
+          : null,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  // Deliberately not filtered by the period: a film added three years ago and
+  // never watched is exactly what this list is for, and dating it by the
+  // recap year would hide the worst offenders.
+  const stillPlanning = statuses
+    .filter((row) => row.status === "planning" && row.contentType === "movie")
+    .map((row) => {
+      const meta = titles.get(titleKey(row.tmdbId, "movie"));
+      if (!meta) return null;
+
+      return {
+        tmdbId: row.tmdbId,
+        title: meta.title,
+        // Floored, so a film added earlier today has waited zero days rather
+        // than being rounded up into a day it has not finished.
+        days: Math.floor(
+          (now.getTime() - row.createdAt.getTime()) / MS_PER_DAY,
+        ),
+        runtime: meta.runtime,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .sort((a, b) => b.days - a.days);
+
+  return { dropped, stillPlanning };
+}

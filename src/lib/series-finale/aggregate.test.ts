@@ -6,6 +6,7 @@ import {
   buildMonths,
   buildNiche,
   buildRhythm,
+  buildShame,
   buildTopShow,
   countDropped,
   countFinished,
@@ -596,5 +597,107 @@ describe("medianEpisodesPerActiveDayByWeekday", () => {
     expect(medianEpisodesPerActiveDayByWeekday([], "UTC")).toEqual([
       0, 0, 0, 0, 0, 0, 0,
     ]);
+  });
+});
+
+describe("buildShame", () => {
+  const NOW = new Date("2026-12-31T00:00:00Z");
+
+  it("lists dropped shows with the last episode watched", () => {
+    const result = buildShame(
+      [status({ tmdbId: 1, status: "dropped" })],
+      titleMap([title({ tmdbId: 1, title: "Foundation" })]),
+      [
+        { tmdbId: 1, seasonNumber: 2, episodeNumber: 3, watchedAt: new Date("2026-02-01T00:00:00Z") },
+        { tmdbId: 1, seasonNumber: 2, episodeNumber: 1, watchedAt: new Date("2026-01-01T00:00:00Z") },
+      ],
+      PERIOD,
+      NOW,
+    );
+
+    expect(result.dropped).toEqual([
+      { tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" },
+    ]);
+  });
+
+  it("reports a null last episode when none were watched", () => {
+    const result = buildShame(
+      [status({ tmdbId: 1, status: "dropped" })],
+      titleMap([title({ tmdbId: 1 })]),
+      [],
+      PERIOD,
+      NOW,
+    );
+
+    expect(result.dropped[0]?.lastEpisode).toBeNull();
+  });
+
+  it("lists still-planning films with days since they were added", () => {
+    const result = buildShame(
+      [
+        status({
+          tmdbId: 2,
+          contentType: "movie",
+          status: "planning",
+          createdAt: new Date("2026-12-01T00:00:00Z"),
+        }),
+      ],
+      titleMap([
+        title({ tmdbId: 2, contentType: "movie", title: "Blade Runner 2049", runtime: 164 }),
+      ]),
+      [],
+      PERIOD,
+      NOW,
+    );
+
+    expect(result.stillPlanning).toEqual([
+      { tmdbId: 2, title: "Blade Runner 2049", days: 30, runtime: 164 },
+    ]);
+  });
+
+  it("counts a film added the same day as zero days, not one", () => {
+    // Whole days elapsed, so something added this morning has not been
+    // waiting a day yet. A ceiling here would open every recap with "1 day".
+    const result = buildShame(
+      [
+        status({
+          tmdbId: 2,
+          contentType: "movie",
+          status: "planning",
+          createdAt: new Date("2026-12-31T00:00:00Z"),
+        }),
+      ],
+      titleMap([title({ tmdbId: 2, contentType: "movie" })]),
+      [],
+      PERIOD,
+      NOW,
+    );
+
+    expect(result.stillPlanning[0]?.days).toBe(0);
+  });
+
+  it("orders still-planning films by longest wait first", () => {
+    const result = buildShame(
+      [
+        status({ tmdbId: 1, contentType: "movie", status: "planning", createdAt: new Date("2026-12-01T00:00:00Z") }),
+        status({ tmdbId: 2, contentType: "movie", status: "planning", createdAt: new Date("2024-01-01T00:00:00Z") }),
+      ],
+      titleMap([
+        title({ tmdbId: 1, contentType: "movie" }),
+        title({ tmdbId: 2, contentType: "movie" }),
+      ]),
+      [],
+      PERIOD,
+      NOW,
+    );
+
+    expect(result.stillPlanning.map((f) => f.tmdbId)).toEqual([2, 1]);
+  });
+
+  it("returns empty lists when there is nothing to report", () => {
+    expect(buildShame([], new Map(), [], PERIOD, NOW)).toEqual({
+      dropped: [],
+      stillPlanning: [],
+    });
   });
 });
