@@ -15,6 +15,7 @@ import {
   longestStreak,
   median,
   medianEpisodesPerActiveDayByWeekday,
+  mostWatchedShowId,
 } from "./aggregate";
 import {
   type AggregationInput,
@@ -259,6 +260,21 @@ describe("median", () => {
 
   it("returns null for no values", () => {
     expect(median([])).toBeNull();
+  });
+});
+
+describe("mostWatchedShowId", () => {
+  it("picks the show with the most episodes", () => {
+    expect(mostWatchedShowId(new Map([[5, 2], [9, 7], [3, 4]]))).toBe(9);
+  });
+
+  it("breaks a tie toward the lower tmdbId whatever the insertion order", () => {
+    expect(mostWatchedShowId(new Map([[20, 3], [10, 3]]))).toBe(10);
+    expect(mostWatchedShowId(new Map([[10, 3], [20, 3]]))).toBe(10);
+  });
+
+  it("returns null when there are no shows", () => {
+    expect(mostWatchedShowId(new Map())).toBeNull();
   });
 });
 

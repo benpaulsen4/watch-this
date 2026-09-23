@@ -25,7 +25,7 @@ import {
 } from "../db/schema";
 import { resolveTimeZone } from "../time";
 import { tmdbClient } from "../tmdb/client";
-import { buildPayload } from "./aggregate";
+import { buildPayload, mostWatchedShowId } from "./aggregate";
 import { completedYearsBetween, localisePeriod, type Period } from "./periods";
 import {
   ensureSeasonsCached,
@@ -366,11 +366,9 @@ export async function loadCollaboratorSlices(
 
 /**
  * A collaborator's most-watched show, for the "also number one for" line on
- * the viewer's top-show card.
- *
- * A tie resolves to the lower tmdbId, matching `buildTopShow` in
- * `./aggregate`: the two ids are compared to fill `alsoTopFor`, so their
- * tie-breaks must agree.
+ * the viewer's top-show card. Ties go through `mostWatchedShowId`, the same
+ * helper `buildTopShow` uses, so the two ids compared to fill `alsoTopFor`
+ * cannot disagree on a tie.
  */
 function mostWatchedShow(episodes: WatchedEpisodeRow[]): number | null {
   const counts = new Map<number, number>();
@@ -378,19 +376,7 @@ function mostWatchedShow(episodes: WatchedEpisodeRow[]): number | null {
     counts.set(episode.tmdbId, (counts.get(episode.tmdbId) ?? 0) + 1);
   }
 
-  let topId: number | null = null;
-  let topCount = 0;
-  for (const [tmdbId, count] of counts) {
-    if (
-      count > topCount ||
-      (count === topCount && topId !== null && tmdbId < topId)
-    ) {
-      topId = tmdbId;
-      topCount = count;
-    }
-  }
-
-  return topId;
+  return mostWatchedShowId(counts);
 }
 
 /**

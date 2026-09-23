@@ -215,6 +215,42 @@ export function median(values: number[]): number | null {
  * watched show of the year was something it was not, and nothing in the
  * rendering would reveal the substitution.
  */
+/**
+ * The show with the most episodes in `episodeCounts` (tmdbId to count), or
+ * null when there are none.
+ *
+ * A tie resolves to the lower `tmdbId` rather than to whichever show the
+ * input happened to mention first -- the same correction `buildBigDay`
+ * carries for its date. Episodes arrive in whatever order the caller's query
+ * produced, and "your most watched show" silently changing because an ORDER
+ * BY changed is a bug nobody would think to look for. The id is arbitrary as
+ * a ranking, which is the point: nothing here ranks two equally-watched shows
+ * against each other, so the only requirement is that the same year renders
+ * the same way twice.
+ *
+ * The one tie-break for both the viewer's top show (`buildTopShow`) and each
+ * collaborator's (the service's crew slice). `alsoTopFor` compares the two
+ * ids, so if the rules ever differed a tied collaborator would silently drop
+ * off the line.
+ */
+export function mostWatchedShowId(
+  episodeCounts: Map<number, number>,
+): number | null {
+  let topId: number | null = null;
+  let topCount = 0;
+  for (const [tmdbId, count] of episodeCounts) {
+    if (
+      count > topCount ||
+      (count === topCount && topId !== null && tmdbId < topId)
+    ) {
+      topId = tmdbId;
+      topCount = count;
+    }
+  }
+
+  return topId;
+}
+
 export function buildTopShow(
   episodes: WatchedEpisodeRow[],
   titles: Map<string, TitleMeta>,
@@ -230,28 +266,11 @@ export function buildTopShow(
     else byShow.set(row.tmdbId, [row]);
   }
 
-  let topId: number | null = null;
-  let topRows: WatchedEpisodeRow[] = [];
-  for (const [tmdbId, rows] of byShow) {
-    // A tie resolves to the lower `tmdbId` rather than to whichever show the
-    // input happened to mention first -- the same correction `buildBigDay`
-    // carries for its date. `episodes` arrives in whatever order the caller's
-    // query produced, and "your most watched show" silently changing because
-    // an ORDER BY changed is a bug nobody would think to look for. The id is
-    // arbitrary as a ranking, which is the point: nothing here ranks two
-    // equally-watched shows against each other, so the only requirement is
-    // that the same year renders the same way twice.
-    const better =
-      rows.length > topRows.length ||
-      (rows.length === topRows.length && topId !== null && tmdbId < topId);
-
-    if (better) {
-      topId = tmdbId;
-      topRows = rows;
-    }
-  }
-
-  if (topId === null) return null;
+  const topId = mostWatchedShowId(
+    new Map(Array.from(byShow, ([tmdbId, rows]) => [tmdbId, rows.length])),
+  );
+  const topRows = topId === null ? undefined : byShow.get(topId);
+  if (topId === null || !topRows) return null;
 
   const meta = titles.get(titleKey(topId, "tv"));
   if (!meta) return null;
