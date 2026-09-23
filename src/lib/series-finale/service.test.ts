@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../db", () => {
   const resultsQueue: unknown[] = [];
   const inserted: unknown[] = [];
+  const conflicts: unknown[] = [];
   const queries: Array<{
     from: unknown;
     joins: Array<{ type: "left" | "inner"; table: unknown }>;
@@ -48,7 +49,10 @@ vi.mock("../db", () => {
       inserted.push(row);
       return chain;
     },
-    onConflictDoUpdate: () => chain,
+    onConflictDoUpdate: (config: unknown) => {
+      conflicts.push(config);
+      return chain;
+    },
     limit: () => Promise.resolve(resultsQueue.shift() ?? []),
     returning: () => Promise.resolve(resultsQueue.shift() ?? []),
     then: (resolve: (v: unknown) => unknown) =>
@@ -65,9 +69,11 @@ vi.mock("../db", () => {
       resultsQueue.push(...rows);
       queries.length = 0;
       inserted.length = 0;
+      conflicts.length = 0;
     },
     __getQueries: () => queries.slice(),
     __getInserted: () => inserted.slice(),
+    __getConflicts: () => conflicts.slice(),
   };
 
   // `./runtime` imports its tables and `ContentType` from `../db` rather than
@@ -95,7 +101,18 @@ vi.mock("../db/schema", () => ({
   lists: { ownerId: { column: "lists.owner_id" } },
   listItems: {},
   listCollaborators: { userId: { column: "list_collaborators.user_id" } },
-  seriesFinale: {},
+  // Column sentinels, so the upsert test can check its conflict target by
+  // identity.
+  seriesFinale: {
+    userId: { column: "series_finale.user_id" },
+    periodStart: { column: "series_finale.period_start" },
+    periodEnd: { column: "series_finale.period_end" },
+    periodLabel: { column: "series_finale.period_label" },
+    payload: { column: "series_finale.payload" },
+    schemaVersion: { column: "series_finale.schema_version" },
+    generatedAt: { column: "series_finale.generated_at" },
+    dismissedAt: { column: "series_finale.dismissed_at" },
+  },
   ContentType: { MOVIE: "movie", TV: "tv" },
 }));
 
@@ -112,7 +129,7 @@ vi.mock("../tmdb/client", () => ({
 }));
 
 import { db, tmdbSeasonFetch } from "../db";
-import { listCollaborators, lists, users } from "../db/schema";
+import { listCollaborators, lists, seriesFinale, users } from "../db/schema";
 import { tmdbClient } from "../tmdb/client";
 import { buildPayload } from "./aggregate";
 import { calendarYearPeriod } from "./periods";
@@ -159,6 +176,9 @@ const getQueries = () =>
 
 const getInserted = () =>
   (db as unknown as { __getInserted: () => unknown[] }).__getInserted();
+
+const getConflicts = () =>
+  (db as unknown as { __getConflicts: () => unknown[] }).__getConflicts();
 
 /**
  * Whether `target` is reachable anywhere inside `node` -- used to find a
@@ -1275,6 +1295,39 @@ describe("getOrGenerateSnapshot", () => {
     expect(containsInstant(episodesQuery?.where, "2026-01-01T00:00:00.000Z")).toBe(false);
     expect(containsInstant(cohortQuery?.where, "2026-01-01T00:00:00.000Z")).toBe(true);
     expect(containsInstant(cohortQuery?.where, "2026-01-01T08:00:00.000Z")).toBe(false);
+  });
+
+  it("upserts on the row's unique key, replacing the payload, schema version and generation time", async () => {
+    setResults([
+      [],
+      [{ timezone: "UTC" }],
+      [{ first: new Date("2025-06-01T00:00:00Z") }],
+      [{ first: null }],
+      [], // episodes
+      [], // statuses
+      [], // collaborator list ids
+      [], // collaborative title keys
+      [], // cohort
+    ]);
+
+    const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
+
+    // Without `payload` or `schemaVersion` in `set`, a regeneration would be a
+    // silent no-op, and the list route would regenerate every stale year on
+    // every load forever.
+    const conflicts = getConflicts() as Array<{ target: unknown[]; set: unknown }>;
+    expect(conflicts).toHaveLength(1);
+    const [upsert] = conflicts;
+    expect(upsert?.target).toHaveLength(3);
+    expect(upsert?.target[0]).toBe(seriesFinale.userId);
+    expect(upsert?.target[1]).toBe(seriesFinale.periodStart);
+    expect(upsert?.target[2]).toBe(seriesFinale.periodEnd);
+    expect(upsert?.set).toEqual({
+      periodLabel: "2026",
+      payload,
+      schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
+      generatedAt: afterPeriod,
+    });
   });
 
   it("drops withdrawn or deleted collaborators from a stored snapshot and returns the rest as frozen", async () => {
