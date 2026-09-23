@@ -23,6 +23,12 @@ export const users = pgTable("users", {
   profilePictureUrl: varchar("profile_picture_url", { length: 500 }),
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   country: varchar("country", { length: 2 }),
+  // Series Finale crew comparisons. Default true, matching the app's existing
+  // posture that people sharing a list can already see each other's activity.
+  // This is a withdrawal switch, not an opt-in.
+  shareStatsWithCollaborators: boolean("share_stats_with_collaborators")
+    .default(true)
+    .notNull(),
   // Incremented to invalidate all outstanding session JWTs for this user
   // (e.g. on "sign out all devices" or passkey deletion). Sessions carry the
   // value they were minted with and are rejected once it falls behind.
@@ -385,6 +391,41 @@ export const tmdbSeasonFetch = pgTable(
   (table) => [unique().on(table.tmdbId, table.seasonNumber)],
 );
 
+// A frozen Series Finale recap. Written once per user per period and never
+// recomputed on read -- tmdb_cache.popularity drifts and users keep editing
+// status, so a live recompute would make an archived year disagree with the
+// share image somebody already posted.
+export const seriesFinale = pgTable(
+  "series_finale",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    // Exclusive. A period is [start, end).
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    periodLabel: varchar("period_label", { length: 32 }).notNull(),
+    payload: jsonb("payload").notNull(),
+    // Bumped when the payload shape changes. A snapshot below the current
+    // version is regenerated on read rather than rendered against a shape it
+    // was never written for.
+    schemaVersion: integer("schema_version").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    // Dashboard banner "Not now". Per-recap, so it needs no table of its own.
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+  },
+  (table) => [
+    unique().on(table.userId, table.periodStart, table.periodEnd),
+    index("series_finale_user_id_period_start_idx").on(
+      table.userId,
+      table.periodStart.desc(),
+    ),
+  ],
+);
+
 // Relations
 // Types
 export type User = typeof users.$inferSelect;
@@ -433,6 +474,9 @@ export type NewTmdbEpisodeRuntime = typeof tmdbEpisodeRuntime.$inferInsert;
 
 export type TmdbSeasonFetch = typeof tmdbSeasonFetch.$inferSelect;
 export type NewTmdbSeasonFetch = typeof tmdbSeasonFetch.$inferInsert;
+
+export type SeriesFinale = typeof seriesFinale.$inferSelect;
+export type NewSeriesFinale = typeof seriesFinale.$inferInsert;
 
 // Enums for type safety
 export const ListType = {
