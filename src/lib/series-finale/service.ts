@@ -29,8 +29,11 @@ import { buildPayload } from "./aggregate";
 import { completedYearsBetween, localisePeriod, type Period } from "./periods";
 import {
   ensureSeasonsCached,
+  episodeKeyOf,
   loadEpisodeRuntimes,
   loadFilmRuntimes,
+  type RuntimeLookup,
+  type SeasonKey,
   summariseEpisodeRuntimes,
   summariseFilmRuntimes,
 } from "./runtime";
@@ -708,6 +711,28 @@ export async function generateSnapshot(
   return generateInZone(userId, period, await loadTimeZone(userId), now);
 }
 
+/**
+ * The distinct (show, season) pairs holding at least one episode with NO entry
+ * in `lookup`. An entry whose runtime is null is not missing: it means TMDB
+ * was asked and does not know, and asking again will not change that (see
+ * `RuntimeLookup`).
+ */
+function seasonsMissingFrom(
+  episodes: WatchedEpisodeRow[],
+  lookup: RuntimeLookup,
+): SeasonKey[] {
+  const missing = new Map<string, SeasonKey>();
+  for (const episode of episodes) {
+    if (lookup.has(episodeKeyOf(episode))) continue;
+    missing.set(`${episode.tmdbId}:${episode.seasonNumber}`, {
+      tmdbId: episode.tmdbId,
+      seasonNumber: episode.seasonNumber,
+    });
+  }
+
+  return Array.from(missing.values());
+}
+
 async function generateInZone(
   userId: string,
   period: Period,
@@ -718,17 +743,21 @@ async function generateInZone(
 
   const rows = await loadUserRows(userId, window);
 
-  const seasonPairs = Array.from(
-    new Map(
-      rows.episodes.map((row) => [
-        `${row.tmdbId}:${row.seasonNumber}`,
-        { tmdbId: row.tmdbId, seasonNumber: row.seasonNumber },
-      ]),
-    ).values(),
-  );
-  await ensureSeasonsCached(seasonPairs);
+  // Only seasons with a watched episode the cache has never heard of are
+  // handed to TMDB. A cached season is never refetched here, however old its
+  // fetch record: the spec says generation does not block on live fetches for
+  // seasons already recorded, and a heavy user's year spans hundreds of
+  // seasons at 250 ms apiece. Keeping cached seasons fresh is the backfill's
+  // job, not a user-facing request's.
+  let episodeRuntimeLookup = await loadEpisodeRuntimes(rows.episodes);
+  const uncachedSeasons = seasonsMissingFrom(rows.episodes, episodeRuntimeLookup);
+  if (uncachedSeasons.length > 0) {
+    const { fetched } = await ensureSeasonsCached(uncachedSeasons);
+    if (fetched > 0) {
+      episodeRuntimeLookup = await loadEpisodeRuntimes(rows.episodes);
+    }
+  }
 
-  const episodeRuntimeLookup = await loadEpisodeRuntimes(rows.episodes);
   const episodeMinutes = summariseEpisodeRuntimes(
     rows.episodes,
     episodeRuntimeLookup,

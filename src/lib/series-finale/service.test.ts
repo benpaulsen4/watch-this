@@ -111,8 +111,9 @@ vi.mock("../tmdb/client", () => ({
   },
 }));
 
-import { db } from "../db";
+import { db, tmdbSeasonFetch } from "../db";
 import { listCollaborators, lists, users } from "../db/schema";
+import { tmdbClient } from "../tmdb/client";
 import { buildPayload } from "./aggregate";
 import { calendarYearPeriod } from "./periods";
 import {
@@ -929,9 +930,7 @@ describe("generateSnapshot", () => {
         status(10, "movie", "2026-01-01T03:00:00Z"),
       ],
       [title(1, "tv", "Severance"), title(9, "movie", "Arrival"), title(10, "movie", "Heat")],
-      // season fetch record: fresh, so no TMDB call
-      [{ tmdbId: 1, seasonNumber: 1, fetchedAt: new Date() }],
-      // episode runtimes
+      // episode runtimes: every watched episode is cached, so no season fetch
       [
         { tmdbId: 1, seasonNumber: 1, episodeNumber: 1, runtime: 50 },
         { tmdbId: 1, seasonNumber: 1, episodeNumber: 2, runtime: 50 },
@@ -1001,6 +1000,93 @@ describe("generateSnapshot", () => {
     expect(getInserted()).toEqual([
       expect.objectContaining({ userId: "viewer", payload }),
     ]);
+  });
+});
+
+describe("generation's runtime fetches", () => {
+  const period = calendarYearPeriod(2026);
+  const afterPeriod = new Date("2027-02-01T00:00:00Z");
+  const getTVSeasonDetails = vi.mocked(tmdbClient.getTVSeasonDetails);
+
+  const episode = (episodeNumber: number) => ({
+    tmdbId: 1,
+    seasonNumber: 1,
+    episodeNumber,
+    watchedAt: new Date("2026-03-14T20:00:00Z"),
+  });
+  const runtime = (episodeNumber: number, minutes: number | null) => ({
+    tmdbId: 1,
+    seasonNumber: 1,
+    episodeNumber,
+    runtime: minutes,
+  });
+
+  // Stored-row lookup (none), zone and account, first activity.
+  const gate = () => [
+    [],
+    [{ timezone: "UTC" }],
+    [{ first: new Date("2025-06-01T00:00:00Z") }],
+    [{ first: null }],
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMovieGenres.mockResolvedValue({ genres: [] });
+    getTVGenres.mockResolvedValue({ genres: [] });
+    clearGenreNameCache();
+  });
+
+  it("asks TMDB nothing for a fully cached year, however old its season fetch records are", async () => {
+    setResults([
+      ...gate(),
+      [episode(1), episode(2)],
+      [], // statuses
+      [], // titles
+      // Both episodes have an entry -- one a known "TMDB has no runtime". Any
+      // season fetch record for this season would be months old; it must not
+      // even be read.
+      [runtime(1, 50), runtime(2, null)],
+      [], // collaborator list ids
+      [], // collaborative title keys
+      [], // cohort
+    ]);
+
+    const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
+
+    expect(payload?.headline.minutes).toBe(50);
+    expect(getTVSeasonDetails).not.toHaveBeenCalled();
+    expect(getQueries().some((query) => query.from === tmdbSeasonFetch)).toBe(false);
+  });
+
+  it("fetches only a season holding an uncached episode, then reloads runtimes", async () => {
+    getTVSeasonDetails.mockResolvedValue({
+      episodes: [
+        { episode_number: 1, runtime: 50 },
+        { episode_number: 2, runtime: 40 },
+      ],
+    } as Awaited<ReturnType<typeof tmdbClient.getTVSeasonDetails>>);
+
+    setResults([
+      ...gate(),
+      [episode(1), episode(2)],
+      [], // statuses
+      [], // titles
+      [runtime(1, 50)], // episode 2 has never been asked about
+      [], // season fetch records: none
+      [], // runtime insert (the mock's insert chain is awaited as a read)
+      [], // season fetch insert, likewise
+      [runtime(1, 50), runtime(2, 40)], // runtimes, reloaded
+      [], // collaborator list ids
+      [], // collaborative title keys
+      [], // cohort
+    ]);
+
+    const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
+
+    expect(getTVSeasonDetails).toHaveBeenCalledTimes(1);
+    expect(getTVSeasonDetails).toHaveBeenCalledWith(1, 1);
+    expect(payload?.headline.minutes).toBe(90);
+    expect(payload?.headline.unknownRuntimeEpisodes).toBe(0);
   });
 });
 
