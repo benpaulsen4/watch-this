@@ -53,6 +53,7 @@ describe("GET /api/series-finale/[period]", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Period not available",
     });
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
   it("returns the payload the service resolves", async () => {
@@ -69,5 +70,6 @@ describe("GET /api/series-finale/[period]", () => {
       expect.objectContaining({ label: "2025" }),
     );
     await expect(response.json()).resolves.toEqual({ payload });
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 });

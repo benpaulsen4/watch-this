@@ -38,6 +38,7 @@ describe("GET /api/series-finale", () => {
 
     expect(response.status).toBe(401);
     expect(listAvailableSnapshots).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
   it("returns the available periods for the current user", async () => {
@@ -60,6 +61,7 @@ describe("GET /api/series-finale", () => {
     await expect(response.json()).resolves.toEqual({
       periods: JSON.parse(JSON.stringify(periods)),
     });
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
   it("maps a service failure to a 500", async () => {
@@ -70,5 +72,6 @@ describe("GET /api/series-finale", () => {
     );
 
     expect(response.status).toBe(500);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 });

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import {
   AuthenticatedRequest,
@@ -11,7 +11,7 @@ import { listAvailableSnapshots } from "@/lib/series-finale/service";
 // dashboard banner and profile rows. Generates any snapshot that is missing
 // or stale (see `listAvailableSnapshots`) -- this is the feature's only entry
 // point, so it cannot return placeholders for periods nobody has opened.
-export const GET = withAuth(async (request: AuthenticatedRequest) => {
+const handler = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const periods = await listAvailableSnapshots(request.user.id);
     return NextResponse.json({ periods });
@@ -19,3 +19,12 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
     return handleApiError(error, "Series Finale list");
   }
 });
+
+// Every response carries one user's recap data (or its absence) at a URL that
+// is the same for every user, so no shared cache may keep it -- 401s and
+// errors included, rather than trusting each branch to remember.
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const response = await handler(request);
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
+}
