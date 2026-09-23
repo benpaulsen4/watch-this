@@ -1069,7 +1069,13 @@ async function generateAndList(
   return listSnapshots(userId);
 }
 
-/** Every generated period for a user, newest first. */
+/**
+ * Every generated period for a user, newest first.
+ *
+ * Only the headline is read out of each payload, in SQL: the listing runs on
+ * every dashboard load, and the rest of the jsonb (crew, timelines, shame
+ * lists) is never shown here.
+ */
 export async function listSnapshots(userId: string): Promise<
   {
     label: string;
@@ -1083,7 +1089,11 @@ export async function listSnapshots(userId: string): Promise<
       periodLabel: seriesFinale.periodLabel,
       generatedAt: seriesFinale.generatedAt,
       dismissedAt: seriesFinale.dismissedAt,
-      payload: seriesFinale.payload,
+      // Decoded like the jsonb column itself, whichever form the driver hands
+      // back.
+      headline: sql`${seriesFinale.payload}->'headline'`.mapWith(
+        seriesFinale.payload,
+      ),
     })
     .from(seriesFinale)
     .where(eq(seriesFinale.userId, userId))
@@ -1093,6 +1103,6 @@ export async function listSnapshots(userId: string): Promise<
     label: row.periodLabel,
     generatedAt: row.generatedAt,
     dismissedAt: row.dismissedAt,
-    headline: (row.payload as SeriesFinalePayload).headline,
+    headline: row.headline as SeriesFinalePayload["headline"],
   }));
 }

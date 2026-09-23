@@ -1435,15 +1435,28 @@ describe("listSnapshots", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns each period's label, dates and headline", async () => {
-    const payload = emptyPayload();
+    const { headline } = emptyPayload();
     const generatedAt = new Date("2027-01-02T00:00:00Z");
     setResults([
-      [{ periodLabel: "2026", generatedAt, dismissedAt: null, payload }],
+      [{ periodLabel: "2026", generatedAt, dismissedAt: null, headline }],
     ]);
 
     expect(await listSnapshots("viewer")).toEqual([
-      { label: "2026", generatedAt, dismissedAt: null, headline: payload.headline },
+      { label: "2026", generatedAt, dismissedAt: null, headline },
     ]);
+  });
+
+  it("selects only the headline out of each payload, never the whole payload", async () => {
+    setResults([[]]);
+
+    await listSnapshots("viewer");
+
+    const selection = vi.mocked(db.select).mock.calls[0]?.[0] as
+      | Record<string, unknown>
+      | undefined;
+    expect(Object.values(selection ?? {})).not.toContain(seriesFinale.payload);
+    expect(references(selection?.headline, seriesFinale.payload)).toBe(true);
+    expect(containsText(selection?.headline, "->'headline'")).toBe(true);
   });
 });
 
@@ -1501,8 +1514,8 @@ describe("listAvailableSnapshots", () => {
       [],
       // final listing
       [
-        { periodLabel: "2025", generatedAt: now, dismissedAt: null, payload: emptyPayload() },
-        { periodLabel: "2024", generatedAt: now, dismissedAt: null, payload: emptyPayload() },
+        { periodLabel: "2025", generatedAt: now, dismissedAt: null, headline: emptyPayload().headline },
+        { periodLabel: "2024", generatedAt: now, dismissedAt: null, headline: emptyPayload().headline },
       ],
     ]);
 
@@ -1527,7 +1540,7 @@ describe("listAvailableSnapshots", () => {
       [], // collaborative title keys
       [], // cohort
       [], // phantom read from the insert chain's thenable, see note above
-      [{ periodLabel: "2025", generatedAt: now, dismissedAt: null, payload: emptyPayload() }],
+      [{ periodLabel: "2025", generatedAt: now, dismissedAt: null, headline: emptyPayload().headline }],
     ]);
 
     await listAvailableSnapshots("viewer", now);
@@ -1550,7 +1563,7 @@ describe("listAvailableSnapshots", () => {
     // collaborative title keys, cohort, and the insert chain's phantom read.
     const generation = () => [[], [], [], [], [], []];
     const listing = [
-      { periodLabel: "2026", generatedAt: later, dismissedAt: null, payload: emptyPayload() },
+      { periodLabel: "2026", generatedAt: later, dismissedAt: null, headline: emptyPayload().headline },
     ];
 
     it("always generates the newest missing year, and stops there once the budget is spent", async () => {
@@ -1645,8 +1658,8 @@ describe("listAvailableSnapshots", () => {
       // nothing is missing -- unless 1994-2024 were offered too.
       [current(period2026), current(period2025)],
       [
-        { periodLabel: "2026", generatedAt: now, dismissedAt: null, payload: emptyPayload() },
-        { periodLabel: "2025", generatedAt: now, dismissedAt: null, payload: emptyPayload() },
+        { periodLabel: "2026", generatedAt: now, dismissedAt: null, headline: emptyPayload().headline },
+        { periodLabel: "2025", generatedAt: now, dismissedAt: null, headline: emptyPayload().headline },
       ],
     ]);
 
@@ -1673,7 +1686,7 @@ describe("listAvailableSnapshots", () => {
           schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
         },
       ],
-      [{ periodLabel: "2025", generatedAt: now, dismissedAt: null, payload: emptyPayload() }],
+      [{ periodLabel: "2025", generatedAt: now, dismissedAt: null, headline: emptyPayload().headline }],
     ]);
 
     await listAvailableSnapshots("viewer", now);
