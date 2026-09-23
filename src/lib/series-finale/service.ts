@@ -881,6 +881,61 @@ async function withholdWithdrawnCollaborators(
   };
 }
 
+/**
+ * Every period available to the user -- from their first activity through the
+ * last completed year in their own zone -- generating any snapshot that is
+ * missing or was written against an older payload shape, then returning the
+ * listing.
+ *
+ * This is the route the dashboard banner and profile rows read (plan 4's only
+ * entry point into the feature), and nothing else generates a snapshot except
+ * opening a recap page. Without this, no user would ever see a recap: the
+ * banner would have nothing to show and nothing to click. So this list
+ * generates rather than reporting only what already happens to exist.
+ *
+ * Generation runs sequentially, newest first, and never in parallel -- each
+ * generation fans out to TMDB and to up to eight collaborators, and running
+ * several at once would multiply that fan-out against the same rate limits
+ * for one request.
+ *
+ * The cost is real and not hidden: the first call after a year ends pays one
+ * generation per missing year, and at launch that is every completed year a
+ * long-history user has. The spec accepts this latency behind a loading
+ * state.
+ */
+export async function listAvailableSnapshots(
+  userId: string,
+  now: Date = new Date(),
+): ReturnType<typeof listSnapshots> {
+  const zone = await loadTimeZone(userId);
+  const firstActivity = await loadFirstActivity(userId);
+  if (firstActivity === null) return listSnapshots(userId);
+
+  const available = completedYearsBetween(firstActivity, now, zone);
+
+  const stored = await db
+    .select({
+      periodStart: seriesFinale.periodStart,
+      periodEnd: seriesFinale.periodEnd,
+      schemaVersion: seriesFinale.schemaVersion,
+    })
+    .from(seriesFinale)
+    .where(eq(seriesFinale.userId, userId));
+
+  for (const period of available) {
+    const row = stored.find(
+      (candidate) =>
+        candidate.periodStart.getTime() === period.start.getTime() &&
+        candidate.periodEnd.getTime() === period.end.getTime(),
+    );
+    if (!row || row.schemaVersion < SERIES_FINALE_SCHEMA_VERSION) {
+      await generateInZone(userId, period, zone, now);
+    }
+  }
+
+  return listSnapshots(userId);
+}
+
 /** Every generated period for a user, newest first. */
 export async function listSnapshots(userId: string): Promise<
   {

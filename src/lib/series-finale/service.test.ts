@@ -122,6 +122,7 @@ import {
   CREW_LIMIT,
   generateSnapshot,
   getOrGenerateSnapshot,
+  listAvailableSnapshots,
   listSnapshots,
   loadCohortMinutes,
   loadCollaborativeTitleKeys,
@@ -1205,5 +1206,116 @@ describe("listSnapshots", () => {
     expect(await listSnapshots("viewer")).toEqual([
       { label: "2026", generatedAt, dismissedAt: null, headline: payload.headline },
     ]);
+  });
+});
+
+describe("listAvailableSnapshots", () => {
+  const now = new Date("2026-06-01T00:00:00Z");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMovieGenres.mockResolvedValue({ genres: [] });
+    getTVGenres.mockResolvedValue({ genres: [] });
+    clearGenreNameCache();
+  });
+
+  it("generates nothing and returns the listing when the user has no first activity", async () => {
+    setResults([
+      [{ timezone: "UTC" }],
+      [{ first: null }],
+      [{ first: null }],
+      [],
+    ]);
+
+    const result = await listAvailableSnapshots("viewer", now);
+
+    expect(result).toEqual([]);
+    expect(db.insert).not.toHaveBeenCalled();
+    // Zone, first-activity (x2) and the final listing -- no stored-rows query,
+    // since there is nothing to compare it against.
+    expect(db.select).toHaveBeenCalledTimes(4);
+  });
+
+  it("generates exactly the missing year when one of two available years is already current", async () => {
+    const period2025 = calendarYearPeriod(2025);
+
+    setResults([
+      [{ timezone: "UTC" }],
+      [{ first: new Date("2024-03-01T00:00:00Z") }],
+      [{ first: null }],
+      // stored rows: only 2025, at the current schema version
+      [
+        {
+          periodStart: period2025.start,
+          periodEnd: period2025.end,
+          schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
+        },
+      ],
+      // generation of the missing 2024 period
+      [], // episodes
+      [], // statuses
+      [], // collaborator list ids
+      [], // collaborative title keys
+      [], // cohort
+      // the mock db's `insert(...).onConflictDoUpdate(...)` chain is itself
+      // thenable and shifts the queue when awaited, even though nothing reads
+      // its result -- account for that phantom read here.
+      [],
+      // final listing
+      [
+        { periodLabel: "2025", generatedAt: now, dismissedAt: null, payload: emptyPayload() },
+        { periodLabel: "2024", generatedAt: now, dismissedAt: null, payload: emptyPayload() },
+      ],
+    ]);
+
+    const result = await listAvailableSnapshots("viewer", now);
+
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(getInserted()[0]).toMatchObject({ periodLabel: "2024" });
+    expect(result.map((row) => row.label)).toEqual(["2025", "2024"]);
+  });
+
+  it("regenerates a stored snapshot below the current schema version", async () => {
+    const period2025 = calendarYearPeriod(2025);
+
+    setResults([
+      [{ timezone: "UTC" }],
+      [{ first: new Date("2025-03-01T00:00:00Z") }],
+      [{ first: null }],
+      [{ periodStart: period2025.start, periodEnd: period2025.end, schemaVersion: 0 }],
+      [], // episodes
+      [], // statuses
+      [], // collaborator list ids
+      [], // collaborative title keys
+      [], // cohort
+      [], // phantom read from the insert chain's thenable, see note above
+      [{ periodLabel: "2025", generatedAt: now, dismissedAt: null, payload: emptyPayload() }],
+    ]);
+
+    await listAvailableSnapshots("viewer", now);
+
+    expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not regenerate a stored snapshot already at the current schema version", async () => {
+    const period2025 = calendarYearPeriod(2025);
+
+    setResults([
+      [{ timezone: "UTC" }],
+      [{ first: new Date("2025-03-01T00:00:00Z") }],
+      [{ first: null }],
+      [
+        {
+          periodStart: period2025.start,
+          periodEnd: period2025.end,
+          schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
+        },
+      ],
+      [{ periodLabel: "2025", generatedAt: now, dismissedAt: null, payload: emptyPayload() }],
+    ]);
+
+    await listAvailableSnapshots("viewer", now);
+
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
