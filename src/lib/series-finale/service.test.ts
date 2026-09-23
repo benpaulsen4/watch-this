@@ -112,10 +112,14 @@ import {
   buildCompare,
   clearGenreNameCache,
   CREW_LIMIT,
+  loadCohortMinutes,
   loadCollaboratorIds,
   loadCollaboratorSlices,
   loadGenreNames,
   loadUserRows,
+  PERCENTILE_COHORT_MINIMUM,
+  PERCENTILE_LENGTH_TOLERANCE,
+  percentileOf,
 } from "./service";
 import type { ComparePeer, TitleMeta } from "./types";
 
@@ -599,5 +603,93 @@ describe("loadCollaboratorSlices", () => {
       topShowTmdbId: 1,
     });
     expect(crew.find((member) => member.username === "ana")?.hours).toBe(0);
+  });
+});
+
+describe("percentileOf", () => {
+  const cohort = Array.from({ length: 20 }, (_, i) => i * 100);
+
+  it("returns null below the cohort minimum", () => {
+    expect(percentileOf(500, [1, 2, 3])).toBeNull();
+  });
+
+  it("puts a top scorer in a low percentile number", () => {
+    expect(percentileOf(10_000, cohort)).toBe(1);
+  });
+
+  it("puts a bottom scorer in a high percentile number", () => {
+    expect(percentileOf(0, cohort)).toBeGreaterThan(90);
+  });
+
+  it("uses exactly the cohort minimum as the floor", () => {
+    expect(PERCENTILE_COHORT_MINIMUM).toBe(10);
+    expect(percentileOf(500, Array.from({ length: 10 }, () => 100))).not.toBeNull();
+    expect(percentileOf(500, Array.from({ length: 9 }, () => 100))).toBeNull();
+  });
+
+  it("uses a 10% length tolerance for cohort membership", () => {
+    expect(PERCENTILE_LENGTH_TOLERANCE).toBe(0.1);
+  });
+});
+
+describe("loadCohortMinutes", () => {
+  const period = calendarYearPeriod(2026);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // The mocked db chain hands back whatever rows a test queues, so it can't
+  // exercise the SQL itself -- the jsonb extraction, the schemaVersion
+  // filter, or the own-snapshot exclusion clause. What it can honestly test
+  // is the code that runs on the rows the query returns: the length-based
+  // cohort filter and the null-minutes drop.
+
+  it("keeps a row within the 10% length tolerance and drops one outside it", async () => {
+    setResults([
+      [
+        // Same length as the target period: within tolerance.
+        { minutes: 100, periodStart: period.start, periodEnd: period.end },
+        // A 30-day period against a ~365-day target: well outside tolerance.
+        {
+          minutes: 200,
+          periodStart: period.start,
+          periodEnd: new Date(
+            period.start.getTime() + 30 * 24 * 60 * 60 * 1000,
+          ),
+        },
+      ],
+    ]);
+
+    const result = await loadCohortMinutes(period, "viewer");
+
+    expect(result).toEqual([100]);
+  });
+
+  it("drops a row with null minutes", async () => {
+    setResults([
+      [
+        { minutes: null, periodStart: period.start, periodEnd: period.end },
+        { minutes: 150, periodStart: period.start, periodEnd: period.end },
+      ],
+    ]);
+
+    const result = await loadCohortMinutes(period, "viewer");
+
+    expect(result).toEqual([150]);
+  });
+
+  it("returns plain numbers in row order", async () => {
+    setResults([
+      [
+        { minutes: 300, periodStart: period.start, periodEnd: period.end },
+        { minutes: 100, periodStart: period.start, periodEnd: period.end },
+        { minutes: 200, periodStart: period.start, periodEnd: period.end },
+      ],
+    ]);
+
+    const result = await loadCohortMinutes(period, "viewer");
+
+    expect(result).toEqual([300, 100, 200]);
   });
 });

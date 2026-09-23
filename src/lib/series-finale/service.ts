@@ -1,10 +1,11 @@
-import { and, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, not, or, sql } from "drizzle-orm";
 
 import { db } from "../db";
 import {
   episodeWatchStatus,
   listCollaborators,
   lists,
+  seriesFinale,
   tmdbCache,
   userContentStatus,
   users,
@@ -16,6 +17,7 @@ import {
   type ComparePeer,
   type ContentStatusRow,
   type CrewMemberTotals,
+  SERIES_FINALE_SCHEMA_VERSION,
   type SeriesFinalePayload,
   titleKey,
   type TitleMeta,
@@ -429,4 +431,100 @@ export function buildCompare(
       bothPlanningNeitherStarted: firstTitle(peer.planningKeys, myPlanning),
     };
   });
+}
+
+/**
+ * Minimum qualifying snapshots before a percentile is reported.
+ *
+ * Generation is lazy, so the first user to generate has no cohort at all.
+ * Below this, "top 4% of everyone on WatchThis" would describe a handful of
+ * people, so the line is dropped rather than shown with a weak number behind it.
+ */
+export const PERCENTILE_COHORT_MINIMUM = 10;
+
+/**
+ * How closely a snapshot's period length must match the target's to join the
+ * cohort.
+ *
+ * The cohort spans periods -- a year is a year, and restricting to one period
+ * starves it for no benefit. But the seasonal cut on the roadmap would
+ * otherwise pool three-month totals with twelve-month ones and make the figure
+ * meaningless. Inert while every period is a calendar year.
+ */
+export const PERCENTILE_LENGTH_TOLERANCE = 0.1;
+
+/**
+ * Where `minutes` falls in `cohortMinutes`, as a "top N%" figure. Lower is
+ * better: 1 means the top one percent.
+ */
+export function percentileOf(
+  minutes: number,
+  cohortMinutes: number[],
+): number | null {
+  if (cohortMinutes.length < PERCENTILE_COHORT_MINIMUM) return null;
+
+  const below = cohortMinutes.filter((value) => value < minutes).length;
+  const share = below / cohortMinutes.length;
+
+  // Clamp to 1 so a top scorer reads "top 1%" rather than "top 0%".
+  return Math.max(1, Math.round((1 - share) * 100));
+}
+
+/**
+ * Headline minutes from every snapshot of a comparable period length, across
+ * all periods, excluding the generating user's own snapshot of this exact
+ * period.
+ *
+ * `period` must be the CANONICAL period -- the UTC calendar year from
+ * `calendarYearPeriod`, not a localised window. The length guard below
+ * compares it against the stored `period_start`/`period_end`, which are
+ * themselves canonical; handing this a localised period would compare
+ * localised bounds against canonical ones and mis-measure the length for
+ * every non-UTC user.
+ *
+ * Only the computed minutes figure is selected, never the payload -- pulling
+ * every snapshot's full jsonb (crew, timelines, shame lists...) across the
+ * whole table to read one number apiece does not scale with the table.
+ *
+ * The exclusion is a `where` clause, not a post-filter: a regeneration would
+ * otherwise rank the user against their own previous snapshot of the same
+ * year. Their OTHER years stay in the cohort -- a year is a year, regardless
+ * of whose it is.
+ */
+export async function loadCohortMinutes(
+  period: Period,
+  excludeUserId: string,
+): Promise<number[]> {
+  const targetLength = period.end.getTime() - period.start.getTime();
+
+  const rows = await db
+    .select({
+      minutes: sql<number | null>`(${seriesFinale.payload}->'headline'->>'minutes')::int`,
+      periodStart: seriesFinale.periodStart,
+      periodEnd: seriesFinale.periodEnd,
+    })
+    .from(seriesFinale)
+    .where(
+      and(
+        eq(seriesFinale.schemaVersion, SERIES_FINALE_SCHEMA_VERSION),
+        not(
+          and(
+            eq(seriesFinale.userId, excludeUserId),
+            eq(seriesFinale.periodStart, period.start),
+            eq(seriesFinale.periodEnd, period.end),
+          )!,
+        ),
+      ),
+    );
+
+  return rows
+    .filter((row) => {
+      const length = row.periodEnd.getTime() - row.periodStart.getTime();
+      return (
+        Math.abs(length - targetLength) / targetLength <=
+        PERCENTILE_LENGTH_TOLERANCE
+      );
+    })
+    .map((row) => row.minutes)
+    .filter((minutes): minutes is number => minutes !== null);
 }
