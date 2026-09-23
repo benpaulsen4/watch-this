@@ -694,42 +694,6 @@ async function loadRecapStart(
   };
 }
 
-/** The user's zone, validated. Read once per public call, never per step. */
-async function loadTimeZone(userId: string): Promise<string> {
-  const [user] = await db
-    .select({ timezone: users.timezone })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-
-  return resolveTimeZone(user?.timezone);
-}
-
-/**
- * Compute and freeze a recap for one user and period.
- *
- * `period` is the CANONICAL period (`calendarYearPeriod`): it is the row's
- * identity and the cohort's argument. Everything the user lived -- their rows,
- * the completed-film filter, their collaborators' slices and the compare sets
- * -- is loaded over the period localised to their zone, so the frozen
- * `payload.period` records the local bounds while the row is keyed by the
- * canonical ones.
- *
- * Idempotent on `(user_id, period_start, period_end)` -- regenerating replaces
- * the row. Nothing else may write to `series_finale`; a read path that
- * recomputes would defeat the entire point of snapshotting.
- *
- * Does not check that the period is over or that the user was active in it;
- * `getOrGenerateSnapshot` is the gated entry point.
- */
-export async function generateSnapshot(
-  userId: string,
-  period: Period,
-  now: Date = new Date(),
-): Promise<SeriesFinalePayload> {
-  return generateInZone(userId, period, await loadTimeZone(userId), now);
-}
-
 /**
  * The distinct (show, season) pairs holding at least one episode with NO entry
  * in `lookup`. An entry whose runtime is null is not missing: it means TMDB
@@ -752,6 +716,28 @@ function seasonsMissingFrom(
   return Array.from(missing.values());
 }
 
+/**
+ * Compute and freeze a recap for one user and period.
+ *
+ * `period` is the CANONICAL period (`calendarYearPeriod`): it is the row's
+ * identity and the cohort's argument. Everything the user lived -- their rows,
+ * the completed-film filter, their collaborators' slices and the compare sets
+ * -- is loaded over the period localised to their zone, so the frozen
+ * `payload.period` records the local bounds while the row is keyed by the
+ * canonical ones.
+ *
+ * Idempotent on `(user_id, period_start, period_end)` -- regenerating replaces
+ * the row. Nothing else may write to `series_finale`; a read path that
+ * recomputes would defeat the entire point of snapshotting.
+ *
+ * UNGATED: it does not check that the period is over or that the user was
+ * active in it, so it is deliberately not exported. The gated entry points are
+ * `getOrGenerateSnapshot` and `listAvailableSnapshots`; a route or a later
+ * plan's "regenerate" action must go through one of them, or it could freeze
+ * an arbitrary year into the percentile cohort.
+ *
+ * `zone` is the user's validated zone, read once by the caller.
+ */
 async function generateInZone(
   userId: string,
   period: Period,

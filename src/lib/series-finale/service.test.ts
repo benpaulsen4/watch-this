@@ -138,7 +138,6 @@ import {
   buildCompare,
   clearGenreNameCache,
   CREW_LIMIT,
-  generateSnapshot,
   getOrGenerateSnapshot,
   LIST_GENERATION_BUDGET_MS,
   listAvailableSnapshots,
@@ -942,7 +941,8 @@ describe("loadCollaborativeTitleKeys", () => {
   });
 });
 
-describe("generateSnapshot", () => {
+// Through the gated entry point: the generator itself is not exported.
+describe("snapshot generation", () => {
   const period = calendarYearPeriod(2026);
   const now = new Date("2027-02-01T00:00:00Z");
 
@@ -988,8 +988,12 @@ describe("generateSnapshot", () => {
 
   it("fills alsoTopFor, compare and the percentile from other users' data, then freezes it", async () => {
     setResults([
-      // zone
+      // no stored row
+      [],
+      // zone, then first activity (episodes, statuses)
       [{ timezone: "America/Los_Angeles" }],
+      [{ first: new Date("2025-06-01T00:00:00Z") }],
+      [{ first: null }],
       // viewer: episodes, statuses, titles
       [episode(1, 1), episode(1, 2)],
       [
@@ -1035,7 +1039,8 @@ describe("generateSnapshot", () => {
       })),
     ]);
 
-    const payload = await generateSnapshot("viewer", period, now);
+    const payload = await getOrGenerateSnapshot("viewer", period, now);
+    if (payload === null) throw new Error("expected a generated payload");
 
     expect(payload.topShow?.tmdbId).toBe(1);
     expect(payload.topShow?.alsoTopFor).toEqual(["ana"]);
