@@ -842,8 +842,9 @@ async function generateInZone(
  * `period` is the canonical period. A stored row at the current schema
  * version is returned without any availability check: it is already a fact.
  * Otherwise the period must be one of the user's completed years since their
- * recaps start (`loadRecapStart`), judged in their own zone -- anything else would freeze an empty 1950 into the
- * percentile cohort, or freeze a year that has not yet ended where they live.
+ * recaps start (`loadRecapStart`), judged in their own zone -- anything else
+ * would freeze an empty 1950 into the percentile cohort, or freeze a year
+ * that has not yet ended where they live.
  */
 export async function getOrGenerateSnapshot(
   userId: string,
