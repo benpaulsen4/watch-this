@@ -949,10 +949,31 @@ async function withholdWithdrawnCollaborators(
 }
 
 /**
+ * How long `listAvailableSnapshots` keeps generating older missing years in
+ * one request (ruling F2). The newest missing year is always generated; older
+ * ones only while the request has spent less than this. The rest catch up on
+ * later loads, so a long-history user's archive fills over a few dashboard
+ * visits instead of one very slow one.
+ */
+export const LIST_GENERATION_BUDGET_MS = 5000;
+
+/**
+ * In-flight listings, keyed by user id, so concurrent calls for one user in
+ * this process share one run instead of each generating the same years.
+ *
+ * This does NOT dedupe across processes: two serverless instances serving the
+ * same user will both generate. What keeps that correct is the upsert on
+ * `(user_id, period_start, period_end)` in `generateInZone` -- the second
+ * write replaces the first. This map only saves the duplicated work within
+ * one process.
+ */
+const inFlightListings = new Map<string, ReturnType<typeof listSnapshots>>();
+
+/**
  * Every period available to the user -- from where their recaps start (see
- * `loadRecapStart`) through the last completed year in their own zone -- generating any snapshot that is
- * missing or was written against an older payload shape, then returning the
- * listing.
+ * `loadRecapStart`) through the last completed year in their own zone --
+ * generating snapshots that are missing or were written against an older
+ * payload shape, then returning the listing.
  *
  * This is the route the dashboard banner and profile rows read (plan 4's only
  * entry point into the feature), and nothing else generates a snapshot except
@@ -965,14 +986,33 @@ async function withholdWithdrawnCollaborators(
  * several at once would multiply that fan-out against the same rate limits
  * for one request.
  *
- * The cost is real and not hidden: the first call after a year ends pays one
- * generation per missing year, and at launch that is every completed year a
- * long-history user has. The spec accepts this latency behind a loading
- * state.
+ * Per-request work is bounded: the newest missing year is always generated,
+ * older ones only within `LIST_GENERATION_BUDGET_MS`, so the listing can come
+ * back without some older years that a later call will fill in. Concurrent
+ * calls for the same user share one run (see `inFlightListings`).
+ *
+ * `clock` measures the budget and nothing else, and is injectable so tests
+ * can move time deterministically. `now` still decides which years are over.
  */
-export async function listAvailableSnapshots(
+export function listAvailableSnapshots(
   userId: string,
   now: Date = new Date(),
+  clock: () => number = Date.now,
+): ReturnType<typeof listSnapshots> {
+  const pending = inFlightListings.get(userId);
+  if (pending) return pending;
+
+  const listing = generateAndList(userId, now, clock).finally(() => {
+    inFlightListings.delete(userId);
+  });
+  inFlightListings.set(userId, listing);
+  return listing;
+}
+
+async function generateAndList(
+  userId: string,
+  now: Date,
+  clock: () => number,
 ): ReturnType<typeof listSnapshots> {
   const { zone, start } = await loadRecapStart(userId);
   if (start === null) return listSnapshots(userId);
@@ -988,15 +1028,23 @@ export async function listAvailableSnapshots(
     .from(seriesFinale)
     .where(eq(seriesFinale.userId, userId));
 
+  const startedAt = clock();
+  let generated = 0;
+
   for (const period of available) {
     const row = stored.find(
       (candidate) =>
         candidate.periodStart.getTime() === period.start.getTime() &&
         candidate.periodEnd.getTime() === period.end.getTime(),
     );
-    if (!row || row.schemaVersion < SERIES_FINALE_SCHEMA_VERSION) {
-      await generateInZone(userId, period, zone, now);
+    if (row && row.schemaVersion >= SERIES_FINALE_SCHEMA_VERSION) continue;
+
+    if (generated > 0 && clock() - startedAt >= LIST_GENERATION_BUDGET_MS) {
+      break;
     }
+
+    await generateInZone(userId, period, zone, now);
+    generated += 1;
   }
 
   return listSnapshots(userId);

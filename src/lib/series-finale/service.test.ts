@@ -123,6 +123,7 @@ import {
   CREW_LIMIT,
   generateSnapshot,
   getOrGenerateSnapshot,
+  LIST_GENERATION_BUDGET_MS,
   listAvailableSnapshots,
   listSnapshots,
   loadCohortMinutes,
@@ -1430,6 +1431,99 @@ describe("listAvailableSnapshots", () => {
     await listAvailableSnapshots("viewer", now);
 
     expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  describe("per-request bounds", () => {
+    const later = new Date("2027-03-01T00:00:00Z");
+
+    // Zone, first activity in 2024, and no stored rows: 2026, 2025 and 2024
+    // are all missing.
+    const threeMissing = () => [
+      [{ timezone: "UTC" }],
+      [{ first: new Date("2024-03-01T00:00:00Z") }],
+      [{ first: null }],
+      [],
+    ];
+    // One empty generation: episodes, statuses, collaborator list ids,
+    // collaborative title keys, cohort, and the insert chain's phantom read.
+    const generation = () => [[], [], [], [], [], []];
+    const listing = [
+      { periodLabel: "2026", generatedAt: later, dismissedAt: null, payload: emptyPayload() },
+    ];
+
+    it("always generates the newest missing year, and stops there once the budget is spent", async () => {
+      setResults([...threeMissing(), ...generation(), listing]);
+      // Starts at 0, then reads past the budget at every later check.
+      const clock = vi
+        .fn<() => number>()
+        .mockReturnValueOnce(0)
+        .mockReturnValue(LIST_GENERATION_BUDGET_MS + 1);
+
+      const result = await listAvailableSnapshots("viewer", later, clock);
+
+      expect(LIST_GENERATION_BUDGET_MS).toBe(5000);
+      expect(getInserted().map((row) => (row as { periodLabel: string }).periodLabel)).toEqual([
+        "2026",
+      ]);
+      expect(result.map((row) => row.label)).toEqual(["2026"]);
+    });
+
+    it("generates every missing year, newest first, while the budget lasts", async () => {
+      setResults([
+        ...threeMissing(),
+        ...generation(),
+        ...generation(),
+        ...generation(),
+        listing,
+      ]);
+
+      await listAvailableSnapshots("viewer", later, () => 0);
+
+      expect(getInserted().map((row) => (row as { periodLabel: string }).periodLabel)).toEqual([
+        "2026",
+        "2025",
+        "2024",
+      ]);
+    });
+
+    it("shares one run between concurrent calls for the same user", async () => {
+      setResults([
+        [{ timezone: "UTC" }],
+        [{ first: new Date("2026-03-01T00:00:00Z") }],
+        [{ first: null }],
+        [],
+        ...generation(),
+        listing,
+      ]);
+
+      const first = listAvailableSnapshots("viewer", later, () => 0);
+      const second = listAvailableSnapshots("viewer", later, () => 0);
+
+      expect(second).toBe(first);
+      const [a, b] = await Promise.all([first, second]);
+      expect(db.insert).toHaveBeenCalledTimes(1);
+      expect(a).toEqual(b);
+      expect(a.map((row) => row.label)).toEqual(["2026"]);
+    });
+
+    it("does not hand a failed run to the next call", async () => {
+      vi.mocked(db.select).mockImplementationOnce(() => {
+        throw new Error("db down");
+      });
+      await expect(listAvailableSnapshots("viewer", later, () => 0)).rejects.toThrow(
+        "db down",
+      );
+
+      setResults([
+        [{ timezone: "UTC" }],
+        [{ first: null }],
+        [{ first: null }],
+        listing,
+      ]);
+      const result = await listAvailableSnapshots("viewer", later, () => 0);
+
+      expect(result.map((row) => row.label)).toEqual(["2026"]);
+    });
   });
 
   it("lists an importer's years only from their account's creation onward", async () => {
