@@ -298,10 +298,20 @@ describe("loadGenreNames", () => {
   });
 
   it("returns an empty map rather than throwing when TMDB is unreachable", async () => {
+    // The failure is logged by design; capture it rather than print it.
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     getMovieGenres.mockRejectedValue(new Error("503"));
     getTVGenres.mockRejectedValue(new Error("503"));
 
-    await expect(loadGenreNames()).resolves.toBeInstanceOf(Map);
+    try {
+      await expect(loadGenreNames()).resolves.toBeInstanceOf(Map);
+      expect(logged).toHaveBeenCalledWith(
+        "Series Finale: failed to load TMDB genre names",
+        expect.any(Error),
+      );
+    } finally {
+      logged.mockRestore();
+    }
   });
 
   it("serves a successful non-empty load from cache on the second call", async () => {
@@ -320,11 +330,17 @@ describe("loadGenreNames", () => {
   });
 
   it("does not cache a failed load, so a later successful load still returns names", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     getMovieGenres.mockRejectedValueOnce(new Error("503"));
     getTVGenres.mockRejectedValueOnce(new Error("503"));
 
-    const failed = await loadGenreNames();
-    expect(failed.size).toBe(0);
+    try {
+      const failed = await loadGenreNames();
+      expect(failed.size).toBe(0);
+      expect(logged).toHaveBeenCalledTimes(1);
+    } finally {
+      logged.mockRestore();
+    }
 
     getMovieGenres.mockResolvedValue({ genres: [{ id: 18, name: "Drama" }] });
     getTVGenres.mockResolvedValue({ genres: [] });
