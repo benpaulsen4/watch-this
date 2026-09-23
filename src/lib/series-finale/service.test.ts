@@ -1416,7 +1416,7 @@ describe("getOrGenerateSnapshot", () => {
     setResults([
       [{ payload: stored, schemaVersion: SERIES_FINALE_SCHEMA_VERSION }],
       // consent: only "a" still exists and still shares
-      [{ id: "a" }],
+      [{ id: "a", username: "ana" }],
     ]);
 
     const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
@@ -1433,6 +1433,58 @@ describe("getOrGenerateSnapshot", () => {
     const consent = getQueries()[1];
     expect(consent?.from).toBe(users);
     expect(references(consent?.where, users.shareStatsWithCollaborators)).toBe(true);
+  });
+
+  it("shows a renamed collaborator under their current name in crew, compare and alsoTopFor", async () => {
+    const base = emptyPayload();
+    const ana: CrewMemberTotals = { userId: "a", username: "ana", episodes: 40, hours: 30, topShowTmdbId: 1 };
+    const bo: CrewMemberTotals = { userId: "b", username: "bo", episodes: 20, hours: 15, topShowTmdbId: 1 };
+    const compareRow = (userId: string, username: string) => ({
+      userId,
+      username,
+      onlyYou: 3,
+      both: 2,
+      onlyThem: 1,
+      theyFinishedYouDropped: null,
+      bothPlanningNeitherStarted: null,
+    });
+    const topShow = {
+      tmdbId: 1,
+      title: "Severance",
+      posterPath: null,
+      episodes: 19,
+      minutes: 950,
+      finishedAt: "2026-03-21",
+      alsoTopFor: ["ana", "bo"],
+    };
+    const stored: SeriesFinalePayload = {
+      ...base,
+      topShow,
+      crew: [ana, bo],
+      compare: [compareRow("a", "ana"), compareRow("b", "bo")],
+    };
+
+    setResults([
+      [{ payload: stored, schemaVersion: SERIES_FINALE_SCHEMA_VERSION }],
+      // "a" is now "anastasia"; "b" is unchanged.
+      [
+        { id: "a", username: "anastasia" },
+        { id: "b", username: "bo" },
+      ],
+    ]);
+
+    const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
+
+    expect(payload).toEqual({
+      ...stored,
+      topShow: { ...topShow, alsoTopFor: ["anastasia", "bo"] },
+      crew: [{ ...ana, username: "anastasia" }, bo],
+      compare: [compareRow("a", "anastasia"), compareRow("b", "bo")],
+    });
+    // Still the one consent query, and the frozen row itself is untouched.
+    expect(db.select).toHaveBeenCalledTimes(2);
+    expect(stored.crew[0]?.username).toBe("ana");
+    expect(getQueries()[1]?.from).toBe(users);
   });
 });
 

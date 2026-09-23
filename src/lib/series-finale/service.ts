@@ -900,21 +900,26 @@ export async function getOrGenerateSnapshot(
 
 /**
  * Remove, from a frozen payload, every collaborator who has since withdrawn
- * from crew comparisons or no longer exists.
+ * from crew comparisons or no longer exists, and show the ones who remain
+ * under their CURRENT usernames.
  *
  * This is not a recompute, and it does not breach "no read path may
- * recompute". It only ever REMOVES other people's data, applying privacy rule
- * 1 -- a standing rule -- at the moment of reading. The viewer's own numbers
- * are returned exactly as frozen: headline, top show, rhythm and the rest are
- * untouched, including crew-derived facts about the viewer, because those
- * describe the viewer's year. Without this, withdrawing would withdraw nothing
- * already written, and a collaborator's name and totals would sit in other
- * people's recaps forever.
+ * recompute". It only ever removes other people's data or relabels it with
+ * their present name, applying privacy rule 1 -- a standing rule -- at the
+ * moment of reading. The viewer's own numbers are returned exactly as frozen:
+ * headline, top show, rhythm and the rest are untouched, including
+ * crew-derived facts about the viewer, because those describe the viewer's
+ * year; so are every collaborator's frozen numbers. Without the removal,
+ * withdrawing would withdraw nothing already written, and a collaborator's
+ * name and totals would sit in other people's recaps forever. Without the
+ * relabelling, someone who changed their handle would keep appearing under
+ * the old one in everyone else's recaps.
  *
  * One query over the ids present, and none at all when there are none.
- * `alsoTopFor` holds usernames, so it keeps only the names of crew members
- * that survived -- the frozen crew carries the id/username pairs that were
- * true when it was written.
+ * `alsoTopFor` holds usernames, not ids, so each frozen name is mapped back
+ * to its user through the frozen crew's userId/username pairs -- true when
+ * the snapshot was written -- and then to that user's current name, if they
+ * are still consenting.
  */
 async function withholdWithdrawnCollaborators(
   payload: SeriesFinalePayload,
@@ -928,26 +933,38 @@ async function withholdWithdrawnCollaborators(
   if (ids.length === 0) return payload;
 
   const consenting = await db
-    .select({ id: users.id })
+    .select({ id: users.id, username: users.username })
     .from(users)
     .where(
       and(inArray(users.id, ids), eq(users.shareStatsWithCollaborators, true)),
     );
-  const kept = new Set(consenting.map((row) => row.id));
+  const currentName = new Map(consenting.map((row) => [row.id, row.username]));
 
-  const crew = payload.crew.filter((member) => kept.has(member.userId));
-  const keptNames = new Set(crew.map((member) => member.username));
+  const relabel = <T extends { userId: string; username: string }>(
+    rows: T[],
+  ): T[] =>
+    rows.flatMap((row) => {
+      const username = currentName.get(row.userId);
+      return username === undefined ? [] : [{ ...row, username }];
+    });
+
+  const frozenIdOf = new Map(
+    payload.crew.map((member) => [member.username, member.userId]),
+  );
 
   return {
     ...payload,
-    crew,
-    compare: payload.compare.filter((row) => kept.has(row.userId)),
+    crew: relabel(payload.crew),
+    compare: relabel(payload.compare),
     topShow: payload.topShow
       ? {
           ...payload.topShow,
-          alsoTopFor: payload.topShow.alsoTopFor.filter((name) =>
-            keptNames.has(name),
-          ),
+          alsoTopFor: payload.topShow.alsoTopFor.flatMap((frozenName) => {
+            const userId = frozenIdOf.get(frozenName);
+            const username =
+              userId === undefined ? undefined : currentName.get(userId);
+            return username === undefined ? [] : [username];
+          }),
         }
       : null,
   };

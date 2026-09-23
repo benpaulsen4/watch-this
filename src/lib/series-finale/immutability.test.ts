@@ -215,7 +215,7 @@ describe("snapshot immutability", () => {
     setResults([
       [{ payload: stored, schemaVersion: SERIES_FINALE_SCHEMA_VERSION }],
       // The consent check for "crew-1": still sharing, so nothing is withheld.
-      [{ id: "crew-1" }],
+      [{ id: "crew-1", username: "ana" }],
     ]);
 
     const payload = requirePayload(
