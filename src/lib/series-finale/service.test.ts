@@ -1071,6 +1071,55 @@ describe("getOrGenerateSnapshot", () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
+  it("floors an importer's recaps at the year their account was created", async () => {
+    // Imported history dated by air date reaches back to 1994; the account is
+    // from 2025. 2024 would be available on first activity alone.
+    const importer = () => [
+      [],
+      [{ timezone: "UTC", createdAt: new Date("2025-05-01T00:00:00Z") }],
+      [{ first: new Date("1994-09-22T00:00:00Z") }],
+      [{ first: null }],
+    ];
+    const after = new Date("2027-03-01T00:00:00Z");
+
+    setResults(importer());
+    expect(
+      await getOrGenerateSnapshot("viewer", calendarYearPeriod(2024), after),
+    ).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+
+    setResults([
+      ...importer(),
+      [], // episodes
+      [], // statuses
+      [], // collaborator list ids
+      [], // collaborative title keys
+      [], // cohort
+    ]);
+    expect(
+      await getOrGenerateSnapshot("viewer", calendarYearPeriod(2025), after),
+    ).not.toBeNull();
+    expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts at the first watch when the account is older than any activity", async () => {
+    setResults([
+      [],
+      [{ timezone: "UTC", createdAt: new Date("2020-01-10T00:00:00Z") }],
+      [{ first: new Date("2025-03-01T00:00:00Z") }],
+      [{ first: null }],
+    ]);
+
+    expect(
+      await getOrGenerateSnapshot(
+        "viewer",
+        calendarYearPeriod(2024),
+        new Date("2027-03-01T00:00:00Z"),
+      ),
+    ).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it("returns null without generating for a user with no activity", async () => {
     setResults([[], [{ timezone: "UTC" }], [{ first: null }], [{ first: null }]]);
 
@@ -1295,6 +1344,37 @@ describe("listAvailableSnapshots", () => {
     await listAvailableSnapshots("viewer", now);
 
     expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists an importer's years only from their account's creation onward", async () => {
+    const period2025 = calendarYearPeriod(2025);
+    const period2026 = calendarYearPeriod(2026);
+    const current = (period: typeof period2025) => ({
+      periodStart: period.start,
+      periodEnd: period.end,
+      schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
+    });
+
+    setResults([
+      [{ timezone: "UTC", createdAt: new Date("2025-05-01T00:00:00Z") }],
+      [{ first: new Date("1994-09-22T00:00:00Z") }],
+      [{ first: null }],
+      // Both years since the account was created are already current, so
+      // nothing is missing -- unless 1994-2024 were offered too.
+      [current(period2026), current(period2025)],
+      [
+        { periodLabel: "2026", generatedAt: now, dismissedAt: null, payload: emptyPayload() },
+        { periodLabel: "2025", generatedAt: now, dismissedAt: null, payload: emptyPayload() },
+      ],
+    ]);
+
+    const result = await listAvailableSnapshots(
+      "viewer",
+      new Date("2027-03-01T00:00:00Z"),
+    );
+
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(result.map((row) => row.label)).toEqual(["2026", "2025"]);
   });
 
   it("does not regenerate a stored snapshot already at the current schema version", async () => {

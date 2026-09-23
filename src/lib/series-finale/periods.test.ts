@@ -4,6 +4,7 @@ import {
   calendarYearPeriod,
   completedYearsBetween,
   localisePeriod,
+  MIN_YEAR,
   parsePeriodLabel,
 } from "./periods";
 
@@ -77,6 +78,24 @@ describe("completedYearsBetween", () => {
 
     expect(periods.map((p) => p.label)).toEqual(["2026", "2025"]);
   });
+
+  it("never reaches before MIN_YEAR, whatever the first activity says", () => {
+    // A hand-edited import can date a watch to year 100. Unclamped, the loop
+    // would walk down to it, and Date.UTC maps two-digit years onto 19xx --
+    // year 51 would collide with 1951.
+    const periods = completedYearsBetween(
+      new Date("0100-06-01T00:00:00Z"),
+      new Date("2027-03-01T00:00:00Z"),
+    );
+
+    const years = periods.map((p) => p.start.getUTCFullYear());
+    expect(Math.min(...years)).toBe(MIN_YEAR);
+    expect(periods.every((p) => /^\d{4}$/.test(p.label))).toBe(true);
+    expect(periods.every((p) => Number(p.label) >= MIN_YEAR)).toBe(true);
+    // One period per year, no collisions.
+    expect(new Set(periods.map((p) => p.label)).size).toBe(periods.length);
+    expect(periods).toHaveLength(2026 - MIN_YEAR + 1);
+  });
 });
 
 describe("parsePeriodLabel", () => {
@@ -89,6 +108,8 @@ describe("parsePeriodLabel", () => {
   });
 
   it("rejects an implausible year", () => {
+    expect(parsePeriodLabel(String(MIN_YEAR - 1))).toBeNull();
+    expect(parsePeriodLabel(String(MIN_YEAR))?.label).toBe(String(MIN_YEAR));
     expect(parsePeriodLabel("1200")).toBeNull();
     expect(parsePeriodLabel("9999")).toBeNull();
   });

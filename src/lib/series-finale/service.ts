@@ -633,6 +633,45 @@ export async function loadFirstActivity(userId: string): Promise<Date | null> {
   return candidates.reduce((earliest, at) => (at < earliest ? at : earliest));
 }
 
+/**
+ * The user's zone, and the instant their recaps start from: the LATER of their
+ * first activity and their account's creation. `start` is null for a user with
+ * no activity at all. Read once per public call, never per step, and the one
+ * source of availability for both `getOrGenerateSnapshot`'s gate and
+ * `listAvailableSnapshots` -- two gates that disagreed would list a year the
+ * payload route then refuses, or serve one the list never offers.
+ *
+ * Why the account floor (ruling F1): imports stamp history with whatever dates
+ * the source had, and the SeriesGuide converter uses each episode's AIR date.
+ * An importer whose history includes Friends would otherwise have a first
+ * activity in 1994 and get ~30 recaps of air dates presented as watches, each
+ * frozen into the percentile cohort. The cost is that someone who imported
+ * genuine watch timestamps from another tracker gets no recaps for the years
+ * before they joined.
+ *
+ * A user who joined first and watched later still starts at their first
+ * watch; there is nothing to recap before it.
+ */
+async function loadRecapStart(
+  userId: string,
+): Promise<{ zone: string; start: Date | null }> {
+  const [user] = await db
+    .select({ timezone: users.timezone, createdAt: users.createdAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const zone = resolveTimeZone(user?.timezone);
+
+  const firstActivity = await loadFirstActivity(userId);
+  if (firstActivity === null) return { zone, start: null };
+
+  const joinedAt = user?.createdAt;
+  return {
+    zone,
+    start: joinedAt && joinedAt > firstActivity ? joinedAt : firstActivity,
+  };
+}
+
 /** The user's zone, validated. Read once per public call, never per step. */
 async function loadTimeZone(userId: string): Promise<string> {
   const [user] = await db
@@ -782,8 +821,8 @@ async function generateInZone(
  *
  * `period` is the canonical period. A stored row at the current schema
  * version is returned without any availability check: it is already a fact.
- * Otherwise the period must be one of the user's completed years, judged in
- * their own zone -- anything else would freeze an empty 1950 into the
+ * Otherwise the period must be one of the user's completed years since their
+ * recaps start (`loadRecapStart`), judged in their own zone -- anything else would freeze an empty 1950 into the
  * percentile cohort, or freeze a year that has not yet ended where they live.
  */
 export async function getOrGenerateSnapshot(
@@ -812,11 +851,10 @@ export async function getOrGenerateSnapshot(
     );
   }
 
-  const zone = await loadTimeZone(userId);
-  const firstActivity = await loadFirstActivity(userId);
-  if (firstActivity === null) return null;
+  const { zone, start } = await loadRecapStart(userId);
+  if (start === null) return null;
 
-  const available = completedYearsBetween(firstActivity, now, zone).some(
+  const available = completedYearsBetween(start, now, zone).some(
     (candidate) =>
       candidate.start.getTime() === period.start.getTime() &&
       candidate.end.getTime() === period.end.getTime(),
@@ -882,8 +920,8 @@ async function withholdWithdrawnCollaborators(
 }
 
 /**
- * Every period available to the user -- from their first activity through the
- * last completed year in their own zone -- generating any snapshot that is
+ * Every period available to the user -- from where their recaps start (see
+ * `loadRecapStart`) through the last completed year in their own zone -- generating any snapshot that is
  * missing or was written against an older payload shape, then returning the
  * listing.
  *
@@ -907,11 +945,10 @@ export async function listAvailableSnapshots(
   userId: string,
   now: Date = new Date(),
 ): ReturnType<typeof listSnapshots> {
-  const zone = await loadTimeZone(userId);
-  const firstActivity = await loadFirstActivity(userId);
-  if (firstActivity === null) return listSnapshots(userId);
+  const { zone, start } = await loadRecapStart(userId);
+  if (start === null) return listSnapshots(userId);
 
-  const available = completedYearsBetween(firstActivity, now, zone);
+  const available = completedYearsBetween(start, now, zone);
 
   const stored = await db
     .select({

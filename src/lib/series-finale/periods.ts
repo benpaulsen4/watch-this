@@ -10,7 +10,12 @@ export interface Period {
 // Nothing before streaming existed, and nothing far in the future, is a real
 // period. Bounds exist so a hand-typed URL segment cannot ask for a scan
 // across a thousand years.
-const MIN_YEAR = 1900;
+//
+// `MIN_YEAR` is also the floor for `completedYearsBetween`: an imported watch
+// dated to year 100 would otherwise walk the loop down past it, and
+// `Date.UTC` maps years 0-99 onto 1900-1999, so year 51 would collide with
+// 1951. One constant, so the listing can never offer a year the URL rejects.
+export const MIN_YEAR = 1900;
 const MAX_YEAR = 2999;
 
 export function calendarYearPeriod(year: number): Period {
@@ -26,6 +31,9 @@ export function calendarYearPeriod(year: number): Period {
  * newest first. The year in progress is excluded -- a recap of a year that has
  * not finished would be frozen mid-flight.
  *
+ * The first year is never earlier than `MIN_YEAR`, whatever `firstActivity`
+ * says.
+ *
  * Completeness and the first year are judged in `timeZone` -- the spec's
  * "every date bucket is computed in the user's timezone" -- but the returned
  * periods keep their canonical UTC bounds; that's the identity used as the DB
@@ -38,9 +46,9 @@ export function completedYearsBetween(
   timeZone = "UTC",
 ): Period[] {
   const zone = resolveTimeZone(timeZone);
-  const firstYear = Number.parseInt(
-    getTimezoneDateKey(firstActivity, zone).slice(0, 4),
-    10,
+  const firstYear = Math.max(
+    MIN_YEAR,
+    Number.parseInt(getTimezoneDateKey(firstActivity, zone).slice(0, 4), 10),
   );
 
   const periods: Period[] = [];
