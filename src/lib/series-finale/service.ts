@@ -514,6 +514,13 @@ export function percentileOf(
  * otherwise rank the user against their own previous snapshot of the same
  * year. Their OTHER years stay in the cohort -- a year is a year, regardless
  * of whose it is.
+ *
+ * Thin snapshots (`payload.thin`) are left out -- ruling F4, reversible by
+ * deleting that one clause. The list route generates every available year,
+ * including dormant gap years and churned users' years at or near zero
+ * minutes; left in, they would inflate every active user's "top N%", and that
+ * figure is frozen at generation. The cohort is people who actually watched
+ * that year.
  */
 export async function loadCohortMinutes(
   period: Period,
@@ -531,6 +538,7 @@ export async function loadCohortMinutes(
     .where(
       and(
         eq(seriesFinale.schemaVersion, SERIES_FINALE_SCHEMA_VERSION),
+        sql`${seriesFinale.payload}->>'thin' IS DISTINCT FROM 'true'`,
         not(
           and(
             eq(seriesFinale.userId, excludeUserId),

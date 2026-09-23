@@ -724,6 +724,21 @@ describe("loadCohortMinutes", () => {
     expect(result).toEqual([150]);
   });
 
+  it("keeps thin snapshots out of the cohort, alongside the existing conditions", async () => {
+    setResults([[]]);
+
+    await loadCohortMinutes(period, "viewer");
+
+    // The mock cannot run SQL, so this pins the clause's presence: the where
+    // reads the payload's `thin` flag, which only the thin exclusion does.
+    const [query] = getQueries();
+    expect(query?.from).toBe(seriesFinale);
+    expect(references(query?.where, seriesFinale.payload)).toBe(true);
+    expect(containsText(query?.where, "->>'thin' IS DISTINCT FROM 'true'")).toBe(true);
+    expect(references(query?.where, seriesFinale.schemaVersion)).toBe(true);
+    expect(bindsColumnTo(query?.where, seriesFinale.userId, "viewer")).toBe(true);
+  });
+
   it("returns plain numbers in row order", async () => {
     setResults([
       [
@@ -738,6 +753,20 @@ describe("loadCohortMinutes", () => {
     expect(result).toEqual([300, 100, 200]);
   });
 });
+
+/** Whether any raw SQL text inside a drizzle expression contains `text`. */
+function containsText(
+  node: unknown,
+  text: string,
+  seen = new WeakSet<object>(),
+): boolean {
+  if (typeof node === "string") return node.includes(text);
+  if (typeof node !== "object" || node === null) return false;
+  if (seen.has(node)) return false;
+  seen.add(node);
+
+  return Object.values(node).some((value) => containsText(value, text, seen));
+}
 
 /**
  * Whether a drizzle expression carries a bound parameter at exactly this
