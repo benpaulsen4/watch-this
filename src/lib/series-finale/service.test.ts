@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // or the `share_stats_with_collaborators` filter fails a test here.
 vi.mock("../db", () => {
   const resultsQueue: unknown[] = [];
+  const inserted: unknown[] = [];
   const queries: Array<{
     from: unknown;
     joins: Array<{ type: "left" | "inner"; table: unknown }>;
@@ -43,7 +44,10 @@ vi.mock("../db", () => {
     orderBy: () => chain,
     groupBy: () => chain,
     set: () => chain,
-    values: () => chain,
+    values: (row: unknown) => {
+      inserted.push(row);
+      return chain;
+    },
     onConflictDoUpdate: () => chain,
     limit: () => Promise.resolve(resultsQueue.shift() ?? []),
     returning: () => Promise.resolve(resultsQueue.shift() ?? []),
@@ -60,8 +64,10 @@ vi.mock("../db", () => {
       resultsQueue.length = 0;
       resultsQueue.push(...rows);
       queries.length = 0;
+      inserted.length = 0;
     },
     __getQueries: () => queries.slice(),
+    __getInserted: () => inserted.slice(),
   };
 
   // `./runtime` imports its tables and `ContentType` from `../db` rather than
@@ -86,9 +92,9 @@ vi.mock("../db/schema", () => ({
     username: { column: "users.username" },
     shareStatsWithCollaborators: { column: "users.share_stats_with_collaborators" },
   },
-  lists: {},
+  lists: { ownerId: { column: "lists.owner_id" } },
   listItems: {},
-  listCollaborators: {},
+  listCollaborators: { userId: { column: "list_collaborators.user_id" } },
   seriesFinale: {},
   ContentType: { MOVIE: "movie", TV: "tv" },
 }));
@@ -107,21 +113,34 @@ vi.mock("../tmdb/client", () => ({
 
 import { db } from "../db";
 import { listCollaborators, lists, users } from "../db/schema";
+import { buildPayload } from "./aggregate";
 import { calendarYearPeriod } from "./periods";
 import {
+  alsoTopForOf,
   buildCompare,
   clearGenreNameCache,
   CREW_LIMIT,
+  generateSnapshot,
+  getOrGenerateSnapshot,
+  listSnapshots,
   loadCohortMinutes,
+  loadCollaborativeTitleKeys,
   loadCollaboratorIds,
   loadCollaboratorSlices,
+  loadFirstActivity,
   loadGenreNames,
   loadUserRows,
   PERCENTILE_COHORT_MINIMUM,
   PERCENTILE_LENGTH_TOLERANCE,
   percentileOf,
 } from "./service";
-import type { ComparePeer, TitleMeta } from "./types";
+import {
+  type ComparePeer,
+  type CrewMemberTotals,
+  SERIES_FINALE_SCHEMA_VERSION,
+  type SeriesFinalePayload,
+  type TitleMeta,
+} from "./types";
 
 const setResults = (rows: unknown[]) =>
   (db as unknown as { __setResults: (r: unknown[]) => void }).__setResults(rows);
@@ -134,6 +153,9 @@ interface RecordedQuery {
 
 const getQueries = () =>
   (db as unknown as { __getQueries: () => RecordedQuery[] }).__getQueries();
+
+const getInserted = () =>
+  (db as unknown as { __getInserted: () => unknown[] }).__getInserted();
 
 /**
  * Whether `target` is reachable anywhere inside `node` -- used to find a
@@ -691,5 +713,497 @@ describe("loadCohortMinutes", () => {
     const result = await loadCohortMinutes(period, "viewer");
 
     expect(result).toEqual([300, 100, 200]);
+  });
+});
+
+/**
+ * Whether a drizzle expression carries a bound parameter at exactly this
+ * instant. Used to tell which period -- the canonical one or the user's local
+ * window -- reached a given query.
+ */
+function containsInstant(
+  node: unknown,
+  iso: string,
+  seen = new WeakSet<object>(),
+): boolean {
+  if (node instanceof Date) return node.toISOString() === iso;
+  if (typeof node !== "object" || node === null) return false;
+  if (seen.has(node)) return false;
+  seen.add(node);
+
+  return Object.values(node).some((value) => containsInstant(value, iso, seen));
+}
+
+/**
+ * Whether some comparison inside a drizzle expression puts `column` and the
+ * bound value `value` side by side -- i.e. filters that column on that value,
+ * rather than merely mentioning the column somewhere.
+ */
+function bindsColumnTo(
+  node: unknown,
+  column: unknown,
+  value: unknown,
+  seen = new WeakSet<object>(),
+): boolean {
+  if (typeof node !== "object" || node === null) return false;
+  if (seen.has(node)) return false;
+  seen.add(node);
+
+  const chunks = (node as { queryChunks?: unknown }).queryChunks;
+  if (
+    Array.isArray(chunks) &&
+    chunks.includes(column) &&
+    // drizzle binds a value against a real column as a `Param`; against the
+    // plain-object sentinels this file mocks columns with, it leaves it raw.
+    chunks.some(
+      (chunk) =>
+        chunk === value ||
+        (typeof chunk === "object" &&
+          chunk !== null &&
+          (chunk as { value?: unknown }).value === value),
+    )
+  ) {
+    return true;
+  }
+
+  return Object.values(node).some((child) =>
+    bindsColumnTo(child, column, value, seen),
+  );
+}
+
+/** A well-formed current-version payload with nothing in it. */
+function emptyPayload(): SeriesFinalePayload {
+  return buildPayload(
+    {
+      period: calendarYearPeriod(2026),
+      timeZone: "UTC",
+      episodes: [],
+      statuses: [],
+      titles: new Map(),
+      genreNames: new Map(),
+      episodeMinutes: { minutes: 0, unknownCount: 0 },
+      filmMinutes: { minutes: 0, unknownCount: 0 },
+      episodeRuntimeLookup: new Map(),
+      collaborativeCompletedKeys: new Set(),
+      crew: [],
+      peers: [],
+      percentile: null,
+    },
+    new Date("2027-02-01T00:00:00Z"),
+  );
+}
+
+describe("alsoTopForOf", () => {
+  const member = (
+    userId: string,
+    username: string,
+    topShowTmdbId: number | null,
+  ): CrewMemberTotals => ({ userId, username, episodes: 10, hours: 5, topShowTmdbId });
+
+  it("names only crew members whose top show matches, in crew order", () => {
+    const crew = [
+      member("u1", "ana", 1),
+      member("u2", "marcus", 2),
+      member("u3", "bo", 1),
+      member("u4", "cy", null),
+    ];
+
+    expect(alsoTopForOf(crew, 1)).toEqual(["ana", "bo"]);
+  });
+
+  it("names nobody when the viewer has no top show, even crew who have none either", () => {
+    expect(alsoTopForOf([member("u4", "cy", null)], null)).toEqual([]);
+  });
+});
+
+describe("loadFirstActivity", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns the earlier of the first watched episode and the first status row", async () => {
+    setResults([
+      [{ first: new Date("2024-05-01T00:00:00Z") }],
+      [{ first: new Date("2023-02-01T00:00:00Z") }],
+    ]);
+
+    expect(await loadFirstActivity("viewer")).toEqual(
+      new Date("2023-02-01T00:00:00Z"),
+    );
+  });
+
+  it("uses whichever source has activity when the other has none", async () => {
+    setResults([[{ first: new Date("2024-05-01T00:00:00Z") }], [{ first: null }]]);
+
+    expect(await loadFirstActivity("viewer")).toEqual(
+      new Date("2024-05-01T00:00:00Z"),
+    );
+  });
+
+  it("returns null for a user with no activity at all", async () => {
+    setResults([[{ first: null }], [{ first: null }]]);
+
+    expect(await loadFirstActivity("viewer")).toBeNull();
+  });
+});
+
+describe("loadCollaborativeTitleKeys", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("keys titles on shared lists the user owns or has joined", async () => {
+    setResults([
+      [
+        { tmdbId: 1, contentType: "tv" },
+        { tmdbId: 2, contentType: "movie" },
+      ],
+    ]);
+
+    const keys = await loadCollaborativeTitleKeys("viewer");
+
+    expect(keys).toEqual(new Set(["tv:1", "movie:2"]));
+
+    const [query] = getQueries();
+    expect(query?.joins).toContainEqual({ type: "inner", table: lists });
+    expect(query?.joins).toContainEqual({ type: "inner", table: listCollaborators });
+    // Both directions of membership: a list the user owns, and one they were
+    // invited onto. Owner-only would count a joined list's titles as solo.
+    expect(bindsColumnTo(query?.where, lists.ownerId, "viewer")).toBe(true);
+    expect(bindsColumnTo(query?.where, listCollaborators.userId, "viewer")).toBe(true);
+  });
+});
+
+describe("generateSnapshot", () => {
+  const period = calendarYearPeriod(2026);
+  const now = new Date("2027-02-01T00:00:00Z");
+
+  const episode = (tmdbId: number, episodeNumber: number) => ({
+    tmdbId,
+    seasonNumber: 1,
+    episodeNumber,
+    watchedAt: new Date("2026-03-14T20:00:00Z"),
+  });
+
+  const status = (
+    tmdbId: number,
+    contentType: "movie" | "tv",
+    updatedAt: string,
+  ) => ({
+    tmdbId,
+    contentType,
+    status: "completed",
+    createdAt: new Date("2025-01-01T00:00:00Z"),
+    updatedAt: new Date(updatedAt),
+  });
+
+  const title = (
+    tmdbId: number,
+    contentType: "movie" | "tv",
+    name: string,
+  ) => ({
+    tmdbId,
+    contentType,
+    title: name,
+    posterPath: null,
+    genreIds: [],
+    popularity: "10",
+    runtime: null,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMovieGenres.mockResolvedValue({ genres: [] });
+    getTVGenres.mockResolvedValue({ genres: [] });
+    clearGenreNameCache();
+  });
+
+  it("fills alsoTopFor, compare and the percentile from other users' data, then freezes it", async () => {
+    setResults([
+      // zone
+      [{ timezone: "America/Los_Angeles" }],
+      // viewer: episodes, statuses, titles
+      [episode(1, 1), episode(1, 2)],
+      [
+        status(1, "tv", "2026-03-15T00:00:00Z"),
+        status(9, "movie", "2026-06-01T00:00:00Z"),
+        // Inside the canonical UTC year, but still New Year's Eve 2025 in Los
+        // Angeles: outside the window, so no film minutes and no compare key.
+        status(10, "movie", "2026-01-01T03:00:00Z"),
+      ],
+      [title(1, "tv", "Severance"), title(9, "movie", "Arrival"), title(10, "movie", "Heat")],
+      // season fetch record: fresh, so no TMDB call
+      [{ tmdbId: 1, seasonNumber: 1, fetchedAt: new Date() }],
+      // episode runtimes
+      [
+        { tmdbId: 1, seasonNumber: 1, episodeNumber: 1, runtime: 50 },
+        { tmdbId: 1, seasonNumber: 1, episodeNumber: 2, runtime: 50 },
+      ],
+      // film runtimes
+      [{ tmdbId: 9, runtime: 120 }],
+      // collaborators: list ids, owners, collaborators, usernames
+      [{ listId: "l1" }],
+      [{ userId: "u2" }],
+      [{ userId: "u3" }],
+      [
+        { id: "u2", username: "ana" },
+        { id: "u3", username: "bo" },
+      ],
+      // u2: episodes, statuses, titles, runtimes
+      [episode(1, 1)],
+      [status(1, "tv", "2026-04-01T00:00:00Z")],
+      [],
+      [],
+      // u3: episodes, statuses, titles, runtimes
+      [episode(2, 1)],
+      [],
+      [],
+      [],
+      // collaborative title keys
+      [{ tmdbId: 1, contentType: "tv" }],
+      // cohort
+      Array.from({ length: 10 }, () => ({
+        minutes: 100,
+        periodStart: period.start,
+        periodEnd: period.end,
+      })),
+    ]);
+
+    const payload = await generateSnapshot("viewer", period, now);
+
+    expect(payload.topShow?.tmdbId).toBe(1);
+    expect(payload.topShow?.alsoTopFor).toEqual(["ana"]);
+    expect(payload.crew.map((member) => member.username)).toEqual(["ana", "bo"]);
+    expect(payload.compare).toEqual([
+      {
+        userId: "u2",
+        username: "ana",
+        onlyYou: 1,
+        both: 1,
+        onlyThem: 0,
+        theyFinishedYouDropped: null,
+        bothPlanningNeitherStarted: null,
+      },
+      {
+        userId: "u3",
+        username: "bo",
+        onlyYou: 2,
+        both: 0,
+        onlyThem: 0,
+        theyFinishedYouDropped: null,
+        bothPlanningNeitherStarted: null,
+      },
+    ]);
+    // 100 episode minutes plus the one in-window film. Had the out-of-window
+    // film been looked up too, it would come back unknown.
+    expect(payload.headline.minutes).toBe(220);
+    expect(payload.headline.unknownRuntimeEpisodes).toBe(0);
+    expect(payload.headline.percentile).toBe(1);
+
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(getInserted()).toEqual([
+      expect.objectContaining({ userId: "viewer", payload }),
+    ]);
+  });
+});
+
+describe("getOrGenerateSnapshot", () => {
+  const period = calendarYearPeriod(2026);
+  const afterPeriod = new Date("2027-02-01T00:00:00Z");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMovieGenres.mockResolvedValue({ genres: [] });
+    getTVGenres.mockResolvedValue({ genres: [] });
+    clearGenreNameCache();
+  });
+
+  it("returns a stored snapshot without regenerating or checking availability", async () => {
+    const base = emptyPayload();
+    const stored = { ...base, headline: { ...base.headline, hours: 412 } };
+    setResults([[{ payload: stored, schemaVersion: SERIES_FINALE_SCHEMA_VERSION }]]);
+
+    // `now` falls inside the period: a stored snapshot is already a fact.
+    const payload = await getOrGenerateSnapshot(
+      "viewer",
+      period,
+      new Date("2026-06-01T00:00:00Z"),
+    );
+
+    expect(payload?.headline.hours).toBe(412);
+    expect(db.insert).not.toHaveBeenCalled();
+    // No crew and no compare, so no consent query either.
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("regenerates a snapshot written against an older schema version", async () => {
+    setResults([
+      [{ payload: { schemaVersion: 0 }, schemaVersion: 0 }],
+      [{ timezone: "UTC" }],
+      // first activity: episodes, statuses
+      [{ first: new Date("2025-06-01T00:00:00Z") }],
+      [{ first: null }],
+      [], // episodes
+      [], // statuses
+      [], // collaborator list ids
+      [], // collaborative title keys
+      [], // cohort
+    ]);
+
+    const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
+
+    expect(payload?.schemaVersion).toBe(SERIES_FINALE_SCHEMA_VERSION);
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it("returns null without generating for a year before the user's first activity", async () => {
+    setResults([
+      [],
+      [{ timezone: "UTC" }],
+      [{ first: new Date("2027-01-05T00:00:00Z") }],
+      [{ first: null }],
+    ]);
+
+    const payload = await getOrGenerateSnapshot(
+      "viewer",
+      period,
+      new Date("2027-03-01T00:00:00Z"),
+    );
+
+    expect(payload).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("returns null without generating for a user with no activity", async () => {
+    setResults([[], [{ timezone: "UTC" }], [{ first: null }], [{ first: null }]]);
+
+    const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
+
+    expect(payload).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("returns null until the year has ended in the user's own zone", async () => {
+    setResults([
+      [],
+      [{ timezone: "America/Los_Angeles" }],
+      [{ first: new Date("2025-06-01T00:00:00Z") }],
+      [{ first: null }],
+    ]);
+
+    // Past midnight in UTC, still New Year's Eve in Los Angeles.
+    const payload = await getOrGenerateSnapshot(
+      "viewer",
+      period,
+      new Date("2027-01-01T03:00:00Z"),
+    );
+
+    expect(payload).toBeNull();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("aggregates over the user's local window but keys the row by the canonical period", async () => {
+    setResults([
+      [],
+      [{ timezone: "America/Los_Angeles" }],
+      [{ first: new Date("2025-06-01T00:00:00Z") }],
+      [{ first: null }],
+      [], // episodes
+      [], // statuses
+      [], // collaborator list ids
+      [], // collaborative title keys
+      [], // cohort
+    ]);
+
+    const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
+
+    expect(payload?.period).toEqual({
+      start: "2026-01-01T08:00:00.000Z",
+      end: "2027-01-01T08:00:00.000Z",
+      label: "2026",
+    });
+
+    expect(getInserted()).toEqual([
+      expect.objectContaining({
+        userId: "viewer",
+        periodStart: new Date("2026-01-01T00:00:00.000Z"),
+        periodEnd: new Date("2027-01-01T00:00:00.000Z"),
+        periodLabel: "2026",
+        schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
+        payload,
+      }),
+    ]);
+
+    // Rows are selected by the local window; the cohort by the canonical year.
+    const queries = getQueries();
+    const episodesQuery = queries[4];
+    const cohortQuery = queries[queries.length - 1];
+    expect(containsInstant(episodesQuery?.where, "2026-01-01T08:00:00.000Z")).toBe(true);
+    expect(containsInstant(episodesQuery?.where, "2026-01-01T00:00:00.000Z")).toBe(false);
+    expect(containsInstant(cohortQuery?.where, "2026-01-01T00:00:00.000Z")).toBe(true);
+    expect(containsInstant(cohortQuery?.where, "2026-01-01T08:00:00.000Z")).toBe(false);
+  });
+
+  it("drops withdrawn or deleted collaborators from a stored snapshot and returns the rest as frozen", async () => {
+    const base = emptyPayload();
+    const ana: CrewMemberTotals = { userId: "a", username: "ana", episodes: 40, hours: 30, topShowTmdbId: 1 };
+    const bo: CrewMemberTotals = { userId: "b", username: "bo", episodes: 20, hours: 15, topShowTmdbId: 1 };
+    const compareRow = (userId: string, username: string) => ({
+      userId,
+      username,
+      onlyYou: 3,
+      both: 2,
+      onlyThem: 1,
+      theyFinishedYouDropped: null,
+      bothPlanningNeitherStarted: null,
+    });
+    const stored: SeriesFinalePayload = {
+      ...base,
+      headline: { ...base.headline, hours: 412, minutes: 24_720, episodes: 900 },
+      topShow: {
+        tmdbId: 1,
+        title: "Severance",
+        posterPath: null,
+        episodes: 19,
+        minutes: 950,
+        finishedAt: "2026-03-21",
+        alsoTopFor: ["ana", "bo"],
+      },
+      crew: [ana, bo],
+      compare: [compareRow("a", "ana"), compareRow("b", "bo")],
+    };
+
+    setResults([
+      [{ payload: stored, schemaVersion: SERIES_FINALE_SCHEMA_VERSION }],
+      // consent: only "a" still exists and still shares
+      [{ id: "a" }],
+    ]);
+
+    const payload = await getOrGenerateSnapshot("viewer", period, afterPeriod);
+
+    expect(payload).toEqual({
+      ...stored,
+      topShow: { ...stored.topShow, alsoTopFor: ["ana"] },
+      crew: [ana],
+      compare: [compareRow("a", "ana")],
+    });
+    expect(stored.crew).toHaveLength(2);
+    expect(db.insert).not.toHaveBeenCalled();
+
+    const consent = getQueries()[1];
+    expect(consent?.from).toBe(users);
+    expect(references(consent?.where, users.shareStatsWithCollaborators)).toBe(true);
+  });
+});
+
+describe("listSnapshots", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns each period's label, dates and headline", async () => {
+    const payload = emptyPayload();
+    const generatedAt = new Date("2027-01-02T00:00:00Z");
+    setResults([
+      [{ periodLabel: "2026", generatedAt, dismissedAt: null, payload }],
+    ]);
+
+    expect(await listSnapshots("viewer")).toEqual([
+      { label: "2026", generatedAt, dismissedAt: null, headline: payload.headline },
+    ]);
   });
 });

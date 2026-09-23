@@ -1,18 +1,39 @@
-import { and, eq, gte, inArray, lt, not, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lt,
+  min,
+  ne,
+  not,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "../db";
 import {
   episodeWatchStatus,
   listCollaborators,
+  listItems,
   lists,
   seriesFinale,
   tmdbCache,
   userContentStatus,
   users,
 } from "../db/schema";
+import { resolveTimeZone } from "../time";
 import { tmdbClient } from "../tmdb/client";
-import type { Period } from "./periods";
-import { loadEpisodeRuntimes, summariseEpisodeRuntimes } from "./runtime";
+import { buildPayload } from "./aggregate";
+import { completedYearsBetween, localisePeriod, type Period } from "./periods";
+import {
+  ensureSeasonsCached,
+  loadEpisodeRuntimes,
+  loadFilmRuntimes,
+  summariseEpisodeRuntimes,
+  summariseFilmRuntimes,
+} from "./runtime";
 import {
   type ComparePeer,
   type ContentStatusRow,
@@ -527,4 +548,363 @@ export async function loadCohortMinutes(
     })
     .map((row) => row.minutes)
     .filter((minutes): minutes is number => minutes !== null);
+}
+
+/**
+ * Crew members whose most-watched show of the period is `topShowTmdbId`, by
+ * username, for the "also number one for" line on the viewer's top-show card.
+ *
+ * A viewer with no top show gets nobody -- not every crew member who also has
+ * none.
+ */
+export function alsoTopForOf(
+  crew: CrewMemberTotals[],
+  topShowTmdbId: number | null,
+): string[] {
+  if (topShowTmdbId === null) return [];
+
+  return crew
+    .filter((member) => member.topShowTmdbId === topShowTmdbId)
+    .map((member) => member.username);
+}
+
+/**
+ * Title keys on every list the user shares with someone else: lists they own
+ * that have a collaborator, and lists they were invited onto. The engine
+ * intersects these with the period's completions for the group-watcher
+ * archetype.
+ *
+ * Both directions matter. Owner-only would count everything on a list the
+ * user joined as solo watching, understating exactly the users the archetype
+ * is for. Each joined row pairs an owner with a collaborator, and requiring
+ * the two to differ keeps a list that only "shares" with its own owner out.
+ */
+export async function loadCollaborativeTitleKeys(
+  userId: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .selectDistinct({
+      tmdbId: listItems.tmdbId,
+      contentType: listItems.contentType,
+    })
+    .from(listItems)
+    .innerJoin(lists, eq(lists.id, listItems.listId))
+    .innerJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
+    .where(
+      and(
+        or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
+        ne(listCollaborators.userId, lists.ownerId),
+      ),
+    );
+
+  return new Set(
+    rows.map((row) => titleKey(row.tmdbId, row.contentType as "movie" | "tv")),
+  );
+}
+
+/**
+ * The user's earliest recorded activity: the first watched episode or the
+ * first status row, whichever came first. Null for a user with neither.
+ *
+ * `min` skips null `watched_at` values, so an undated watched row cannot pull
+ * the first year back to the epoch.
+ */
+export async function loadFirstActivity(userId: string): Promise<Date | null> {
+  const [firstWatch] = await db
+    .select({ first: min(episodeWatchStatus.watchedAt) })
+    .from(episodeWatchStatus)
+    .where(
+      and(
+        eq(episodeWatchStatus.userId, userId),
+        eq(episodeWatchStatus.watched, true),
+      ),
+    );
+
+  const [firstStatus] = await db
+    .select({ first: min(userContentStatus.createdAt) })
+    .from(userContentStatus)
+    .where(eq(userContentStatus.userId, userId));
+
+  const candidates = [firstWatch?.first, firstStatus?.first].filter(
+    (at): at is Date => at != null,
+  );
+  if (candidates.length === 0) return null;
+
+  return candidates.reduce((earliest, at) => (at < earliest ? at : earliest));
+}
+
+/** The user's zone, validated. Read once per public call, never per step. */
+async function loadTimeZone(userId: string): Promise<string> {
+  const [user] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  return resolveTimeZone(user?.timezone);
+}
+
+/**
+ * Compute and freeze a recap for one user and period.
+ *
+ * `period` is the CANONICAL period (`calendarYearPeriod`): it is the row's
+ * identity and the cohort's argument. Everything the user lived -- their rows,
+ * the completed-film filter, their collaborators' slices and the compare sets
+ * -- is loaded over the period localised to their zone, so the frozen
+ * `payload.period` records the local bounds while the row is keyed by the
+ * canonical ones.
+ *
+ * Idempotent on `(user_id, period_start, period_end)` -- regenerating replaces
+ * the row. Nothing else may write to `series_finale`; a read path that
+ * recomputes would defeat the entire point of snapshotting.
+ *
+ * Does not check that the period is over or that the user was active in it;
+ * `getOrGenerateSnapshot` is the gated entry point.
+ */
+export async function generateSnapshot(
+  userId: string,
+  period: Period,
+  now: Date = new Date(),
+): Promise<SeriesFinalePayload> {
+  return generateInZone(userId, period, await loadTimeZone(userId), now);
+}
+
+async function generateInZone(
+  userId: string,
+  period: Period,
+  zone: string,
+  now: Date,
+): Promise<SeriesFinalePayload> {
+  const window = localisePeriod(period, zone);
+
+  const rows = await loadUserRows(userId, window);
+
+  const seasonPairs = Array.from(
+    new Map(
+      rows.episodes.map((row) => [
+        `${row.tmdbId}:${row.seasonNumber}`,
+        { tmdbId: row.tmdbId, seasonNumber: row.seasonNumber },
+      ]),
+    ).values(),
+  );
+  await ensureSeasonsCached(seasonPairs);
+
+  const episodeRuntimeLookup = await loadEpisodeRuntimes(rows.episodes);
+  const episodeMinutes = summariseEpisodeRuntimes(
+    rows.episodes,
+    episodeRuntimeLookup,
+  );
+
+  const completedFilmIds = rows.statuses
+    .filter(
+      (row) =>
+        row.contentType === "movie" &&
+        row.status === "completed" &&
+        row.updatedAt >= window.start &&
+        row.updatedAt < window.end,
+    )
+    .map((row) => row.tmdbId);
+  const filmRuntimeLookup = await loadFilmRuntimes(completedFilmIds);
+  const filmMinutes = summariseFilmRuntimes(completedFilmIds, filmRuntimeLookup);
+
+  const { crew, peers } = await loadCollaboratorSlices(userId, window);
+  const collaborativeCompletedKeys = await loadCollaborativeTitleKeys(userId);
+  const cohortMinutes = await loadCohortMinutes(period, userId);
+
+  const draft = buildPayload(
+    {
+      period: window,
+      timeZone: zone,
+      episodes: rows.episodes,
+      statuses: rows.statuses,
+      titles: rows.titles,
+      genreNames: rows.genreNames,
+      episodeMinutes,
+      filmMinutes,
+      episodeRuntimeLookup,
+      collaborativeCompletedKeys,
+      crew,
+      peers,
+      percentile: null,
+    },
+    now,
+  );
+
+  // The engine owns the minutes total, so the percentile is ranked against the
+  // figure it produced rather than a second sum computed here.
+  const payload: SeriesFinalePayload = {
+    ...draft,
+    headline: {
+      ...draft.headline,
+      percentile: percentileOf(draft.headline.minutes, cohortMinutes),
+    },
+    // The pure engine cannot know about other users, so the cross-user line on
+    // the top-show card is filled here.
+    topShow: draft.topShow
+      ? { ...draft.topShow, alsoTopFor: alsoTopForOf(crew, draft.topShow.tmdbId) }
+      : null,
+    compare: buildCompare(rows, peers, window),
+  };
+
+  await db
+    .insert(seriesFinale)
+    .values({
+      userId,
+      periodStart: period.start,
+      periodEnd: period.end,
+      periodLabel: period.label,
+      payload,
+      schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
+      generatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        seriesFinale.userId,
+        seriesFinale.periodStart,
+        seriesFinale.periodEnd,
+      ],
+      set: {
+        periodLabel: period.label,
+        payload,
+        schemaVersion: SERIES_FINALE_SCHEMA_VERSION,
+        generatedAt: now,
+      },
+    });
+
+  return payload;
+}
+
+/**
+ * Read a stored snapshot, generating one only if absent or written against an
+ * older payload shape -- and then only for a period the user can have a recap
+ * of. Null means "no such recap", and every caller has to say what that looks
+ * like.
+ *
+ * `period` is the canonical period. A stored row at the current schema
+ * version is returned without any availability check: it is already a fact.
+ * Otherwise the period must be one of the user's completed years, judged in
+ * their own zone -- anything else would freeze an empty 1950 into the
+ * percentile cohort, or freeze a year that has not yet ended where they live.
+ */
+export async function getOrGenerateSnapshot(
+  userId: string,
+  period: Period,
+  now: Date = new Date(),
+): Promise<SeriesFinalePayload | null> {
+  const [existing] = await db
+    .select({
+      payload: seriesFinale.payload,
+      schemaVersion: seriesFinale.schemaVersion,
+    })
+    .from(seriesFinale)
+    .where(
+      and(
+        eq(seriesFinale.userId, userId),
+        eq(seriesFinale.periodStart, period.start),
+        eq(seriesFinale.periodEnd, period.end),
+      ),
+    )
+    .limit(1);
+
+  if (existing && existing.schemaVersion === SERIES_FINALE_SCHEMA_VERSION) {
+    return withholdWithdrawnCollaborators(
+      existing.payload as SeriesFinalePayload,
+    );
+  }
+
+  const zone = await loadTimeZone(userId);
+  const firstActivity = await loadFirstActivity(userId);
+  if (firstActivity === null) return null;
+
+  const available = completedYearsBetween(firstActivity, now, zone).some(
+    (candidate) =>
+      candidate.start.getTime() === period.start.getTime() &&
+      candidate.end.getTime() === period.end.getTime(),
+  );
+  if (!available) return null;
+
+  return generateInZone(userId, period, zone, now);
+}
+
+/**
+ * Remove, from a frozen payload, every collaborator who has since withdrawn
+ * from crew comparisons or no longer exists.
+ *
+ * This is not a recompute, and it does not breach "no read path may
+ * recompute". It only ever REMOVES other people's data, applying privacy rule
+ * 1 -- a standing rule -- at the moment of reading. The viewer's own numbers
+ * are returned exactly as frozen: headline, top show, rhythm and the rest are
+ * untouched, including crew-derived facts about the viewer, because those
+ * describe the viewer's year. Without this, withdrawing would withdraw nothing
+ * already written, and a collaborator's name and totals would sit in other
+ * people's recaps forever.
+ *
+ * One query over the ids present, and none at all when there are none.
+ * `alsoTopFor` holds usernames, so it keeps only the names of crew members
+ * that survived -- the frozen crew carries the id/username pairs that were
+ * true when it was written.
+ */
+async function withholdWithdrawnCollaborators(
+  payload: SeriesFinalePayload,
+): Promise<SeriesFinalePayload> {
+  const ids = Array.from(
+    new Set([
+      ...payload.crew.map((member) => member.userId),
+      ...payload.compare.map((row) => row.userId),
+    ]),
+  );
+  if (ids.length === 0) return payload;
+
+  const consenting = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(inArray(users.id, ids), eq(users.shareStatsWithCollaborators, true)),
+    );
+  const kept = new Set(consenting.map((row) => row.id));
+
+  const crew = payload.crew.filter((member) => kept.has(member.userId));
+  const keptNames = new Set(crew.map((member) => member.username));
+
+  return {
+    ...payload,
+    crew,
+    compare: payload.compare.filter((row) => kept.has(row.userId)),
+    topShow: payload.topShow
+      ? {
+          ...payload.topShow,
+          alsoTopFor: payload.topShow.alsoTopFor.filter((name) =>
+            keptNames.has(name),
+          ),
+        }
+      : null,
+  };
+}
+
+/** Every generated period for a user, newest first. */
+export async function listSnapshots(userId: string): Promise<
+  {
+    label: string;
+    generatedAt: Date;
+    dismissedAt: Date | null;
+    headline: SeriesFinalePayload["headline"];
+  }[]
+> {
+  const rows = await db
+    .select({
+      periodLabel: seriesFinale.periodLabel,
+      generatedAt: seriesFinale.generatedAt,
+      dismissedAt: seriesFinale.dismissedAt,
+      payload: seriesFinale.payload,
+    })
+    .from(seriesFinale)
+    .where(eq(seriesFinale.userId, userId))
+    .orderBy(desc(seriesFinale.periodStart));
+
+  return rows.map((row) => ({
+    label: row.periodLabel,
+    generatedAt: row.generatedAt,
+    dismissedAt: row.dismissedAt,
+    headline: (row.payload as SeriesFinalePayload).headline,
+  }));
 }
