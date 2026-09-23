@@ -1,11 +1,22 @@
-import { and, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, or } from "drizzle-orm";
 
 import { db } from "../db";
-import { episodeWatchStatus, tmdbCache, userContentStatus } from "../db/schema";
+import {
+  episodeWatchStatus,
+  listCollaborators,
+  lists,
+  tmdbCache,
+  userContentStatus,
+  users,
+} from "../db/schema";
 import { tmdbClient } from "../tmdb/client";
 import type { Period } from "./periods";
+import { loadEpisodeRuntimes, summariseEpisodeRuntimes } from "./runtime";
 import {
+  type ComparePeer,
   type ContentStatusRow,
+  type CrewMemberTotals,
+  type SeriesFinalePayload,
   titleKey,
   type TitleMeta,
   type WatchedEpisodeRow,
@@ -175,4 +186,247 @@ export async function loadGenreNames(): Promise<Map<number, string>> {
 /** Exists for tests: resets the module-scope genre-name memo. */
 export function clearGenreNameCache(): void {
   genreNameCache = null;
+}
+
+/**
+ * Maximum people on the crew leaderboard.
+ *
+ * A user on many shared lists with many collaborators would otherwise fan out
+ * into an unbounded number of per-peer queries at generation time. The mock
+ * shows five; eight leaves room without letting it grow.
+ */
+export const CREW_LIMIT = 8;
+
+/**
+ * Everyone who shares a list with this user and has not withdrawn from crew
+ * comparisons, sorted and capped at `CREW_LIMIT`.
+ *
+ * The `share_stats_with_collaborators` filter is the consent boundary. It lives
+ * in the query rather than a later filter so there is no path that loads a
+ * withdrawn user's data at all. The first query yields list ids only, so it
+ * needs no consent check; both queries that yield a person do.
+ *
+ * Sorted before capping so the same eight people are chosen on every
+ * regeneration, rather than whichever eight the queries returned first.
+ */
+export async function loadCollaboratorIds(userId: string): Promise<string[]> {
+  const ownedOrJoined = await db
+    .selectDistinct({ listId: lists.id })
+    .from(lists)
+    .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
+    .where(or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)));
+
+  const listIds = ownedOrJoined.map((row) => row.listId);
+  if (listIds.length === 0) return [];
+
+  const owners = await db
+    .selectDistinct({ userId: lists.ownerId })
+    .from(lists)
+    .innerJoin(users, eq(users.id, lists.ownerId))
+    .where(
+      and(
+        inArray(lists.id, listIds),
+        eq(users.shareStatsWithCollaborators, true),
+      ),
+    );
+
+  const collaborators = await db
+    .selectDistinct({ userId: listCollaborators.userId })
+    .from(listCollaborators)
+    .innerJoin(users, eq(users.id, listCollaborators.userId))
+    .where(
+      and(
+        inArray(listCollaborators.listId, listIds),
+        eq(users.shareStatsWithCollaborators, true),
+      ),
+    );
+
+  const ids = new Set<string>();
+  for (const row of [...owners, ...collaborators]) {
+    if (row.userId !== userId) ids.add(row.userId);
+  }
+
+  return Array.from(ids).sort().slice(0, CREW_LIMIT);
+}
+
+/**
+ * Crew totals and compare keys for every consenting collaborator.
+ *
+ * `window` must be the viewer's LOCALISED period (`localisePeriod` in
+ * `./periods`) -- the same window the viewer's own rows were loaded with -- so
+ * "the same period" means the same instants on both sides of the comparison.
+ *
+ * One fan-out: each collaborator's rows are loaded once and both slices are
+ * derived from that load. Usernames come from a single query that re-applies
+ * the consent filter at the point names are read; anyone it does not return
+ * (withdrawn or deleted since their id was resolved) is skipped entirely, with
+ * no rows loaded for them.
+ *
+ * Hours come from the runtime cache only. This deliberately does not call
+ * `ensureSeasonsCached`: that would be live TMDB fan-out on someone else's
+ * behalf, and the launch backfill already covers the shared cache.
+ */
+export async function loadCollaboratorSlices(
+  userId: string,
+  window: Period,
+): Promise<{ crew: CrewMemberTotals[]; peers: ComparePeer[] }> {
+  const collaboratorIds = await loadCollaboratorIds(userId);
+  if (collaboratorIds.length === 0) return { crew: [], peers: [] };
+
+  const profiles = await db
+    .select({ id: users.id, username: users.username })
+    .from(users)
+    .where(
+      and(
+        inArray(users.id, collaboratorIds),
+        eq(users.shareStatsWithCollaborators, true),
+      ),
+    );
+  const usernames = new Map(
+    profiles.map((profile) => [profile.id, profile.username]),
+  );
+
+  const inWindow = (at: Date) => at >= window.start && at < window.end;
+
+  const crew: CrewMemberTotals[] = [];
+  const peers: ComparePeer[] = [];
+
+  for (const collaboratorId of collaboratorIds) {
+    const username = usernames.get(collaboratorId);
+    if (username === undefined) continue;
+
+    const rows = await loadUserRows(collaboratorId, window);
+
+    const lookup = await loadEpisodeRuntimes(rows.episodes);
+    const { minutes } = summariseEpisodeRuntimes(rows.episodes, lookup);
+
+    crew.push({
+      userId: collaboratorId,
+      username,
+      episodes: rows.episodes.length,
+      hours: Math.round(minutes / 60),
+      topShowTmdbId: mostWatchedShow(rows.episodes),
+    });
+
+    // Completed and dropped are scoped to the window, like the viewer's side
+    // in `buildCompare`, so the split compares one year against one year.
+    // Planning is a present-tense list and stays unscoped on both sides.
+    const keysWhere = (status: string, scoped: boolean) =>
+      rows.statuses
+        .filter(
+          (row) => row.status === status && (!scoped || inWindow(row.updatedAt)),
+        )
+        .map((row) => titleKey(row.tmdbId, row.contentType));
+
+    peers.push({
+      userId: collaboratorId,
+      username,
+      completedKeys: keysWhere("completed", true),
+      planningKeys: keysWhere("planning", false),
+      droppedKeys: keysWhere("dropped", true),
+    });
+  }
+
+  // Ties by username, compared by code unit rather than locale, so a
+  // regeneration cannot reorder the leaderboard.
+  crew.sort(
+    (a, b) =>
+      b.episodes - a.episodes ||
+      (a.username < b.username ? -1 : a.username > b.username ? 1 : 0),
+  );
+
+  return { crew, peers };
+}
+
+/**
+ * A collaborator's most-watched show, for the "also number one for" line on
+ * the viewer's top-show card.
+ *
+ * A tie resolves to the lower tmdbId, matching `buildTopShow` in
+ * `./aggregate`: the two ids are compared to fill `alsoTopFor`, so their
+ * tie-breaks must agree.
+ */
+function mostWatchedShow(episodes: WatchedEpisodeRow[]): number | null {
+  const counts = new Map<number, number>();
+  for (const episode of episodes) {
+    counts.set(episode.tmdbId, (counts.get(episode.tmdbId) ?? 0) + 1);
+  }
+
+  let topId: number | null = null;
+  let topCount = 0;
+  for (const [tmdbId, count] of counts) {
+    if (
+      count > topCount ||
+      (count === topCount && topId !== null && tmdbId < topId)
+    ) {
+      topId = tmdbId;
+      topCount = count;
+    }
+  }
+
+  return topId;
+}
+
+/**
+ * Set arithmetic between the viewer's completed titles and each peer's.
+ *
+ * Completed and dropped are scoped to `window` on the viewer's side here and
+ * on the peer's side in `loadCollaboratorSlices`; planning is unscoped on
+ * both.
+ *
+ * The two "fun fact" fields hold a display title, not a title key -- a
+ * snapshot freezes them, and no renderer can do anything with `"tv:3"`. Both
+ * candidate sets are drawn from the viewer's own statuses, so the viewer's
+ * title map covers them; candidates are walked in sorted key order and the
+ * first that resolves wins, so the pick is stable across regenerations.
+ */
+export function buildCompare(
+  mine: Pick<LoadedRows, "statuses" | "titles">,
+  peers: ComparePeer[],
+  window: Period,
+): SeriesFinalePayload["compare"] {
+  const inWindow = (at: Date) => at >= window.start && at < window.end;
+
+  const myKeysWhere = (status: string, scoped: boolean) =>
+    new Set(
+      mine.statuses
+        .filter(
+          (row) => row.status === status && (!scoped || inWindow(row.updatedAt)),
+        )
+        .map((row) => titleKey(row.tmdbId, row.contentType)),
+    );
+
+  const myCompleted = myKeysWhere("completed", true);
+  const myDropped = myKeysWhere("dropped", true);
+  const myPlanning = myKeysWhere("planning", false);
+
+  const firstTitle = (candidates: string[], mineOf: Set<string>) => {
+    const matches = Array.from(new Set(candidates))
+      .filter((key) => mineOf.has(key))
+      .sort();
+    for (const key of matches) {
+      const meta = mine.titles.get(key);
+      if (meta) return meta.title;
+    }
+    return null;
+  };
+
+  return peers.map((peer) => {
+    const theirCompleted = new Set(peer.completedKeys);
+
+    let both = 0;
+    for (const key of myCompleted) {
+      if (theirCompleted.has(key)) both += 1;
+    }
+
+    return {
+      userId: peer.userId,
+      username: peer.username,
+      onlyYou: myCompleted.size - both,
+      both,
+      onlyThem: theirCompleted.size - both,
+      theyFinishedYouDropped: firstTitle(peer.completedKeys, myDropped),
+      bothPlanningNeitherStarted: firstTitle(peer.planningKeys, myPlanning),
+    };
+  });
 }
