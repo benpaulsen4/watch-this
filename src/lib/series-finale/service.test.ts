@@ -451,6 +451,26 @@ describe("buildCompare", () => {
     expect(result[0]).toMatchObject({ onlyYou: 0, both: 0, onlyThem: 1 });
   });
 
+  it("orders rows by titles in common, most first, then by username", () => {
+    const result = buildCompare(
+      mine,
+      [
+        peer({ userId: "u2", username: "zed", completedKeys: ["tv:1"] }),
+        peer({ userId: "u3", username: "bo", completedKeys: [] }),
+        peer({ userId: "u4", username: "ana", completedKeys: ["tv:1"] }),
+        peer({ userId: "u5", username: "cy", completedKeys: ["tv:1", "tv:2"] }),
+      ],
+      period,
+    );
+
+    expect(result.map((row) => [row.username, row.both])).toEqual([
+      ["cy", 2],
+      ["ana", 1],
+      ["zed", 1],
+      ["bo", 0],
+    ]);
+  });
+
   it("returns an empty list when there are no peers", () => {
     expect(buildCompare(mine, [], period)).toEqual([]);
   });

@@ -405,6 +405,8 @@ function mostWatchedShow(episodes: WatchedEpisodeRow[]): number | null {
  * candidate sets are drawn from the viewer's own statuses, so the viewer's
  * title map covers them; candidates are walked in sorted key order and the
  * first that resolves wins, so the pick is stable across regenerations.
+ *
+ * Rows are ordered by `both` descending, then username.
  */
 export function buildCompare(
   mine: Pick<LoadedRows, "statuses" | "titles">,
@@ -437,7 +439,7 @@ export function buildCompare(
     return null;
   };
 
-  return peers.map((peer) => {
+  const rows = peers.map((peer) => {
     const theirCompleted = new Set(peer.completedKeys);
 
     let both = 0;
@@ -455,6 +457,15 @@ export function buildCompare(
       bothPlanningNeitherStarted: firstTitle(peer.planningKeys, myPlanning),
     };
   });
+
+  // Most titles in common first, ties by username compared by code unit, so
+  // `compare[0]` means "the person you overlap with most" and a regeneration
+  // cannot reorder the list.
+  return rows.sort(
+    (a, b) =>
+      b.both - a.both ||
+      (a.username < b.username ? -1 : a.username > b.username ? 1 : 0),
+  );
 }
 
 /**
