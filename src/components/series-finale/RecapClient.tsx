@@ -15,7 +15,10 @@ import {
   useSeriesFinale,
 } from "@/hooks/useSeriesFinale";
 import type { User } from "@/lib/auth/client";
-import type { SeriesFinalePayload } from "@/lib/series-finale/types";
+import type {
+  ArchetypeId,
+  SeriesFinalePayload,
+} from "@/lib/series-finale/types";
 import { getImageUrl } from "@/lib/tmdb/client";
 import { cn } from "@/lib/utils";
 
@@ -157,6 +160,14 @@ function RecapBody({
     );
   }
 
+  // Each optional panel is decided here rather than inside the panel, so a
+  // band knows how many panels it really holds and can widen a lone one.
+  const { archetype } = payload.rhythm;
+  const { topShow, niche, bigDay, shame } = payload;
+  const hasShame = shame.dropped.length > 0 || shame.stillPlanning.length > 0;
+  // `compare` arrives ordered by titles in common, so this is the closest peer.
+  const [peer] = payload.compare;
+
   return (
     <>
       <Hero payload={payload} user={user} />
@@ -164,10 +175,14 @@ function RecapBody({
         <StatRow payload={payload} />
         <Band wide>
           <MonthsPanel months={payload.months} />
-          <ArchetypePanel rhythm={payload.rhythm} />
+          {archetype !== null ? (
+            <ArchetypePanel archetype={archetype} rhythm={payload.rhythm} />
+          ) : null}
         </Band>
         <Band>
-          <TopTitlesPanel topShow={payload.topShow} niche={payload.niche} />
+          {topShow || niche ? (
+            <TopTitlesPanel topShow={topShow} niche={niche} />
+          ) : null}
           {payload.genres.length > 0 ? (
             <Panel title="Genres">
               <GenreBars genres={payload.genres} />
@@ -175,8 +190,8 @@ function RecapBody({
           ) : null}
         </Band>
         <Band>
-          <BigDayPanel bigDay={payload.bigDay} />
-          <ShamePanel shame={payload.shame} />
+          {bigDay ? <BigDayPanel bigDay={bigDay} /> : null}
+          {hasShame ? <ShamePanel shame={shame} /> : null}
         </Band>
         <Band>
           {payload.crew.length > 0 ? (
@@ -194,7 +209,7 @@ function RecapBody({
               />
             </Panel>
           ) : null}
-          <ComparePanel compare={payload.compare} />
+          {peer ? <ComparePanel peer={peer} /> : null}
         </Band>
         <Footer />
       </Container>
@@ -388,12 +403,16 @@ function MonthsPanel({ months }: { months: SeriesFinalePayload["months"] }) {
   );
 }
 
-function ArchetypePanel({ rhythm }: { rhythm: SeriesFinalePayload["rhythm"] }) {
-  const name = archetypeName(rhythm);
-  if (rhythm.archetype === null || name === null) return null;
-
+function ArchetypePanel({
+  archetype,
+  rhythm,
+}: {
+  archetype: ArchetypeId;
+  rhythm: SeriesFinalePayload["rhythm"];
+}) {
+  const name = archetypeName({ archetype, topWeekday: rhythm.topWeekday });
   const description = [
-    ARCHETYPE_LABELS[rhythm.archetype].blurb,
+    ARCHETYPE_LABELS[archetype].blurb,
     archetypeDetail(rhythm),
   ]
     .filter(Boolean)
@@ -465,8 +484,6 @@ function TopTitlesPanel({
   topShow: SeriesFinalePayload["topShow"];
   niche: SeriesFinalePayload["niche"];
 }) {
-  if (!topShow && !niche) return null;
-
   const title =
     topShow && niche
       ? "Most watched, and least known"
@@ -529,9 +546,11 @@ function TopTitlesPanel({
  * The biggest day. Its timeline is UTC instants with no zone, so there are no
  * clock times here: solo ticks are placed by elapsed time from the first.
  */
-function BigDayPanel({ bigDay }: { bigDay: SeriesFinalePayload["bigDay"] }) {
-  if (!bigDay) return null;
-
+function BigDayPanel({
+  bigDay,
+}: {
+  bigDay: NonNullable<SeriesFinalePayload["bigDay"]>;
+}) {
   const spread = bigDay.timeline
     ? timelineSpread(bigDay.timeline.map((point) => point.at))
     : null;
@@ -574,7 +593,6 @@ const PLANNING_SHOWN = 5;
 
 function ShamePanel({ shame }: { shame: SeriesFinalePayload["shame"] }) {
   const { dropped, stillPlanning } = shame;
-  if (dropped.length === 0 && stillPlanning.length === 0) return null;
 
   const planning = stillPlanning.slice(0, PLANNING_SHOWN);
   const intro =
@@ -599,15 +617,12 @@ function ShamePanel({ shame }: { shame: SeriesFinalePayload["shame"] }) {
   );
 }
 
-/** The peer you overlap with most: `compare` arrives ordered by `both`. */
+/** One peer's comparison; the page passes the one it overlaps with most. */
 function ComparePanel({
-  compare,
+  peer,
 }: {
-  compare: SeriesFinalePayload["compare"];
+  peer: SeriesFinalePayload["compare"][number];
 }) {
-  const [peer] = compare;
-  if (!peer) return null;
-
   return (
     <Panel title={`You & ${peer.username}`} intro={overlapLine(peer)}>
       <CompareSplit peer={peer} />

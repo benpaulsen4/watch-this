@@ -562,4 +562,47 @@ describe("RecapClient", () => {
     await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
     expect(screen.queryByText(/^You &/)).not.toBeInTheDocument();
   });
+
+  it("gives a panel the full row when its partner has nothing to show", async () => {
+    mockFetch({
+      payload: payload({
+        bigDay: {
+          date: "2026-03-14", episodes: 11, minutes: 500, timeline: null,
+          soloTickCount: 0, streak: null,
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("Biggest day")).toBeInTheDocument(),
+    );
+    // No archetype beside the monthly chart, no abandonment beside the big day.
+    for (const title of ["Watched by month", "Biggest day"]) {
+      const row = screen.getByText(title).closest(".grid");
+      expect(row?.children).toHaveLength(1);
+      expect(row?.className).not.toMatch(/grid-cols/);
+    }
+  });
+
+  it("sets two panels side by side when both have something to show", async () => {
+    mockFetch({
+      payload: payload({
+        rhythm: {
+          archetype: "completionist",
+          weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
+          topWeekday: 0,
+          lateShare: null,
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("The Completionist")).toBeInTheDocument(),
+    );
+    const row = screen.getByText("Watched by month").closest(".grid");
+    expect(row?.children).toHaveLength(2);
+    expect(row?.className).toMatch(/lg:grid-cols-\[1\.55fr_1fr\]/);
+  });
 });

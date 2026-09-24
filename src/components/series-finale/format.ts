@@ -7,7 +7,10 @@
  * reach into an array under `noUncheckedIndexedAccess`.
  */
 
-import type { SeriesFinalePayload } from "@/lib/series-finale/types";
+import type {
+  ArchetypeId,
+  SeriesFinalePayload,
+} from "@/lib/series-finale/types";
 import { getTimezoneDateKey, resolveTimeZone } from "@/lib/time";
 
 import { ARCHETYPE_LABELS } from "./ARCHETYPE_LABELS";
@@ -141,6 +144,13 @@ function joinWithAnd(items: string[]): string {
 }
 
 /** The archetype's display name, with the weekday marathoner's day filled in. */
+export function archetypeName(rhythm: {
+  archetype: ArchetypeId;
+  topWeekday: number | null;
+}): string;
+export function archetypeName(
+  rhythm: Pick<Payload["rhythm"], "archetype" | "topWeekday">,
+): string | null;
 export function archetypeName(
   rhythm: Pick<Payload["rhythm"], "archetype" | "topWeekday">,
 ): string | null {
