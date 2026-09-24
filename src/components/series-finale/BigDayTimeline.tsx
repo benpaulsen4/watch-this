@@ -55,9 +55,7 @@ export function BigDayTimeline({
   return (
     <>
       <div aria-hidden="true" className="relative h-10">
-        <div
-          className={cn("absolute inset-x-0 top-1/2 h-px", styles.track)}
-        />
+        <div className={cn("absolute inset-x-0 top-1/2 h-px", styles.track)} />
         {spread.offsets.map((offset, index) => (
           <span
             key={index}

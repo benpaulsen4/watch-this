@@ -163,9 +163,7 @@ export function CompareFacts({
 
   return (
     <dl
-      className={cn(
-        large ? "flex flex-col gap-2" : "border-b border-gray-700",
-      )}
+      className={cn(large ? "flex flex-col gap-2" : "border-b border-gray-700")}
     >
       {facts.map((fact) => (
         <div

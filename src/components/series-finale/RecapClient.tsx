@@ -1,7 +1,5 @@
 "use client";
 
-import { Play } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { Children, type ReactNode } from "react";
 
@@ -19,10 +17,8 @@ import type {
   ArchetypeId,
   SeriesFinalePayload,
 } from "@/lib/series-finale/types";
-import { getImageUrl } from "@/lib/tmdb/client";
 import { cn } from "@/lib/utils";
 
-import { BarChart } from "./BarChart";
 import { BigDayTimeline } from "./BigDayTimeline";
 import { CompareFacts, CompareSplit } from "./CompareSplit";
 import { CrewRanking } from "./CrewRanking";
@@ -33,7 +29,6 @@ import {
   bigDayLine,
   formatCount,
   heroSentence,
-  monthLabel,
   monthName,
   nicheLine,
   overlapLine,
@@ -45,10 +40,10 @@ import {
   streakLabel,
   topShowStats,
   unknownRuntimeNote,
-  weekdayInitial,
-  weekdayName,
 } from "./format";
 import { GenreBars } from "./GenreBars";
+import { Poster } from "./Poster";
+import { MonthsChart, WeekdayStrip } from "./RhythmCharts";
 import {
   LoadFailedNotice,
   PROFILE_DATA_TAB,
@@ -376,19 +371,7 @@ function MonthsPanel({ months }: { months: SeriesFinalePayload["months"] }) {
           : undefined
       }
     >
-      <BarChart
-        axis
-        ariaLabel={
-          peak
-            ? `Episodes and films by month. Peak ${monthName(peak.month)}, ${formatCount(peak.episodes)}.`
-            : "Episodes and films by month. Nothing logged."
-        }
-        bars={months.map((month) => ({
-          label: monthLabel(month.month),
-          value: month.episodes,
-          highlight: peak !== null && month.month === peak.month,
-        }))}
-      />
+      <MonthsChart months={months} axis />
     </Panel>
   );
 }
@@ -412,53 +395,9 @@ function ArchetypePanel({
         {description}
       </p>
       <div className="mt-auto pt-6">
-        <BarChart
-          size="compact"
-          ariaLabel={
-            rhythm.topWeekday === null
-              ? "Episodes by weekday."
-              : `Episodes by weekday. Peak ${weekdayName(rhythm.topWeekday)}.`
-          }
-          bars={rhythm.weekdayCounts.map((value, index) => ({
-            label: weekdayInitial(index),
-            value,
-            highlight: index === rhythm.topWeekday,
-          }))}
-        />
+        <WeekdayStrip rhythm={rhythm} />
       </div>
     </Panel>
-  );
-}
-
-/** A TMDB poster, or a quiet placeholder where the title has none. */
-function Poster({
-  posterPath,
-  title,
-}: {
-  posterPath: string | null;
-  title: string;
-}) {
-  const src = getImageUrl(posterPath, "w342");
-
-  return (
-    <div className="relative aspect-[2/3] overflow-hidden rounded-[10px] bg-gray-800">
-      {src ? (
-        <Image
-          src={src}
-          alt={title}
-          fill
-          sizes="(min-width: 1024px) 14rem, 45vw"
-          className="object-cover"
-        />
-      ) : (
-        <div
-          aria-hidden="true"
-          className="flex h-full items-center justify-center rounded-[10px] border border-dashed border-gray-600"
-        >
-          <Play className="h-5 w-5 text-gray-500" />
-        </div>
-      )}
-    </div>
   );
 }
 
