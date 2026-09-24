@@ -425,3 +425,42 @@ export function peakMonth(
   }
   return peak;
 }
+
+/** "Also number one for ana and marcus." -- crew data, recap and story only. */
+export function alsoTopForLine(usernames: string[]): string | null {
+  if (usernames.length === 0) return null;
+  return `Also number one for ${joinWithAnd(usernames)}.`;
+}
+
+/**
+ * Where each of the biggest day's solo ticks falls between the first and the
+ * last, as 0-100, and the minutes between them. Elapsed time is the same in
+ * every zone, so this needs no clock -- the timeline's instants carry none.
+ * Null when the ticks span no time at all: one tick, or a batch sharing one
+ * instant, is not a session.
+ */
+export function timelineSpread(
+  ats: string[],
+): { offsets: number[]; minutes: number } | null {
+  const times = ats
+    .map((at) => new Date(at).getTime())
+    .filter((time) => !Number.isNaN(time));
+  if (times.length < 2) return null;
+
+  const first = Math.min(...times);
+  const span = Math.max(...times) - first;
+  if (span <= 0) return null;
+
+  return {
+    offsets: times.map((time) => Math.round(((time - first) / span) * 100)),
+    minutes: Math.round(span / 60_000),
+  };
+}
+
+/** "8 of these were ticked one at a time, 9h 40m from first to last." */
+export function timelineLine(soloTicks: number, minutes: number): string {
+  const ticked = `${formatCount(soloTicks)} of these ${soloTicks === 1 ? "was" : "were"} ticked one at a time`;
+  return minutes > 0
+    ? `${ticked}, ${formatHoursMinutes(minutes)} from first to last.`
+    : `${ticked}.`;
+}

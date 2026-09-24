@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  alsoTopForLine,
   archetypeDetail,
   archetypeName,
   bigDayLine,
@@ -20,6 +21,8 @@ import {
   percentileLine,
   pluralise,
   streakLabel,
+  timelineLine,
+  timelineSpread,
   weekdayInitial,
   weekdayName,
 } from "./format";
@@ -419,5 +422,46 @@ describe("peakMonth", () => {
         { month: 2, episodes: 0 },
       ]),
     ).toBeNull();
+  });
+});
+
+describe("alsoTopForLine", () => {
+  it("names the crew who shared the top show", () => {
+    expect(alsoTopForLine(["ana"])).toBe("Also number one for ana.");
+    expect(alsoTopForLine(["ana", "marcus", "tom"])).toBe(
+      "Also number one for ana, marcus and tom.",
+    );
+  });
+
+  it("says nothing when nobody did", () => {
+    expect(alsoTopForLine([])).toBeNull();
+  });
+});
+
+describe("timelineSpread", () => {
+  it("places each solo tick along the span from first to last", () => {
+    expect(
+      timelineSpread([
+        "2026-03-14T10:00:00.000Z",
+        "2026-03-14T14:50:00.000Z",
+        "2026-03-14T19:40:00.000Z",
+      ]),
+    ).toEqual({ offsets: [0, 50, 100], minutes: 580 });
+  });
+
+  it("returns null when the ticks do not span any time", () => {
+    expect(timelineSpread(["2026-03-14T10:00:00.000Z"])).toBeNull();
+    expect(
+      timelineSpread(["2026-03-14T10:00:00.000Z", "2026-03-14T10:00:00.000Z"]),
+    ).toBeNull();
+  });
+});
+
+describe("timelineLine", () => {
+  it("states how the solo ticks spread across the day", () => {
+    expect(timelineLine(8, 580)).toBe(
+      "8 of these were ticked one at a time, 9h 40m from first to last.",
+    );
+    expect(timelineLine(1, 0)).toBe("1 of these was ticked one at a time.");
   });
 });

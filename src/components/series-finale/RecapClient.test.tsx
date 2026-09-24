@@ -246,4 +246,237 @@ describe("RecapClient", () => {
       screen.queryByText("No Series Finale for 2026"),
     ).not.toBeInTheDocument();
   });
+
+  it("renders the archetype with the user's actual top weekday", async () => {
+    mockFetch({
+      payload: payload({
+        rhythm: {
+          archetype: "weekday-marathoner",
+          weekdayCounts: [10, 10, 10, 10, 10, 10, 60],
+          topWeekday: 6,
+          lateShare: 0.41,
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("The Sunday Marathoner")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(
+        "One day a week does most of the work. 50% of your episodes landed on a Sunday, and 41% of everything after 21:00.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Episodes by weekday. Peak Sunday." }),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the archetype section when there is none", async () => {
+    mockFetch({ payload: payload() });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(screen.queryByText(/Marathoner/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Your type")).not.toBeInTheDocument();
+  });
+
+  it("lists dropped shows with the episode that tipped it", async () => {
+    mockFetch({
+      payload: payload({
+        shame: {
+          dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }],
+          stillPlanning: [],
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText(/Foundation/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Foundation · S2E03")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "One show marked dropped. This episode was what tipped you over the edge.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("follows the dropped shows with the films still waiting", async () => {
+    mockFetch({
+      payload: payload({
+        shame: {
+          dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }],
+          stillPlanning: Array.from({ length: 7 }, (_, i) => ({
+            tmdbId: 100 + i, title: `Film ${i + 1}`, days: 1104 - i, runtime: 120,
+          })),
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "And even after giving up on those, you still didn't find time for these.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Film 1 · 1,104 days")).toBeInTheDocument();
+    expect(screen.getByText("Film 5 · 1,100 days")).toBeInTheDocument();
+    expect(screen.queryByText(/Film 6/)).not.toBeInTheDocument();
+  });
+
+  it("does not claim a dropped show when only films are waiting", async () => {
+    mockFetch({
+      payload: payload({
+        shame: {
+          dropped: [],
+          stillPlanning: [{ tmdbId: 7, title: "Stalker", days: 892, runtime: 161 }],
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("Stalker · 892 days")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/marked dropped/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/giving up on those/)).not.toBeInTheDocument();
+  });
+
+  it("omits the abandonment panel when nothing was dropped or left waiting", async () => {
+    mockFetch({ payload: payload() });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(screen.queryByText("Walked out on")).not.toBeInTheDocument();
+  });
+
+  it("omits the niche panel when no films were completed", async () => {
+    mockFetch({ payload: payload({ niche: null }) });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(screen.queryByText(/most obscure/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the most watched show and the least known film", async () => {
+    mockFetch({
+      payload: payload({
+        topShow: {
+          tmdbId: 1, title: "The Bear", posterPath: "/bear.jpg", episodes: 38,
+          minutes: 1002, finishedAt: null, alsoTopFor: ["ana", "marcus"],
+        },
+        niche: {
+          tmdbId: 2, title: "Ich war zuhause, aber", posterPath: null,
+          popularity: 2.1, medianPopularity: 68, mostPopular: null,
+          filmPopularities: Array.from({ length: 31 }, () => 50),
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Most watched, and least known"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText("The Bear")).toBeInTheDocument();
+    expect(screen.getByText("38 episodes · 16h 42m")).toBeInTheDocument();
+    expect(
+      screen.getByText("Also number one for ana and marcus."),
+    ).toBeInTheDocument();
+    expect(screen.getByAltText("The Bear")).toBeInTheDocument();
+    expect(screen.getByText("Ich war zuhause, aber")).toBeInTheDocument();
+    expect(screen.getByText("popularity 2.1")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Your most obscure watch — median for your other 30 films was 68",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("titles the panel for whichever half it has", async () => {
+    mockFetch({
+      payload: payload({
+        topShow: {
+          tmdbId: 1, title: "The Bear", posterPath: null, episodes: 38,
+          minutes: 0, finishedAt: null, alsoTopFor: [],
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("Most watched")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("38 episodes")).toBeInTheDocument();
+    expect(screen.queryByText(/Also number one/)).not.toBeInTheDocument();
+  });
+
+  it("shows the genre split", async () => {
+    mockFetch({
+      payload: payload({
+        genres: [
+          { name: "Drama", percent: 40 },
+          { name: "Comedy", percent: 35 },
+        ],
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("Genres")).toBeInTheDocument());
+    expect(screen.getByText("Drama")).toBeInTheDocument();
+    expect(screen.getByText("35%")).toBeInTheDocument();
+  });
+
+  it("describes the biggest day, and why there is no timeline for batch ticks", async () => {
+    mockFetch({
+      payload: payload({
+        bigDay: {
+          date: "2026-03-14", episodes: 11, minutes: 500, timeline: null,
+          soloTickCount: 0, streak: null,
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Saturday 14 March · 11 episodes · 8h 20m"),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(/ticked off in batches/),
+    ).toBeInTheDocument();
+  });
+
+  it("spreads the biggest day's solo ticks from first to last", async () => {
+    mockFetch({
+      payload: payload({
+        bigDay: {
+          date: "2026-03-14", episodes: 11, minutes: 500,
+          timeline: [
+            { at: "2026-03-14T10:00:00.000Z" },
+            { at: "2026-03-14T14:50:00.000Z" },
+            { at: "2026-03-14T19:40:00.000Z" },
+          ],
+          soloTickCount: 3, streak: null,
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "3 of these were ticked one at a time, 9h 40m from first to last.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/ticked off in batches/)).not.toBeInTheDocument();
+  });
 });

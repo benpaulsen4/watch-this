@@ -1,8 +1,11 @@
 "use client";
 
+import { Play } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { Children, type ReactNode } from "react";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -13,20 +16,35 @@ import {
 } from "@/hooks/useSeriesFinale";
 import type { User } from "@/lib/auth/client";
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
+import { getImageUrl } from "@/lib/tmdb/client";
 import { cn } from "@/lib/utils";
 
+import { ARCHETYPE_LABELS } from "./ARCHETYPE_LABELS";
 import { BarChart } from "./BarChart";
 import {
+  alsoTopForLine,
+  archetypeDetail,
+  archetypeName,
+  bigDayLine,
+  droppedIntro,
   formatCount,
+  formatHoursMinutes,
   formatPeriodRange,
   heroSentence,
   monthLabel,
   monthName,
+  nicheLine,
   peakMonth,
   percentileLine,
   pluralise,
   streakLabel,
+  timelineLine,
+  timelineSpread,
+  weekdayInitial,
+  weekdayName,
 } from "./format";
+import { GenreBars } from "./GenreBars";
+import { DroppedBadges, PlanningBadges } from "./ShameBadges";
 import { StatTile } from "./StatTile";
 import { ThinYearCard } from "./ThinYearCard";
 import { TmdbAttribution } from "./TmdbAttribution";
@@ -143,6 +161,19 @@ function RecapBody({
         <StatRow payload={payload} />
         <Band wide>
           <MonthsPanel months={payload.months} />
+          <ArchetypePanel rhythm={payload.rhythm} />
+        </Band>
+        <Band>
+          <TopTitlesPanel topShow={payload.topShow} niche={payload.niche} />
+          {payload.genres.length > 0 ? (
+            <Panel title="Genres">
+              <GenreBars genres={payload.genres} />
+            </Panel>
+          ) : null}
+        </Band>
+        <Band>
+          <BigDayPanel bigDay={payload.bigDay} />
+          <ShamePanel shame={payload.shame} />
         </Band>
         <Footer />
       </Container>
@@ -332,6 +363,217 @@ function MonthsPanel({ months }: { months: SeriesFinalePayload["months"] }) {
           highlight: peak !== null && month.month === peak.month,
         }))}
       />
+    </Panel>
+  );
+}
+
+function ArchetypePanel({ rhythm }: { rhythm: SeriesFinalePayload["rhythm"] }) {
+  const name = archetypeName(rhythm);
+  if (rhythm.archetype === null || name === null) return null;
+
+  const description = [
+    ARCHETYPE_LABELS[rhythm.archetype].blurb,
+    archetypeDetail(rhythm),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <Panel title="Your type">
+      <p className="bg-gradient-to-br from-red-500 to-orange-300 bg-clip-text text-3xl leading-tight font-bold tracking-tight text-transparent sm:text-[34px]">
+        {name}
+      </p>
+      <p className="mt-4 text-sm leading-relaxed text-pretty text-gray-300">
+        {description}
+      </p>
+      <div className="mt-auto pt-6">
+        <BarChart
+          size="compact"
+          ariaLabel={
+            rhythm.topWeekday === null
+              ? "Episodes by weekday."
+              : `Episodes by weekday. Peak ${weekdayName(rhythm.topWeekday)}.`
+          }
+          bars={rhythm.weekdayCounts.map((value, index) => ({
+            label: weekdayInitial(index),
+            value,
+            highlight: index === rhythm.topWeekday,
+          }))}
+        />
+      </div>
+    </Panel>
+  );
+}
+
+/** A TMDB poster, or a quiet placeholder where the title has none. */
+function Poster({
+  posterPath,
+  title,
+}: {
+  posterPath: string | null;
+  title: string;
+}) {
+  const src = getImageUrl(posterPath, "w342");
+
+  return (
+    <div className="relative aspect-[2/3] overflow-hidden rounded-[10px] bg-gray-800">
+      {src ? (
+        <Image
+          src={src}
+          alt={title}
+          fill
+          sizes="(min-width: 1024px) 14rem, 45vw"
+          className="object-cover"
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="flex h-full items-center justify-center rounded-[10px] border border-dashed border-gray-600"
+        >
+          <Play className="h-5 w-5 text-gray-500" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TopTitlesPanel({
+  topShow,
+  niche,
+}: {
+  topShow: SeriesFinalePayload["topShow"];
+  niche: SeriesFinalePayload["niche"];
+}) {
+  if (!topShow && !niche) return null;
+
+  const title =
+    topShow && niche
+      ? "Most watched, and least known"
+      : topShow
+        ? "Most watched"
+        : "Least known";
+  const alsoTopFor = topShow ? alsoTopForLine(topShow.alsoTopFor) : null;
+
+  return (
+    <Panel title={title}>
+      <div className="grid grid-cols-2 gap-4">
+        {topShow ? (
+          <div>
+            <Poster posterPath={topShow.posterPath} title={topShow.title} />
+            <p className="mt-3 text-[15px] leading-snug font-semibold text-gray-100">
+              {topShow.title}
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <Badge variant="genre" size="sm">
+                Show
+              </Badge>
+            </div>
+            <p className="mt-2 text-[13px] leading-snug text-gray-500">
+              {topShow.minutes > 0
+                ? `${pluralise(topShow.episodes, "episode")} · ${formatHoursMinutes(topShow.minutes)}`
+                : pluralise(topShow.episodes, "episode")}
+            </p>
+            {alsoTopFor ? (
+              <p className="mt-1 text-[13px] leading-snug text-gray-500">
+                {alsoTopFor}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {niche ? (
+          <div>
+            <Poster posterPath={niche.posterPath} title={niche.title} />
+            <p className="mt-3 text-[15px] leading-snug font-semibold text-gray-100">
+              {niche.title}
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <Badge variant="genre" size="sm">
+                Film
+              </Badge>
+              <Badge variant="year" size="sm">
+                {`popularity ${niche.popularity.toFixed(1)}`}
+              </Badge>
+            </div>
+            <p className="mt-2 text-[13px] leading-snug text-gray-500">
+              {nicheLine(niche)}
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * The biggest day. Its timeline is UTC instants with no zone, so there are no
+ * clock times here: solo ticks are placed by elapsed time from the first.
+ */
+function BigDayPanel({ bigDay }: { bigDay: SeriesFinalePayload["bigDay"] }) {
+  if (!bigDay) return null;
+
+  const spread = bigDay.timeline
+    ? timelineSpread(bigDay.timeline.map((point) => point.at))
+    : null;
+
+  return (
+    <Panel title="Biggest day" intro={bigDayLine(bigDay)}>
+      {bigDay.timeline === null ? (
+        <p className="text-xs leading-relaxed text-gray-500">
+          No hour-by-hour breakdown for this one. Most of these were ticked off
+          in batches, which says more about how you use the app than how you
+          watch.
+        </p>
+      ) : spread === null ? (
+        <p className="text-xs leading-relaxed text-gray-500">
+          Too few of these were ticked one at a time to say how the day went.
+        </p>
+      ) : (
+        <>
+          <div aria-hidden="true" className="relative h-10">
+            <div className="absolute inset-x-0 top-1/2 h-px bg-gray-700" />
+            {spread.offsets.map((offset, index) => (
+              <span
+                key={index}
+                className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 ring-2 ring-gray-900"
+                style={{ left: `${offset}%` }}
+              />
+            ))}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-gray-500">
+            {timelineLine(bigDay.soloTickCount, spread.minutes)}
+          </p>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/** How many waiting films the recap lists; the payload carries all of them. */
+const PLANNING_SHOWN = 5;
+
+function ShamePanel({ shame }: { shame: SeriesFinalePayload["shame"] }) {
+  const { dropped, stillPlanning } = shame;
+  if (dropped.length === 0 && stillPlanning.length === 0) return null;
+
+  const planning = stillPlanning.slice(0, PLANNING_SHOWN);
+  const intro =
+    dropped.length > 0
+      ? droppedIntro(
+          dropped.length,
+          dropped.some((show) => show.lastEpisode !== null),
+        )
+      : "Nothing dropped this year. These films, on the other hand, are still waiting.";
+
+  return (
+    <Panel title="Walked out on" intro={intro}>
+      {dropped.length > 0 ? <DroppedBadges shows={dropped} /> : null}
+      {dropped.length > 0 && planning.length > 0 ? (
+        <p className="mt-4 mb-2.5 text-sm text-gray-400">
+          And even after giving up on those, you still didn&apos;t find time for
+          these.
+        </p>
+      ) : null}
+      {planning.length > 0 ? <PlanningBadges films={planning} /> : null}
     </Panel>
   );
 }
