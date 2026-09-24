@@ -416,6 +416,24 @@ describe("RecapClient", () => {
     ).toBeInTheDocument();
   });
 
+  it("dates the top show's last episode watched", async () => {
+    mockFetch({
+      payload: payload({
+        topShow: {
+          tmdbId: 1, title: "The Bear", posterPath: null, episodes: 38,
+          minutes: 1002, finishedAt: "2026-04-04", alsoTopFor: [],
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("38 episodes · 16h 42m · last watched 4 April"),
+      ).toBeInTheDocument(),
+    );
+  });
+
   it("titles the panel for whichever half it has", async () => {
     mockFetch({
       payload: payload({

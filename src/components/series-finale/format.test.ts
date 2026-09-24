@@ -630,6 +630,11 @@ describe("episodesPerDayLine", () => {
     );
   });
 
+  it("says one a day when the gap rounds to a day", () => {
+    expect(episodesPerDayLine(0.7)).toBe("About one a day, on average.");
+    expect(episodesPerDayLine(0.99)).toBe("About one a day, on average.");
+  });
+
   it("says nothing without episodes", () => {
     expect(episodesPerDayLine(0)).toBeNull();
   });
@@ -637,13 +642,24 @@ describe("episodesPerDayLine", () => {
 
 describe("topShowStats", () => {
   it("counts the episodes and the time", () => {
-    expect(topShowStats({ episodes: 38, minutes: 1002 })).toBe(
-      "38 episodes · 16h 42m",
-    );
+    expect(
+      topShowStats({ episodes: 38, minutes: 1002, finishedAt: null }),
+    ).toBe("38 episodes · 16h 42m");
   });
 
-  it("leaves out an unknown runtime", () => {
-    expect(topShowStats({ episodes: 1, minutes: 0 })).toBe("1 episode");
+  it("dates the last episode watched, from its zone-correct key", () => {
+    expect(
+      topShowStats({ episodes: 38, minutes: 1002, finishedAt: "2026-04-04" }),
+    ).toBe("38 episodes · 16h 42m · last watched 4 April");
+  });
+
+  it("leaves out an unknown runtime or date", () => {
+    expect(
+      topShowStats({ episodes: 1, minutes: 0, finishedAt: null }),
+    ).toBe("1 episode");
+    expect(
+      topShowStats({ episodes: 1, minutes: 0, finishedAt: "nonsense" }),
+    ).toBe("1 episode");
   });
 });
 

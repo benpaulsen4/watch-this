@@ -106,17 +106,25 @@ describe("StoryCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the top show without a finish date, with TMDB attribution", () => {
+  it("shows the top show and when its last episode was watched, with TMDB attribution", () => {
     const { container } = renderCard("topShow", { topShow });
     expect(screen.getByText("Your #1 show")).toBeInTheDocument();
     expect(screen.getByText("The Bear")).toBeInTheDocument();
     expect(screen.getByAltText("The Bear")).toBeInTheDocument();
-    expect(screen.getByText("38 episodes · 16h 42m")).toBeInTheDocument();
+    expect(
+      screen.getByText("38 episodes · 16h 42m · last watched 4 April"),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Also number one for marcus. You two need new material."),
     ).toBeInTheDocument();
-    expect(container.textContent).not.toMatch(/finished|April/);
+    // It is the last episode watched, not a finish: the show may be ongoing.
+    expect(container.textContent).not.toMatch(/finished/);
     expect(screen.getByAltText("TMDB")).toBeInTheDocument();
+  });
+
+  it("leaves the date out when the top show has none", () => {
+    renderCard("topShow", { topShow: { ...topShow, finishedAt: null } });
+    expect(screen.getByText("38 episodes · 16h 42m")).toBeInTheDocument();
   });
 
   it("counts everyone sharing the top show", () => {

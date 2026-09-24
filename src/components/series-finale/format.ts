@@ -524,14 +524,27 @@ export function newMaterialLine(othersCount: number): string | null {
   return `You ${numberWords(othersCount + 1)} need new material.`;
 }
 
-/** "38 episodes · 16h 42m", the time left out when no runtime is known. */
+/**
+ * "38 episodes · 16h 42m · last watched 4 April". `finishedAt` is the
+ * zone-correct date key of the last episode watched in the period -- not a
+ * finish date, since the show may well be unfinished. Unknown parts are left
+ * out.
+ */
 export function topShowStats(
-  topShow: Pick<NonNullable<Payload["topShow"]>, "episodes" | "minutes">,
+  topShow: Pick<
+    NonNullable<Payload["topShow"]>,
+    "episodes" | "minutes" | "finishedAt"
+  >,
 ): string {
-  const episodes = pluralise(topShow.episodes, "episode");
-  return topShow.minutes > 0
-    ? `${episodes} · ${formatHoursMinutes(topShow.minutes)}`
-    : episodes;
+  const lastWatched =
+    topShow.finishedAt === null ? "" : formatDateKey(topShow.finishedAt);
+  return [
+    pluralise(topShow.episodes, "episode"),
+    topShow.minutes > 0 ? formatHoursMinutes(topShow.minutes) : null,
+    lastWatched ? `last watched ${lastWatched}` : null,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
 }
 
 /**
@@ -644,7 +657,10 @@ export function finishedLine(finished: number, dropped: number): string {
 export function episodesPerDayLine(perDay: number): string | null {
   if (perDay <= 0) return null;
   if (perDay < 1) {
-    return `About one every ${Math.round(1 / perDay)} days, on average.`;
+    const gap = Math.round(1 / perDay);
+    return gap <= 1
+      ? "About one a day, on average."
+      : `About one every ${gap} days, on average.`;
   }
   return `${perDay.toFixed(1)} a day, on average.`;
 }
