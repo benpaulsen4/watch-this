@@ -28,4 +28,14 @@ describe("PageHeader", () => {
     );
     expect(screen.getByText("Action")).toBeInTheDocument();
   });
+
+  it("names the back link when a label is given", () => {
+    render(
+      <PageHeader title="Test" backLinkHref="/home" backLinkLabel="Back home" />,
+    );
+    expect(screen.getByRole("link", { name: "Back home" })).toHaveAttribute(
+      "href",
+      "/home",
+    );
+  });
 });

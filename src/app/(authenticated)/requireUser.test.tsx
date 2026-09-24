@@ -15,6 +15,7 @@ import ListsPage from "./lists/page";
 import ProfilePage from "./profile/page";
 import { requireUser } from "./requireUser";
 import SearchPage from "./search/page";
+import SeriesFinalePage from "./series-finale/[period]/page";
 
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 vi.mock("next/navigation", () => ({ notFound: vi.fn(), redirect: vi.fn() }));
@@ -48,6 +49,9 @@ vi.mock("@/components/profile/ProfileClient", () => ({
   ProfileClient: () => null,
 }));
 vi.mock("@/components/search/SearchClient", () => ({ SearchClient: () => null }));
+vi.mock("@/components/series-finale/RecapClient", () => ({
+  RecapClient: () => null,
+}));
 
 const signedInUser = { id: "u1", username: "alice" };
 
@@ -110,6 +114,11 @@ describe("authenticated pages with no session", () => {
     ["search", () => SearchPage(), "%2Fsearch"],
     ["activity", () => ActivityPage(), "%2Factivity"],
     ["profile", () => ProfilePage(), "%2Fprofile"],
+    [
+      "series finale",
+      () => SeriesFinalePage({ params: Promise.resolve({ period: "2026" }) }),
+      "%2Fseries-finale%2F2026",
+    ],
   ];
 
   it.each(cases)("%s redirects to /auth", async (_name, run, encodedPath) => {
@@ -159,6 +168,7 @@ describe("authenticated pages with no session", () => {
       "/lists/archived",
       "/profile",
       "/search",
+      "/series-finale/[period]",
     ].sort();
 
     expect(discovered).toEqual(covered);

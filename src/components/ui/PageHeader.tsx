@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 interface PageHeaderProps {
   title?: string;
   backLinkHref?: string;
+  /** Accessible name for the icon-only back link, e.g. "Back to profile". */
+  backLinkLabel?: string;
   subheaderSlot?: React.ReactNode;
   children?: React.ReactNode;
 }
@@ -14,6 +16,7 @@ interface PageHeaderProps {
 export function PageHeader({
   title,
   backLinkHref,
+  backLinkLabel,
   subheaderSlot,
   children,
 }: PageHeaderProps) {
@@ -24,7 +27,7 @@ export function PageHeader({
           <div className="flex items-center gap-4">
             {backLinkHref && (
               <Button variant="ghost" size="icon" asChild>
-                <Link href={backLinkHref}>
+                <Link href={backLinkHref} aria-label={backLinkLabel}>
                   <ArrowLeft className="h-4 w-4" />
                 </Link>
               </Button>
