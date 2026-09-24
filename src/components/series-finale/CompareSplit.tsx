@@ -131,11 +131,14 @@ export function CompareSplit({
  */
 export function CompareFacts({
   peer,
+  size = "default",
 }: {
   peer: Pick<
     Peer,
     "username" | "theyFinishedYouDropped" | "bothPlanningNeitherStarted"
   >;
+  /** "default": the recap's ruled list (1e). "large": the story's boxes (1c). */
+  size?: "default" | "large";
 }) {
   const facts = [
     peer.theyFinishedYouDropped
@@ -156,18 +159,39 @@ export function CompareFacts({
 
   if (facts.length === 0) return null;
 
+  const large = size === "large";
+
   return (
-    <dl className="border-b border-gray-700">
+    <dl
+      className={cn(
+        large ? "flex flex-col gap-2" : "border-b border-gray-700",
+      )}
+    >
       {facts.map((fact) => (
         <div
           key={fact.label}
-          className="flex items-center justify-between gap-3 border-t border-gray-700 py-2.5"
+          data-fact=""
+          className={cn(
+            "flex items-center justify-between gap-3",
+            large
+              ? "rounded-[11px] border border-white/10 bg-white/[0.07] px-4 py-3"
+              : "border-t border-gray-700 py-2.5",
+          )}
         >
-          <dt className="text-[13px] leading-snug text-gray-400">
+          <dt
+            className={cn(
+              "text-[13px] leading-snug",
+              large ? "text-white/60" : "text-gray-400",
+            )}
+          >
             {fact.label}
           </dt>
           <dd
-            className={`text-right text-[13px] leading-snug font-semibold ${fact.tone}`}
+            className={cn(
+              "text-right leading-snug font-semibold",
+              large ? "text-sm" : "text-[13px]",
+              fact.tone,
+            )}
           >
             {fact.title}
           </dd>

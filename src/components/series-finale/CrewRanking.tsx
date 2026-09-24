@@ -19,6 +19,11 @@ interface CrewRankingProps {
     episodes: number;
   };
   crew: CrewMemberTotals[];
+  /**
+   * "default" is the recap's panel (1e): names over bars. "large" is the
+   * story's card (1c): numbered, boxed rows, the viewer's outlined, no bars.
+   */
+  size?: "default" | "large";
 }
 
 interface Row {
@@ -37,7 +42,11 @@ interface Row {
  * Bars are drawn against the leader; the name and count are the text, the bar
  * decoration.
  */
-export function CrewRanking({ viewer, crew }: CrewRankingProps) {
+export function CrewRanking({
+  viewer,
+  crew,
+  size = "default",
+}: CrewRankingProps) {
   const rows: Row[] = [
     {
       key: "viewer",
@@ -59,54 +68,97 @@ export function CrewRanking({ viewer, crew }: CrewRankingProps) {
   );
   const leader = Math.max(...rows.map((row) => row.episodes), 0);
 
+  const large = size === "large";
+
   return (
-    <ol className="flex flex-col gap-3">
-      {rows.map((row) => (
-        <li key={row.key} className="flex items-center gap-3">
+    <ol className={cn("flex flex-col", large ? "gap-2.5" : "gap-3")}>
+      {rows.map((row, position) => (
+        <li
+          key={row.key}
+          className={cn(
+            "flex items-center gap-3",
+            large && "rounded-xl border px-3.5 py-3",
+            large &&
+              (row.isViewer
+                ? "border-red-400/40 bg-white/10"
+                : "border-transparent bg-white/5"),
+          )}
+        >
+          {large ? (
+            <span
+              data-rank=""
+              className={cn(
+                "w-4 flex-none text-sm font-bold tabular-nums",
+                row.isViewer ? "text-red-400" : "text-white/40",
+              )}
+            >
+              {position + 1}
+            </span>
+          ) : null}
           <ProfileImage
             src={row.profilePictureUrl}
             username={row.username}
             size="sm"
           />
           <div className="min-w-0 flex-1">
-            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+            <div
+              className={cn(
+                "flex items-baseline justify-between gap-3",
+                !large && "mb-1.5",
+              )}
+            >
               <span
                 data-name=""
                 className={cn(
-                  "truncate text-sm",
+                  "truncate",
+                  large ? "text-base" : "text-sm",
                   row.isViewer
                     ? "font-semibold text-white"
-                    : "font-medium text-gray-200",
+                    : large
+                      ? "font-medium text-white/85"
+                      : "font-medium text-gray-200",
                 )}
               >
                 {row.isViewer ? "you" : row.username}
               </span>
               <span
                 className={cn(
-                  "text-[13px] font-semibold tabular-nums",
-                  row.isViewer ? "text-gray-100" : "text-gray-300",
+                  "font-semibold whitespace-nowrap tabular-nums",
+                  large ? "text-[15px]" : "text-[13px]",
+                  row.isViewer
+                    ? large
+                      ? "text-white"
+                      : "text-gray-100"
+                    : large
+                      ? "text-white/60"
+                      : "text-gray-300",
                 )}
               >
                 {pluralise(row.episodes, "episode")}
               </span>
             </div>
-            <div aria-hidden="true" className="h-1.5 rounded-full bg-gray-700">
+            {large ? null : (
               <div
-                data-episodes-bar=""
-                className={cn(
-                  "h-full rounded-full",
-                  row.isViewer
-                    ? "bg-gradient-to-r from-red-600 to-orange-500"
-                    : "bg-gray-500",
-                )}
-                style={{
-                  width:
-                    leader === 0
-                      ? "0%"
-                      : `${Math.round((row.episodes / leader) * 100)}%`,
-                }}
-              />
-            </div>
+                aria-hidden="true"
+                className="h-1.5 rounded-full bg-gray-700"
+              >
+                <div
+                  data-episodes-bar=""
+                  className={cn(
+                    "h-full rounded-full",
+                    row.isViewer
+                      ? "bg-gradient-to-r from-red-600 to-orange-500"
+                      : "bg-gray-500",
+                  )}
+                  style={{
+                    width:
+                      leader === 0
+                        ? "0%"
+                        : `${Math.round((row.episodes / leader) * 100)}%`,
+                  }}
+                />
+              </div>
+            )}
           </div>
         </li>
       ))}

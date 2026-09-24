@@ -52,4 +52,11 @@ describe("GenreBars", () => {
 
     expect(screen.getAllByText("Unknown")).toHaveLength(2);
   });
+
+  it("sets the story's larger type when asked", () => {
+    render(<GenreBars genres={genres} size="large" />);
+
+    expect(screen.getByText("Drama")).toHaveClass("text-[17px]");
+    expect(screen.getByText("22%")).toHaveClass("text-[15px]");
+  });
 });

@@ -80,4 +80,22 @@ describe("CrewRanking", () => {
 
     expect(barWidths(container)).toEqual(["0%", "0%"]);
   });
+
+  it("draws the story's numbered rows without bars when asked", () => {
+    const { container } = render(
+      <CrewRanking
+        viewer={{ username: "ben", profilePictureUrl: "", episodes: 900 }}
+        crew={crew}
+        size="large"
+      />,
+    );
+
+    expect(names()).toEqual(["ana", "you", "marcus"]);
+    const ranks = Array.from(container.querySelectorAll("[data-rank]")).map(
+      (rank) => rank.textContent,
+    );
+    expect(ranks).toEqual(["1", "2", "3"]);
+    expect(barWidths(container)).toEqual([]);
+    expect(screen.getByText("900 episodes")).toBeInTheDocument();
+  });
 });

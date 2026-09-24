@@ -72,4 +72,17 @@ describe("CompareFacts", () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("boxes each fact on the story's card when asked", () => {
+    render(
+      <CompareFacts
+        size="large"
+        peer={{ ...peer, theyFinishedYouDropped: "Foundation" }}
+      />,
+    );
+
+    expect(
+      screen.getByText("ana finished, you dropped").closest("[data-fact]"),
+    ).toHaveClass("rounded-[11px]");
+  });
 });

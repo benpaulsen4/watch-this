@@ -23,6 +23,7 @@ import { getImageUrl } from "@/lib/tmdb/client";
 import { cn } from "@/lib/utils";
 
 import { BarChart } from "./BarChart";
+import { BigDayTimeline } from "./BigDayTimeline";
 import { CompareFacts, CompareSplit } from "./CompareSplit";
 import { CrewRanking } from "./CrewRanking";
 import {
@@ -31,7 +32,6 @@ import {
   archetypeName,
   bigDayLine,
   formatCount,
-  formatHoursMinutes,
   heroSentence,
   monthLabel,
   monthName,
@@ -40,24 +40,24 @@ import {
   peakMonth,
   percentileLine,
   periodRange,
-  pluralise,
   SHAME_PLANNING_LINK,
   shameIntro,
-  soloTickDisclosure,
   streakLabel,
-  timelineLine,
-  timelineSpread,
+  topShowStats,
+  unknownRuntimeNote,
   weekdayInitial,
   weekdayName,
 } from "./format";
 import { GenreBars } from "./GenreBars";
+import {
+  LoadFailedNotice,
+  PROFILE_DATA_TAB,
+  UnavailableNotice,
+} from "./SeriesFinaleNotices";
 import { DroppedBadges, PlanningBadges } from "./ShameBadges";
 import { StatTile } from "./StatTile";
 import { ThinYearCard } from "./ThinYearCard";
 import { TmdbAttribution } from "./TmdbAttribution";
-
-/** The profile rows that open this page live on the profile's data tab. */
-const PROFILE_DATA_TAB = "/profile#data";
 
 type Viewer = Pick<User, "username" | "profilePictureUrl">;
 
@@ -120,18 +120,7 @@ function RecapBody({
   if (error instanceof SeriesFinaleUnavailableError) {
     return (
       <Container className="py-16">
-        <Card className="mx-auto max-w-lg p-8 text-center">
-          <h2 className="text-xl font-semibold text-gray-50">
-            No Series Finale for {period}
-          </h2>
-          <p className="mx-auto mt-3 max-w-sm text-sm text-gray-400">
-            Either that year is not over yet where you are, or you had not
-            logged anything by then. Nothing to recap either way.
-          </p>
-          <Button variant="outline" size="sm" className="mt-6" asChild>
-            <Link href={PROFILE_DATA_TAB}>Back to your profile</Link>
-          </Button>
-        </Card>
+        <UnavailableNotice period={period} />
       </Container>
     );
   }
@@ -139,11 +128,7 @@ function RecapBody({
   if (error || !payload) {
     return (
       <Container className="py-16">
-        <Card className="mx-auto max-w-lg p-8 text-center">
-          <p className="text-sm text-gray-400">
-            That recap could not be loaded. Try again in a moment.
-          </p>
-        </Card>
+        <LoadFailedNotice />
       </Container>
     );
   }
@@ -310,7 +295,9 @@ function Hero({
   user: Viewer;
 }) {
   const percentile = percentileLine(payload.headline.percentile);
-  const unknownRuntime = payload.headline.unknownRuntimeEpisodes;
+  const unknownRuntime = unknownRuntimeNote(
+    payload.headline.unknownRuntimeEpisodes,
+  );
 
   return (
     <section className="relative overflow-hidden">
@@ -342,11 +329,8 @@ function Hero({
         {percentile ? (
           <p className="mt-4 text-sm font-medium text-gray-400">{percentile}</p>
         ) : null}
-        {unknownRuntime > 0 ? (
-          <p className="mt-2 text-xs text-gray-500">
-            Excludes {pluralise(unknownRuntime, "episode")} with no runtime on
-            TMDB
-          </p>
+        {unknownRuntime ? (
+          <p className="mt-2 text-xs text-gray-500">{unknownRuntime}</p>
         ) : null}
       </Container>
     </section>
@@ -508,9 +492,7 @@ function TopTitlesPanel({
               </Badge>
             </div>
             <p className="mt-2 text-[13px] leading-snug text-gray-500">
-              {topShow.minutes > 0
-                ? `${pluralise(topShow.episodes, "episode")} · ${formatHoursMinutes(topShow.minutes)}`
-                : pluralise(topShow.episodes, "episode")}
+              {topShowStats(topShow)}
             </p>
             {alsoTopFor ? (
               <p className="mt-1 text-[13px] leading-snug text-gray-500">
@@ -543,49 +525,17 @@ function TopTitlesPanel({
   );
 }
 
-/**
- * The biggest day. Its timeline is UTC instants with no zone, so there are no
- * clock times here: solo ticks are placed by elapsed time from the first.
- */
+/** The biggest day: when it was, then how it went (see `BigDayTimeline`). */
 function BigDayPanel({
   bigDay,
   soloTickTotal,
 }: {
   bigDay: NonNullable<SeriesFinalePayload["bigDay"]>;
-  /** The period's solo ticks: the number the timeline's floor is judged on. */
   soloTickTotal: number;
 }) {
-  const spread = bigDay.timeline
-    ? timelineSpread(bigDay.timeline.map((point) => point.at))
-    : null;
-
   return (
     <Panel title="Biggest day" intro={bigDayLine(bigDay)}>
-      {bigDay.timeline === null ? (
-        <p className="text-xs leading-relaxed text-gray-500">
-          {soloTickDisclosure(soloTickTotal)}
-        </p>
-      ) : spread === null ? (
-        <p className="text-xs leading-relaxed text-gray-500">
-          Too few of these were ticked one at a time to say how the day went.
-        </p>
-      ) : (
-        <>
-          <div aria-hidden="true" className="relative h-10">
-            <div className="absolute inset-x-0 top-1/2 h-px bg-gray-700" />
-            {spread.offsets.map((offset, index) => (
-              <span
-                key={index}
-                className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-500 ring-2 ring-gray-900"
-                style={{ left: `${offset}%` }}
-              />
-            ))}
-          </div>
-          <p className="mt-3 text-xs leading-relaxed text-gray-500">
-            {timelineLine(bigDay.soloTickCount, spread.minutes)}
-          </p>
-        </>
-      )}
+      <BigDayTimeline bigDay={bigDay} soloTickTotal={soloTickTotal} />
     </Panel>
   );
 }
