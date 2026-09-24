@@ -2,15 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   alsoTopForLine,
+  archetypeDescription,
   archetypeDetail,
   archetypeName,
   bigDayLine,
-  droppedIntro,
   formatCount,
   formatDateKey,
   formatDateRange,
   formatHoursMinutes,
-  formatPeriodRange,
   heroSentence,
   monthLabel,
   monthName,
@@ -19,7 +18,11 @@ import {
   overlapLine,
   peakMonth,
   percentileLine,
+  periodRange,
   pluralise,
+  SHAME_PLANNING_LINK,
+  shameIntro,
+  soloTickDisclosure,
   streakLabel,
   timelineLine,
   timelineSpread,
@@ -117,7 +120,7 @@ describe("archetypeName", () => {
 });
 
 describe("archetypeDetail", () => {
-  it("states the top weekday's share and the late share", () => {
+  it("states the top weekday's share and the solo-tick late share", () => {
     expect(
       archetypeDetail(
         rhythm({
@@ -127,7 +130,7 @@ describe("archetypeDetail", () => {
         }),
       ),
     ).toBe(
-      "26% of your episodes landed on a Sunday, and 41% of everything after 21:00. Mondays you watched nothing.",
+      "26% of your episodes landed on a Sunday. 41% of the episodes you ticked one at a time came after 21:00. Mondays had no episodes.",
     );
   });
 
@@ -139,13 +142,25 @@ describe("archetypeDetail", () => {
     ).toBe("40% of your episodes landed on a Sunday.");
   });
 
-  it("names every weekday with nothing on it", () => {
+  it("states the late share alone when there is no top weekday", () => {
+    expect(
+      archetypeDetail(
+        rhythm({
+          weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
+          topWeekday: null,
+          lateShare: 0.6,
+        }),
+      ),
+    ).toBe("60% of the episodes you ticked one at a time came after 21:00.");
+  });
+
+  it("names every weekday with no episodes on it", () => {
     expect(
       archetypeDetail(
         rhythm({ weekdayCounts: [0, 0, 5, 5, 5, 5, 10], lateShare: null }),
       ),
     ).toBe(
-      "33% of your episodes landed on a Sunday. Mondays and Tuesdays you watched nothing.",
+      "33% of your episodes landed on a Sunday. Mondays and Tuesdays had no episodes.",
     );
   });
 
@@ -159,6 +174,32 @@ describe("archetypeDetail", () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("archetypeDescription", () => {
+  it("leads with the archetype's blurb, then what the weekday strip shows", () => {
+    expect(
+      archetypeDescription(
+        "weekday-marathoner",
+        rhythm({ weekdayCounts: [1, 1, 1, 1, 1, 1, 4], lateShare: null }),
+      ),
+    ).toBe(
+      "One day a week does most of the work. 40% of your episodes landed on a Sunday.",
+    );
+  });
+
+  it("is the blurb alone when rhythm has nothing to add", () => {
+    expect(
+      archetypeDescription(
+        "completionist",
+        rhythm({
+          weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
+          topWeekday: null,
+          lateShare: null,
+        }),
+      ),
+    ).toBe("Once you start something you see it through, whatever it costs.");
   });
 });
 
@@ -206,32 +247,14 @@ describe("formatDateRange", () => {
   });
 });
 
-describe("formatPeriodRange", () => {
-  it("formats a UTC year", () => {
-    expect(
-      formatPeriodRange(
-        { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z" },
-        "UTC",
-      ),
-    ).toBe("1 January – 31 December 2026");
+describe("periodRange", () => {
+  it("spans the calendar year its label names", () => {
+    expect(periodRange("2026")).toBe("1 January – 31 December 2026");
+    expect(periodRange("1999")).toBe("1 January – 31 December 1999");
   });
 
-  it("reads bounds west of UTC in the user's zone", () => {
-    expect(
-      formatPeriodRange(
-        { start: "2026-01-01T08:00:00.000Z", end: "2027-01-01T08:00:00.000Z" },
-        "America/Los_Angeles",
-      ),
-    ).toBe("1 January – 31 December 2026");
-  });
-
-  it("reads bounds east of UTC in the user's zone", () => {
-    expect(
-      formatPeriodRange(
-        { start: "2025-12-31T11:00:00.000Z", end: "2026-12-31T11:00:00.000Z" },
-        "Pacific/Auckland",
-      ),
-    ).toBe("1 January – 31 December 2026");
+  it("says nothing for a label that is not a year", () => {
+    expect(periodRange("spring-2026")).toBe("");
   });
 });
 
@@ -252,31 +275,24 @@ describe("heroSentence", () => {
   const input = {
     headline: { episodes: 1208, minutes: 24720 },
     finished: { films: 31 },
-    rhythm: { topWeekday: 6, lateShare: 0.62 },
+    rhythm: { topWeekday: 6 },
   };
 
   it("builds the mock's sentence from the payload", () => {
     expect(heroSentence(input)).toBe(
-      "1,208 episodes and 31 films, mostly on Sundays, mostly after nine. Seventeen straight days of screen, if you had done it all at once.",
-    );
-  });
-
-  it("drops the after-nine clause unless late viewing is a majority", () => {
-    expect(
-      heroSentence({ ...input, rhythm: { topWeekday: 6, lateShare: 0.41 } }),
-    ).toBe(
-      "1,208 episodes and 31 films, mostly on Sundays. Seventeen straight days of screen, if you had done it all at once.",
+      "1,208 episodes, most often on Sundays, and 31 films. Seventeen straight days of screen, if you had done it all at once.",
     );
   });
 
   it("drops clauses whose data is null", () => {
-    expect(
-      heroSentence({
-        ...input,
-        rhythm: { topWeekday: null, lateShare: null },
-      }),
-    ).toBe(
+    expect(heroSentence({ ...input, rhythm: { topWeekday: null } })).toBe(
       "1,208 episodes and 31 films. Seventeen straight days of screen, if you had done it all at once.",
+    );
+  });
+
+  it("keeps the weekday with the episodes when there are no films", () => {
+    expect(heroSentence({ ...input, finished: { films: 0 } })).toBe(
+      "1,208 episodes, most often on Sundays. Seventeen straight days of screen, if you had done it all at once.",
     );
   });
 
@@ -285,7 +301,7 @@ describe("heroSentence", () => {
       heroSentence({
         headline: { episodes: 0, minutes: 1500 },
         finished: { films: 1 },
-        rhythm: { topWeekday: null, lateShare: null },
+        rhythm: { topWeekday: 3 },
       }),
     ).toBe(
       "1 film. One straight day of screen, if you had done it all at once.",
@@ -297,7 +313,7 @@ describe("heroSentence", () => {
       heroSentence({
         headline: { episodes: 12, minutes: 600 },
         finished: { films: 0 },
-        rhythm: { topWeekday: null, lateShare: null },
+        rhythm: { topWeekday: null },
       }),
     ).toBe("12 episodes.");
   });
@@ -329,21 +345,71 @@ describe("bigDayLine", () => {
   });
 });
 
-describe("droppedIntro", () => {
+describe("shameIntro", () => {
+  const show = (lastEpisode: string | null) => ({
+    tmdbId: 1,
+    title: "Foundation",
+    lastEpisode,
+  });
+  const film = { tmdbId: 2, title: "Stalker", days: 892, runtime: 161 };
+
   it("counts the dropped shows and points at the tipping episodes", () => {
-    expect(droppedIntro(6, true)).toBe(
+    expect(
+      shameIntro({
+        dropped: Array.from({ length: 6 }, () => show("S2E03")),
+        stillPlanning: [],
+      }),
+    ).toBe(
       "Six shows marked dropped. These episodes were what tipped you over the edge.",
     );
   });
 
   it("singularises one", () => {
-    expect(droppedIntro(1, true)).toBe(
+    expect(shameIntro({ dropped: [show("S2E03")], stillPlanning: [] })).toBe(
       "One show marked dropped. This episode was what tipped you over the edge.",
     );
   });
 
   it("does not point at episodes it cannot name", () => {
-    expect(droppedIntro(2, false)).toBe("Two shows marked dropped.");
+    expect(
+      shameIntro({ dropped: [show(null), show(null)], stillPlanning: [] }),
+    ).toBe("Two shows marked dropped.");
+  });
+
+  it("speaks about the waiting films when nothing was dropped", () => {
+    expect(shameIntro({ dropped: [], stillPlanning: [film] })).toBe(
+      "Nothing dropped this year. These films, on the other hand, are still waiting.",
+    );
+  });
+
+  it("has nothing to say about an empty list", () => {
+    expect(shameIntro({ dropped: [], stillPlanning: [] })).toBeNull();
+  });
+
+  it("links the dropped shows to the waiting films", () => {
+    expect(SHAME_PLANNING_LINK).toBe(
+      "And even after giving up on those, you still didn't find time for these.",
+    );
+  });
+});
+
+describe("soloTickDisclosure", () => {
+  it("quotes the year's solo ticks", () => {
+    expect(soloTickDisclosure(12)).toBe(
+      "Only 12 episodes this year were ticked one at a time — too few to put on a clock.",
+    );
+  });
+
+  it("singularises one", () => {
+    expect(soloTickDisclosure(1)).toBe(
+      "Only 1 episode this year was ticked one at a time — too few to put on a clock.",
+    );
+  });
+
+  it("says none plainly", () => {
+    expect(soloTickDisclosure(0)).toBe(
+      "No episodes this year were ticked one at a time, so there is nothing to put on a clock.",
+    );
   });
 });
 

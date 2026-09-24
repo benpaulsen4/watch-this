@@ -11,7 +11,6 @@ import type {
   ArchetypeId,
   SeriesFinalePayload,
 } from "@/lib/series-finale/types";
-import { getTimezoneDateKey, resolveTimeZone } from "@/lib/time";
 
 import { ARCHETYPE_LABELS } from "./ARCHETYPE_LABELS";
 
@@ -169,12 +168,10 @@ function percentOf(part: number, whole: number): number {
 }
 
 /**
- * What the weekday chart under the archetype shows, in words: the top
- * weekday's share, the share of solo ticks from 21:00, and any weekday with
- * nothing on it.
- *
- * `lateShare` is over the whole week, not over the top weekday -- so this says
- * "41% of everything", never the mock's "41% of those".
+ * What the weekday strip under the archetype shows, in words, saying exactly
+ * what `rhythm` measures: weekday counts are episodes, and `lateShare` is the
+ * share of episodes ticked one at a time that came from 21:00 -- batch ticks
+ * carry no real time of day, so they are not in it.
  */
 export function archetypeDetail(
   rhythm: Pick<Payload["rhythm"], "weekdayCounts" | "topWeekday" | "lateShare">,
@@ -182,22 +179,20 @@ export function archetypeDetail(
   const total = rhythm.weekdayCounts.reduce((sum, count) => sum + count, 0);
   const sentences: string[] = [];
 
-  const late =
-    rhythm.lateShare === null ? null : percentOf(rhythm.lateShare, 1);
   const topCount =
     rhythm.topWeekday === null
       ? undefined
       : rhythm.weekdayCounts[rhythm.topWeekday];
-
   if (rhythm.topWeekday !== null && topCount !== undefined && total > 0) {
-    const share = `${percentOf(topCount, total)}% of your episodes landed on a ${weekdayName(rhythm.topWeekday)}`;
     sentences.push(
-      late === null
-        ? `${share}.`
-        : `${share}, and ${late}% of everything after 21:00.`,
+      `${percentOf(topCount, total)}% of your episodes landed on a ${weekdayName(rhythm.topWeekday)}.`,
     );
-  } else if (late !== null) {
-    sentences.push(`${late}% of your episodes landed after 21:00.`);
+  }
+
+  if (rhythm.lateShare !== null) {
+    sentences.push(
+      `${percentOf(rhythm.lateShare, 1)}% of the episodes you ticked one at a time came after 21:00.`,
+    );
   }
 
   if (total > 0) {
@@ -205,11 +200,21 @@ export function archetypeDetail(
       count === 0 ? [`${weekdayName(index)}s`] : [],
     );
     if (empty.length > 0) {
-      sentences.push(`${joinWithAnd(empty)} you watched nothing.`);
+      sentences.push(`${joinWithAnd(empty)} had no episodes.`);
     }
   }
 
   return sentences.length > 0 ? sentences.join(" ") : null;
+}
+
+/** The archetype's blurb, then what the weekday strip shows. */
+export function archetypeDescription(
+  archetype: ArchetypeId,
+  rhythm: Pick<Payload["rhythm"], "weekdayCounts" | "topWeekday" | "lateShare">,
+): string {
+  const detail = archetypeDetail(rhythm);
+  const { blurb } = ARCHETYPE_LABELS[archetype];
+  return detail ? `${blurb} ${detail}` : blurb;
 }
 
 /** "16h 42m", "8h", "42m". */
@@ -266,41 +271,14 @@ export function formatDateRange(startKey: string, endKey: string): string {
   return `${short(start)} – ${short(end)}`;
 }
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 /**
- * "1 January – 31 December 2026" from `payload.period`, whose bounds are the
- * user's local midnights stored as UTC instants (end exclusive). Read in the
- * user's zone they land on the calendar days they were computed from;
- * formatted in UTC they would be a day early anywhere east of Greenwich.
+ * "1 January – 31 December 2026". Every period is a calendar year, so the
+ * range comes from the label. The payload's bounds are instants localised to
+ * whatever zone the user had when the snapshot froze, and nothing records that
+ * zone -- reading them in today's zone could shift either end by a day.
  */
-export function formatPeriodRange(
-  period: Pick<Payload["period"], "start" | "end">,
-  timeZone: string,
-): string {
-  const zone = resolveTimeZone(timeZone);
-  const startInstant = new Date(period.start);
-  const endInstant = new Date(period.end);
-  if (
-    Number.isNaN(startInstant.getTime()) ||
-    Number.isNaN(endInstant.getTime())
-  ) {
-    return "";
-  }
-
-  const start = parseDateKey(getTimezoneDateKey(startInstant, zone));
-  const endExclusive = parseDateKey(getTimezoneDateKey(endInstant, zone));
-  if (!start || !endExclusive) return "";
-
-  const end = new Date(endExclusive.getTime() - MS_PER_DAY);
-  const day = (date: Date) =>
-    `${date.getUTCDate()} ${monthName(date.getUTCMonth() + 1)}`;
-  const startYear =
-    start.getUTCFullYear() === end.getUTCFullYear()
-      ? ""
-      : ` ${start.getUTCFullYear()}`;
-
-  return `${day(start)}${startYear} – ${day(end)} ${end.getUTCFullYear()}`;
+export function periodRange(label: string): string {
+  return /^\d{4}$/.test(label) ? `1 January – 31 December ${label}` : "";
 }
 
 /**
@@ -313,36 +291,37 @@ export function percentileLine(percentile: number | null): string | null {
 }
 
 /**
- * The hero's sentence: "1,208 episodes and 31 films, mostly on Sundays, mostly
- * after nine. Seventeen straight days of screen, if you had done it all at
- * once." Each clause appears only when the payload backs it -- "after nine"
- * only when late viewing is a majority.
+ * The hero's sentence: "1,208 episodes, most often on Sundays, and 31 films.
+ * Seventeen straight days of screen, if you had done it all at once." The
+ * weekday rides with the episodes because that is what `weekdayCounts`
+ * counts; each clause appears only when the payload backs it.
  */
 export function heroSentence(input: {
   headline: Pick<Payload["headline"], "episodes" | "minutes">;
   finished: Pick<Payload["finished"], "films">;
-  rhythm: Pick<Payload["rhythm"], "topWeekday" | "lateShare">;
+  rhythm: Pick<Payload["rhythm"], "topWeekday">;
 }): string {
-  const counts = [
-    input.headline.episodes > 0
-      ? pluralise(input.headline.episodes, "episode")
-      : null,
-    input.finished.films > 0 ? pluralise(input.finished.films, "film") : null,
-  ].filter((part): part is string => part !== null);
+  const { episodes, minutes } = input.headline;
+  const { films } = input.finished;
+  const { topWeekday } = input.rhythm;
 
-  const sentences: string[] = [];
-  if (counts.length > 0) {
-    const clauses = [counts.join(" and ")];
-    if (input.rhythm.topWeekday !== null) {
-      clauses.push(`mostly on ${weekdayName(input.rhythm.topWeekday)}s`);
+  let counts = "";
+  if (episodes > 0) {
+    counts = pluralise(episodes, "episode");
+    if (topWeekday !== null) {
+      counts += `, most often on ${weekdayName(topWeekday)}s`;
+      if (films > 0) counts += ",";
     }
-    if (input.rhythm.lateShare !== null && input.rhythm.lateShare > 0.5) {
-      clauses.push("mostly after nine");
-    }
-    sentences.push(`${clauses.join(", ")}.`);
+  }
+  if (films > 0) {
+    counts = counts
+      ? `${counts} and ${pluralise(films, "film")}`
+      : pluralise(films, "film");
   }
 
-  const days = Math.floor(input.headline.minutes / (24 * 60));
+  const sentences = counts ? [`${counts}.`] : [];
+
+  const days = Math.floor(minutes / (24 * 60));
   if (days > 0) {
     sentences.push(
       `${capitalise(numberWords(days))} straight ${days === 1 ? "day" : "days"} of screen, if you had done it all at once.`,
@@ -373,16 +352,50 @@ export function bigDayLine(
     .join(" · ");
 }
 
-/**
- * "Six shows marked dropped. These episodes were what tipped you over the
- * edge." The second sentence only when at least one show names its episode.
- */
-export function droppedIntro(count: number, namesEpisodes: boolean): string {
+function droppedIntro(count: number, namesEpisodes: boolean): string {
   const shows = `${capitalise(numberWords(count))} ${count === 1 ? "show" : "shows"} marked dropped.`;
   if (!namesEpisodes) return shows;
   return count === 1
     ? `${shows} This episode was what tipped you over the edge.`
     : `${shows} These episodes were what tipped you over the edge.`;
+}
+
+/**
+ * The abandonment panel's opening line: the dropped shows when there are any
+ * ("Six shows marked dropped. These episodes were what tipped you over the
+ * edge." -- the second sentence only when a show names its episode), otherwise
+ * the waiting films, never "0 shows". Null when there is nothing to say.
+ */
+export function shameIntro(
+  shame: Pick<Payload["shame"], "dropped" | "stillPlanning">,
+): string | null {
+  const { dropped, stillPlanning } = shame;
+  if (dropped.length > 0) {
+    return droppedIntro(
+      dropped.length,
+      dropped.some((show) => show.lastEpisode !== null),
+    );
+  }
+  if (stillPlanning.length > 0) {
+    return "Nothing dropped this year. These films, on the other hand, are still waiting.";
+  }
+  return null;
+}
+
+/** Between the dropped shows and the waiting films, when there are both. */
+export const SHAME_PLANNING_LINK =
+  "And even after giving up on those, you still didn't find time for these.";
+
+/**
+ * Why the biggest day has no timeline: the whole period's solo ticks fell
+ * below `SOLO_TICK_FLOOR`. Quotes `soloTickTotal`, the number actually
+ * compared against the floor -- not the day's own count.
+ */
+export function soloTickDisclosure(soloTickTotal: number): string {
+  if (soloTickTotal === 0) {
+    return "No episodes this year were ticked one at a time, so there is nothing to put on a clock.";
+  }
+  return `Only ${pluralise(soloTickTotal, "episode")} this year ${soloTickTotal === 1 ? "was" : "were"} ticked one at a time — too few to put on a clock.`;
 }
 
 /** "an" for the percentages read aloud with a vowel: 8, 11, 18, 80-89. */

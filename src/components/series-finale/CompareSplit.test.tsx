@@ -24,6 +24,27 @@ describe("CompareSplit", () => {
     expect(screen.getByText("28")).toBeInTheDocument();
     expect(screen.getByText("only ana")).toBeInTheDocument();
   });
+
+  it("draws the recap's discs by default", () => {
+    render(<CompareSplit peer={peer} />);
+
+    expect(screen.getByText("62").closest("[data-disc]")).toHaveClass(
+      "h-[108px]",
+    );
+    expect(screen.getByText("34").closest("[data-disc]")).toHaveClass(
+      "h-[72px]",
+    );
+  });
+
+  it("draws the story's larger discs when asked", () => {
+    render(<CompareSplit peer={peer} size="large" />);
+
+    expect(screen.getByText("62").closest("[data-disc]")).toHaveClass("h-32");
+    expect(screen.getByText("34").closest("[data-disc]")).toHaveClass(
+      "h-[88px]",
+    );
+    expect(screen.getByText("28").closest("[data-disc]")).toHaveClass("h-32");
+  });
 });
 
 describe("CompareFacts", () => {

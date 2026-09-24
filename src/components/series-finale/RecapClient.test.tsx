@@ -12,7 +12,7 @@ const wrapper = ({ children }: { children: ReactNode }) => {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 };
 
-const viewer = { username: "ben", profilePictureUrl: "", timezone: "UTC" };
+const viewer = { username: "ben", profilePictureUrl: "" };
 
 const payload = (overrides: Record<string, unknown> = {}) => ({
   schemaVersion: 1,
@@ -136,6 +136,23 @@ describe("RecapClient", () => {
     );
   });
 
+  it("dates the year from its label, not from the snapshot's instants", async () => {
+    mockFetch({
+      payload: payload({
+        // Bounds localised to Auckland at generation: read in UTC they would
+        // start on 31 December.
+        period: { start: "2025-12-31T11:00:00.000Z", end: "2026-12-31T11:00:00.000Z", label: "2026" },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("ben · 1 January – 31 December 2026"),
+      ).toBeInTheDocument(),
+    );
+  });
+
   it("describes the year in a sentence built from the payload", async () => {
     mockFetch({
       payload: payload({
@@ -147,7 +164,7 @@ describe("RecapClient", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "1,208 episodes and 31 films, mostly on Sundays, mostly after nine. Seventeen straight days of screen, if you had done it all at once.",
+          "1,208 episodes, most often on Sundays, and 31 films. Seventeen straight days of screen, if you had done it all at once.",
         ),
       ).toBeInTheDocument(),
     );
@@ -265,7 +282,7 @@ describe("RecapClient", () => {
     );
     expect(
       screen.getByText(
-        "One day a week does most of the work. 50% of your episodes landed on a Sunday, and 41% of everything after 21:00.",
+        "One day a week does most of the work. 50% of your episodes landed on a Sunday. 41% of the episodes you ticked one at a time came after 21:00.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -433,9 +450,10 @@ describe("RecapClient", () => {
     expect(screen.getByText("35%")).toBeInTheDocument();
   });
 
-  it("describes the biggest day, and why there is no timeline for batch ticks", async () => {
+  it("describes the biggest day, and why there is no timeline", async () => {
     mockFetch({
       payload: payload({
+        soloTickTotal: 12,
         bigDay: {
           date: "2026-03-14", episodes: 11, minutes: 500, timeline: null,
           soloTickCount: 0, streak: null,
@@ -450,7 +468,9 @@ describe("RecapClient", () => {
       ).toBeInTheDocument(),
     );
     expect(
-      screen.getByText(/ticked off in batches/),
+      screen.getByText(
+        "Only 12 episodes this year were ticked one at a time — too few to put on a clock.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -477,10 +497,10 @@ describe("RecapClient", () => {
         ),
       ).toBeInTheDocument(),
     );
-    expect(screen.queryByText(/ticked off in batches/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/too few to put on a clock/)).not.toBeInTheDocument();
   });
 
-  it("ranks the crew by hours, with the viewer's row from the headline", async () => {
+  it("ranks the crew by episodes, with the viewer's row from the headline", async () => {
     mockFetch({
       payload: payload({
         crew: [
@@ -494,7 +514,8 @@ describe("RecapClient", () => {
     await waitFor(() => expect(screen.getByText("ana")).toBeInTheDocument());
     expect(screen.getByText("marcus")).toBeInTheDocument();
     expect(screen.getByText("you")).toBeInTheDocument();
-    expect(screen.getByText("412h")).toBeInTheDocument();
+    expect(screen.getByText("1,208 episodes")).toBeInTheDocument();
+    expect(screen.getByText("1,041 episodes")).toBeInTheDocument();
     expect(
       screen.getByText(
         "Everyone you share a list with. Nobody asked to be ranked.",

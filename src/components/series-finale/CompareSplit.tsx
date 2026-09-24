@@ -1,4 +1,5 @@
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
+import { cn } from "@/lib/utils";
 
 import { formatCount } from "./format";
 
@@ -9,42 +10,113 @@ import { formatCount } from "./format";
 type Peer = SeriesFinalePayload["compare"][number];
 
 /**
+ * Disc geometry and type per surface: "default" is the recap's panel (1e),
+ * "large" the story's card (1c). Only the classes differ; the content and the
+ * red / gradient / purple treatment are one implementation.
+ */
+const SIZES = {
+  default: {
+    outer: "h-[108px] w-[108px]",
+    you: "-mr-[34px] pr-9 border-red-600/45 bg-red-600/20",
+    them: "-ml-[34px] pl-9 border-purple-500/40 bg-purple-500/20",
+    outerCount: "text-[19px] text-gray-100",
+    outerLabel: "mt-1 text-[11px] text-gray-400",
+    themLabelWidth: "max-w-[4.25rem]",
+    middle: "h-[72px] w-[72px] shadow-[0_8px_24px_-6px_rgba(220,38,38,0.6)]",
+    middleCount: "text-[21px]",
+    middleLabel: "mt-0.5 text-[10px] text-white/80",
+  },
+  large: {
+    outer: "h-32 w-32",
+    you: "-mr-10 pr-[42px] border-red-400/45 bg-red-600/25",
+    them: "-ml-10 pl-[42px] border-purple-400/40 bg-purple-500/20",
+    outerCount: "text-2xl text-white",
+    outerLabel: "mt-1 text-[11px] text-white/60",
+    themLabelWidth: "max-w-[5rem]",
+    middle: "h-[88px] w-[88px] shadow-[0_10px_30px_-8px_rgba(220,38,38,0.7)]",
+    middleCount: "text-[26px]",
+    middleLabel: "mt-[3px] text-[11px] text-white/80",
+  },
+} as const;
+
+/**
  * Titles finished in the period: only you, both of you, only them -- as the
  * mock's three overlapping discs, with the shared middle on top.
  */
 export function CompareSplit({
   peer,
+  size = "default",
 }: {
   peer: Pick<Peer, "username" | "onlyYou" | "both" | "onlyThem">;
+  size?: keyof typeof SIZES;
 }) {
+  const styles = SIZES[size];
+
   return (
     <div className="flex items-center justify-center">
-      <div className="-mr-[34px] flex h-[108px] w-[108px] flex-none items-center justify-center rounded-full border border-red-600/45 bg-red-600/20 pr-9">
+      <div
+        data-disc=""
+        className={cn(
+          "flex flex-none items-center justify-center rounded-full border",
+          styles.outer,
+          styles.you,
+        )}
+      >
         <div className="text-center">
-          <div className="text-[19px] leading-none font-bold text-gray-100 tabular-nums">
+          <div
+            className={cn(
+              "leading-none font-bold tabular-nums",
+              styles.outerCount,
+            )}
+          >
             {formatCount(peer.onlyYou)}
           </div>
-          <div className="mt-1 text-[11px] leading-none text-gray-400">
-            only you
-          </div>
+          <div className={cn("leading-none", styles.outerLabel)}>only you</div>
         </div>
       </div>
-      <div className="relative z-10 flex h-[72px] w-[72px] flex-none items-center justify-center rounded-full bg-gradient-to-br from-red-600 to-orange-500 shadow-[0_8px_24px_-6px_rgba(220,38,38,0.6)]">
+      <div
+        data-disc=""
+        className={cn(
+          "relative z-10 flex flex-none items-center justify-center rounded-full bg-gradient-to-br from-red-600 to-orange-500",
+          styles.middle,
+        )}
+      >
         <div className="text-center">
-          <div className="text-[21px] leading-none font-bold text-white tabular-nums">
+          <div
+            className={cn(
+              "leading-none font-bold text-white tabular-nums",
+              styles.middleCount,
+            )}
+          >
             {formatCount(peer.both)}
           </div>
-          <div className="mt-0.5 text-[10px] leading-none text-white/80">
-            both
-          </div>
+          <div className={cn("leading-none", styles.middleLabel)}>both</div>
         </div>
       </div>
-      <div className="-ml-[34px] flex h-[108px] w-[108px] flex-none items-center justify-center rounded-full border border-purple-500/40 bg-purple-500/20 pl-9">
+      <div
+        data-disc=""
+        className={cn(
+          "flex flex-none items-center justify-center rounded-full border",
+          styles.outer,
+          styles.them,
+        )}
+      >
         <div className="min-w-0 text-center">
-          <div className="text-[19px] leading-none font-bold text-gray-100 tabular-nums">
+          <div
+            className={cn(
+              "leading-none font-bold tabular-nums",
+              styles.outerCount,
+            )}
+          >
             {formatCount(peer.onlyThem)}
           </div>
-          <div className="mt-1 max-w-[4.25rem] truncate text-[11px] leading-none text-gray-400">
+          <div
+            className={cn(
+              "truncate leading-none",
+              styles.outerLabel,
+              styles.themLabelWidth,
+            )}
+          >
             only {peer.username}
           </div>
         </div>

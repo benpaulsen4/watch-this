@@ -22,19 +22,16 @@ import type {
 import { getImageUrl } from "@/lib/tmdb/client";
 import { cn } from "@/lib/utils";
 
-import { ARCHETYPE_LABELS } from "./ARCHETYPE_LABELS";
 import { BarChart } from "./BarChart";
 import { CompareFacts, CompareSplit } from "./CompareSplit";
 import { CrewRanking } from "./CrewRanking";
 import {
   alsoTopForLine,
-  archetypeDetail,
+  archetypeDescription,
   archetypeName,
   bigDayLine,
-  droppedIntro,
   formatCount,
   formatHoursMinutes,
-  formatPeriodRange,
   heroSentence,
   monthLabel,
   monthName,
@@ -42,7 +39,11 @@ import {
   overlapLine,
   peakMonth,
   percentileLine,
+  periodRange,
   pluralise,
+  SHAME_PLANNING_LINK,
+  shameIntro,
+  soloTickDisclosure,
   streakLabel,
   timelineLine,
   timelineSpread,
@@ -58,7 +59,7 @@ import { TmdbAttribution } from "./TmdbAttribution";
 /** The profile rows that open this page live on the profile's data tab. */
 const PROFILE_DATA_TAB = "/profile#data";
 
-type Viewer = Pick<User, "username" | "profilePictureUrl" | "timezone">;
+type Viewer = Pick<User, "username" | "profilePictureUrl">;
 
 interface RecapClientProps {
   period: string;
@@ -190,7 +191,12 @@ function RecapBody({
           ) : null}
         </Band>
         <Band>
-          {bigDay ? <BigDayPanel bigDay={bigDay} /> : null}
+          {bigDay ? (
+            <BigDayPanel
+              bigDay={bigDay}
+              soloTickTotal={payload.soloTickTotal}
+            />
+          ) : null}
           {hasShame ? <ShamePanel shame={shame} /> : null}
         </Band>
         <Band>
@@ -203,7 +209,7 @@ function RecapBody({
                 viewer={{
                   username: user.username,
                   profilePictureUrl: user.profilePictureUrl,
-                  hours: payload.headline.hours,
+                  episodes: payload.headline.episodes,
                 }}
                 crew={payload.crew}
               />
@@ -322,7 +328,7 @@ function Hero({
       />
       <Container className="relative pt-16 pb-[76px] text-center">
         <p className="mb-6 text-xs font-semibold tracking-[0.28em] text-white/50 uppercase">
-          {user.username} · {formatPeriodRange(payload.period, user.timezone)}
+          {user.username} · {periodRange(payload.period.label)}
         </p>
         <p className="text-7xl leading-[0.86] font-bold tracking-[-0.055em] text-gray-50 tabular-nums sm:text-9xl">
           <span>{formatCount(payload.headline.hours)}</span>
@@ -411,12 +417,7 @@ function ArchetypePanel({
   rhythm: SeriesFinalePayload["rhythm"];
 }) {
   const name = archetypeName({ archetype, topWeekday: rhythm.topWeekday });
-  const description = [
-    ARCHETYPE_LABELS[archetype].blurb,
-    archetypeDetail(rhythm),
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const description = archetypeDescription(archetype, rhythm);
 
   return (
     <Panel title="Your type">
@@ -548,8 +549,11 @@ function TopTitlesPanel({
  */
 function BigDayPanel({
   bigDay,
+  soloTickTotal,
 }: {
   bigDay: NonNullable<SeriesFinalePayload["bigDay"]>;
+  /** The period's solo ticks: the number the timeline's floor is judged on. */
+  soloTickTotal: number;
 }) {
   const spread = bigDay.timeline
     ? timelineSpread(bigDay.timeline.map((point) => point.at))
@@ -559,9 +563,7 @@ function BigDayPanel({
     <Panel title="Biggest day" intro={bigDayLine(bigDay)}>
       {bigDay.timeline === null ? (
         <p className="text-xs leading-relaxed text-gray-500">
-          No hour-by-hour breakdown for this one. Most of these were ticked off
-          in batches, which says more about how you use the app than how you
-          watch.
+          {soloTickDisclosure(soloTickTotal)}
         </p>
       ) : spread === null ? (
         <p className="text-xs leading-relaxed text-gray-500">
@@ -595,21 +597,13 @@ function ShamePanel({ shame }: { shame: SeriesFinalePayload["shame"] }) {
   const { dropped, stillPlanning } = shame;
 
   const planning = stillPlanning.slice(0, PLANNING_SHOWN);
-  const intro =
-    dropped.length > 0
-      ? droppedIntro(
-          dropped.length,
-          dropped.some((show) => show.lastEpisode !== null),
-        )
-      : "Nothing dropped this year. These films, on the other hand, are still waiting.";
 
   return (
-    <Panel title="Walked out on" intro={intro}>
+    <Panel title="Walked out on" intro={shameIntro(shame)}>
       {dropped.length > 0 ? <DroppedBadges shows={dropped} /> : null}
       {dropped.length > 0 && planning.length > 0 ? (
         <p className="mt-4 mb-2.5 text-sm text-gray-400">
-          And even after giving up on those, you still didn&apos;t find time for
-          these.
+          {SHAME_PLANNING_LINK}
         </p>
       ) : null}
       {planning.length > 0 ? <PlanningBadges films={planning} /> : null}

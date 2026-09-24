@@ -22,10 +22,10 @@ vi.mock("@/components/series-finale/RecapClient", () => ({
     user,
   }: {
     period: string;
-    user: { username: string; timezone: string };
+    user: { username: string };
   }) => (
     <div>
-      recap {period} for {user.username} in {user.timezone}
+      recap {period} for {user.username}
     </div>
   ),
 }));
@@ -48,9 +48,7 @@ describe("SeriesFinalePage", () => {
     render(await SeriesFinalePage(params("2026")));
 
     expect(requireUser).toHaveBeenCalledWith("/series-finale/2026");
-    expect(
-      screen.getByText("recap 2026 for ben in Europe/London"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("recap 2026 for ben")).toBeInTheDocument();
   });
 
   it("is a 404 for a segment that is not a period", async () => {

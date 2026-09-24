@@ -2,7 +2,7 @@ import { ProfileImage } from "@/components/ui/ProfileImage";
 import type { CrewMemberTotals } from "@/lib/series-finale/types";
 import { cn } from "@/lib/utils";
 
-import { formatCount } from "./format";
+import { pluralise } from "./format";
 
 /**
  * Crew data: renders only inside the authenticated recap and story, never in
@@ -11,9 +11,13 @@ import { formatCount } from "./format";
 interface CrewRankingProps {
   /**
    * The signed-in user's own row. The payload's `crew` never contains the
-   * viewer, so their hours come from `headline`, not from crew data.
+   * viewer, so their count comes from `headline.episodes`, not crew data.
    */
-  viewer: { username: string; profilePictureUrl: string | null; hours: number };
+  viewer: {
+    username: string;
+    profilePictureUrl: string | null;
+    episodes: number;
+  };
   crew: CrewMemberTotals[];
 }
 
@@ -21,14 +25,17 @@ interface Row {
   key: string;
   username: string;
   profilePictureUrl: string | null;
-  hours: number;
+  episodes: number;
   isViewer: boolean;
 }
 
 /**
  * Everyone who shares a list with the viewer, the viewer included, ranked by
- * the hours shown beside them -- the viewer first on a tie. Bars are drawn
- * against the leader; the name and hours are the text, the bar decoration.
+ * episodes -- the viewer first on a tie. Not hours: the viewer's headline
+ * hours include films, while a collaborator's hours count episodes only, so
+ * the two do not compare. Episodes do, and match the server's crew order.
+ * Bars are drawn against the leader; the name and count are the text, the bar
+ * decoration.
  */
 export function CrewRanking({ viewer, crew }: CrewRankingProps) {
   const rows: Row[] = [
@@ -36,20 +43,21 @@ export function CrewRanking({ viewer, crew }: CrewRankingProps) {
       key: "viewer",
       username: viewer.username,
       profilePictureUrl: viewer.profilePictureUrl,
-      hours: viewer.hours,
+      episodes: viewer.episodes,
       isViewer: true,
     },
     ...crew.map((member) => ({
       key: member.userId,
       username: member.username,
       profilePictureUrl: null,
-      hours: member.hours,
+      episodes: member.episodes,
       isViewer: false,
     })),
   ].sort(
-    (a, b) => b.hours - a.hours || Number(b.isViewer) - Number(a.isViewer),
+    (a, b) =>
+      b.episodes - a.episodes || Number(b.isViewer) - Number(a.isViewer),
   );
-  const leader = Math.max(...rows.map((row) => row.hours), 0);
+  const leader = Math.max(...rows.map((row) => row.episodes), 0);
 
   return (
     <ol className="flex flex-col gap-3">
@@ -79,12 +87,12 @@ export function CrewRanking({ viewer, crew }: CrewRankingProps) {
                   row.isViewer ? "text-gray-100" : "text-gray-300",
                 )}
               >
-                {formatCount(row.hours)}h
+                {pluralise(row.episodes, "episode")}
               </span>
             </div>
             <div aria-hidden="true" className="h-1.5 rounded-full bg-gray-700">
               <div
-                data-hours-bar=""
+                data-episodes-bar=""
                 className={cn(
                   "h-full rounded-full",
                   row.isViewer
@@ -95,7 +103,7 @@ export function CrewRanking({ viewer, crew }: CrewRankingProps) {
                   width:
                     leader === 0
                       ? "0%"
-                      : `${Math.round((row.hours / leader) * 100)}%`,
+                      : `${Math.round((row.episodes / leader) * 100)}%`,
                 }}
               />
             </div>
