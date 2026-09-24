@@ -308,6 +308,19 @@ describe("StoryCard", () => {
     expect(screen.queryByText(/joined/)).not.toBeInTheDocument();
   });
 
+  it("shows the crew's top five plus the viewer, as the mock does", () => {
+    renderCard("crew", {
+      headline: { hours: 1, minutes: 60, episodes: 5, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: null },
+      crew: ["a", "b", "c", "d", "e", "f", "g", "h"].map((name, index) =>
+        member(name, 800 - index * 10),
+      ),
+    });
+    expect(screen.getAllByRole("listitem")).toHaveLength(6);
+    expect(screen.getByText("you")).toBeInTheDocument();
+    expect(screen.queryByText("f")).not.toBeInTheDocument();
+    expect(screen.getByText("And three more.")).toBeInTheDocument();
+  });
+
   it("compares with the closest peer and swaps to the others", async () => {
     renderCard("compare", {
       compare: [peer("ana", 34), peer("marcus", 5)],

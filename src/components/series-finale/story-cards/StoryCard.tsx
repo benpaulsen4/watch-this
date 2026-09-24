@@ -116,7 +116,8 @@ function Enter({
 }
 
 /**
- * One full-bleed card over its wash. `align="end"` sits the content low, as
+ * One full-bleed card over its wash, never shorter than the screen and never
+ * cut short by it. `align="end"` sits the content low, as
  * the hours card does; `centred` centres it. TMDB attribution rides on every
  * card that shows their metadata.
  */
@@ -134,17 +135,17 @@ function Shell({
   children: ReactNode;
 }) {
   return (
-    <div data-card={id} className="absolute inset-0 bg-gray-950">
+    <div data-card={id} className="relative min-h-dvh bg-gray-950">
       <div
         aria-hidden="true"
         className={cn("pointer-events-none absolute inset-0", WASH[id])}
       />
       <div
         className={cn(
-          "absolute inset-0 flex flex-col overflow-hidden px-[30px]",
-          align === "end"
-            ? "justify-end pb-[92px]"
-            : "justify-center-safe pt-24 pb-10",
+          // At least the viewport, growing with the content: a tall card makes
+          // the page scroll instead of hiding its bottom.
+          "relative flex min-h-dvh flex-col px-[30px] pt-24",
+          align === "end" ? "justify-end pb-[92px]" : "justify-center pb-10",
           centred && "items-center text-center",
         )}
       >
@@ -208,6 +209,9 @@ function bigFigureSize(text: string, sizes: [string, string, string]): string {
 }
 
 const BODY = "text-lg leading-normal text-pretty text-white/80";
+
+/** The story's crew card lists this many, plus the viewer (the mock's five). */
+const CREW_SHOWN = 5;
 
 export function StoryCard({
   id,
@@ -553,6 +557,7 @@ export function StoryCard({
           <Enter delay={140}>
             <CrewRanking
               size="large"
+              limit={CREW_SHOWN}
               viewer={{
                 username: viewer.username,
                 profilePictureUrl: viewer.profilePictureUrl,
@@ -717,7 +722,7 @@ function CompareCard({ compare }: { compare: Payload["compare"] }) {
   const overlap = overlapLine(peer);
 
   return (
-    <Shell id="compare">
+    <Shell id="compare" tmdb>
       <Eyebrow className="mb-3.5">You &amp; {peer.username}</Eyebrow>
       {headline ? <Headline className="mb-[30px]">{headline}</Headline> : null}
       <Enter kind="riseLarge" delay={160}>

@@ -140,6 +140,11 @@ export function StoryReel({ period, user }: StoryReelProps) {
     [cards.length],
   );
 
+  // Each card starts at its top, however far down the last one was read.
+  useEffect(() => {
+    (document.scrollingElement ?? document.documentElement).scrollTop = 0;
+  }, [index]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       // Alt+Arrow is the browser's own back and forward.
@@ -155,7 +160,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
   if (isLoading) {
     return (
       <Frame>
-        <div className="flex h-full items-center justify-center">
+        <div className="flex min-h-dvh items-center justify-center">
           <LoadingSpinner text="Putting your year together" />
         </div>
       </Frame>
@@ -165,7 +170,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
   if (error instanceof SeriesFinaleUnavailableError) {
     return (
       <Frame>
-        <div className="flex h-full items-center px-4">
+        <div className="flex min-h-dvh items-center px-4">
           <UnavailableNotice period={period} />
         </div>
       </Frame>
@@ -175,7 +180,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
   if (error || !payload) {
     return (
       <Frame onClose={close}>
-        <div className="flex h-full items-center px-4">
+        <div className="flex min-h-dvh items-center px-4">
           <LoadFailedNotice />
         </div>
       </Frame>
@@ -185,7 +190,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
   if (payload.thin) {
     return (
       <Frame onClose={close}>
-        <div className="flex h-full items-center px-4">
+        <div className="flex min-h-dvh items-center px-4">
           <ThinYearCard
             label={payload.period.label}
             episodes={payload.headline.episodes}
@@ -203,30 +208,36 @@ export function StoryReel({ period, user }: StoryReelProps) {
   return (
     <Frame onClose={close} progress={{ position, total: cards.length }}>
       {/* A stable live region, so each new card is read out as it arrives. */}
-      <div aria-live="polite" className="absolute inset-0">
+      <div aria-live="polite">
         {/* Keyed by card so each one's entrance plays when it arrives. */}
         <div
           key={current}
           role="group"
           aria-roledescription="card"
           aria-label={`Card ${position + 1} of ${cards.length}`}
-          className="absolute inset-0"
         >
           <StoryCard id={current} payload={payload} viewer={user} />
         </div>
       </div>
 
-      {/* The mock's film grain and scan line, over the card, under the taps. */}
+      {/*
+        The mock's film grain and scan line, over the card, under the taps. The
+        clipping wrapper keeps the drifting grain from widening the page; it
+        holds no content, so it never cuts a card short.
+      */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle,rgba(255,255,255,0.10)_1px,transparent_1px)] bg-[length:3px_3px] opacity-30 motion-safe:animate-[wt-grain_7s_steps(10)_infinite]"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(255,255,255,0.06),transparent)] bg-[length:100%_140px] opacity-20 motion-safe:animate-[wt-scan_7s_linear_infinite]"
-      />
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle,rgba(255,255,255,0.10)_1px,transparent_1px)] bg-[length:3px_3px] opacity-30 motion-safe:animate-[wt-grain_7s_steps(10)_infinite]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(255,255,255,0.06),transparent)] bg-[length:100%_140px] opacity-20 motion-safe:animate-[wt-scan_7s_linear_infinite]" />
+      </div>
 
-      {/* Tap zones: buttons, so they are named and reachable without a pointer. */}
+      {/*
+        Tap zones: buttons, so they are named and reachable without a pointer.
+        They span the whole card however tall it grows; a touch drag over them
+        still scrolls the page.
+      */}
       <button
         type="button"
         aria-label="Previous card"
@@ -258,10 +269,15 @@ function Frame({
 }) {
   return (
     <div className="flex min-h-dvh justify-center bg-gray-950">
-      <div className="relative h-dvh w-full max-w-md overflow-hidden bg-gray-950 select-none">
+      {/*
+        At least one screen tall, and taller when a card needs it: the page
+        scrolls rather than a card losing its bottom (attribution included).
+      */}
+      <div className="relative min-h-dvh w-full max-w-md bg-gray-950 select-none">
         {children}
 
-        <div className="absolute inset-x-4 top-3 z-20">
+        {/* Fixed, so the progress and the close control stay in reach. */}
+        <div className="fixed inset-x-0 top-0 z-20 mx-auto w-full max-w-md bg-gradient-to-b from-gray-950/80 to-transparent px-4 pt-3 pb-2">
           {progress ? (
             <div className="flex gap-1">
               {Array.from({ length: progress.total }, (_, bar) => {

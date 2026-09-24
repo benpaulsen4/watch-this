@@ -80,6 +80,33 @@ const walk = async (container: HTMLElement) => {
   return seen;
 };
 
+/**
+ * The first ancestor that would cut a tall card short: one that hides or clips
+ * vertical overflow, or pins the card to the viewport's height. jsdom has no
+ * layout, so this reads the classes that would.
+ */
+const clippingAncestor = (element: HTMLElement) => {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (
+      /(^|\s)(overflow-(y-)?(hidden|clip)|h-dvh|h-screen)(\s|$)/.test(
+        node.className,
+      )
+    ) {
+      return node.className;
+    }
+  }
+  return null;
+};
+
+/** Steps forward until the named card is showing. */
+const advanceTo = async (container: HTMLElement, card: string) => {
+  for (let step = 0; step < REEL_ORDER.length; step += 1) {
+    if (currentCard(container) === card) return;
+    await userEvent.keyboard("{ArrowRight}");
+  }
+  throw new Error(`never reached ${card}`);
+};
+
 beforeEach(() => push.mockClear());
 
 afterEach(() => {
@@ -156,6 +183,32 @@ describe("StoryReel", () => {
       "intro", "hours", "episodes", "finished", "topShow", "niche", "genres",
       "months", "bigDay", "rhythm", "shame", "crew", "compare", "summary",
     ]);
+  });
+
+  it("never cuts a tall card short: attribution and controls stay reachable", async () => {
+    const full = fullPayload();
+    mockFetch({
+      payload: {
+        ...full,
+        compare: [
+          ...full.compare,
+          { userId: "u3", username: "marcus", onlyYou: 80, both: 10, onlyThem: 40, theyFinishedYouDropped: null, bothPlanningNeitherStarted: null },
+        ],
+      },
+    });
+    const { container } = renderReel();
+    await waitFor(() => expect(screen.getByText("Series Finale")).toBeInTheDocument());
+
+    for (const card of ["topShow", "niche", "genres", "shame", "compare"]) {
+      await advanceTo(container, card);
+      expect(clippingAncestor(screen.getByAltText("TMDB"))).toBeNull();
+    }
+    expect(
+      clippingAncestor(screen.getByRole("button", { name: "marcus" })),
+    ).toBeNull();
+    // The chrome still works from a grown page.
+    expect(screen.getByRole("button", { name: /close/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(14);
   });
 
   it("stays put at either end rather than wrapping", async () => {

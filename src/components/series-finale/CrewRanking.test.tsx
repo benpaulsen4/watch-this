@@ -98,4 +98,42 @@ describe("CrewRanking", () => {
     expect(barWidths(container)).toEqual([]);
     expect(screen.getByText("900 episodes")).toBeInTheDocument();
   });
+
+  it("lists the top rows plus the viewer when limited, counting the rest", () => {
+    const { container } = render(
+      <CrewRanking
+        viewer={{ username: "ben", profilePictureUrl: "", episodes: 10 }}
+        crew={[
+          member("a1", 900, 0), member("a2", 800, 0), member("a3", 700, 0),
+          member("a4", 600, 0), member("a5", 500, 0), member("a6", 400, 0),
+          member("a7", 300, 0),
+        ]}
+        size="large"
+        limit={5}
+      />,
+    );
+
+    expect(names()).toEqual(["a1", "a2", "a3", "a4", "a5", "you"]);
+    const ranks = Array.from(container.querySelectorAll("[data-rank]")).map(
+      (rank) => rank.textContent,
+    );
+    expect(ranks).toEqual(["1", "2", "3", "4", "5", "8"]);
+    expect(screen.getByText("And two more.")).toBeInTheDocument();
+  });
+
+  it("needs no extra row when the viewer is already in the top rows", () => {
+    render(
+      <CrewRanking
+        viewer={{ username: "ben", profilePictureUrl: "", episodes: 1000 }}
+        crew={[
+          member("a1", 900, 0), member("a2", 800, 0), member("a3", 700, 0),
+          member("a4", 600, 0), member("a5", 500, 0),
+        ]}
+        limit={5}
+      />,
+    );
+
+    expect(names()).toEqual(["you", "a1", "a2", "a3", "a4"]);
+    expect(screen.getByText("And one more.")).toBeInTheDocument();
+  });
 });
