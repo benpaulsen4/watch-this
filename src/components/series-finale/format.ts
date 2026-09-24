@@ -245,16 +245,23 @@ function utcWeekdayIndex(date: Date): number {
   return (date.getUTCDay() + 6) % 7;
 }
 
-/** "14 March", or "Saturday 14 March". "" for a malformed key. */
+/**
+ * "14 March", "Saturday 14 March", or with `short` "14 Mar" / "Sat 14 Mar".
+ * "" for a malformed key.
+ */
 export function formatDateKey(
   key: string,
-  options: { weekday?: boolean } = {},
+  options: { weekday?: boolean; short?: boolean } = {},
 ): string {
   const date = parseDateKey(key);
   if (!date) return "";
 
-  const day = `${date.getUTCDate()} ${monthName(date.getUTCMonth() + 1)}`;
-  return options.weekday ? `${weekdayName(utcWeekdayIndex(date))} ${day}` : day;
+  const month = date.getUTCMonth() + 1;
+  const day = `${date.getUTCDate()} ${options.short ? monthLabel(month) : monthName(month)}`;
+  if (!options.weekday) return day;
+
+  const weekday = weekdayName(utcWeekdayIndex(date));
+  return `${options.short ? weekday.slice(0, 3) : weekday} ${day}`;
 }
 
 /** "2–24 Jan", "28 Jan – 3 Feb", "14 Mar". Keys are in the user's zone. */
@@ -620,6 +627,17 @@ export function hoursLine(minutes: number): string {
 }
 
 /**
+ * The line under the story's finished count, set against the titles dropped:
+ * "things, all the way to the end. Which is more impressive than it sounds,
+ * given six others did not make it."
+ */
+export function finishedLine(finished: number, dropped: number): string {
+  const line = `${finished === 1 ? "thing" : "things"}, all the way to the end.`;
+  if (dropped <= 0) return line;
+  return `${line} Which is more impressive than it sounds, given ${numberWords(dropped)} ${dropped === 1 ? "other" : "others"} did not make it.`;
+}
+
+/**
  * The average rate over the whole period -- never "every day": plenty of
  * episodes are batch-ticked, and plenty of days have none.
  */
@@ -735,8 +753,9 @@ export function crewHeadline(
 ): string | null {
   if (crew.length === 0) return null;
 
-  const beaten = crew.filter((member) => member.episodes < viewerEpisodes)
-    .length;
+  const beaten = crew.filter(
+    (member) => member.episodes < viewerEpisodes,
+  ).length;
   if (beaten === 0) return "You out-watched nobody. It is not a race.";
   if (beaten === crew.length) {
     return beaten === 1

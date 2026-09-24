@@ -12,6 +12,7 @@ import {
   crewHeadline,
   dateKeyWeekday,
   episodesPerDayLine,
+  finishedLine,
   formatCount,
   formatDateKey,
   formatDateRange,
@@ -244,6 +245,13 @@ describe("formatDateKey", () => {
   it("can lead with the weekday", () => {
     expect(formatDateKey("2026-03-14", { weekday: true })).toBe(
       "Saturday 14 March",
+    );
+  });
+
+  it("can shorten the month and the weekday", () => {
+    expect(formatDateKey("2026-03-14", { short: true })).toBe("14 Mar");
+    expect(formatDateKey("2026-03-14", { short: true, weekday: true })).toBe(
+      "Sat 14 Mar",
     );
   });
 
@@ -860,5 +868,20 @@ describe("compareHeadline", () => {
 
   it("says nothing when neither of you finished anything", () => {
     expect(compareHeadline({ onlyYou: 0, both: 0, onlyThem: 0 })).toBeNull();
+  });
+});
+
+describe("finishedLine", () => {
+  it("counts what did not make it, from the dropped titles", () => {
+    expect(finishedLine(47, 6)).toBe(
+      "things, all the way to the end. Which is more impressive than it sounds, given six others did not make it.",
+    );
+    expect(finishedLine(1, 1)).toBe(
+      "thing, all the way to the end. Which is more impressive than it sounds, given one other did not make it.",
+    );
+  });
+
+  it("leaves the comparison out when nothing was dropped", () => {
+    expect(finishedLine(47, 0)).toBe("things, all the way to the end.");
   });
 });
