@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 
 import { ARCHETYPE_LABELS } from "./ARCHETYPE_LABELS";
 import { BarChart } from "./BarChart";
+import { CompareFacts, CompareSplit } from "./CompareSplit";
+import { CrewRanking } from "./CrewRanking";
 import {
   alsoTopForLine,
   archetypeDetail,
@@ -34,6 +36,7 @@ import {
   monthLabel,
   monthName,
   nicheLine,
+  overlapLine,
   peakMonth,
   percentileLine,
   pluralise,
@@ -174,6 +177,24 @@ function RecapBody({
         <Band>
           <BigDayPanel bigDay={payload.bigDay} />
           <ShamePanel shame={payload.shame} />
+        </Band>
+        <Band>
+          {payload.crew.length > 0 ? (
+            <Panel
+              title="The crew"
+              intro="Everyone you share a list with. Nobody asked to be ranked."
+            >
+              <CrewRanking
+                viewer={{
+                  username: user.username,
+                  profilePictureUrl: user.profilePictureUrl,
+                  hours: payload.headline.hours,
+                }}
+                crew={payload.crew}
+              />
+            </Panel>
+          ) : null}
+          <ComparePanel compare={payload.compare} />
         </Band>
         <Footer />
       </Container>
@@ -574,6 +595,25 @@ function ShamePanel({ shame }: { shame: SeriesFinalePayload["shame"] }) {
         </p>
       ) : null}
       {planning.length > 0 ? <PlanningBadges films={planning} /> : null}
+    </Panel>
+  );
+}
+
+/** The peer you overlap with most: `compare` arrives ordered by `both`. */
+function ComparePanel({
+  compare,
+}: {
+  compare: SeriesFinalePayload["compare"];
+}) {
+  const [peer] = compare;
+  if (!peer) return null;
+
+  return (
+    <Panel title={`You & ${peer.username}`} intro={overlapLine(peer)}>
+      <CompareSplit peer={peer} />
+      <div className="mt-auto pt-5">
+        <CompareFacts peer={peer} />
+      </div>
     </Panel>
   );
 }

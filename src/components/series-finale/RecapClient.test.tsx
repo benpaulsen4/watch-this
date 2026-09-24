@@ -479,4 +479,87 @@ describe("RecapClient", () => {
     );
     expect(screen.queryByText(/ticked off in batches/)).not.toBeInTheDocument();
   });
+
+  it("ranks the crew by hours, with the viewer's row from the headline", async () => {
+    mockFetch({
+      payload: payload({
+        crew: [
+          { userId: "u1", username: "ana", episodes: 1041, hours: 358 },
+          { userId: "u2", username: "marcus", episodes: 760, hours: 241 },
+        ],
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("ana")).toBeInTheDocument());
+    expect(screen.getByText("marcus")).toBeInTheDocument();
+    expect(screen.getByText("you")).toBeInTheDocument();
+    expect(screen.getByText("412h")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Everyone you share a list with. Nobody asked to be ranked.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the crew panel when nobody is sharing", async () => {
+    mockFetch({ payload: payload({ crew: [] }) });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(screen.queryByText(/The crew/)).not.toBeInTheDocument();
+  });
+
+  it("renders the overlap split for a peer", async () => {
+    mockFetch({
+      payload: payload({
+        compare: [
+          {
+            userId: "u1", username: "ana", onlyYou: 62, both: 34, onlyThem: 28,
+            theyFinishedYouDropped: null, bothPlanningNeitherStarted: null,
+          },
+        ],
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("34")).toBeInTheDocument());
+    expect(screen.getByText("You & ana")).toBeInTheDocument();
+    expect(
+      screen.getByText("34 titles in common out of 124. A 27% overlap."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/finished, you dropped/)).not.toBeInTheDocument();
+  });
+
+  it("compares with the closest peer only, and states the facts it has", async () => {
+    mockFetch({
+      payload: payload({
+        compare: [
+          {
+            userId: "u1", username: "ana", onlyYou: 62, both: 34, onlyThem: 28,
+            theyFinishedYouDropped: "Foundation", bothPlanningNeitherStarted: null,
+          },
+          {
+            userId: "u2", username: "marcus", onlyYou: 90, both: 6, onlyThem: 12,
+            theyFinishedYouDropped: null, bothPlanningNeitherStarted: null,
+          },
+        ],
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("ana finished, you dropped")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("You & marcus")).not.toBeInTheDocument();
+    expect(screen.queryByText(/On both lists/)).not.toBeInTheDocument();
+  });
+
+  it("omits the comparison when there is nobody to compare with", async () => {
+    mockFetch({ payload: payload({ compare: [] }) });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(screen.queryByText(/^You &/)).not.toBeInTheDocument();
+  });
 });
