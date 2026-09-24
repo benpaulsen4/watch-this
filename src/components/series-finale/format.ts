@@ -52,6 +52,11 @@ export function monthLabel(month: number): string {
   return monthName(month).slice(0, 3);
 }
 
+/** One-letter month label, for the story's twelve narrow bars. */
+export function monthInitial(month: number): string {
+  return monthName(month).slice(0, 1);
+}
+
 /** Weekday name for a Monday-first index; "" out of range. */
 export function weekdayName(index: number): string {
   return WEEKDAY_NAMES[index] ?? "";
@@ -281,6 +286,11 @@ export function periodRange(label: string): string {
   return /^\d{4}$/.test(label) ? `1 January – 31 December ${label}` : "";
 }
 
+/** Whole days of screen time, back to back: the hero's and the story's figure. */
+function straightDays(minutes: number): number {
+  return Math.floor(minutes / (24 * 60));
+}
+
 /**
  * Only the top half is told where they rank: "Top 96% of everyone" is not a
  * line anyone wants read back to them.
@@ -321,7 +331,7 @@ export function heroSentence(input: {
 
   const sentences = counts ? [`${counts}.`] : [];
 
-  const days = Math.floor(minutes / (24 * 60));
+  const days = straightDays(minutes);
   if (days > 0) {
     sentences.push(
       `${capitalise(numberWords(days))} straight ${days === 1 ? "day" : "days"} of screen, if you had done it all at once.`,
@@ -419,6 +429,19 @@ export function overlapLine(
   return `${pluralise(peer.both, "title")} in common out of ${formatCount(total)}. ${articleFor(percent)} ${percent}% overlap.`;
 }
 
+/** The films the niche pick is compared against: how many, and their median. */
+function nicheOthers(
+  niche: Pick<
+    NonNullable<Payload["niche"]>,
+    "medianPopularity" | "filmPopularities"
+  >,
+): { count: number; median: number } {
+  return {
+    count: niche.filmPopularities.length - 1,
+    median: Math.round(niche.medianPopularity),
+  };
+}
+
 /** The niche film's comparison line, against the other films finished. */
 export function nicheLine(
   niche: Pick<
@@ -426,14 +449,44 @@ export function nicheLine(
     "medianPopularity" | "filmPopularities"
   >,
 ): string {
-  const others = niche.filmPopularities.length - 1;
-  const median = Math.round(niche.medianPopularity);
+  const others = nicheOthers(niche);
 
-  if (others <= 0) return "The only film you finished";
-  if (others === 1) {
-    return `Your most obscure watch — your other film was at ${median}`;
+  if (others.count <= 0) return "The only film you finished";
+  if (others.count === 1) {
+    return `Your most obscure watch — your other film was at ${others.median}`;
   }
-  return `Your most obscure watch — median for your other ${formatCount(others)} films was ${median}`;
+  return `Your most obscure watch — median for your other ${formatCount(others.count)} films was ${others.median}`;
+}
+
+/**
+ * The story's niche card: the same comparison as `nicheLine`, led by the
+ * film's own score. "TMDB popularity 2.1, against a median of 68 for the
+ * other 30 films you finished."
+ */
+export function nicheComparison(
+  niche: Pick<
+    NonNullable<Payload["niche"]>,
+    "popularity" | "medianPopularity" | "filmPopularities"
+  >,
+): string {
+  const own = `TMDB popularity ${niche.popularity.toFixed(1)}`;
+  const others = nicheOthers(niche);
+
+  if (others.count <= 0) return `${own}. The only film you finished.`;
+  if (others.count === 1) {
+    return `${own}, against ${others.median} for the other film you finished.`;
+  }
+  return `${own}, against a median of ${others.median} for the other ${formatCount(others.count)} films you finished.`;
+}
+
+/** "Most famous: Dune: Part Two, popularity 412". */
+export function mostFamousLine(
+  mostPopular: Pick<
+    NonNullable<NonNullable<Payload["niche"]>["mostPopular"]>,
+    "title" | "popularity"
+  >,
+): string {
+  return `Most famous: ${mostPopular.title}, popularity ${Math.round(mostPopular.popularity)}`;
 }
 
 /** The busiest month, the earlier on a tie; null when nothing was logged. */
@@ -453,6 +506,25 @@ export function peakMonth(
 export function alsoTopForLine(usernames: string[]): string | null {
   if (usernames.length === 0) return null;
   return `Also number one for ${joinWithAnd(usernames)}.`;
+}
+
+/**
+ * The story's follow-up to `alsoTopForLine`: everyone sharing the top show,
+ * counting the viewer -- "You two" for one other person, "You four" for three.
+ */
+export function newMaterialLine(othersCount: number): string | null {
+  if (othersCount <= 0) return null;
+  return `You ${numberWords(othersCount + 1)} need new material.`;
+}
+
+/** "38 episodes · 16h 42m", the time left out when no runtime is known. */
+export function topShowStats(
+  topShow: Pick<NonNullable<Payload["topShow"]>, "episodes" | "minutes">,
+): string {
+  const episodes = pluralise(topShow.episodes, "episode");
+  return topShow.minutes > 0
+    ? `${episodes} · ${formatHoursMinutes(topShow.minutes)}`
+    : episodes;
 }
 
 /**
@@ -486,4 +558,207 @@ export function timelineLine(soloTicks: number, minutes: number): string {
   return minutes > 0
     ? `${ticked}, ${formatHoursMinutes(minutes)} from first to last.`
     : `${ticked}.`;
+}
+
+/** When a non-null timeline still holds too few points to place on a line. */
+export const TIMELINE_TOO_FEW =
+  "Too few of these were ticked one at a time to say how the day went.";
+
+/** "Excludes 3 episodes with no runtime on TMDB", or null when none. */
+export function unknownRuntimeNote(count: number): string | null {
+  if (count <= 0) return null;
+  return `Excludes ${pluralise(count, "episode")} with no runtime on TMDB`;
+}
+
+// ---------------------------------------------------------------------------
+// The story's own sentences
+// ---------------------------------------------------------------------------
+
+/** A working day and a working month: four 40-hour weeks. */
+const WORKING_DAY_HOURS = 8;
+const WORKING_MONTH_HOURS = 160;
+
+/**
+ * The hours as a job: to the nearest half working month from three weeks of
+ * work (120 hours) up, otherwise to the nearest working day. Null under half
+ * a working day.
+ */
+function workingTime(hours: number): string | null {
+  if (hours >= 0.75 * WORKING_MONTH_HOURS) {
+    const halves = Math.round((hours / WORKING_MONTH_HOURS) * 2);
+    const whole = Math.floor(halves / 2);
+    if (halves % 2 === 1) {
+      return `${numberWords(whole)} and a half working months`;
+    }
+    return whole === 1
+      ? "one full working month"
+      : `${numberWords(whole)} full working months`;
+  }
+
+  const days = Math.round(hours / WORKING_DAY_HOURS);
+  if (days === 0) return null;
+  return days === 1 ? "one working day" : `${numberWords(days)} working days`;
+}
+
+/**
+ * The line under the story's hours figure: "in front of something. That is
+ * 17 straight days, or roughly two and a half working months if you had a job
+ * doing this." Built from minutes, so the conversions are not compounded from
+ * a rounded hours figure.
+ */
+export function hoursLine(minutes: number): string {
+  const days = straightDays(minutes);
+  const work = workingTime(minutes / 60);
+
+  if (days > 0 && work) {
+    return `in front of something. That is ${formatCount(days)} straight ${days === 1 ? "day" : "days"}, or roughly ${work} if you had a job doing this.`;
+  }
+  if (work) {
+    return `in front of something. That is roughly ${work}, if you had a job doing this.`;
+  }
+  return "in front of something.";
+}
+
+/**
+ * The average rate over the whole period -- never "every day": plenty of
+ * episodes are batch-ticked, and plenty of days have none.
+ */
+export function episodesPerDayLine(perDay: number): string | null {
+  if (perDay <= 0) return null;
+  if (perDay < 1) {
+    return `About one every ${Math.round(1 / perDay)} days, on average.`;
+  }
+  return `${perDay.toFixed(1)} a day, on average.`;
+}
+
+/** The quietest month, the earlier on a tie; null for an empty list. */
+export function quietestMonth(
+  months: Payload["months"],
+): Payload["months"][number] | null {
+  let quietest: Payload["months"][number] | null = null;
+  for (const month of months) {
+    if (!quietest || month.episodes < quietest.episodes) quietest = month;
+  }
+  return quietest;
+}
+
+/** A month is "not so much" at a quarter of the peak or less. */
+const QUIET_MONTH_SHARE = 0.25;
+
+/**
+ * The months card's headline, by a fixed rule on the counts:
+ * - months with nothing in them are named ("July did not", or "Four months
+ *   did not" for several);
+ * - otherwise a quietest month at a quarter of the peak or less is "not so
+ *   much";
+ * - otherwise the year was steady.
+ * Null when nothing was logged at all.
+ */
+export function monthsHeadline(months: Payload["months"]): string | null {
+  const peak = peakMonth(months);
+  const quietest = quietestMonth(months);
+  if (!peak || !quietest) return null;
+
+  const happened = `${monthName(peak.month)} happened.`;
+  const empty = months.filter((month) => month.episodes === 0);
+
+  if (empty.length > 1) {
+    return `${happened} ${capitalise(numberWords(empty.length))} months did not.`;
+  }
+  if (empty.length === 1) {
+    return `${happened} ${monthName(quietest.month)} did not.`;
+  }
+  if (quietest.episodes <= peak.episodes * QUIET_MONTH_SHARE) {
+    return `${happened} ${monthName(quietest.month)}, not so much.`;
+  }
+  return `A steady year, peaking in ${monthName(peak.month)}.`;
+}
+
+/** "Saturday" for "2026-03-14"; "" for a malformed key. */
+export function dateKeyWeekday(key: string): string {
+  const date = parseDateKey(key);
+  return date ? weekdayName(utcWeekdayIndex(date)) : "";
+}
+
+/** "Eleven episodes in one day, 8h 20m of screen." */
+export function bigDaySentence(
+  bigDay: Pick<NonNullable<Payload["bigDay"]>, "episodes" | "minutes">,
+): string {
+  const episodes = `${capitalise(numberWords(bigDay.episodes))} ${bigDay.episodes === 1 ? "episode" : "episodes"} in one day`;
+  return bigDay.minutes > 0
+    ? `${episodes}, ${formatHoursMinutes(bigDay.minutes)} of screen.`
+    : `${episodes}.`;
+}
+
+/** "Longest streak: 23 days, 2–24 Jan". */
+export function streakLine(
+  streak: NonNullable<NonNullable<Payload["bigDay"]>["streak"]>,
+): string {
+  return `Longest streak: ${pluralise(streak.days, "day")}, ${formatDateRange(streak.start, streak.end)}`;
+}
+
+/** "Blade Runner 2049, for 1,104 days. It is 164 minutes long." */
+export function planningLine(
+  film: Pick<
+    Payload["shame"]["stillPlanning"][number],
+    "title" | "days" | "runtime"
+  >,
+): string {
+  const waited = `${film.title}, for ${pluralise(film.days, "day")}.`;
+  return film.runtime
+    ? `${waited} It is ${pluralise(film.runtime, "minute")} long.`
+    : waited;
+}
+
+/** The waiting films behind the one the story names. */
+export function planningMoreLine(count: number): string | null {
+  if (count <= 0) return null;
+  return count === 1
+    ? "One more is waiting behind it."
+    : `${capitalise(numberWords(count))} more are waiting behind it.`;
+}
+
+/** "And four more." -- what a capped list left out. */
+export function andMore(count: number): string | null {
+  if (count <= 0) return null;
+  return `And ${numberWords(count)} more.`;
+}
+
+/**
+ * The crew card's headline, counting everyone with fewer EPISODES than the
+ * viewer (`headline.episodes`) -- the number the ranking shows. A tie is not
+ * out-watching. Null without a crew.
+ */
+export function crewHeadline(
+  viewerEpisodes: number,
+  crew: Pick<Payload["crew"][number], "episodes">[],
+): string | null {
+  if (crew.length === 0) return null;
+
+  const beaten = crew.filter((member) => member.episodes < viewerEpisodes)
+    .length;
+  if (beaten === 0) return "You out-watched nobody. It is not a race.";
+  if (beaten === crew.length) {
+    return beaten === 1
+      ? "You out-watched one person who was also trying"
+      : `You out-watched ${numberWords(beaten)} people who were also trying`;
+  }
+  return `You out-watched ${numberWords(beaten)} of the ${numberWords(crew.length)} people who were also trying`;
+}
+
+/**
+ * The compare card's headline, from the share of titles in common -- the
+ * same share `overlapLine` states: under 20% is almost none, under 50% is
+ * some, and half or more is mostly. Everyone compared shares a list with you.
+ */
+export function compareHeadline(
+  peer: Pick<Payload["compare"][number], "onlyYou" | "both" | "onlyThem">,
+): string | null {
+  const total = peer.onlyYou + peer.both + peer.onlyThem;
+  if (total === 0) return null;
+
+  const share = peer.both / total;
+  if (share >= 0.5) return "A shared list, and mostly shared taste";
+  if (share >= 0.2) return "A shared list, and some shared taste";
+  return "A shared list, and almost no shared taste";
 }

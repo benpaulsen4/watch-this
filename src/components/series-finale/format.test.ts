@@ -2,30 +2,49 @@ import { describe, expect, it } from "vitest";
 
 import {
   alsoTopForLine,
+  andMore,
   archetypeDescription,
   archetypeDetail,
   archetypeName,
   bigDayLine,
+  bigDaySentence,
+  compareHeadline,
+  crewHeadline,
+  dateKeyWeekday,
+  episodesPerDayLine,
   formatCount,
   formatDateKey,
   formatDateRange,
   formatHoursMinutes,
   heroSentence,
+  hoursLine,
+  monthInitial,
   monthLabel,
   monthName,
+  monthsHeadline,
+  mostFamousLine,
+  newMaterialLine,
+  nicheComparison,
   nicheLine,
   numberWords,
   overlapLine,
   peakMonth,
   percentileLine,
   periodRange,
+  planningLine,
+  planningMoreLine,
   pluralise,
+  quietestMonth,
   SHAME_PLANNING_LINK,
   shameIntro,
   soloTickDisclosure,
   streakLabel,
+  streakLine,
+  TIMELINE_TOO_FEW,
   timelineLine,
   timelineSpread,
+  topShowStats,
+  unknownRuntimeNote,
   weekdayInitial,
   weekdayName,
 } from "./format";
@@ -529,5 +548,317 @@ describe("timelineLine", () => {
       "8 of these were ticked one at a time, 9h 40m from first to last.",
     );
     expect(timelineLine(1, 0)).toBe("1 of these was ticked one at a time.");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The story's lines. Where a card states the same fact as a recap panel it
+// uses the recap's helper; these are the story's own sentences.
+// ---------------------------------------------------------------------------
+
+describe("monthInitial", () => {
+  it("gives the month's initial, empty out of range", () => {
+    expect(monthInitial(1)).toBe("J");
+    expect(monthInitial(3)).toBe("M");
+    expect(monthInitial(13)).toBe("");
+  });
+});
+
+describe("hoursLine", () => {
+  it("converts the hours into straight days and working months", () => {
+    // 412 hours: 17 whole days, and 412 / 160 = 2.6 working months.
+    expect(hoursLine(24720)).toBe(
+      "in front of something. That is 17 straight days, or roughly two and a half working months if you had a job doing this.",
+    );
+  });
+
+  it("rounds to the nearest half month and says 'full' for a whole one", () => {
+    expect(hoursLine(160 * 60)).toBe(
+      "in front of something. That is 6 straight days, or roughly one full working month if you had a job doing this.",
+    );
+    expect(hoursLine(330 * 60)).toBe(
+      "in front of something. That is 13 straight days, or roughly two full working months if you had a job doing this.",
+    );
+  });
+
+  it("counts working days under three weeks of work", () => {
+    expect(hoursLine(30 * 60)).toBe(
+      "in front of something. That is 1 straight day, or roughly four working days if you had a job doing this.",
+    );
+  });
+
+  it("drops the straight days under a full day", () => {
+    expect(hoursLine(6 * 60)).toBe(
+      "in front of something. That is roughly one working day, if you had a job doing this.",
+    );
+  });
+
+  it("says nothing more for a handful of hours", () => {
+    expect(hoursLine(3 * 60)).toBe("in front of something.");
+  });
+});
+
+describe("unknownRuntimeNote", () => {
+  it("discloses episodes the hours could not count", () => {
+    expect(unknownRuntimeNote(3)).toBe(
+      "Excludes 3 episodes with no runtime on TMDB",
+    );
+    expect(unknownRuntimeNote(1)).toBe(
+      "Excludes 1 episode with no runtime on TMDB",
+    );
+    expect(unknownRuntimeNote(0)).toBeNull();
+  });
+});
+
+describe("episodesPerDayLine", () => {
+  it("states the average, never 'every day'", () => {
+    expect(episodesPerDayLine(3.3)).toBe("3.3 a day, on average.");
+    expect(episodesPerDayLine(1)).toBe("1.0 a day, on average.");
+  });
+
+  it("turns a rate under one a day into a gap between episodes", () => {
+    expect(episodesPerDayLine(0.3)).toBe(
+      "About one every 3 days, on average.",
+    );
+  });
+
+  it("says nothing without episodes", () => {
+    expect(episodesPerDayLine(0)).toBeNull();
+  });
+});
+
+describe("topShowStats", () => {
+  it("counts the episodes and the time", () => {
+    expect(topShowStats({ episodes: 38, minutes: 1002 })).toBe(
+      "38 episodes · 16h 42m",
+    );
+  });
+
+  it("leaves out an unknown runtime", () => {
+    expect(topShowStats({ episodes: 1, minutes: 0 })).toBe("1 episode");
+  });
+});
+
+describe("newMaterialLine", () => {
+  it("counts everyone who shares the top show, the viewer included", () => {
+    expect(newMaterialLine(1)).toBe("You two need new material.");
+    expect(newMaterialLine(3)).toBe("You four need new material.");
+  });
+
+  it("says nothing when nobody shares it", () => {
+    expect(newMaterialLine(0)).toBeNull();
+  });
+});
+
+describe("nicheComparison", () => {
+  it("compares against the median of the other films", () => {
+    expect(
+      nicheComparison({
+        popularity: 2.14,
+        medianPopularity: 68.4,
+        filmPopularities: Array.from({ length: 31 }, () => 50),
+      }),
+    ).toBe(
+      "TMDB popularity 2.1, against a median of 68 for the other 30 films you finished.",
+    );
+  });
+
+  it("compares against a single other film directly", () => {
+    expect(
+      nicheComparison({
+        popularity: 2.1,
+        medianPopularity: 41.2,
+        filmPopularities: [2.1, 41.2],
+      }),
+    ).toBe("TMDB popularity 2.1, against 41 for the other film you finished.");
+  });
+
+  it("makes no comparison with nothing to compare against", () => {
+    expect(
+      nicheComparison({
+        popularity: 2.1,
+        medianPopularity: 2.1,
+        filmPopularities: [2.1],
+      }),
+    ).toBe("TMDB popularity 2.1. The only film you finished.");
+  });
+});
+
+describe("mostFamousLine", () => {
+  it("names the most popular film finished", () => {
+    expect(mostFamousLine({ title: "Dune: Part Two", popularity: 411.6 })).toBe(
+      "Most famous: Dune: Part Two, popularity 412",
+    );
+  });
+});
+
+describe("quietestMonth", () => {
+  it("picks the quietest month, the earlier one on a tie", () => {
+    expect(
+      quietestMonth([
+        { month: 1, episodes: 5 },
+        { month: 2, episodes: 3 },
+        { month: 3, episodes: 3 },
+      ]),
+    ).toEqual({ month: 2, episodes: 3 });
+  });
+
+  it("has none for an empty list", () => {
+    expect(quietestMonth([])).toBeNull();
+  });
+});
+
+describe("monthsHeadline", () => {
+  const months = (counts: number[]) =>
+    counts.map((episodes, index) => ({ month: index + 1, episodes }));
+
+  it("names the peak and the quietest month when the gap is at least fourfold", () => {
+    expect(monthsHeadline(months([90, 60, 174, 80, 40, 20, 29, 30, 60, 70, 80, 90]))).toBe(
+      "March happened. June, not so much.",
+    );
+  });
+
+  it("names an empty month outright", () => {
+    expect(monthsHeadline(months([90, 60, 174, 80, 40, 20, 0, 30, 60, 70, 80, 90]))).toBe(
+      "March happened. July did not.",
+    );
+  });
+
+  it("counts several empty months", () => {
+    expect(monthsHeadline(months([0, 0, 174, 80, 40, 20, 0, 30, 60, 70, 80, 0]))).toBe(
+      "March happened. Four months did not.",
+    );
+  });
+
+  it("calls an even year steady", () => {
+    expect(monthsHeadline(months([90, 60, 100, 80, 40, 50, 29, 30, 60, 70, 80, 90]))).toBe(
+      "A steady year, peaking in March.",
+    );
+  });
+
+  it("has nothing to say about an empty year", () => {
+    expect(monthsHeadline(months(Array.from({ length: 12 }, () => 0)))).toBeNull();
+  });
+});
+
+describe("dateKeyWeekday", () => {
+  it("names the weekday of a date key without a timezone shift", () => {
+    expect(dateKeyWeekday("2026-03-14")).toBe("Saturday");
+    expect(dateKeyWeekday("nonsense")).toBe("");
+  });
+});
+
+describe("bigDaySentence", () => {
+  it("counts the day's episodes and time", () => {
+    expect(bigDaySentence({ episodes: 11, minutes: 500 })).toBe(
+      "Eleven episodes in one day, 8h 20m of screen.",
+    );
+  });
+
+  it("leaves out an unknown runtime and singularises one", () => {
+    expect(bigDaySentence({ episodes: 1, minutes: 0 })).toBe(
+      "One episode in one day.",
+    );
+  });
+});
+
+describe("streakLine", () => {
+  it("dates the longest streak", () => {
+    expect(streakLine({ days: 23, start: "2026-01-02", end: "2026-01-24" })).toBe(
+      "Longest streak: 23 days, 2–24 Jan",
+    );
+    expect(streakLine({ days: 1, start: "2026-01-02", end: "2026-01-02" })).toBe(
+      "Longest streak: 1 day, 2 Jan",
+    );
+  });
+});
+
+describe("TIMELINE_TOO_FEW", () => {
+  it("does not imply a session from a short timeline", () => {
+    expect(TIMELINE_TOO_FEW).toBe(
+      "Too few of these were ticked one at a time to say how the day went.",
+    );
+  });
+});
+
+describe("planningLine", () => {
+  it("names the film, how long it has waited and how long it runs", () => {
+    expect(
+      planningLine({ title: "Blade Runner 2049", days: 1104, runtime: 164 }),
+    ).toBe("Blade Runner 2049, for 1,104 days. It is 164 minutes long.");
+  });
+
+  it("leaves out an unknown runtime and singularises", () => {
+    expect(planningLine({ title: "Heat", days: 1, runtime: null })).toBe(
+      "Heat, for 1 day.",
+    );
+    expect(planningLine({ title: "Heat", days: 2, runtime: 1 })).toBe(
+      "Heat, for 2 days. It is 1 minute long.",
+    );
+  });
+});
+
+describe("planningMoreLine", () => {
+  it("counts the films waiting behind the first", () => {
+    expect(planningMoreLine(1)).toBe("One more is waiting behind it.");
+    expect(planningMoreLine(4)).toBe("Four more are waiting behind it.");
+    expect(planningMoreLine(0)).toBeNull();
+  });
+});
+
+describe("andMore", () => {
+  it("counts what a list left out", () => {
+    expect(andMore(4)).toBe("And four more.");
+    expect(andMore(0)).toBeNull();
+  });
+});
+
+describe("crewHeadline", () => {
+  const crew = (...episodes: number[]) => episodes.map((count) => ({ episodes: count }));
+
+  it("counts everyone the viewer out-watched, by episodes", () => {
+    expect(crewHeadline(1208, crew(1041, 760, 512, 88))).toBe(
+      "You out-watched four people who were also trying",
+    );
+    expect(crewHeadline(1208, crew(88))).toBe(
+      "You out-watched one person who was also trying",
+    );
+  });
+
+  it("says how many of the crew when it is not all of them", () => {
+    expect(crewHeadline(600, crew(1041, 760, 512, 88))).toBe(
+      "You out-watched two of the four people who were also trying",
+    );
+  });
+
+  it("does not count a tie as out-watching", () => {
+    expect(crewHeadline(500, crew(500))).toBe(
+      "You out-watched nobody. It is not a race.",
+    );
+  });
+
+  it("says nothing without a crew", () => {
+    expect(crewHeadline(500, [])).toBeNull();
+  });
+});
+
+describe("compareHeadline", () => {
+  it("reads the overlap share by a fixed rule", () => {
+    // under 20% in common
+    expect(compareHeadline({ onlyYou: 62, both: 10, onlyThem: 28 })).toBe(
+      "A shared list, and almost no shared taste",
+    );
+    // 20% to under 50%
+    expect(compareHeadline({ onlyYou: 62, both: 34, onlyThem: 28 })).toBe(
+      "A shared list, and some shared taste",
+    );
+    // 50% and over
+    expect(compareHeadline({ onlyYou: 10, both: 30, onlyThem: 10 })).toBe(
+      "A shared list, and mostly shared taste",
+    );
+  });
+
+  it("says nothing when neither of you finished anything", () => {
+    expect(compareHeadline({ onlyYou: 0, both: 0, onlyThem: 0 })).toBeNull();
   });
 });
