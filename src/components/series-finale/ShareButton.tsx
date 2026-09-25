@@ -7,9 +7,18 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
-/** A `DOMException`-shaped rejection, without assuming the constructor. */
+/**
+ * The `name` of a `DOMException`-shaped rejection, by shape rather than by
+ * `instanceof`: a cancel read as an unknown failure would show failure copy
+ * and skip the NotAllowedError download fallback.
+ */
 function errorName(error: unknown): string | undefined {
-  return error instanceof Error ? error.name : undefined;
+  return typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    typeof error.name === "string"
+    ? error.name
+    : undefined;
 }
 
 async function fetchCardFile(period: string): Promise<File> {
@@ -25,10 +34,15 @@ async function fetchCardFile(period: string): Promise<File> {
 /**
  * The card query, shared between the mount-time prefetch and the click
  * handler's fallback fetch, so both agree on the same cache entry.
+ *
+ * Keyed by the username the card is drawn with, not just the period: a
+ * rename mid-session keeps the same user id, so the sign-in cache clear in
+ * AuthProvider does not fire, and the cached card would still carry the old
+ * name.
  */
-function cardQueryOptions(period: string) {
+function cardQueryOptions(period: string, username: string) {
   return queryOptions({
-    queryKey: ["series-finale-card", period] as const,
+    queryKey: ["series-finale-card", period, username] as const,
     queryFn: () => fetchCardFile(period),
     // A generated card is a snapshot: nothing to refetch for, and a failed
     // fetch should not spend retries a click will just repeat anyway.
@@ -39,6 +53,8 @@ function cardQueryOptions(period: string) {
 
 interface ShareButtonProps {
   period: string;
+  /** The viewer's username, which the server draws on the card. */
+  username: string;
   /** "Share" in the recap header, "Share your card" on the story's close. */
   label?: string;
   size?: "sm" | "lg";
@@ -59,11 +75,12 @@ interface ShareButtonProps {
  */
 export function ShareButton({
   period,
+  username,
   label = "Share",
   size = "sm",
 }: ShareButtonProps) {
   const queryClient = useQueryClient();
-  const options = cardQueryOptions(period);
+  const options = cardQueryOptions(period, username);
   const { data: cardFile } = useQuery(options);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);

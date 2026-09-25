@@ -90,6 +90,7 @@ export function SummaryCard({
       <Enter delay={160} className="relative z-20 mt-5 flex justify-center">
         <ShareButton
           period={summary.period.label}
+          username={viewer.username}
           label="Share your card"
           size="lg"
         />

@@ -79,7 +79,7 @@ export function RecapClient({ period, user }: RecapClientProps) {
             <Button variant="outline" size="sm" asChild>
               <Link href={`/series-finale/${period}/story`}>Play as story</Link>
             </Button>
-            <ShareButton period={period} />
+            <ShareButton period={period} username={user.username} />
           </>
         ) : null}
       </PageHeader>
