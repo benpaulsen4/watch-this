@@ -1,13 +1,11 @@
 import { Card } from "@/components/ui/Card";
 
+import { pluralise } from "./format";
+
 interface ThinYearCardProps {
   label: string;
   episodes: number;
   titles: number;
-}
-
-function pluralize(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 /**
@@ -25,7 +23,7 @@ export function ThinYearCard({ label, episodes, titles }: ThinYearCardProps) {
         Not much of a {label}
       </h2>
       <p className="mx-auto mt-3 max-w-md text-sm text-gray-400">
-        {pluralize(episodes, "episode")} and {pluralize(titles, "title")} is
+        {pluralise(episodes, "episode")} and {pluralise(titles, "title")} is
         not enough to reconstruct a year from. Keep ticking things off and
         next year will have more to say.
       </p>

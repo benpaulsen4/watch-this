@@ -42,7 +42,7 @@ interface Row {
 
 /**
  * Everyone who shares a list with the viewer, the viewer included, ranked by
- * episodes -- the viewer first on a tie. Not hours: the payload carries none
+ * episodes -- the viewer listed first on a tie, at the same rank. Not hours: the payload carries none
  * for collaborators (their consent covers what is shown, and hours are not),
  * and the viewer's include films. Episodes compare, and match the server's
  * crew order.
@@ -55,7 +55,7 @@ export function CrewRanking({
   size = "default",
   limit,
 }: CrewRankingProps) {
-  const ranked = [
+  const sorted = [
     {
       key: "viewer",
       username: viewer.username,
@@ -74,8 +74,16 @@ export function CrewRanking({
     .sort(
       (a, b) =>
         b.episodes - a.episodes || Number(b.isViewer) - Number(a.isViewer),
-    )
-    .map((row, index): Row => ({ ...row, rank: index + 1 }));
+    );
+  // Competition ranking (1, 1, 3): a tie shares a number, so the viewer
+  // listed first on a tie is not ranked above anyone -- as `crewHeadline`
+  // says, a tie is not out-watching.
+  const ranked = sorted.map(
+    (row): Row => ({
+      ...row,
+      rank: 1 + sorted.filter((other) => other.episodes > row.episodes).length,
+    }),
+  );
   const leader = Math.max(...ranked.map((row) => row.episodes), 0);
 
   const top = limit === undefined ? ranked : ranked.slice(0, limit);

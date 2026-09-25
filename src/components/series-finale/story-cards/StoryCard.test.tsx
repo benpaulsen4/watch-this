@@ -25,6 +25,11 @@ const payload = (overrides: Partial<SeriesFinalePayload> = {}) =>
 
 const viewer = { username: "ben", profilePictureUrl: "" };
 
+/** The default headline with its dropped count replaced. */
+const droppedCount = (titlesDropped: number) => ({
+  headline: { ...payload().headline, titlesDropped },
+});
+
 const renderCard = (
   id: Parameters<typeof StoryCard>[0]["id"],
   overrides: Partial<SeriesFinalePayload> = {},
@@ -65,7 +70,7 @@ describe("StoryCard", () => {
     expect(screen.getByText(/Top 4%/)).toBeInTheDocument();
     expect(
       screen.getByText(
-        "in front of something. That is 17 straight days, or roughly two and a half working months if you had a job doing this.",
+        "in front of something. That is seventeen straight days, or roughly two and a half working months if you had a job doing this.",
       ),
     ).toBeInTheDocument();
   });
@@ -83,7 +88,7 @@ describe("StoryCard", () => {
     });
     expect(screen.queryByText(/Top/)).not.toBeInTheDocument();
     expect(
-      screen.getByText("Excludes 14 episodes with no runtime on TMDB"),
+      screen.getByText("Excludes 14 episodes or films with no runtime on TMDB"),
     ).toBeInTheDocument();
   });
 
@@ -239,6 +244,7 @@ describe("StoryCard", () => {
 
   it("lists the dropped shows and the longest-waiting film", () => {
     renderCard("shame", {
+      ...droppedCount(2),
       shame: {
         dropped: [
           { tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" },
@@ -272,14 +278,37 @@ describe("StoryCard", () => {
     const dropped = Array.from({ length: 8 }, (_, index) => ({
       tmdbId: index, title: `Show ${index}`, lastEpisode: null,
     }));
-    renderCard("shame", { shame: { dropped, stillPlanning: [] } });
+    renderCard("shame", {
+      ...droppedCount(8),
+      shame: { dropped, stillPlanning: [] },
+    });
     expect(screen.getByText("Show 5")).toBeInTheDocument();
     expect(screen.queryByText("Show 6")).not.toBeInTheDocument();
     expect(screen.getByText("And two more.")).toBeInTheDocument();
   });
 
+  it("states the headline's dropped count and counts the shows it could not name", () => {
+    // Six dropped, five with metadata: the card says six, as the finished
+    // card and the recap's stat tile do, and covers the sixth.
+    const dropped = Array.from({ length: 5 }, (_, index) => ({
+      tmdbId: index, title: `Show ${index}`, lastEpisode: "S1E02",
+    }));
+    renderCard("shame", {
+      ...droppedCount(6),
+      shame: { dropped, stillPlanning: [] },
+    });
+    expect(
+      screen.getByText(
+        "Six shows marked dropped. These episodes were what tipped you over the edge.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Show 4")).toBeInTheDocument();
+    expect(screen.getByText("And one more.")).toBeInTheDocument();
+  });
+
   it("speaks about the waiting films when nothing was dropped", () => {
     const { container } = renderCard("shame", {
+      ...droppedCount(0),
       shame: {
         dropped: [],
         stillPlanning: [
@@ -289,7 +318,7 @@ describe("StoryCard", () => {
     });
     expect(
       screen.getByText(
-        "Nothing dropped this year. These films, on the other hand, are still waiting.",
+        "Nothing dropped this year. This film, on the other hand, is still waiting.",
       ),
     ).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/0 shows|Zero shows/i);

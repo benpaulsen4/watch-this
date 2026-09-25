@@ -138,9 +138,17 @@ function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/**
+ * "hour" for one, "hours" otherwise: the noun alone, for a figure set apart
+ * from its unit (the hero's big number, the summary's stat labels).
+ */
+export function pluralNoun(count: number, noun: string): string {
+  return count === 1 ? noun : `${noun}s`;
+}
+
 /** "1 episode", "1,208 episodes". */
 export function pluralise(count: number, noun: string): string {
-  return `${formatCount(count)} ${noun}${count === 1 ? "" : "s"}`;
+  return `${formatCount(count)} ${pluralNoun(count, noun)}`;
 }
 
 /**
@@ -312,9 +320,16 @@ export function periodRange(label: string): string {
   return /^\d{4}$/.test(label) ? `1 January – 31 December ${label}` : "";
 }
 
-/** Whole days of screen time, back to back: the hero's and the story's figure. */
-function straightDays(minutes: number): number {
-  return Math.floor(minutes / (24 * 60));
+/**
+ * Whole days of screen time, back to back, in words: "seventeen straight
+ * days", "one straight day". The hero and the story's hours card both state
+ * this figure, so both take it from here and it reads one way. Null under a
+ * full day.
+ */
+function straightDaysPhrase(minutes: number): string | null {
+  const days = Math.floor(minutes / (24 * 60));
+  if (days <= 0) return null;
+  return `${numberWords(days)} straight ${pluralNoun(days, "day")}`;
 }
 
 /**
@@ -357,10 +372,10 @@ export function heroSentence(input: {
 
   const sentences = counts ? [`${counts}.`] : [];
 
-  const days = straightDays(minutes);
-  if (days > 0) {
+  const days = straightDaysPhrase(minutes);
+  if (days) {
     sentences.push(
-      `${capitalise(numberWords(days))} straight ${days === 1 ? "day" : "days"} of screen, if you had done it all at once.`,
+      `${capitalise(days)} of screen, if you had done it all at once.`,
     );
   }
 
@@ -399,28 +414,45 @@ function droppedIntro(count: number, namesEpisodes: boolean): string {
 /**
  * The abandonment panel's opening line: the dropped shows when there are any
  * ("Six shows marked dropped. These episodes were what tipped you over the
- * edge." -- the second sentence only when a show names its episode), otherwise
- * the waiting films, never "0 shows". Null when there is nothing to say.
+ * edge." -- the second sentence only when a named show has its episode),
+ * otherwise the waiting films, never "0 shows". Null when there is nothing to
+ * say.
+ *
+ * The count is `headline.titlesDropped`, the number the stat tile and the
+ * finished card state, not `shame.dropped.length`: that list leaves out any
+ * title with no cached metadata, so it can be shorter. Surfaces listing the
+ * named ones cover the rest with `andMore`.
  */
 export function shameIntro(
   shame: Pick<Payload["shame"], "dropped" | "stillPlanning">,
+  titlesDropped: number,
 ): string | null {
   const { dropped, stillPlanning } = shame;
-  if (dropped.length > 0) {
+  if (titlesDropped > 0) {
     return droppedIntro(
-      dropped.length,
+      titlesDropped,
       dropped.some((show) => show.lastEpisode !== null),
     );
   }
-  if (stillPlanning.length > 0) {
+  if (stillPlanning.length === 1) {
+    return "Nothing dropped this year. This film, on the other hand, is still waiting.";
+  }
+  if (stillPlanning.length > 1) {
     return "Nothing dropped this year. These films, on the other hand, are still waiting.";
   }
   return null;
 }
 
-/** Between the dropped shows and the waiting films, when there are both. */
-export const SHAME_PLANNING_LINK =
-  "And even after giving up on those, you still didn't find time for these.";
+/**
+ * Between the dropped shows and the waiting films, when there are both, in
+ * the number of each: `dropped` is the count the intro states, `waiting` the
+ * films listed under this line.
+ */
+export function shamePlanningLink(dropped: number, waiting: number): string {
+  const those = dropped === 1 ? "that one" : "those";
+  const these = waiting === 1 ? "this" : "these";
+  return `And even after giving up on ${those}, you still didn't find time for ${these}.`;
+}
 
 /**
  * Why the biggest day has no timeline: the whole period's solo ticks fell
@@ -444,15 +476,36 @@ function articleFor(percent: number): "A" | "An" {
     : "A";
 }
 
-/** "34 titles in common out of 124. A 27% overlap." */
-export function overlapLine(
-  peer: Pick<Payload["compare"][number], "onlyYou" | "both" | "onlyThem">,
-): string | null {
-  const total = peer.onlyYou + peer.both + peer.onlyThem;
-  if (total === 0) return null;
+type OverlapCounts = Pick<
+  Payload["compare"][number],
+  "onlyYou" | "both" | "onlyThem"
+>;
 
-  const percent = percentOf(peer.both, total);
-  return `${pluralise(peer.both, "title")} in common out of ${formatCount(total)}. ${articleFor(percent)} ${percent}% overlap.`;
+/**
+ * The share of titles in common, rounded to a whole percent -- the one
+ * figure both `overlapLine` states and `compareHeadline` reads, so the
+ * headline never characterises a number the line beneath it rounds
+ * differently. Null when neither of you finished anything.
+ */
+function overlapPercent(peer: OverlapCounts): number | null {
+  const total = peer.onlyYou + peer.both + peer.onlyThem;
+  return total === 0 ? null : percentOf(peer.both, total);
+}
+
+/**
+ * "34 titles in common out of 124. A 27% overlap." A title in common that
+ * rounds to 0% is "Under 1%", never "0%".
+ */
+export function overlapLine(peer: OverlapCounts): string | null {
+  const percent = overlapPercent(peer);
+  if (percent === null) return null;
+
+  const total = peer.onlyYou + peer.both + peer.onlyThem;
+  const share =
+    percent === 0 && peer.both > 0
+      ? "Under 1% overlap."
+      : `${articleFor(percent)} ${percent}% overlap.`;
+  return `${pluralise(peer.both, "title")} in common out of ${formatCount(total)}. ${share}`;
 }
 
 /** The films the niche pick is compared against: how many, and their median. */
@@ -603,10 +656,13 @@ export function timelineLine(soloTicks: number, minutes: number): string {
 export const TIMELINE_TOO_FEW =
   "Too few of these were ticked one at a time to say how the day went.";
 
-/** "Excludes 3 episodes with no runtime on TMDB", or null when none. */
+/**
+ * "Excludes 3 episodes or films with no runtime on TMDB", or null when none.
+ * `headline.unknownRuntimeEpisodes` counts both, whatever its name says.
+ */
 export function unknownRuntimeNote(count: number): string | null {
   if (count <= 0) return null;
-  return `Excludes ${pluralise(count, "episode")} with no runtime on TMDB`;
+  return `Excludes ${pluralise(count, "episode")} or ${pluralNoun(count, "film")} with no runtime on TMDB`;
 }
 
 // ---------------------------------------------------------------------------
@@ -641,16 +697,16 @@ function workingTime(hours: number): string | null {
 
 /**
  * The line under the story's hours figure: "in front of something. That is
- * 17 straight days, or roughly two and a half working months if you had a job
+ * seventeen straight days, or roughly two and a half working months if you had a job
  * doing this." Built from minutes, so the conversions are not compounded from
  * a rounded hours figure.
  */
 export function hoursLine(minutes: number): string {
-  const days = straightDays(minutes);
+  const days = straightDaysPhrase(minutes);
   const work = workingTime(minutes / 60);
 
-  if (days > 0 && work) {
-    return `in front of something. That is ${formatCount(days)} straight ${days === 1 ? "day" : "days"}, or roughly ${work} if you had a job doing this.`;
+  if (days && work) {
+    return `in front of something. That is ${days}, or roughly ${work} if you had a job doing this.`;
   }
   if (work) {
     return `in front of something. That is roughly ${work}, if you had a job doing this.`;
@@ -802,17 +858,14 @@ export function crewHeadline(
 
 /**
  * The compare card's headline, from the share of titles in common -- the
- * same share `overlapLine` states: under 20% is almost none, under 50% is
- * some, and half or more is mostly. Everyone compared shares a list with you.
+ * same rounded percentage `overlapLine` states (see `overlapPercent`): under
+ * 20% is almost none, under 50% is some, and half or more is mostly. Everyone compared shares a list with you.
  */
-export function compareHeadline(
-  peer: Pick<Payload["compare"][number], "onlyYou" | "both" | "onlyThem">,
-): string | null {
-  const total = peer.onlyYou + peer.both + peer.onlyThem;
-  if (total === 0) return null;
+export function compareHeadline(peer: OverlapCounts): string | null {
+  const percent = overlapPercent(peer);
+  if (percent === null) return null;
 
-  const share = peer.both / total;
-  if (share >= 0.5) return "A shared list, and mostly shared taste";
-  if (share >= 0.2) return "A shared list, and some shared taste";
+  if (percent >= 50) return "A shared list, and mostly shared taste";
+  if (percent >= 20) return "A shared list, and some shared taste";
   return "A shared list, and almost no shared taste";
 }

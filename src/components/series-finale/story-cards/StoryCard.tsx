@@ -35,6 +35,7 @@ import {
   planningLine,
   planningMoreLine,
   pluralise,
+  pluralNoun,
   quietestMonth,
   shameIntro,
   streakLine,
@@ -544,7 +545,12 @@ export function StoryCard({
     }
 
     case "shame":
-      return <ShameCard shame={payload.shame} />;
+      return (
+        <ShameCard
+          shame={payload.shame}
+          titlesDropped={payload.headline.titlesDropped}
+        />
+      );
 
     case "crew": {
       const headline = crewHeadline(payload.headline.episodes, payload.crew);
@@ -646,14 +652,22 @@ function PopularityStrip({ popularities }: { popularities: number[] }) {
 const DROPPED_SHOWN = 6;
 const DROPPED_SHOWN_WITH_PLANNING = 5;
 
-function ShameCard({ shame }: { shame: Payload["shame"] }) {
-  const intro = shameIntro(shame);
+function ShameCard({
+  shame,
+  titlesDropped,
+}: {
+  shame: Payload["shame"];
+  /** The headline's count; see `shameIntro`. */
+  titlesDropped: number;
+}) {
+  const intro = shameIntro(shame, titlesDropped);
   const [oldest, ...waiting] = shame.stillPlanning;
   const dropped = shame.dropped.slice(
     0,
     oldest ? DROPPED_SHOWN_WITH_PLANNING : DROPPED_SHOWN,
   );
-  const droppedMore = andMore(shame.dropped.length - dropped.length);
+  // Everything not listed, whether cut for room or never named.
+  const droppedMore = andMore(titlesDropped - dropped.length);
   const waitingMore = planningMoreLine(waiting.length);
 
   return (
@@ -779,8 +793,8 @@ function SummaryCard({
     type ? { label: "Type", value: type, accent: true } : null,
   ].filter((row): row is NonNullable<typeof row> => row !== null);
   const stats = [
-    { value: hours, label: hours === 1 ? "hour" : "hours" },
-    { value: episodes, label: episodes === 1 ? "episode" : "episodes" },
+    { value: hours, label: pluralNoun(hours, "hour") },
+    { value: episodes, label: pluralNoun(episodes, "episode") },
     {
       value: titlesCompleted,
       label: titlesCompleted === 1 ? "title finished" : "titles finished",

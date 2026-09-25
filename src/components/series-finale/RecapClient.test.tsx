@@ -19,7 +19,7 @@ const payload = (overrides: Record<string, unknown> = {}) => ({
   period: { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z", label: "2026" },
   headline: {
     hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47,
-    titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: 4,
+    titlesDropped: 0, unknownRuntimeEpisodes: 0, percentile: 4,
   },
   episodes: { total: 1208, perDay: 3.3 },
   finished: { films: 31, shows: 16, total: 47 },
@@ -31,6 +31,11 @@ const payload = (overrides: Record<string, unknown> = {}) => ({
   shame: { dropped: [], stillPlanning: [] },
   crew: [], compare: [], thin: false,
   ...overrides,
+});
+
+/** The default headline with its dropped count replaced. */
+const droppedCount = (titlesDropped: number) => ({
+  headline: { ...payload().headline, titlesDropped },
 });
 
 const mockFetch = (body: unknown) =>
@@ -59,6 +64,19 @@ describe("RecapClient", () => {
     renderRecap();
 
     await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(screen.getByText("hours")).toBeInTheDocument();
+  });
+
+  it("says one hour, not one hours", async () => {
+    mockFetch({
+      payload: payload({
+        headline: { ...payload().headline, hours: 1, minutes: 70 },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("hour")).toBeInTheDocument());
+    expect(screen.queryByText("hours")).not.toBeInTheDocument();
   });
 
   it("renders the thin-year card instead of stats for a thin period", async () => {
@@ -83,7 +101,7 @@ describe("RecapClient", () => {
   it("omits the percentile line when there is no cohort", async () => {
     mockFetch({
       payload: payload({
-        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: null },
+        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 0, unknownRuntimeEpisodes: 0, percentile: null },
       }),
     });
     renderRecap();
@@ -106,7 +124,7 @@ describe("RecapClient", () => {
   it("omits the percentile line for the lower half", async () => {
     mockFetch({
       payload: payload({
-        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: 96 },
+        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 0, unknownRuntimeEpisodes: 0, percentile: 96 },
       }),
     });
     renderRecap();
@@ -173,14 +191,14 @@ describe("RecapClient", () => {
   it("discloses episodes left out of the hours for want of a runtime", async () => {
     mockFetch({
       payload: payload({
-        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 14, percentile: 4 },
+        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 0, unknownRuntimeEpisodes: 14, percentile: 4 },
       }),
     });
     renderRecap();
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Excludes 14 episodes with no runtime on TMDB/),
+        screen.getByText(/Excludes 14 episodes or films with no runtime on TMDB/),
       ).toBeInTheDocument(),
     );
   });
@@ -302,6 +320,7 @@ describe("RecapClient", () => {
   it("lists dropped shows with the episode that tipped it", async () => {
     mockFetch({
       payload: payload({
+        ...droppedCount(1),
         shame: {
           dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }],
           stillPlanning: [],
@@ -321,9 +340,39 @@ describe("RecapClient", () => {
     ).toBeInTheDocument();
   });
 
+  it("states the stat tile's dropped count, and counts the shows it could not name", async () => {
+    // `shame.dropped` leaves out titles with no cached metadata. The panel
+    // takes its count from the headline, like the tile beside it, and covers
+    // the one it cannot name.
+    mockFetch({
+      payload: payload({
+        ...droppedCount(6),
+        shame: {
+          dropped: Array.from({ length: 5 }, (_, i) => ({
+            tmdbId: i, title: `Show ${i + 1}`, lastEpisode: "S1E02",
+          })),
+          stillPlanning: [],
+        },
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Six shows marked dropped. These episodes were what tipped you over the edge.",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText("6")).toBeInTheDocument();
+    expect(screen.getByText("Show 5 · S1E02")).toBeInTheDocument();
+    expect(screen.getByText("And one more.")).toBeInTheDocument();
+  });
+
   it("follows the dropped shows with the films still waiting", async () => {
     mockFetch({
       payload: payload({
+        ...droppedCount(1),
         shame: {
           dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }],
           stillPlanning: Array.from({ length: 7 }, (_, i) => ({
@@ -337,7 +386,7 @@ describe("RecapClient", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "And even after giving up on those, you still didn't find time for these.",
+          "And even after giving up on that one, you still didn't find time for these.",
         ),
       ).toBeInTheDocument(),
     );
@@ -536,7 +585,7 @@ describe("RecapClient", () => {
     expect(screen.getByText("1,041 episodes")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Everyone you share a list with. Nobody asked to be ranked.",
+        "People you share a list with. Nobody asked to be ranked.",
       ),
     ).toBeInTheDocument();
   });

@@ -46,6 +46,22 @@ describe("CrewRanking", () => {
     expect(names()).toEqual(["you", "ana", "marcus"]);
   });
 
+  it("gives a tie one rank and skips the next, so the viewer is not above anyone they tied", () => {
+    const { container } = render(
+      <CrewRanking
+        viewer={{ username: "ben", profilePictureUrl: "", episodes: 1041 }}
+        crew={[member("ana", 1041), member("marcus", 760), member("bo", 760)]}
+        size="large"
+      />,
+    );
+
+    expect(names()).toEqual(["you", "ana", "marcus", "bo"]);
+    const ranks = Array.from(container.querySelectorAll("[data-rank]")).map(
+      (rank) => rank.textContent,
+    );
+    expect(ranks).toEqual(["1", "1", "3", "3"]);
+  });
+
   it("sizes each bar against the leader", () => {
     const { container } = render(
       <CrewRanking

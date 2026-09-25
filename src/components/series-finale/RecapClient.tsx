@@ -24,6 +24,7 @@ import { CompareFacts, CompareSplit } from "./CompareSplit";
 import { CrewRanking } from "./CrewRanking";
 import {
   alsoTopForLine,
+  andMore,
   archetypeDescription,
   archetypeName,
   bigDayLine,
@@ -35,8 +36,9 @@ import {
   peakMonth,
   percentileLine,
   periodRange,
-  SHAME_PLANNING_LINK,
+  pluralNoun,
   shameIntro,
+  shamePlanningLink,
   streakLabel,
   topShowStats,
   unknownRuntimeNote,
@@ -145,7 +147,8 @@ function RecapBody({
   // band knows how many panels it really holds and can widen a lone one.
   const { archetype } = payload.rhythm;
   const { topShow, niche, bigDay, shame } = payload;
-  const hasShame = shame.dropped.length > 0 || shame.stillPlanning.length > 0;
+  const { titlesDropped } = payload.headline;
+  const hasShame = titlesDropped > 0 || shame.stillPlanning.length > 0;
   // `compare` arrives ordered by titles in common, so this is the closest peer.
   const [peer] = payload.compare;
 
@@ -177,13 +180,15 @@ function RecapBody({
               soloTickTotal={payload.soloTickTotal}
             />
           ) : null}
-          {hasShame ? <ShamePanel shame={shame} /> : null}
+          {hasShame ? (
+            <ShamePanel shame={shame} titlesDropped={titlesDropped} />
+          ) : null}
         </Band>
         <Band>
           {payload.crew.length > 0 ? (
             <Panel
               title="The crew"
-              intro="Everyone you share a list with. Nobody asked to be ranked."
+              intro="People you share a list with. Nobody asked to be ranked."
             >
               <CrewRanking
                 viewer={{
@@ -315,7 +320,7 @@ function Hero({
         <p className="text-7xl leading-[0.86] font-bold tracking-[-0.055em] text-gray-50 tabular-nums sm:text-9xl">
           <span>{formatCount(payload.headline.hours)}</span>
           <span className="ml-3 text-3xl tracking-[-0.02em] text-white/55 sm:text-[44px]">
-            hours
+            {pluralNoun(payload.headline.hours, "hour")}
           </span>
         </p>
         <p className="mx-auto mt-6 max-w-[560px] text-lg leading-relaxed text-pretty text-gray-300 sm:text-[19px]">
@@ -482,17 +487,32 @@ function BigDayPanel({
 /** How many waiting films the recap lists; the payload carries all of them. */
 const PLANNING_SHOWN = 5;
 
-function ShamePanel({ shame }: { shame: SeriesFinalePayload["shame"] }) {
+/**
+ * The dropped shows and the waiting films. The count is the headline's
+ * `titlesDropped`, the stat tile's number; the badges name the ones with
+ * metadata, and any the payload could not name are counted under them.
+ */
+function ShamePanel({
+  shame,
+  titlesDropped,
+}: {
+  shame: SeriesFinalePayload["shame"];
+  titlesDropped: number;
+}) {
   const { dropped, stillPlanning } = shame;
 
   const planning = stillPlanning.slice(0, PLANNING_SHOWN);
+  const unnamed = andMore(titlesDropped - dropped.length);
 
   return (
-    <Panel title="Walked out on" intro={shameIntro(shame)}>
+    <Panel title="Walked out on" intro={shameIntro(shame, titlesDropped)}>
       {dropped.length > 0 ? <DroppedBadges shows={dropped} /> : null}
-      {dropped.length > 0 && planning.length > 0 ? (
+      {dropped.length > 0 && unnamed ? (
+        <p className="mt-2.5 text-[13px] text-gray-500">{unnamed}</p>
+      ) : null}
+      {titlesDropped > 0 && planning.length > 0 ? (
         <p className="mt-4 mb-2.5 text-sm text-gray-400">
-          {SHAME_PLANNING_LINK}
+          {shamePlanningLink(titlesDropped, planning.length)}
         </p>
       ) : null}
       {planning.length > 0 ? <PlanningBadges films={planning} /> : null}

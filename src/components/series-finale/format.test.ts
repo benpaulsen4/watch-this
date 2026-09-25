@@ -36,9 +36,10 @@ import {
   planningLine,
   planningMoreLine,
   pluralise,
+  pluralNoun,
   quietestMonth,
-  SHAME_PLANNING_LINK,
   shameIntro,
+  shamePlanningLink,
   soloTickDisclosure,
   streakLabel,
   streakLine,
@@ -383,40 +384,86 @@ describe("shameIntro", () => {
 
   it("counts the dropped shows and points at the tipping episodes", () => {
     expect(
-      shameIntro({
-        dropped: Array.from({ length: 6 }, () => show("S2E03")),
-        stillPlanning: [],
-      }),
+      shameIntro(
+        {
+          dropped: Array.from({ length: 6 }, () => show("S2E03")),
+          stillPlanning: [],
+        },
+        6,
+      ),
+    ).toBe(
+      "Six shows marked dropped. These episodes were what tipped you over the edge.",
+    );
+  });
+
+  it("states the headline count even when only some of the shows can be named", () => {
+    // `buildShame` leaves out a dropped title with no cached metadata, so the
+    // named list can be shorter than `headline.titlesDropped`. The count is
+    // the headline's, the same number the stat tile and the finished card
+    // show; the unnamed one is covered by `andMore` under the list.
+    expect(
+      shameIntro(
+        {
+          dropped: Array.from({ length: 5 }, () => show("S2E03")),
+          stillPlanning: [],
+        },
+        6,
+      ),
     ).toBe(
       "Six shows marked dropped. These episodes were what tipped you over the edge.",
     );
   });
 
   it("singularises one", () => {
-    expect(shameIntro({ dropped: [show("S2E03")], stillPlanning: [] })).toBe(
+    expect(
+      shameIntro({ dropped: [show("S2E03")], stillPlanning: [] }, 1),
+    ).toBe(
       "One show marked dropped. This episode was what tipped you over the edge.",
     );
   });
 
   it("does not point at episodes it cannot name", () => {
     expect(
-      shameIntro({ dropped: [show(null), show(null)], stillPlanning: [] }),
+      shameIntro({ dropped: [show(null), show(null)], stillPlanning: [] }, 2),
     ).toBe("Two shows marked dropped.");
+    expect(shameIntro({ dropped: [], stillPlanning: [film] }, 3)).toBe(
+      "Three shows marked dropped.",
+    );
   });
 
   it("speaks about the waiting films when nothing was dropped", () => {
-    expect(shameIntro({ dropped: [], stillPlanning: [film] })).toBe(
+    expect(shameIntro({ dropped: [], stillPlanning: [film, film] }, 0)).toBe(
       "Nothing dropped this year. These films, on the other hand, are still waiting.",
     );
   });
 
-  it("has nothing to say about an empty list", () => {
-    expect(shameIntro({ dropped: [], stillPlanning: [] })).toBeNull();
+  it("singularises a lone waiting film", () => {
+    expect(shameIntro({ dropped: [], stillPlanning: [film] }, 0)).toBe(
+      "Nothing dropped this year. This film, on the other hand, is still waiting.",
+    );
   });
 
+  it("has nothing to say about an empty list", () => {
+    expect(shameIntro({ dropped: [], stillPlanning: [] }, 0)).toBeNull();
+  });
+});
+
+describe("shamePlanningLink", () => {
   it("links the dropped shows to the waiting films", () => {
-    expect(SHAME_PLANNING_LINK).toBe(
+    expect(shamePlanningLink(6, 5)).toBe(
       "And even after giving up on those, you still didn't find time for these.",
+    );
+  });
+
+  it("agrees in number with each side", () => {
+    expect(shamePlanningLink(1, 1)).toBe(
+      "And even after giving up on that one, you still didn't find time for this.",
+    );
+    expect(shamePlanningLink(1, 3)).toBe(
+      "And even after giving up on that one, you still didn't find time for these.",
+    );
+    expect(shamePlanningLink(4, 1)).toBe(
+      "And even after giving up on those, you still didn't find time for this.",
     );
   });
 });
@@ -463,6 +510,18 @@ describe("overlapLine", () => {
     );
   });
 
+  it("says under 1% rather than 0% when there is a title in common", () => {
+    expect(overlapLine({ onlyYou: 150, both: 1, onlyThem: 149 })).toBe(
+      "1 title in common out of 300. Under 1% overlap.",
+    );
+  });
+
+  it("says 0% when there is nothing in common", () => {
+    expect(overlapLine({ onlyYou: 150, both: 0, onlyThem: 150 })).toBe(
+      "0 titles in common out of 300. A 0% overlap.",
+    );
+  });
+
   it("returns null when neither of you finished anything", () => {
     expect(overlapLine({ onlyYou: 0, both: 0, onlyThem: 0 })).toBeNull();
   });
@@ -495,6 +554,14 @@ describe("pluralise", () => {
   it("counts a noun", () => {
     expect(pluralise(1, "episode")).toBe("1 episode");
     expect(pluralise(1208, "episode")).toBe("1,208 episodes");
+  });
+});
+
+describe("pluralNoun", () => {
+  it("gives the noun alone, for a figure set apart from its unit", () => {
+    expect(pluralNoun(1, "hour")).toBe("hour");
+    expect(pluralNoun(0, "hour")).toBe("hours");
+    expect(pluralNoun(412, "hour")).toBe("hours");
   });
 });
 
@@ -588,24 +655,26 @@ describe("monthInitial", () => {
 
 describe("hoursLine", () => {
   it("converts the hours into straight days and working months", () => {
+    // Straight days in words, the same phrase the recap's hero uses
+    // ("Seventeen straight days of screen"), so one figure reads one way.
     // 412 hours: 17 whole days, and 412 / 160 = 2.6 working months.
     expect(hoursLine(24720)).toBe(
-      "in front of something. That is 17 straight days, or roughly two and a half working months if you had a job doing this.",
+      "in front of something. That is seventeen straight days, or roughly two and a half working months if you had a job doing this.",
     );
   });
 
   it("rounds to the nearest half month and says 'full' for a whole one", () => {
     expect(hoursLine(160 * 60)).toBe(
-      "in front of something. That is 6 straight days, or roughly one full working month if you had a job doing this.",
+      "in front of something. That is six straight days, or roughly one full working month if you had a job doing this.",
     );
     expect(hoursLine(330 * 60)).toBe(
-      "in front of something. That is 13 straight days, or roughly two full working months if you had a job doing this.",
+      "in front of something. That is thirteen straight days, or roughly two full working months if you had a job doing this.",
     );
   });
 
   it("counts working days under three weeks of work", () => {
     expect(hoursLine(30 * 60)).toBe(
-      "in front of something. That is 1 straight day, or roughly four working days if you had a job doing this.",
+      "in front of something. That is one straight day, or roughly four working days if you had a job doing this.",
     );
   });
 
@@ -621,12 +690,12 @@ describe("hoursLine", () => {
 });
 
 describe("unknownRuntimeNote", () => {
-  it("discloses episodes the hours could not count", () => {
+  it("discloses the episodes and films the hours could not count", () => {
     expect(unknownRuntimeNote(3)).toBe(
-      "Excludes 3 episodes with no runtime on TMDB",
+      "Excludes 3 episodes or films with no runtime on TMDB",
     );
     expect(unknownRuntimeNote(1)).toBe(
-      "Excludes 1 episode with no runtime on TMDB",
+      "Excludes 1 episode or film with no runtime on TMDB",
     );
     expect(unknownRuntimeNote(0)).toBeNull();
   });
@@ -894,6 +963,16 @@ describe("compareHeadline", () => {
     expect(compareHeadline({ onlyYou: 10, both: 30, onlyThem: 10 })).toBe(
       "A shared list, and mostly shared taste",
     );
+  });
+
+  it("reads the same rounded percentage that overlapLine states", () => {
+    // 19.6% in common: overlapLine says "A 20% overlap", so the headline
+    // must not call it almost none.
+    const peer = { onlyYou: 400, both: 98, onlyThem: 2 };
+    expect(overlapLine(peer)).toBe(
+      "98 titles in common out of 500. A 20% overlap.",
+    );
+    expect(compareHeadline(peer)).toBe("A shared list, and some shared taste");
   });
 
   it("says nothing when neither of you finished anything", () => {

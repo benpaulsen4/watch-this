@@ -86,7 +86,7 @@ function hasContent(id: StoryCardId, payload: SeriesFinalePayload): boolean {
       return payload.rhythm.archetype !== null;
     case "shame":
       return (
-        payload.shame.dropped.length > 0 ||
+        payload.headline.titlesDropped > 0 ||
         payload.shame.stillPlanning.length > 0
       );
     case "crew":
