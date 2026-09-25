@@ -357,8 +357,12 @@ describe("StoryCard", () => {
       compare: [peer("ana", 34), peer("marcus", 5)],
     });
     expect(screen.getByText("You & ana")).toBeInTheDocument();
+    // The headline is the card's heading, so heading navigation finds it.
     expect(
-      screen.getByText("A shared list, and some shared taste"),
+      screen.getByRole("heading", {
+        level: 2,
+        name: "A shared list, and some shared taste",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("34 titles in common out of 124. A 27% overlap."),

@@ -123,6 +123,11 @@ describe("StoryReel", () => {
     await waitFor(() =>
       expect(screen.getByText("Series Finale")).toBeInTheDocument(),
     );
+    // One page heading, for assistive tech; the design shows none.
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Series Finale 2026" }),
+    ).toHaveClass("sr-only");
   });
 
   it("advances on ArrowRight", async () => {

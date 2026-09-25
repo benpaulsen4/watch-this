@@ -12,7 +12,6 @@ import {
   SeriesFinaleUnavailableError,
   useSeriesFinale,
 } from "@/hooks/useSeriesFinale";
-import type { User } from "@/lib/auth/client";
 import type {
   ArchetypeId,
   SeriesFinalePayload,
@@ -22,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { BigDayTimeline } from "./BigDayTimeline";
 import { CompareFacts, CompareSplit } from "./CompareSplit";
 import { CrewRanking } from "./CrewRanking";
+import { FilmGrain } from "./FilmGrain";
 import {
   alsoTopForLine,
   andMore,
@@ -55,8 +55,7 @@ import { DroppedBadges, PlanningBadges } from "./ShameBadges";
 import { StatTile } from "./StatTile";
 import { ThinYearCard } from "./ThinYearCard";
 import { TmdbAttribution } from "./TmdbAttribution";
-
-type Viewer = Pick<User, "username" | "profilePictureUrl">;
+import type { Viewer } from "./viewer";
 
 interface RecapClientProps {
   period: string;
@@ -308,10 +307,7 @@ function Hero({
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_50%_12%,rgba(239,68,68,0.2),transparent_56%),radial-gradient(700px_circle_at_12%_66%,rgba(249,115,22,0.12),transparent_60%),radial-gradient(800px_circle_at_90%_40%,rgba(168,85,247,0.12),transparent_60%)]"
       />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle,rgba(255,255,255,0.10)_1px,transparent_1px)] bg-[length:3px_3px] opacity-30 motion-safe:animate-[wt-grain_7s_steps(10)_infinite]"
-      />
+      <FilmGrain />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 -bottom-px h-56 bg-gradient-to-b from-gray-950/0 via-gray-950/70 to-gray-950"

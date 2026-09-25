@@ -16,13 +16,14 @@ import {
   SeriesFinaleUnavailableError,
   useSeriesFinale,
 } from "@/hooks/useSeriesFinale";
-import type { User } from "@/lib/auth/client";
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 import { cn } from "@/lib/utils";
 
+import { FilmGrain } from "./FilmGrain";
 import { LoadFailedNotice, UnavailableNotice } from "./SeriesFinaleNotices";
 import { StoryCard } from "./story-cards/StoryCard";
 import { ThinYearCard } from "./ThinYearCard";
+import type { Viewer } from "./viewer";
 
 export type StoryCardId =
   | "intro"
@@ -100,8 +101,6 @@ function hasContent(id: StoryCardId, payload: SeriesFinalePayload): boolean {
   }
 }
 
-type Viewer = Pick<User, "username" | "profilePictureUrl">;
-
 interface StoryReelProps {
   period: string;
   /** The signed-in user, resolved by the page: the payload carries no username. */
@@ -125,6 +124,9 @@ export function StoryReel({ period, user }: StoryReelProps) {
         : [],
     [payload],
   );
+
+  // The reel's one h1; each card's headline is an h2 beneath it.
+  const title = `Series Finale ${period}`;
 
   const close = useCallback(
     () => router.push(`/series-finale/${period}`),
@@ -161,7 +163,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
   // and a touch user has no Escape key.
   if (isLoading) {
     return (
-      <Frame onClose={close}>
+      <Frame title={title} onClose={close}>
         <div className="flex min-h-dvh items-center justify-center">
           <LoadingSpinner text="Putting your year together" />
         </div>
@@ -171,7 +173,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
 
   if (error instanceof SeriesFinaleUnavailableError) {
     return (
-      <Frame onClose={close}>
+      <Frame title={title} onClose={close}>
         <div className="flex min-h-dvh items-center px-4">
           <UnavailableNotice period={period} />
         </div>
@@ -181,7 +183,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
 
   if (error || !payload) {
     return (
-      <Frame onClose={close}>
+      <Frame title={title} onClose={close}>
         <div className="flex min-h-dvh items-center px-4">
           <LoadFailedNotice onRetry={() => void refetch()} />
         </div>
@@ -191,7 +193,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
 
   if (payload.thin) {
     return (
-      <Frame onClose={close}>
+      <Frame title={title} onClose={close}>
         <div className="flex min-h-dvh items-center px-4">
           <ThinYearCard
             label={payload.period.label}
@@ -208,7 +210,11 @@ export function StoryReel({ period, user }: StoryReelProps) {
   if (current === undefined) return null;
 
   return (
-    <Frame onClose={close} progress={{ position, total: cards.length }}>
+    <Frame
+      title={title}
+      onClose={close}
+      progress={{ position, total: cards.length }}
+    >
       {/* A stable live region, so each new card is read out as it arrives. */}
       <div aria-live="polite">
         {/* Keyed by card so each one's entrance plays when it arrives. */}
@@ -231,7 +237,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 overflow-hidden"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle,rgba(255,255,255,0.10)_1px,transparent_1px)] bg-[length:3px_3px] opacity-30 motion-safe:animate-[wt-grain_7s_steps(10)_infinite]" />
+        <FilmGrain />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(255,255,255,0.06),transparent)] bg-[length:100%_140px] opacity-20 motion-safe:animate-[wt-scan_7s_linear_infinite]" />
       </div>
 
@@ -261,10 +267,13 @@ export function StoryReel({ period, user }: StoryReelProps) {
  * progress bars when there is a reel, the logo, and the close control.
  */
 function Frame({
+  title,
   onClose,
   progress,
   children,
 }: {
+  /** Read by assistive tech only: the design has no visible page title. */
+  title: string;
   onClose?: () => void;
   progress?: { position: number; total: number };
   children: ReactNode;
@@ -276,6 +285,7 @@ function Frame({
         scrolls rather than a card losing its bottom (attribution included).
       */}
       <div className="relative min-h-dvh w-full max-w-md bg-gray-950 select-none">
+        <h1 className="sr-only">{title}</h1>
         {children}
 
         {/* Fixed, so the progress and the close control stay in reach. */}

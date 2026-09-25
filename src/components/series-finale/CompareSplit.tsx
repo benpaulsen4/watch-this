@@ -28,8 +28,10 @@ const SIZES = {
   },
   large: {
     outer: "h-32 w-32",
-    you: "-mr-10 pr-[42px] border-red-400/45 bg-red-600/25",
-    them: "-ml-10 pl-[42px] border-purple-400/40 bg-purple-500/20",
+    // 128 + 88 + 128 - 2 * 48 = 248px, inside the 260px a 320px phone
+    // leaves between the story's 30px gutters.
+    you: "-mr-12 pr-12 border-red-400/45 bg-red-600/25",
+    them: "-ml-12 pl-12 border-purple-400/40 bg-purple-500/20",
     outerCount: "text-2xl text-white",
     outerLabel: "mt-1 text-[11px] text-white/60",
     themLabelWidth: "max-w-[5rem]",
