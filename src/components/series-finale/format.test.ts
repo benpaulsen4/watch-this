@@ -19,6 +19,7 @@ import {
   formatHoursMinutes,
   heroSentence,
   hoursLine,
+  isThinPeriod,
   monthInitial,
   monthLabel,
   monthName,
@@ -494,6 +495,19 @@ describe("pluralise", () => {
   it("counts a noun", () => {
     expect(pluralise(1, "episode")).toBe("1 episode");
     expect(pluralise(1208, "episode")).toBe("1,208 episodes");
+  });
+});
+
+describe("isThinPeriod", () => {
+  it("is thin only below both floors at once", () => {
+    expect(isThinPeriod({ episodes: 9, titlesCompleted: 4 })).toBe(true);
+    expect(isThinPeriod({ episodes: 10, titlesCompleted: 4 })).toBe(false);
+    expect(isThinPeriod({ episodes: 9, titlesCompleted: 5 })).toBe(false);
+    expect(isThinPeriod({ episodes: 0, titlesCompleted: 0 })).toBe(true);
+  });
+
+  it("is not thin once either floor is cleared", () => {
+    expect(isThinPeriod({ episodes: 1208, titlesCompleted: 47 })).toBe(false);
   });
 });
 

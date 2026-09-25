@@ -7,9 +7,11 @@
  * reach into an array under `noUncheckedIndexedAccess`.
  */
 
-import type {
-  ArchetypeId,
-  SeriesFinalePayload,
+import {
+  type ArchetypeId,
+  type SeriesFinalePayload,
+  THIN_YEAR_EPISODES,
+  THIN_YEAR_TITLES,
 } from "@/lib/series-finale/types";
 
 import { ARCHETYPE_LABELS } from "./ARCHETYPE_LABELS";
@@ -139,6 +141,23 @@ function capitalise(text: string): string {
 /** "1 episode", "1,208 episodes". */
 export function pluralise(count: number, noun: string): string {
   return `${formatCount(count)} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * Too little to characterise as a year -- the same rule `aggregate.ts` uses
+ * for `payload.thin`, restated here so a list item's headline alone (no
+ * rhythm, no shame, no crew -- `useSeriesFinaleList` carries none of that) is
+ * enough to decide whether the dashboard banner should offer it. The list
+ * route generates every available year including dormant gap years, so this
+ * is what keeps the banner from ever advertising "0 episodes. 0 titles."
+ */
+export function isThinPeriod(
+  headline: Pick<Payload["headline"], "episodes" | "titlesCompleted">,
+): boolean {
+  return (
+    headline.episodes < THIN_YEAR_EPISODES &&
+    headline.titlesCompleted < THIN_YEAR_TITLES
+  );
 }
 
 /** "A, B and C". */
