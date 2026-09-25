@@ -1,32 +1,11 @@
 import Image from "next/image";
 
-import type { SeriesFinalePayload } from "@/lib/series-finale/types";
+import type { SummaryCardData } from "@/lib/series-finale/share";
 import { cn } from "@/lib/utils";
 
 import { archetypeName, formatCount, pluralNoun } from "../format";
 import type { Viewer } from "../viewer";
 import { Enter, Shell } from "./StoryShell";
-
-type Payload = SeriesFinalePayload;
-
-/**
- * Exactly what the summary card reads, and nothing else -- the viewer's own
- * year only. Plan 5's share image reuses this card, and the share image must
- * never carry crew, compare or `topShow.alsoTopFor` (other people's data), so
- * the type leaves them out rather than trusting a caller to empty them: a
- * field the card cannot name, it cannot render. `topShow` and `niche` are
- * reduced to their titles for the same reason.
- */
-export interface SummaryCardData {
-  period: Pick<Payload["period"], "label">;
-  headline: Pick<
-    Payload["headline"],
-    "hours" | "episodes" | "titlesCompleted" | "titlesDropped"
-  >;
-  rhythm: Pick<Payload["rhythm"], "archetype" | "topWeekday">;
-  topShow: { title: string } | null;
-  niche: { title: string } | null;
-}
 
 /** The story's closing card: the year in four figures and three names. */
 export function SummaryCard({
