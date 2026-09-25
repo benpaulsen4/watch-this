@@ -11,7 +11,6 @@ import { parsePeriodLabel } from "@/lib/series-finale/periods";
 import { getOrGenerateSnapshot } from "@/lib/series-finale/service";
 import { shareQrDataUrl, stripCrossUserData } from "@/lib/series-finale/share";
 import {
-  loadShareCardLogos,
   renderShareCard,
   SHARE_CARD_HEIGHT,
   SHARE_CARD_WIDTH,
@@ -81,10 +80,9 @@ const handler = withAuth(async (request: AuthenticatedRequest) => {
     // sanitised.
     const card = stripCrossUserData(full);
 
-    const [qr, poster, logos] = await Promise.all([
+    const [qr, poster] = await Promise.all([
       shareQrDataUrl(getSiteUrl("/")),
       posterDataUrl(card.topShow?.posterPath ?? null),
-      loadShareCardLogos(),
     ]);
 
     const image = new ImageResponse(
@@ -93,7 +91,6 @@ const handler = withAuth(async (request: AuthenticatedRequest) => {
         username: request.user.username,
         qr,
         poster,
-        ...logos,
       }),
       { width: SHARE_CARD_WIDTH, height: SHARE_CARD_HEIGHT },
     );

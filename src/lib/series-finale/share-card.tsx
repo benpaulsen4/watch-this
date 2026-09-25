@@ -1,6 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import type { ReactElement } from "react";
 
 import {
@@ -10,6 +7,7 @@ import {
 } from "@/components/series-finale/format";
 
 import type { ShareablePayload } from "./share";
+import { TMDB_LOGO_SVG, WATCHTHIS_LOGO_SVG } from "./share-card-logos";
 
 /**
  * The Series Finale share card: artboard 1g, drawn at full size.
@@ -49,32 +47,17 @@ export interface ShareCardInput {
   /** Data URLs, or null to leave that element out (or draw its placeholder). */
   qr: string | null;
   poster: string | null;
-  /** Data URLs of public/logo-master.svg and public/tmdb.svg. */
-  logo: string;
-  tmdbLogo: string;
 }
 
-async function publicSvgDataUrl(name: string): Promise<string> {
-  // `process.cwd()` + a literal path is the pattern Next's output tracing
-  // follows for ImageResponse assets on the Node runtime.
-  const svg = await readFile(join(process.cwd(), "public", name));
-  return `data:image/svg+xml;base64,${svg.toString("base64")}`;
-}
+/** Base64, not URL-encoded: the Inkscape logo is full of `#` and quotes. */
+const svgDataUrl = (svg: string) =>
+  `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;
 
-/**
- * The two marks every card carries, read from `public/` as data URLs. No
- * fallback: the TMDB mark is the attribution the licence requires on anything
- * showing its titles, so a card without it should fail rather than ship.
- */
-export async function loadShareCardLogos(): Promise<
-  Pick<ShareCardInput, "logo" | "tmdbLogo">
-> {
-  const [logo, tmdbLogo] = await Promise.all([
-    publicSvgDataUrl("logo-master.svg"),
-    publicSvgDataUrl("tmdb.svg"),
-  ]);
-  return { logo, tmdbLogo };
-}
+// Embedded rather than read from `public/` per request -- see
+// ./share-card-logos. No fallback either way: the TMDB mark is the
+// attribution the licence requires on anything showing its titles.
+const LOGO_SRC = svgDataUrl(WATCHTHIS_LOGO_SVG);
+const TMDB_LOGO_SRC = svgDataUrl(TMDB_LOGO_SVG);
 
 /** Small uppercase label above a value, as the artboard sets them. */
 function eyebrow(text: string, fontSize: number, marginBottom: number) {
@@ -218,8 +201,6 @@ export function renderShareCard({
   username,
   qr,
   poster,
-  logo,
-  tmdbLogo,
 }: ShareCardInput): ReactElement {
   const hours = card.headline.hours;
   const archetype = archetypeName(card.rhythm);
@@ -261,7 +242,7 @@ export function renderShareCard({
         }}
       >
         <img
-          src={logo}
+          src={LOGO_SRC}
           alt="WatchThis"
           width={LOGO_WIDTH}
           height={LOGO_HEIGHT}
@@ -380,7 +361,7 @@ export function renderShareCard({
           ) : null}
           {/* TMDB attribution: the card shows TMDB titles and artwork. */}
           <img
-            src={tmdbLogo}
+            src={TMDB_LOGO_SRC}
             alt="TMDB"
             width={QR_SIZE}
             height={TMDB_LOGO_HEIGHT}

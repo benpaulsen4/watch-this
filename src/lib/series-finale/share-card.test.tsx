@@ -3,12 +3,12 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ImageResponse } from "next/og";
+import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import type { ShareablePayload } from "./share";
 import { shareQrDataUrl } from "./share";
 import {
-  loadShareCardLogos,
   renderShareCard,
   SHARE_CARD_HEIGHT,
   SHARE_CARD_WIDTH,
@@ -63,7 +63,6 @@ async function render(input: Parameters<typeof renderShareCard>[0]) {
 
 describe("renderShareCard under the real ImageResponse", () => {
   it("renders the full card to a 1080x1350 PNG", async () => {
-    const logos = await loadShareCardLogos();
     const qr = await shareQrDataUrl("https://watchthis.example/");
     expect(qr).not.toBeNull();
 
@@ -73,7 +72,6 @@ describe("renderShareCard under the real ImageResponse", () => {
       qr,
       // Any decodable raster stands in for the TMDB poster; the QR is one.
       poster: qr,
-      ...logos,
     });
 
     expect(pngSize(png)).toEqual({ width: 1080, height: 1350 });
@@ -86,7 +84,6 @@ describe("renderShareCard under the real ImageResponse", () => {
       username: "ben",
       qr: null,
       poster: null,
-      ...(await loadShareCardLogos()),
     });
 
     expect(pngSize(png)).toEqual({ width: 1080, height: 1350 });
@@ -109,10 +106,51 @@ describe("renderShareCard under the real ImageResponse", () => {
       username: "a-rather-long-username-for-the-hero-line",
       qr: null,
       poster: null,
-      ...(await loadShareCardLogos()),
     });
 
     expect(pngSize(png)).toEqual({ width: 1080, height: 1350 });
     await keepForInspection("share-card-sparse", png);
   }, 30_000);
+});
+
+/** The text children of an element tree, in reading order (styles skipped). */
+function textChildren(node: unknown): string[] {
+  if (typeof node === "string" || typeof node === "number") {
+    return [String(node)];
+  }
+  if (Array.isArray(node)) return node.flatMap(textChildren);
+  if (!isValidElement(node)) return [];
+  return textChildren((node.props as { children?: unknown }).children);
+}
+
+describe("renderShareCard copy", () => {
+  it("says hours for most years", () => {
+    const text = textChildren(
+      renderShareCard({
+        card: card(),
+        username: "ben",
+        qr: null,
+        poster: null,
+      }),
+    ).join(" ");
+
+    expect(text).toContain("ben watched 412 hours");
+  });
+
+  it("says 1 hour, singular, for a one-hour year", () => {
+    const oneHour = card();
+    oneHour.headline.hours = 1;
+
+    const text = textChildren(
+      renderShareCard({
+        card: oneHour,
+        username: "ben",
+        qr: null,
+        poster: null,
+      }),
+    ).join(" ");
+
+    expect(text).toContain("ben watched 1 hour 1,208 episodes");
+    expect(text).not.toContain("1 hours");
+  });
 });
