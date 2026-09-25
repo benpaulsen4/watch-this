@@ -324,7 +324,9 @@ describe("GET /api/series-finale/[period]/card", () => {
 
     expect(response.status).toBe(200);
     expect(
-      imageSources(lastTree()).filter((src) => src.startsWith("data:image/webp")),
+      imageSources(lastTree()).filter((src) =>
+        src.startsWith("data:image/webp"),
+      ),
     ).toEqual([]);
   });
 

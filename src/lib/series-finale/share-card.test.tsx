@@ -130,7 +130,9 @@ describe("renderShareCard under the real ImageResponse", () => {
       // Three lines' worth with no break in it: the two-line clamp holds.
       niche: {
         title:
-          "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch".repeat(2),
+          "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch".repeat(
+            2,
+          ),
       },
     };
 
