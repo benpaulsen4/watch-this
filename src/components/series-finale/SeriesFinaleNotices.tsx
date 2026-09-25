@@ -28,13 +28,19 @@ export function UnavailableNotice({ period }: { period: string }) {
   );
 }
 
-/** Any other failure, which may well pass. */
-export function LoadFailedNotice() {
+/**
+ * Any other failure, which may well pass -- so it offers the retry it
+ * suggests. `onRetry` refetches the recap. Shared by the recap and the story.
+ */
+export function LoadFailedNotice({ onRetry }: { onRetry: () => void }) {
   return (
     <Card className="mx-auto max-w-lg p-8 text-center">
       <p className="text-sm text-gray-400">
         That recap could not be loaded. Try again in a moment.
       </p>
+      <Button variant="outline" size="sm" className="mt-6" onClick={onRetry}>
+        Retry
+      </Button>
     </Card>
   );
 }

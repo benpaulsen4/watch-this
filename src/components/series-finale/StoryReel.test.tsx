@@ -301,8 +301,12 @@ describe("StoryReel", () => {
     expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });
 
-  it("offers a retry for any other failure", async () => {
-    mockFetchStatus(500);
+  it("offers a retry for any other failure, and retrying loads the reel", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+      .mockResolvedValue({ ok: true, json: async () => ({ payload: payload() }) });
+    vi.stubGlobal("fetch", fetchMock);
     renderReel();
 
     await waitFor(() =>
@@ -311,5 +315,33 @@ describe("StoryReel", () => {
     expect(
       screen.queryByText("No Series Finale for 2026"),
     ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Series Finale")).toBeInTheDocument(),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("can be closed while the recap is still loading", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    renderReel();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Close story" }),
+    );
+    expect(push).toHaveBeenLastCalledWith("/series-finale/2026");
+  });
+
+  it("can be closed when the period is not available", async () => {
+    mockFetchStatus(404);
+    renderReel();
+
+    await waitFor(() =>
+      expect(screen.getByText("No Series Finale for 2026")).toBeInTheDocument(),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Close story" }));
+    expect(push).toHaveBeenLastCalledWith("/series-finale/2026");
   });
 });

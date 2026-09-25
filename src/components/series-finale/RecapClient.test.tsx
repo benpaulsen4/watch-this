@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -270,8 +271,12 @@ describe("RecapClient", () => {
     ).toHaveAttribute("href", "/profile#data");
   });
 
-  it("offers a retry-later message for any other failure", async () => {
-    mockFetchStatus(500);
+  it("offers a retry for any other failure, and retrying loads the recap", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+      .mockResolvedValue({ ok: true, json: async () => ({ payload: payload() }) });
+    vi.stubGlobal("fetch", fetchMock);
     renderRecap();
 
     await waitFor(() =>
@@ -280,6 +285,11 @@ describe("RecapClient", () => {
     expect(
       screen.queryByText("No Series Finale for 2026"),
     ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("renders the archetype with the user's actual top weekday", async () => {

@@ -65,7 +65,7 @@ interface RecapClientProps {
 }
 
 export function RecapClient({ period, user }: RecapClientProps) {
-  const { data: payload, isLoading, error } = useSeriesFinale(period);
+  const { data: payload, isLoading, error, refetch } = useSeriesFinale(period);
 
   return (
     <>
@@ -87,6 +87,7 @@ export function RecapClient({ period, user }: RecapClientProps) {
           payload={payload}
           isLoading={isLoading}
           error={error}
+          onRetry={() => void refetch()}
         />
       </main>
     </>
@@ -99,12 +100,14 @@ function RecapBody({
   payload,
   isLoading,
   error,
+  onRetry,
 }: {
   period: string;
   user: Viewer;
   payload: SeriesFinalePayload | undefined;
   isLoading: boolean;
   error: Error | null;
+  onRetry: () => void;
 }) {
   if (isLoading) {
     return (
@@ -125,7 +128,7 @@ function RecapBody({
   if (error || !payload) {
     return (
       <Container className="py-16">
-        <LoadFailedNotice />
+        <LoadFailedNotice onRetry={onRetry} />
       </Container>
     );
   }

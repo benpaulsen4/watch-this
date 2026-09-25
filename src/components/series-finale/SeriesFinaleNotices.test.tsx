@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import { LoadFailedNotice, UnavailableNotice } from "./SeriesFinaleNotices";
 
@@ -16,11 +17,14 @@ describe("UnavailableNotice", () => {
 });
 
 describe("LoadFailedNotice", () => {
-  it("asks for a retry, since this failure may pass", () => {
-    render(<LoadFailedNotice />);
+  it("asks for a retry, since this failure may pass, and offers one", async () => {
+    const onRetry = vi.fn();
+    render(<LoadFailedNotice onRetry={onRetry} />);
 
     expect(
       screen.getByText("That recap could not be loaded. Try again in a moment."),
     ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

@@ -115,7 +115,7 @@ interface StoryReelProps {
  */
 export function StoryReel({ period, user }: StoryReelProps) {
   const router = useRouter();
-  const { data: payload, isLoading, error } = useSeriesFinale(period);
+  const { data: payload, isLoading, error, refetch } = useSeriesFinale(period);
   const [index, setIndex] = useState(0);
 
   const cards = useMemo(
@@ -157,9 +157,11 @@ export function StoryReel({ period, user }: StoryReelProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [go, close]);
 
+  // Every state has the close control: a first generation can take seconds,
+  // and a touch user has no Escape key.
   if (isLoading) {
     return (
-      <Frame>
+      <Frame onClose={close}>
         <div className="flex min-h-dvh items-center justify-center">
           <LoadingSpinner text="Putting your year together" />
         </div>
@@ -169,7 +171,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
 
   if (error instanceof SeriesFinaleUnavailableError) {
     return (
-      <Frame>
+      <Frame onClose={close}>
         <div className="flex min-h-dvh items-center px-4">
           <UnavailableNotice period={period} />
         </div>
@@ -181,7 +183,7 @@ export function StoryReel({ period, user }: StoryReelProps) {
     return (
       <Frame onClose={close}>
         <div className="flex min-h-dvh items-center px-4">
-          <LoadFailedNotice />
+          <LoadFailedNotice onRetry={() => void refetch()} />
         </div>
       </Frame>
     );
