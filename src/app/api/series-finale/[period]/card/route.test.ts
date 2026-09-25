@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { isValidElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { shareQrDataUrl } from "@/lib/series-finale/share";
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 
 const mockUser = { id: "user-1", username: "benjamin" };
@@ -17,11 +18,24 @@ vi.mock("@/lib/series-finale/service", () => ({
   getOrGenerateSnapshot: (...args: unknown[]) => getOrGenerateSnapshot(...args),
 }));
 
+// A site URL no environment would produce, so the QR test can tell the QR was
+// made from it and from nothing else.
+const SITE_SENTINEL = "https://qr-sentinel.example/";
+const getSiteUrl = vi.fn((_pathname?: string) => SITE_SENTINEL);
+vi.mock("@/lib/seo/site", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/seo/site")>()),
+  getSiteUrl: (pathname?: string) => getSiteUrl(pathname),
+}));
+
 // The real renderer is exercised by share-card.test.tsx. Here ImageResponse
 // only records the element tree it was handed, so the privacy test can read
 // exactly what would have been drawn.
 const rendered: { element: ReactNode; options: unknown }[] = [];
-const renderFailure = { error: null as Error | null };
+/** `error` fails the next `times` renders (every render by default). */
+const renderFailure = {
+  error: null as Error | null,
+  times: Number.POSITIVE_INFINITY,
+};
 vi.mock("next/og", () => ({
   ImageResponse: class extends Response {
     constructor(element: ReactNode, options: unknown) {
@@ -30,7 +44,10 @@ vi.mock("next/og", () => ({
     }
 
     override async arrayBuffer(): Promise<ArrayBuffer> {
-      if (renderFailure.error) throw renderFailure.error;
+      if (renderFailure.error && renderFailure.times > 0) {
+        renderFailure.times -= 1;
+        throw renderFailure.error;
+      }
       return super.arrayBuffer();
     }
   },
@@ -155,7 +172,9 @@ describe("GET /api/series-finale/[period]/card", () => {
     vi.clearAllMocks();
     rendered.length = 0;
     renderFailure.error = null;
+    renderFailure.times = Number.POSITIVE_INFINITY;
     vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     fetchMock.mockResolvedValue(
       new Response(POSTER_BYTES, {
         headers: { "content-type": "image/jpeg" },
@@ -258,6 +277,74 @@ describe("GET /api/series-finale/[period]/card", () => {
     expect(imageSources(lastTree())).toContain(POSTER_DATA_URL);
   });
 
+  it("refuses to follow a redirect off the TMDB image host", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+
+    await GET(authedRequest(CARD_URL));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ redirect: "error" }),
+    );
+  });
+
+  it("inlines a poster by its base content type, ignoring parameters and case", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+    fetchMock.mockResolvedValue(
+      new Response(POSTER_BYTES, {
+        headers: { "content-type": "Image/JPEG; charset=binary" },
+      }),
+    );
+
+    await GET(authedRequest(CARD_URL));
+
+    expect(imageSources(lastTree())).toContain(POSTER_DATA_URL);
+  });
+
+  it("inlines a PNG poster", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+    fetchMock.mockResolvedValue(
+      new Response(POSTER_BYTES, { headers: { "content-type": "image/png" } }),
+    );
+
+    await GET(authedRequest(CARD_URL));
+
+    expect(imageSources(lastTree())).toContain(
+      `data:image/png;base64,${Buffer.from(POSTER_BYTES).toString("base64")}`,
+    );
+  });
+
+  it("drops a poster in a format the renderer cannot decode", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+    fetchMock.mockResolvedValue(
+      new Response(POSTER_BYTES, { headers: { "content-type": "image/webp" } }),
+    );
+
+    const response = await GET(authedRequest(CARD_URL));
+
+    expect(response.status).toBe(200);
+    expect(
+      imageSources(lastTree()).filter((src) => src.startsWith("data:image/webp")),
+    ).toEqual([]);
+  });
+
+  it("drops a poster that declares more than 2 MB", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+    fetchMock.mockResolvedValue(
+      new Response(POSTER_BYTES, {
+        headers: {
+          "content-type": "image/jpeg",
+          "content-length": String(2 * 1024 * 1024 + 1),
+        },
+      }),
+    );
+
+    const response = await GET(authedRequest(CARD_URL));
+
+    expect(response.status).toBe(200);
+    expect(imageSources(lastTree())).not.toContain(POSTER_DATA_URL);
+  });
+
   it("falls back to the placeholder frame when the poster fetch fails", async () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
     fetchMock.mockRejectedValue(new Error("network down"));
@@ -283,6 +370,35 @@ describe("GET /api/series-finale/[period]/card", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("drops a poster whose body runs past 2 MB without declaring a length", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+    const oversized = new Uint8Array(2 * 1024 * 1024 + 1);
+    oversized.set(POSTER_BYTES);
+    fetchMock.mockResolvedValue(
+      new Response(oversized, { headers: { "content-type": "image/jpeg" } }),
+    );
+
+    const response = await GET(authedRequest(CARD_URL));
+
+    expect(response.status).toBe(200);
+    expect(
+      imageSources(lastTree()).filter((src) =>
+        src.startsWith("data:image/jpeg"),
+      ),
+    ).toEqual([]);
+  });
+
+  it("points the QR at the site's front page, not at anything of the user's", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+
+    await GET(authedRequest(CARD_URL));
+
+    expect(getSiteUrl).toHaveBeenCalledWith("/");
+    const expected = await shareQrDataUrl(SITE_SENTINEL);
+    expect(expected).not.toBeNull();
+    expect(imageSources(lastTree())).toContain(expected);
+  });
+
   it("carries the QR and the TMDB attribution as inline images", async () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
 
@@ -303,5 +419,33 @@ describe("GET /api/series-finale/[period]/card", () => {
 
     expect(response.status).toBe(500);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    // Once with the poster, once without it, and no further.
+    expect(rendered).toHaveLength(2);
+  });
+
+  it("retries without the poster when the render fails with one", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+    renderFailure.error = new Error("Unsupported image type");
+    renderFailure.times = 1;
+
+    const response = await GET(authedRequest(CARD_URL));
+
+    expect(response.status).toBe(200);
+    expect(rendered).toHaveLength(2);
+    expect(imageSources(rendered[0]?.element)).toContain(POSTER_DATA_URL);
+    expect(imageSources(rendered[1]?.element)).not.toContain(POSTER_DATA_URL);
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it("does not retry a failed render that had no poster to drop", async () => {
+    const withoutPoster = payload();
+    if (withoutPoster.topShow) withoutPoster.topShow.posterPath = null;
+    getOrGenerateSnapshot.mockResolvedValue(withoutPoster);
+    renderFailure.error = new Error("Expected <div> to have explicit display");
+
+    const response = await GET(authedRequest(CARD_URL));
+
+    expect(response.status).toBe(500);
+    expect(rendered).toHaveLength(1);
   });
 });

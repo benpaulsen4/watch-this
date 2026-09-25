@@ -23,6 +23,11 @@ import { getImageUrl } from "@/lib/tmdb/client";
 export const runtime = "nodejs";
 
 const POSTER_TIMEOUT_MS = 3000;
+// A w342 poster is tens of kilobytes; anything near this is not one.
+const POSTER_MAX_BYTES = 2 * 1024 * 1024;
+// The formats Satori decodes that TMDB serves. WebP, should the CDN ever
+// negotiate it, would fail the whole render rather than just the poster.
+const POSTER_TYPES = new Set(["image/jpeg", "image/png"]);
 
 /**
  * The top show's poster as a data URL, or null for the placeholder frame.
@@ -40,11 +45,22 @@ async function posterDataUrl(
   try {
     const response = await fetch(url, {
       signal: AbortSignal.timeout(POSTER_TIMEOUT_MS),
+      // The host is fixed by getImageUrl; a redirect is the one way off it.
+      redirect: "error",
     });
-    const type = response.headers.get("content-type") ?? "";
-    if (!response.ok || !type.startsWith("image/")) return null;
+    // The base type only: `image/jpeg; charset=...` would otherwise end up
+    // inside the data URL and make it malformed.
+    const type = (response.headers.get("content-type") ?? "")
+      .split(";")[0]
+      ?.trim()
+      .toLowerCase();
+    if (!response.ok || !type || !POSTER_TYPES.has(type)) return null;
+    if (Number(response.headers.get("content-length")) > POSTER_MAX_BYTES) {
+      return null;
+    }
 
     const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.byteLength > POSTER_MAX_BYTES) return null;
     return `data:${type};base64,${bytes.toString("base64")}`;
   } catch {
     return null;
@@ -85,20 +101,31 @@ const handler = withAuth(async (request: AuthenticatedRequest) => {
       posterDataUrl(card.topShow?.posterPath ?? null),
     ]);
 
-    const image = new ImageResponse(
-      renderShareCard({
-        card,
-        username: request.user.username,
-        qr,
-        poster,
-      }),
-      { width: SHARE_CARD_WIDTH, height: SHARE_CARD_HEIGHT },
-    );
-
     // ImageResponse renders lazily inside its body stream, so a Satori error
     // would otherwise surface as a truncated 200 after this handler returned.
     // Buffering here routes it through handleApiError instead.
-    const png = await image.arrayBuffer();
+    const renderPng = (withPoster: string | null) =>
+      new ImageResponse(
+        renderShareCard({
+          card,
+          username: request.user.username,
+          qr,
+          poster: withPoster,
+        }),
+        { width: SHARE_CARD_WIDTH, height: SHARE_CARD_HEIGHT },
+      ).arrayBuffer();
+
+    let png: ArrayBuffer;
+    try {
+      png = await renderPng(poster);
+    } catch (error) {
+      // A poster that passed the type check can still be one Satori cannot
+      // decode. It should cost the poster, not the card: draw the
+      // placeholder frame instead. Without a poster there is nothing to drop.
+      if (poster === null) throw error;
+      console.warn("Series Finale card: retrying without the poster", error);
+      png = await renderPng(null);
+    }
 
     return new NextResponse(png, {
       headers: { "Content-Type": "image/png" },
