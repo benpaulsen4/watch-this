@@ -52,6 +52,7 @@ import {
   UnavailableNotice,
 } from "./SeriesFinaleNotices";
 import { DroppedBadges, PlanningBadges } from "./ShameBadges";
+import { ShareButton } from "./ShareButton";
 import { StatTile } from "./StatTile";
 import { ThinYearCard } from "./ThinYearCard";
 import { TmdbAttribution } from "./TmdbAttribution";
@@ -74,9 +75,12 @@ export function RecapClient({ period, user }: RecapClientProps) {
         backLinkLabel="Back to profile"
       >
         {payload && !payload.thin ? (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/series-finale/${period}/story`}>Play as story</Link>
-          </Button>
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/series-finale/${period}/story`}>Play as story</Link>
+            </Button>
+            <ShareButton period={period} />
+          </>
         ) : null}
       </PageHeader>
       <main>

@@ -17,20 +17,38 @@ const viewer = { username: "ben", profilePictureUrl: "" };
 
 const payload = (overrides: Record<string, unknown> = {}) => ({
   schemaVersion: 2,
-  period: { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z", label: "2026" },
+  period: {
+    start: "2026-01-01T00:00:00.000Z",
+    end: "2027-01-01T00:00:00.000Z",
+    label: "2026",
+  },
   headline: {
-    hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47,
-    titlesDropped: 0, unknownRuntimeEpisodes: 0, percentile: 4,
+    hours: 412,
+    minutes: 24720,
+    episodes: 1208,
+    titlesCompleted: 47,
+    titlesDropped: 0,
+    unknownRuntimeEpisodes: 0,
+    percentile: 4,
   },
   episodes: { total: 1208, perDay: 3.3 },
   finished: { films: 31, shows: 16, total: 47 },
-  topShow: null, niche: null, genres: [],
+  topShow: null,
+  niche: null,
+  genres: [],
   months: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, episodes: 0 })),
   soloTickTotal: 0,
   bigDay: null,
-  rhythm: { archetype: null, weekdayCounts: [0, 0, 0, 0, 0, 0, 0], topWeekday: null, lateShare: null },
+  rhythm: {
+    archetype: null,
+    weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
+    topWeekday: null,
+    lateShare: null,
+  },
   shame: { dropped: [], stillPlanning: [] },
-  crew: [], compare: [], thin: false,
+  crew: [],
+  compare: [],
+  thin: false,
   ...overrides,
 });
 
@@ -84,7 +102,15 @@ describe("RecapClient", () => {
     mockFetch({
       payload: payload({
         thin: true,
-        headline: { hours: 0, minutes: 0, episodes: 9, titlesCompleted: 2, titlesDropped: 0, unknownRuntimeEpisodes: 0, percentile: null },
+        headline: {
+          hours: 0,
+          minutes: 0,
+          episodes: 9,
+          titlesCompleted: 2,
+          titlesDropped: 0,
+          unknownRuntimeEpisodes: 0,
+          percentile: null,
+        },
       }),
     });
     renderRecap();
@@ -97,12 +123,23 @@ describe("RecapClient", () => {
     expect(
       screen.queryByRole("link", { name: "Play as story" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Share" }),
+    ).not.toBeInTheDocument();
   });
 
   it("omits the percentile line when there is no cohort", async () => {
     mockFetch({
       payload: payload({
-        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 0, unknownRuntimeEpisodes: 0, percentile: null },
+        headline: {
+          hours: 412,
+          minutes: 24720,
+          episodes: 1208,
+          titlesCompleted: 47,
+          titlesDropped: 0,
+          unknownRuntimeEpisodes: 0,
+          percentile: null,
+        },
       }),
     });
     renderRecap();
@@ -125,7 +162,15 @@ describe("RecapClient", () => {
   it("omits the percentile line for the lower half", async () => {
     mockFetch({
       payload: payload({
-        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 0, unknownRuntimeEpisodes: 0, percentile: 96 },
+        headline: {
+          hours: 412,
+          minutes: 24720,
+          episodes: 1208,
+          titlesCompleted: 47,
+          titlesDropped: 0,
+          unknownRuntimeEpisodes: 0,
+          percentile: 96,
+        },
       }),
     });
     renderRecap();
@@ -139,7 +184,9 @@ describe("RecapClient", () => {
     renderRecap();
 
     await waitFor(() =>
-      expect(screen.getByText(/not endorsed or certified by TMDB/)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/not endorsed or certified by TMDB/),
+      ).toBeInTheDocument(),
     );
     expect(screen.getByAltText("TMDB")).toBeInTheDocument();
   });
@@ -160,7 +207,11 @@ describe("RecapClient", () => {
       payload: payload({
         // Bounds localised to Auckland at generation: read in UTC they would
         // start on 31 December.
-        period: { start: "2025-12-31T11:00:00.000Z", end: "2026-12-31T11:00:00.000Z", label: "2026" },
+        period: {
+          start: "2025-12-31T11:00:00.000Z",
+          end: "2026-12-31T11:00:00.000Z",
+          label: "2026",
+        },
       }),
     });
     renderRecap();
@@ -175,7 +226,12 @@ describe("RecapClient", () => {
   it("describes the year in a sentence built from the payload", async () => {
     mockFetch({
       payload: payload({
-        rhythm: { archetype: null, weekdayCounts: [1, 1, 1, 1, 1, 1, 6], topWeekday: 6, lateShare: 0.7 },
+        rhythm: {
+          archetype: null,
+          weekdayCounts: [1, 1, 1, 1, 1, 1, 6],
+          topWeekday: 6,
+          lateShare: 0.7,
+        },
       }),
     });
     renderRecap();
@@ -192,14 +248,24 @@ describe("RecapClient", () => {
   it("discloses episodes left out of the hours for want of a runtime", async () => {
     mockFetch({
       payload: payload({
-        headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 0, unknownRuntimeEpisodes: 14, percentile: 4 },
+        headline: {
+          hours: 412,
+          minutes: 24720,
+          episodes: 1208,
+          titlesCompleted: 47,
+          titlesDropped: 0,
+          unknownRuntimeEpisodes: 14,
+          percentile: 4,
+        },
       }),
     });
     renderRecap();
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Excludes 14 episodes or films with no runtime on TMDB/),
+        screen.getByText(
+          /Excludes 14 episodes or films with no runtime on TMDB/,
+        ),
       ).toBeInTheDocument(),
     );
   });
@@ -208,7 +274,11 @@ describe("RecapClient", () => {
     mockFetch({
       payload: payload({
         bigDay: {
-          date: "2026-03-14", episodes: 11, minutes: 500, timeline: null, soloTickCount: 0,
+          date: "2026-03-14",
+          episodes: 11,
+          minutes: 500,
+          timeline: null,
+          soloTickCount: 0,
           streak: { days: 23, start: "2026-01-02", end: "2026-01-24" },
         },
       }),
@@ -258,6 +328,15 @@ describe("RecapClient", () => {
     ).toHaveAttribute("href", "/profile#data");
   });
 
+  it("offers to share the card beside Play as story", async () => {
+    mockFetch({ payload: payload() });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument(),
+    );
+  });
+
   it("says plainly when the period is not available", async () => {
     mockFetchStatus(404);
     renderRecap();
@@ -275,7 +354,10 @@ describe("RecapClient", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
-      .mockResolvedValue({ ok: true, json: async () => ({ payload: payload() }) });
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ payload: payload() }),
+      });
     vi.stubGlobal("fetch", fetchMock);
     renderRecap();
 
@@ -289,7 +371,12 @@ describe("RecapClient", () => {
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The Share button mounts once the retry succeeds and prefetches its own
+    // card on a separate endpoint, so this counts the payload fetch alone.
+    const payloadCalls = fetchMock.mock.calls.filter(
+      ([url]) => url === "/api/series-finale/2026",
+    );
+    expect(payloadCalls).toHaveLength(2);
   });
 
   it("renders the archetype with the user's actual top weekday", async () => {
@@ -359,7 +446,9 @@ describe("RecapClient", () => {
         ...droppedCount(6),
         shame: {
           dropped: Array.from({ length: 5 }, (_, i) => ({
-            tmdbId: i, title: `Show ${i + 1}`, lastEpisode: "S1E02",
+            tmdbId: i,
+            title: `Show ${i + 1}`,
+            lastEpisode: "S1E02",
           })),
           stillPlanning: [],
         },
@@ -386,7 +475,10 @@ describe("RecapClient", () => {
         shame: {
           dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }],
           stillPlanning: Array.from({ length: 7 }, (_, i) => ({
-            tmdbId: 100 + i, title: `Film ${i + 1}`, days: 1104 - i, runtime: 120,
+            tmdbId: 100 + i,
+            title: `Film ${i + 1}`,
+            days: 1104 - i,
+            runtime: 120,
           })),
         },
       }),
@@ -410,7 +502,9 @@ describe("RecapClient", () => {
       payload: payload({
         shame: {
           dropped: [],
-          stillPlanning: [{ tmdbId: 7, title: "Stalker", days: 892, runtime: 161 }],
+          stillPlanning: [
+            { tmdbId: 7, title: "Stalker", days: 892, runtime: 161 },
+          ],
         },
       }),
     });
@@ -443,12 +537,21 @@ describe("RecapClient", () => {
     mockFetch({
       payload: payload({
         topShow: {
-          tmdbId: 1, title: "The Bear", posterPath: "/bear.jpg", episodes: 38,
-          minutes: 1002, finishedAt: null, alsoTopFor: ["ana", "marcus"],
+          tmdbId: 1,
+          title: "The Bear",
+          posterPath: "/bear.jpg",
+          episodes: 38,
+          minutes: 1002,
+          finishedAt: null,
+          alsoTopFor: ["ana", "marcus"],
         },
         niche: {
-          tmdbId: 2, title: "Ich war zuhause, aber", posterPath: null,
-          popularity: 2.1, medianPopularity: 68, mostPopular: null,
+          tmdbId: 2,
+          title: "Ich war zuhause, aber",
+          posterPath: null,
+          popularity: 2.1,
+          medianPopularity: 68,
+          mostPopular: null,
           filmPopularities: Array.from({ length: 31 }, () => 50),
         },
       }),
@@ -484,8 +587,13 @@ describe("RecapClient", () => {
     mockFetch({
       payload: payload({
         topShow: {
-          tmdbId: 1, title: "The Bear", posterPath: null, episodes: 38,
-          minutes: 1002, finishedAt: "2026-04-04", alsoTopFor: [],
+          tmdbId: 1,
+          title: "The Bear",
+          posterPath: null,
+          episodes: 38,
+          minutes: 1002,
+          finishedAt: "2026-04-04",
+          alsoTopFor: [],
         },
       }),
     });
@@ -502,8 +610,13 @@ describe("RecapClient", () => {
     mockFetch({
       payload: payload({
         topShow: {
-          tmdbId: 1, title: "The Bear", posterPath: null, episodes: 38,
-          minutes: 0, finishedAt: null, alsoTopFor: [],
+          tmdbId: 1,
+          title: "The Bear",
+          posterPath: null,
+          episodes: 38,
+          minutes: 0,
+          finishedAt: null,
+          alsoTopFor: [],
         },
       }),
     });
@@ -537,8 +650,12 @@ describe("RecapClient", () => {
       payload: payload({
         soloTickTotal: 12,
         bigDay: {
-          date: "2026-03-14", episodes: 11, minutes: 500, timeline: null,
-          soloTickCount: 0, streak: null,
+          date: "2026-03-14",
+          episodes: 11,
+          minutes: 500,
+          timeline: null,
+          soloTickCount: 0,
+          streak: null,
         },
       }),
     });
@@ -560,13 +677,16 @@ describe("RecapClient", () => {
     mockFetch({
       payload: payload({
         bigDay: {
-          date: "2026-03-14", episodes: 11, minutes: 500,
+          date: "2026-03-14",
+          episodes: 11,
+          minutes: 500,
           timeline: [
             { at: "2026-03-14T10:00:00.000Z" },
             { at: "2026-03-14T14:50:00.000Z" },
             { at: "2026-03-14T19:40:00.000Z" },
           ],
-          soloTickCount: 3, streak: null,
+          soloTickCount: 3,
+          streak: null,
         },
       }),
     });
@@ -579,7 +699,9 @@ describe("RecapClient", () => {
         ),
       ).toBeInTheDocument(),
     );
-    expect(screen.queryByText(/too few to put on a clock/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/too few to put on a clock/),
+    ).not.toBeInTheDocument();
   });
 
   it("ranks the crew by episodes, with the viewer's row from the headline", async () => {
@@ -618,8 +740,13 @@ describe("RecapClient", () => {
       payload: payload({
         compare: [
           {
-            userId: "u1", username: "ana", onlyYou: 62, both: 34, onlyThem: 28,
-            theyFinishedYouDropped: null, bothPlanningNeitherStarted: null,
+            userId: "u1",
+            username: "ana",
+            onlyYou: 62,
+            both: 34,
+            onlyThem: 28,
+            theyFinishedYouDropped: null,
+            bothPlanningNeitherStarted: null,
           },
         ],
       }),
@@ -639,12 +766,22 @@ describe("RecapClient", () => {
       payload: payload({
         compare: [
           {
-            userId: "u1", username: "ana", onlyYou: 62, both: 34, onlyThem: 28,
-            theyFinishedYouDropped: "Foundation", bothPlanningNeitherStarted: null,
+            userId: "u1",
+            username: "ana",
+            onlyYou: 62,
+            both: 34,
+            onlyThem: 28,
+            theyFinishedYouDropped: "Foundation",
+            bothPlanningNeitherStarted: null,
           },
           {
-            userId: "u2", username: "marcus", onlyYou: 90, both: 6, onlyThem: 12,
-            theyFinishedYouDropped: null, bothPlanningNeitherStarted: null,
+            userId: "u2",
+            username: "marcus",
+            onlyYou: 90,
+            both: 6,
+            onlyThem: 12,
+            theyFinishedYouDropped: null,
+            bothPlanningNeitherStarted: null,
           },
         ],
       }),
@@ -670,8 +807,12 @@ describe("RecapClient", () => {
     mockFetch({
       payload: payload({
         bigDay: {
-          date: "2026-03-14", episodes: 11, minutes: 500, timeline: null,
-          soloTickCount: 0, streak: null,
+          date: "2026-03-14",
+          episodes: 11,
+          minutes: 500,
+          timeline: null,
+          soloTickCount: 0,
+          streak: null,
         },
       }),
     });

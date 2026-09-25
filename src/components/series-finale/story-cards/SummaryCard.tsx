@@ -4,6 +4,7 @@ import type { SummaryCardData } from "@/lib/series-finale/share";
 import { cn } from "@/lib/utils";
 
 import { archetypeName, formatCount, pluralNoun } from "../format";
+import { ShareButton } from "../ShareButton";
 import type { Viewer } from "../viewer";
 import { Enter, Shell } from "./StoryShell";
 
@@ -84,6 +85,14 @@ export function SummaryCard({
             ))}
           </dl>
         ) : null}
+      </Enter>
+      {/* Above the tap zones, so the tap is a share and not a card change. */}
+      <Enter delay={160} className="relative z-20 mt-5 flex justify-center">
+        <ShareButton
+          period={summary.period.label}
+          label="Share your card"
+          size="lg"
+        />
       </Enter>
     </Shell>
   );

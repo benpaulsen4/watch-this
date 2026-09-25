@@ -1,25 +1,63 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 
 import { StoryCard } from "./StoryCard";
 
+const wrapper = ({ children }: { children: ReactNode }) => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 const payload = (overrides: Partial<SeriesFinalePayload> = {}) =>
   ({
     schemaVersion: 2,
-    period: { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z", label: "2026" },
-    headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: 4 },
+    period: {
+      start: "2026-01-01T00:00:00.000Z",
+      end: "2027-01-01T00:00:00.000Z",
+      label: "2026",
+    },
+    headline: {
+      hours: 412,
+      minutes: 24720,
+      episodes: 1208,
+      titlesCompleted: 47,
+      titlesDropped: 6,
+      unknownRuntimeEpisodes: 0,
+      percentile: 4,
+    },
     episodes: { total: 1208, perDay: 3.3 },
     finished: { films: 31, shows: 16, total: 47 },
-    topShow: null, niche: null, genres: [],
-    months: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, episodes: 10 })),
+    topShow: null,
+    niche: null,
+    genres: [],
+    months: Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      episodes: 10,
+    })),
     soloTickTotal: 0,
     bigDay: null,
-    rhythm: { archetype: null, weekdayCounts: [1, 1, 1, 1, 1, 1, 1], topWeekday: 0, lateShare: null },
+    rhythm: {
+      archetype: null,
+      weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
+      topWeekday: 0,
+      lateShare: null,
+    },
     shame: { dropped: [], stillPlanning: [] },
-    crew: [], compare: [], thin: false,
+    crew: [],
+    compare: [],
+    thin: false,
     ...overrides,
   }) as SeriesFinalePayload;
 
@@ -33,26 +71,43 @@ const droppedCount = (titlesDropped: number) => ({
 const renderCard = (
   id: Parameters<typeof StoryCard>[0]["id"],
   overrides: Partial<SeriesFinalePayload> = {},
-) => render(<StoryCard id={id} payload={payload(overrides)} viewer={viewer} />);
+) =>
+  render(<StoryCard id={id} payload={payload(overrides)} viewer={viewer} />, {
+    wrapper,
+  });
 
 const topShow = {
-  tmdbId: 1, title: "The Bear", posterPath: "/bear.jpg", episodes: 38,
-  minutes: 1002, finishedAt: "2026-04-04", alsoTopFor: ["marcus"],
+  tmdbId: 1,
+  title: "The Bear",
+  posterPath: "/bear.jpg",
+  episodes: 38,
+  minutes: 1002,
+  finishedAt: "2026-04-04",
+  alsoTopFor: ["marcus"],
 };
 
 const niche = {
-  tmdbId: 2, title: "Ich war zuhause, aber", posterPath: null,
-  popularity: 2.1, medianPopularity: 68,
+  tmdbId: 2,
+  title: "Ich war zuhause, aber",
+  posterPath: null,
+  popularity: 2.1,
+  medianPopularity: 68,
   mostPopular: { tmdbId: 3, title: "Dune: Part Two", popularity: 411.6 },
   filmPopularities: [50, 2.1, 411.6, ...Array.from({ length: 28 }, () => 68)],
 };
 
 const member = (username: string, episodes: number) => ({
-  userId: `id-${username}`, username, episodes,
+  userId: `id-${username}`,
+  username,
+  episodes,
 });
 
 const peer = (username: string, both: number) => ({
-  userId: `id-${username}`, username, onlyYou: 62, both, onlyThem: 28,
+  userId: `id-${username}`,
+  username,
+  onlyYou: 62,
+  both,
+  onlyThem: 28,
   theyFinishedYouDropped: "Foundation",
   bothPlanningNeitherStarted: null,
 });
@@ -77,14 +132,30 @@ describe("StoryCard", () => {
 
   it("omits the percentile line when null", () => {
     renderCard("hours", {
-      headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: null },
+      headline: {
+        hours: 412,
+        minutes: 24720,
+        episodes: 1208,
+        titlesCompleted: 47,
+        titlesDropped: 6,
+        unknownRuntimeEpisodes: 0,
+        percentile: null,
+      },
     });
     expect(screen.queryByText(/Top/)).not.toBeInTheDocument();
   });
 
   it("omits the percentile line for the lower half", () => {
     renderCard("hours", {
-      headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 14, percentile: 96 },
+      headline: {
+        hours: 412,
+        minutes: 24720,
+        episodes: 1208,
+        titlesCompleted: 47,
+        titlesDropped: 6,
+        unknownRuntimeEpisodes: 14,
+        percentile: 96,
+      },
     });
     expect(screen.queryByText(/Top/)).not.toBeInTheDocument();
     expect(
@@ -117,12 +188,16 @@ describe("StoryCard", () => {
     expect(screen.getByText("The Bear")).toBeInTheDocument();
     // Decorative beside the visible title: not read out twice.
     expect(screen.queryByAltText("The Bear")).not.toBeInTheDocument();
-    expect(container.querySelector('img[alt=""][src*="bear.jpg"]')).not.toBeNull();
+    expect(
+      container.querySelector('img[alt=""][src*="bear.jpg"]'),
+    ).not.toBeNull();
     expect(
       screen.getByText("38 episodes · 16h 42m · last watched 4 April"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Also number one for marcus. You two need new material."),
+      screen.getByText(
+        "Also number one for marcus. You two need new material.",
+      ),
     ).toBeInTheDocument();
     // It is the last episode watched, not a finish: the show may be ongoing.
     expect(container.textContent).not.toMatch(/finished/);
@@ -156,7 +231,9 @@ describe("StoryCard", () => {
     expect(
       screen.getByText("Most famous: Dune: Part Two, popularity 412"),
     ).toBeInTheDocument();
-    expect(screen.getByText("your 31 films, by popularity")).toBeInTheDocument();
+    expect(
+      screen.getByText("your 31 films, by popularity"),
+    ).toBeInTheDocument();
     // Least popular first, the niche film itself marked.
     const bars = Array.from(
       container.querySelectorAll<HTMLElement>("[data-popularity]"),
@@ -203,7 +280,10 @@ describe("StoryCard", () => {
     const { container } = renderCard("bigDay", {
       soloTickTotal: 12,
       bigDay: {
-        date: "2026-03-14", episodes: 11, minutes: 500, timeline: null,
+        date: "2026-03-14",
+        episodes: 11,
+        minutes: 500,
+        timeline: null,
         soloTickCount: 0,
         streak: { days: 23, start: "2026-01-02", end: "2026-01-24" },
       },
@@ -278,7 +358,9 @@ describe("StoryCard", () => {
 
   it("counts the dropped shows it has no room to list", () => {
     const dropped = Array.from({ length: 8 }, (_, index) => ({
-      tmdbId: index, title: `Show ${index}`, lastEpisode: null,
+      tmdbId: index,
+      title: `Show ${index}`,
+      lastEpisode: null,
     }));
     renderCard("shame", {
       ...droppedCount(8),
@@ -293,7 +375,9 @@ describe("StoryCard", () => {
     // Six dropped, five with metadata: the card says six, as the finished
     // card and the recap's stat tile do, and covers the sixth.
     const dropped = Array.from({ length: 5 }, (_, index) => ({
-      tmdbId: index, title: `Show ${index}`, lastEpisode: "S1E02",
+      tmdbId: index,
+      title: `Show ${index}`,
+      lastEpisode: "S1E02",
     }));
     renderCard("shame", {
       ...droppedCount(6),
@@ -341,7 +425,15 @@ describe("StoryCard", () => {
 
   it("shows the crew's top five plus the viewer, as the mock does", () => {
     renderCard("crew", {
-      headline: { hours: 1, minutes: 60, episodes: 5, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: null },
+      headline: {
+        hours: 1,
+        minutes: 60,
+        episodes: 5,
+        titlesCompleted: 47,
+        titlesDropped: 6,
+        unknownRuntimeEpisodes: 0,
+        percentile: null,
+      },
       crew: ["a", "b", "c", "d", "e", "f", "g", "h"].map((name, index) =>
         member(name, 800 - index * 10),
       ),
@@ -368,7 +460,9 @@ describe("StoryCard", () => {
       screen.getByText("34 titles in common out of 124. A 27% overlap."),
     ).toBeInTheDocument();
     expect(screen.getByText("ana finished, you dropped")).toBeInTheDocument();
-    expect(screen.queryByText(/She|He finished|joint streak/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/She|He finished|joint streak/),
+    ).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "marcus" }));
 
@@ -383,14 +477,21 @@ describe("StoryCard", () => {
     renderCard("summary", {
       topShow,
       niche,
-      rhythm: { archetype: "completionist", weekdayCounts: [1, 1, 1, 1, 1, 1, 1], topWeekday: 0, lateShare: null },
+      rhythm: {
+        archetype: "completionist",
+        weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
+        topWeekday: 0,
+        lateShare: null,
+      },
     });
     expect(screen.getByText(/412/)).toBeInTheDocument();
     expect(screen.getByText("ben's year")).toBeInTheDocument();
     expect(screen.getByText("The Bear")).toBeInTheDocument();
     expect(screen.getByText("Ich war zuhause, aber")).toBeInTheDocument();
     expect(screen.getByText("The Completionist")).toBeInTheDocument();
-    expect(screen.queryByText(/Share/)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Share your card" }),
+    ).toBeInTheDocument();
   });
 
   it("leaves out summary rows the payload has nothing for", () => {
@@ -402,21 +503,59 @@ describe("StoryCard", () => {
 
   it("uses no exclamation marks anywhere", () => {
     const full = {
-      topShow, niche,
+      topShow,
+      niche,
       genres: [{ name: "Drama", percent: 40 }],
       soloTickTotal: 12,
-      bigDay: { date: "2026-03-14", episodes: 11, minutes: 500, timeline: null, soloTickCount: 0, streak: null },
-      rhythm: { archetype: "completionist" as const, weekdayCounts: [1, 1, 1, 1, 1, 1, 1], topWeekday: 0, lateShare: 0.4 },
-      shame: { dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }], stillPlanning: [] },
+      bigDay: {
+        date: "2026-03-14",
+        episodes: 11,
+        minutes: 500,
+        timeline: null,
+        soloTickCount: 0,
+        streak: null,
+      },
+      rhythm: {
+        archetype: "completionist" as const,
+        weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
+        topWeekday: 0,
+        lateShare: 0.4,
+      },
+      shame: {
+        dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }],
+        stillPlanning: [],
+      },
       crew: [member("ana", 1041)],
       compare: [peer("ana", 34)],
     };
+    // The summary card's Share button fetches its card on mount.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: async () => new Blob(["x"], { type: "image/png" }),
+      }),
+    );
+
     for (const id of [
-      "intro", "hours", "episodes", "finished", "topShow", "niche", "genres",
-      "months", "bigDay", "rhythm", "shame", "crew", "compare", "summary",
+      "intro",
+      "hours",
+      "episodes",
+      "finished",
+      "topShow",
+      "niche",
+      "genres",
+      "months",
+      "bigDay",
+      "rhythm",
+      "shame",
+      "crew",
+      "compare",
+      "summary",
     ] as const) {
       const { container, unmount } = render(
         <StoryCard id={id} payload={payload(full)} viewer={viewer} />,
+        { wrapper },
       );
       expect(container.textContent).not.toContain("!");
       unmount();
