@@ -38,24 +38,6 @@ describe("BarChart", () => {
     expect(screen.getByText("Jan")).toBeInTheDocument();
   });
 
-  it("does not render a caption when none is given", () => {
-    render(<BarChart bars={bars} ariaLabel="Episodes by month, peak March" />);
-
-    expect(screen.queryByText(/Peak:/)).not.toBeInTheDocument();
-  });
-
-  it("renders an optional caption, e.g. naming the peak month", () => {
-    render(
-      <BarChart
-        bars={bars}
-        ariaLabel="Episodes by month, peak March"
-        caption="Peak: March, 174"
-      />,
-    );
-
-    expect(screen.getByText("Peak: March, 174")).toBeInTheDocument();
-  });
-
   it("renders bars that share a label, such as weekday initials", () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     render(

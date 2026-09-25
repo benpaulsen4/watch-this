@@ -465,7 +465,12 @@ describe("RecapClient", () => {
     expect(
       screen.getByText("Also number one for ana and marcus."),
     ).toBeInTheDocument();
-    expect(screen.getByAltText("The Bear")).toBeInTheDocument();
+    // The poster is decorative beside its visible title, so it is not read
+    // out twice.
+    expect(screen.queryByAltText("The Bear")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("The Bear").closest("div")?.querySelector('img[alt=""]'),
+    ).not.toBeNull();
     expect(screen.getByText("Ich war zuhause, aber")).toBeInTheDocument();
     expect(screen.getByText("popularity 2.1")).toBeInTheDocument();
     expect(

@@ -11,12 +11,6 @@ interface BarChartProps {
   /** Names the chart and its peak, so the shape is available without sight. */
   ariaLabel: string;
   /**
-   * Optional quiet caption shown top-right, e.g. "Peak: March, 174" in the
-   * mock. Left to the caller because it depends on how the peak was framed
-   * (month, weekday, ...), not something BarChart can derive on its own.
-   */
-  caption?: string;
-  /**
    * Optional y-axis tick column and gridlines (the mock's monthly chart). Bars
    * are then scaled against the top tick rather than the peak, so they line up
    * with the gridlines.
@@ -59,7 +53,6 @@ function axisTicks(peak: number): number[] {
 export function BarChart({
   bars,
   ariaLabel,
-  caption,
   axis = false,
   size = "default",
 }: BarChartProps) {
@@ -72,11 +65,6 @@ export function BarChart({
 
   return (
     <div>
-      {caption ? (
-        <div className="mb-2 flex justify-end">
-          <span className="text-xs text-gray-500">{caption}</span>
-        </div>
-      ) : null}
       <div className="flex gap-3">
         {axis ? (
           <div

@@ -24,14 +24,18 @@ const SIZES = {
   },
 } as const;
 
-/** A TMDB poster, or a quiet placeholder where the title has none. */
+/**
+ * A TMDB poster, or a quiet placeholder where the title has none.
+ *
+ * Decorative: every use sits beside the title in text, so the image has an
+ * empty alt rather than making a screen reader read the title twice. A use
+ * without a visible title would need to name it.
+ */
 export function Poster({
   posterPath,
-  title,
   size = "default",
 }: {
   posterPath: string | null;
-  title: string;
   size?: keyof typeof SIZES;
 }) {
   const styles = SIZES[size];
@@ -42,7 +46,7 @@ export function Poster({
       {src ? (
         <Image
           src={src}
-          alt={title}
+          alt=""
           fill
           sizes={styles.sizes}
           className="object-cover"

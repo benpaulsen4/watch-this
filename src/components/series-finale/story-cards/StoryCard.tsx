@@ -372,11 +372,7 @@ export function StoryCard({
         <Shell id={id} centred tmdb>
           <Eyebrow className="mb-6">Your #1 show</Eyebrow>
           <Enter kind="riseLarge" delay={60}>
-            <Poster
-              posterPath={topShow.posterPath}
-              title={topShow.title}
-              size="large"
-            />
+            <Poster posterPath={topShow.posterPath} size="large" />
           </Enter>
           <Enter delay={180} className="mt-[26px]">
             <div className="text-[38px] leading-[1.1] font-bold tracking-[-0.03em] text-white">

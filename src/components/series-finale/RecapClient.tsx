@@ -429,7 +429,7 @@ function TopTitlesPanel({
       <div className="grid grid-cols-2 gap-4">
         {topShow ? (
           <div>
-            <Poster posterPath={topShow.posterPath} title={topShow.title} />
+            <Poster posterPath={topShow.posterPath} />
             <p className="mt-3 text-[15px] leading-snug font-semibold text-gray-100">
               {topShow.title}
             </p>
@@ -450,7 +450,7 @@ function TopTitlesPanel({
         ) : null}
         {niche ? (
           <div>
-            <Poster posterPath={niche.posterPath} title={niche.title} />
+            <Poster posterPath={niche.posterPath} />
             <p className="mt-3 text-[15px] leading-snug font-semibold text-gray-100">
               {niche.title}
             </p>

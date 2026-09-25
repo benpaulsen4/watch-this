@@ -115,7 +115,9 @@ describe("StoryCard", () => {
     const { container } = renderCard("topShow", { topShow });
     expect(screen.getByText("Your #1 show")).toBeInTheDocument();
     expect(screen.getByText("The Bear")).toBeInTheDocument();
-    expect(screen.getByAltText("The Bear")).toBeInTheDocument();
+    // Decorative beside the visible title: not read out twice.
+    expect(screen.queryByAltText("The Bear")).not.toBeInTheDocument();
+    expect(container.querySelector('img[alt=""][src*="bear.jpg"]')).not.toBeNull();
     expect(
       screen.getByText("38 episodes · 16h 42m · last watched 4 April"),
     ).toBeInTheDocument();
