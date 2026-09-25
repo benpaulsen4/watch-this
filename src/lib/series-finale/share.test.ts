@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { stripCrossUserData } from "./share";
+import { shareQrDataUrl, stripCrossUserData } from "./share";
 import type { SeriesFinalePayload } from "./types";
 
 const payload = (): SeriesFinalePayload => ({
@@ -143,5 +143,17 @@ describe("stripCrossUserData", () => {
     expect(result.niche && Object.keys(result.niche).sort()).toEqual([
       "title",
     ]);
+  });
+});
+
+describe("shareQrDataUrl", () => {
+  it("encodes the site URL as a PNG data URL", async () => {
+    const url = await shareQrDataUrl("https://watchthis.example");
+
+    expect(url).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it("returns null rather than throwing for an empty site URL", async () => {
+    expect(await shareQrDataUrl("")).toBeNull();
   });
 });

@@ -1,3 +1,5 @@
+import QRCodeLib from "qrcode";
+
 import type { SeriesFinalePayload } from "./types";
 
 /**
@@ -69,4 +71,32 @@ export function stripCrossUserData(
       : null,
     niche: payload.niche ? { title: payload.niche.title } : null,
   };
+}
+
+/**
+ * QR for the share card, pointing at the marketing splash page.
+ *
+ * Deliberately not a personal link. There is no public recap route, and this
+ * is the one element of the card a stranger is likely to scan. Callers should
+ * pass `getSiteUrl("/")` from `src/lib/seo/site.ts` -- the app's already-
+ * resolved origin -- rather than reading `process.env.SITE_URL` directly,
+ * which yields no QR in an environment where only `NEXT_PUBLIC_SITE_URL` is
+ * set.
+ *
+ * Returns null rather than throwing: a missing QR should cost the corner of a
+ * card, not the whole image.
+ */
+export async function shareQrDataUrl(siteUrl: string): Promise<string | null> {
+  if (!siteUrl) return null;
+
+  try {
+    return await QRCodeLib.toDataURL(siteUrl, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 180,
+      color: { dark: "#101828", light: "#f3f4f6" },
+    });
+  } catch {
+    return null;
+  }
 }
