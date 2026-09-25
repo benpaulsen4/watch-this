@@ -10,8 +10,16 @@ type Props = {
   onUpdate: () => Promise<void> | void;
 };
 
+/**
+ * The only disclosure read before deciding, so it names every fact about the
+ * user that another person's Series Finale renders: the crew ranking's
+ * episode count, the compare split, its two named titles (one they dropped
+ * that the user finished; one on both planning lists, film or show), and the
+ * top-show match. Not hours -- no surface shows a collaborator's hours, and
+ * the payload no longer carries them.
+ */
 const DESCRIPTION =
-  "People you share a list with can see your episode and hour totals in their Series Finale. Turning this off removes you from theirs.";
+  "People you share a list with see, in their Series Finale, how many episodes you watched, how much of what you finished overlaps with theirs, a title you finished that they dropped, one you both still plan to watch, and whether your top show matched theirs. Turn this off to leave their recaps.";
 
 /**
  * The crew-comparison opt-out. Unlike `TimezoneSelector`, there is no edit

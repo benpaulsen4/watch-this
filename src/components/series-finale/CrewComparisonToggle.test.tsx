@@ -31,9 +31,14 @@ describe("CrewComparisonToggle", () => {
     expect(
       screen.getByRole("switch", { name: /include me in crew comparisons/i }),
     ).toBeChecked();
+    // Pinned word for word: this is the consent text, and it has to name
+    // exactly what another user's recap shows about you.
     expect(
-      screen.getByText(/turning this off removes you from theirs/i),
+      screen.getByText(
+        "People you share a list with see, in their Series Finale, how many episodes you watched, how much of what you finished overlaps with theirs, a title you finished that they dropped, one you both still plan to watch, and whether your top show matched theirs. Turn this off to leave their recaps.",
+      ),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/hour/i)).not.toBeInTheDocument();
   });
 
   it("renders an off value as unchecked", () => {
