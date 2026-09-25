@@ -821,6 +821,33 @@ describe("buildShame", () => {
     expect(result.stillPlanning[0]?.days).toBe(0);
   });
 
+  it("leaves out a film added once the period was over, and still counts the wait to now", () => {
+    // A backfilled 2026 recap generated in mid-2027. The film added in
+    // February 2027 was not on the list in 2026, so "still waiting" would be
+    // false about it; one added exactly at the period's end is already past
+    // it. The film added during 2026 stays, with its wait counted to the day
+    // the recap was generated -- the copy is present tense.
+    const later = new Date("2027-06-01T00:00:00Z");
+    const result = buildShame(
+      [
+        status({ tmdbId: 1, contentType: "movie", status: "planning", createdAt: new Date("2026-06-01T00:00:00Z") }),
+        status({ tmdbId: 2, contentType: "movie", status: "planning", createdAt: new Date("2027-02-01T00:00:00Z") }),
+        status({ tmdbId: 3, contentType: "movie", status: "planning", createdAt: PERIOD.end }),
+      ],
+      titleMap([
+        title({ tmdbId: 1, contentType: "movie" }),
+        title({ tmdbId: 2, contentType: "movie" }),
+        title({ tmdbId: 3, contentType: "movie" }),
+      ]),
+      [],
+      PERIOD,
+      later,
+    );
+
+    expect(result.stillPlanning.map((film) => film.tmdbId)).toEqual([1]);
+    expect(result.stillPlanning[0]?.days).toBe(365);
+  });
+
   it("returns empty lists when there is nothing to report", () => {
     expect(buildShame([], new Map(), [], PERIOD, NOW)).toEqual({
       dropped: [],

@@ -8,7 +8,14 @@
  * payload predates the field". `schemaVersion` covers the second case.
  */
 
-export const SERIES_FINALE_SCHEMA_VERSION = 1;
+/**
+ * Bumped whenever a stored payload would read differently if generated today;
+ * a row below it regenerates on its next read.
+ *
+ * 2: crew entries no longer carry a collaborator's hours or top show, and
+ *    `shame.stillPlanning` leaves out films added after the period ended.
+ */
+export const SERIES_FINALE_SCHEMA_VERSION = 2;
 
 /**
  * Minimum individually-ticked episodes before any intra-day statistic is
@@ -59,16 +66,18 @@ export interface TitleMeta {
   runtime: number | null;
 }
 
+/**
+ * A collaborator as the payload stores them: exactly what the crew ranking
+ * renders, and nothing else. The payload reaches the viewer's browser whole,
+ * so a field kept here is disclosed whether or not a card draws it -- which
+ * is why a collaborator's hours and most-watched show are not here. The
+ * service computes those internally (see its `CollaboratorTotals`) and keeps
+ * only the `alsoTopFor` line derived from the latter.
+ */
 export interface CrewMemberTotals {
   userId: string;
   username: string;
   episodes: number;
-  hours: number;
-  /**
-   * Their most-watched show for the period, used to fill `topShow.alsoTopFor`.
-   * Crew data, so it is stripped along with the rest before any share render.
-   */
-  topShowTmdbId: number | null;
 }
 
 export interface ComparePeer {
@@ -108,11 +117,11 @@ export interface AggregationInput {
    * The aggregators that want the period apply their own `isWithin` on
    * `updatedAt` (`countFinished`, `countDropped`, `buildNiche`, `buildGenres`,
    * `buildShame`'s dropped list, the paused count), so pre-filtering buys them
-   * nothing. One consumer deliberately wants everything: `buildShame`'s
-   * `stillPlanning`, which is there to name the film added three years ago and
-   * never watched. A period-scoped array keeps only the rows touched this
-   * year, so exactly the worst offenders vanish and the list comes back short
-   * but well-formed -- again without throwing.
+   * nothing. One consumer deliberately wants everything before the period's
+   * end: `buildShame`'s `stillPlanning`, which is there to name the film added
+   * three years ago and never watched. A period-scoped array keeps only the
+   * rows touched this year, so exactly the worst offenders vanish and the list
+   * comes back short but well-formed -- again without throwing.
    */
   statuses: ContentStatusRow[];
   titles: Map<string, TitleMeta>;

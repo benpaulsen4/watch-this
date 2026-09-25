@@ -15,7 +15,7 @@ const wrapper = ({ children }: { children: ReactNode }) => {
 const viewer = { username: "ben", profilePictureUrl: "" };
 
 const payload = (overrides: Record<string, unknown> = {}) => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   period: { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z", label: "2026" },
   headline: {
     hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47,
@@ -522,8 +522,8 @@ describe("RecapClient", () => {
     mockFetch({
       payload: payload({
         crew: [
-          { userId: "u1", username: "ana", episodes: 1041, hours: 358 },
-          { userId: "u2", username: "marcus", episodes: 760, hours: 241 },
+          { userId: "u1", username: "ana", episodes: 1041 },
+          { userId: "u2", username: "marcus", episodes: 760 },
         ],
       }),
     });

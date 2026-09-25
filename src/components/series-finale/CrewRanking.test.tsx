@@ -3,15 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import { CrewRanking } from "./CrewRanking";
 
-const member = (username: string, episodes: number, hours: number) => ({
+const member = (username: string, episodes: number) => ({
   userId: `id-${username}`,
   username,
   episodes,
-  hours,
-  topShowTmdbId: null,
 });
 
-const crew = [member("ana", 1041, 358), member("marcus", 760, 241)];
+const crew = [member("ana", 1041), member("marcus", 760)];
 
 const names = () =>
   within(screen.getByRole("list"))
@@ -37,17 +35,6 @@ describe("CrewRanking", () => {
     expect(screen.getByText("900 episodes")).toBeInTheDocument();
   });
 
-  it("ranks by episodes even where hours would disagree", () => {
-    render(
-      <CrewRanking
-        viewer={{ username: "ben", profilePictureUrl: "", episodes: 100 }}
-        crew={[member("tom", 50, 900), member("ana", 80, 20)]}
-      />,
-    );
-
-    expect(names()).toEqual(["you", "ana", "tom"]);
-  });
-
   it("puts the viewer first on a tie", () => {
     render(
       <CrewRanking
@@ -63,7 +50,7 @@ describe("CrewRanking", () => {
     const { container } = render(
       <CrewRanking
         viewer={{ username: "ben", profilePictureUrl: "", episodes: 400 }}
-        crew={[member("ana", 100, 10)]}
+        crew={[member("ana", 100)]}
       />,
     );
 
@@ -74,7 +61,7 @@ describe("CrewRanking", () => {
     const { container } = render(
       <CrewRanking
         viewer={{ username: "ben", profilePictureUrl: "", episodes: 0 }}
-        crew={[member("ana", 0, 0)]}
+        crew={[member("ana", 0)]}
       />,
     );
 
@@ -104,9 +91,9 @@ describe("CrewRanking", () => {
       <CrewRanking
         viewer={{ username: "ben", profilePictureUrl: "", episodes: 10 }}
         crew={[
-          member("a1", 900, 0), member("a2", 800, 0), member("a3", 700, 0),
-          member("a4", 600, 0), member("a5", 500, 0), member("a6", 400, 0),
-          member("a7", 300, 0),
+          member("a1", 900), member("a2", 800), member("a3", 700),
+          member("a4", 600), member("a5", 500), member("a6", 400),
+          member("a7", 300),
         ]}
         size="large"
         limit={5}
@@ -126,8 +113,8 @@ describe("CrewRanking", () => {
       <CrewRanking
         viewer={{ username: "ben", profilePictureUrl: "", episodes: 1000 }}
         crew={[
-          member("a1", 900, 0), member("a2", 800, 0), member("a3", 700, 0),
-          member("a4", 600, 0), member("a5", 500, 0),
+          member("a1", 900), member("a2", 800), member("a3", 700),
+          member("a4", 600), member("a5", 500),
         ]}
         limit={5}
       />,

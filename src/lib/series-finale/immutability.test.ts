@@ -185,8 +185,6 @@ describe("snapshot immutability", () => {
       userId: "crew-1",
       username: "ana",
       episodes: 50,
-      hours: 20,
-      topShowTmdbId: 42,
     };
     const compareRow = {
       userId: "crew-1",

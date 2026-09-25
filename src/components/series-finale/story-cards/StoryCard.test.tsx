@@ -8,7 +8,7 @@ import { StoryCard } from "./StoryCard";
 
 const payload = (overrides: Partial<SeriesFinalePayload> = {}) =>
   ({
-    schemaVersion: 1,
+    schemaVersion: 2,
     period: { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z", label: "2026" },
     headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: 4 },
     episodes: { total: 1208, perDay: 3.3 },
@@ -43,7 +43,7 @@ const niche = {
 };
 
 const member = (username: string, episodes: number) => ({
-  userId: `id-${username}`, username, episodes, hours: 0, topShowTmdbId: null,
+  userId: `id-${username}`, username, episodes,
 });
 
 const peer = (username: string, both: number) => ({

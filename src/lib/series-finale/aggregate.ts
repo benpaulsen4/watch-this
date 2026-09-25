@@ -704,11 +704,19 @@ export function buildShame(
     // requirement is that the same year renders the same way twice.
     .sort((a, b) => a.tmdbId - b.tmdbId);
 
-  // Deliberately not filtered by the period: a film added three years ago and
-  // never watched is exactly what this list is for, and dating it by the
-  // recap year would hide the worst offenders.
+  // Bounded only by the period's END, not its start: a film added three years
+  // ago and never watched is exactly what this list is for, and dating it by
+  // the recap year would hide the worst offenders. The end bound is what keeps
+  // a backfilled year honest -- a 2023 recap generated in 2026 must not say a
+  // film added in 2026 was "still waiting" in 2023. `days` is still counted to
+  // `now`: the copy is present tense, and it is true when the recap is made.
   const stillPlanning = statuses
-    .filter((row) => row.status === "planning" && row.contentType === "movie")
+    .filter(
+      (row) =>
+        row.status === "planning" &&
+        row.contentType === "movie" &&
+        row.createdAt < period.end,
+    )
     .map((row) => {
       const meta = titles.get(titleKey(row.tmdbId, "movie"));
       if (!meta) return null;

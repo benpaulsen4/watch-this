@@ -276,6 +276,28 @@ export async function loadCollaboratorIds(userId: string): Promise<string[]> {
 }
 
 /**
+ * One collaborator's totals as generation works with them. Wider than the
+ * stored `CrewMemberTotals` on purpose, and never stored: `topShowTmdbId` is
+ * compared against the viewer's top show to fill `alsoTopFor` and then
+ * discarded, because keeping it would reveal a collaborator's most-watched
+ * show even when it is not the viewer's; `hours` is not rendered anywhere
+ * (the crew ranks by episodes). `toStoredCrew` narrows to the stored shape.
+ */
+export interface CollaboratorTotals extends CrewMemberTotals {
+  hours: number;
+  topShowTmdbId: number | null;
+}
+
+/** The stored crew shape: only what the crew ranking renders. */
+export function toStoredCrew(crew: CollaboratorTotals[]): CrewMemberTotals[] {
+  return crew.map(({ userId, username, episodes }) => ({
+    userId,
+    username,
+    episodes,
+  }));
+}
+
+/**
  * Crew totals and compare keys for every consenting collaborator.
  *
  * `window` must be the viewer's LOCALISED period (`localisePeriod` in
@@ -295,7 +317,7 @@ export async function loadCollaboratorIds(userId: string): Promise<string[]> {
 export async function loadCollaboratorSlices(
   userId: string,
   window: Period,
-): Promise<{ crew: CrewMemberTotals[]; peers: ComparePeer[] }> {
+): Promise<{ crew: CollaboratorTotals[]; peers: ComparePeer[] }> {
   const collaboratorIds = await loadCollaboratorIds(userId);
   if (collaboratorIds.length === 0) return { crew: [], peers: [] };
 
@@ -314,7 +336,7 @@ export async function loadCollaboratorSlices(
 
   const inWindow = (at: Date) => at >= window.start && at < window.end;
 
-  const crew: CrewMemberTotals[] = [];
+  const crew: CollaboratorTotals[] = [];
   const peers: ComparePeer[] = [];
 
   for (const collaboratorId of collaboratorIds) {
@@ -566,7 +588,7 @@ export async function loadCohortMinutes(
  * none.
  */
 export function alsoTopForOf(
-  crew: CrewMemberTotals[],
+  crew: CollaboratorTotals[],
   topShowTmdbId: number | null,
 ): string[] {
   if (topShowTmdbId === null) return [];
@@ -782,7 +804,7 @@ async function generateInZone(
       filmMinutes,
       episodeRuntimeLookup,
       collaborativeCompletedKeys,
-      crew,
+      crew: toStoredCrew(crew),
       peers,
       percentile: null,
     },

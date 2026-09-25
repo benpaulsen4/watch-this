@@ -42,9 +42,10 @@ interface Row {
 
 /**
  * Everyone who shares a list with the viewer, the viewer included, ranked by
- * episodes -- the viewer first on a tie. Not hours: the viewer's headline
- * hours include films, while a collaborator's hours count episodes only, so
- * the two do not compare. Episodes do, and match the server's crew order.
+ * episodes -- the viewer first on a tie. Not hours: the payload carries none
+ * for collaborators (their consent covers what is shown, and hours are not),
+ * and the viewer's include films. Episodes compare, and match the server's
+ * crew order.
  * Bars are drawn against the leader; the name and count are the text, the bar
  * decoration.
  */

@@ -22,7 +22,7 @@ const wrapper = ({ children }: { children: ReactNode }) => {
 const viewer = { username: "ben", profilePictureUrl: "" };
 
 const payload = (overrides: Record<string, unknown> = {}) => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   period: { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z", label: "2026" },
   headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 6, unknownRuntimeEpisodes: 0, percentile: 4 },
   episodes: { total: 1208, perDay: 3.3 },
@@ -46,7 +46,7 @@ const fullPayload = () =>
     bigDay: { date: "2026-03-14", episodes: 11, minutes: 500, timeline: null, soloTickCount: 0, streak: null },
     rhythm: { archetype: "completionist", weekdayCounts: [1, 1, 1, 1, 1, 1, 1], topWeekday: 0, lateShare: null },
     shame: { dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: null }], stillPlanning: [] },
-    crew: [{ userId: "u2", username: "ana", episodes: 1041, hours: 0, topShowTmdbId: null }],
+    crew: [{ userId: "u2", username: "ana", episodes: 1041 }],
     compare: [{ userId: "u2", username: "ana", onlyYou: 62, both: 34, onlyThem: 28, theyFinishedYouDropped: null, bothPlanningNeitherStarted: null }],
   });
 

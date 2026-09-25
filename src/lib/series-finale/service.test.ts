@@ -137,6 +137,7 @@ import {
   alsoTopForOf,
   buildCompare,
   clearGenreNameCache,
+  type CollaboratorTotals,
   CREW_LIMIT,
   getOrGenerateSnapshot,
   LIST_GENERATION_BUDGET_MS,
@@ -885,7 +886,7 @@ describe("alsoTopForOf", () => {
     userId: string,
     username: string,
     topShowTmdbId: number | null,
-  ): CrewMemberTotals => ({ userId, username, episodes: 10, hours: 5, topShowTmdbId });
+  ): CollaboratorTotals => ({ userId, username, episodes: 10, hours: 5, topShowTmdbId });
 
   it("names only crew members whose top show matches, in crew order", () => {
     const crew = [
@@ -1060,7 +1061,18 @@ describe("snapshot generation", () => {
 
     expect(payload.topShow?.tmdbId).toBe(1);
     expect(payload.topShow?.alsoTopFor).toEqual(["ana"]);
-    expect(payload.crew.map((member) => member.username)).toEqual(["ana", "bo"]);
+    // Only what the crew ranking renders. A collaborator's hours are never
+    // shown, and their top show only as the viewer's own `alsoTopFor` line --
+    // stored per member, it would name ana's and bo's most-watched shows in
+    // the viewer's browser whether or not they matched the viewer's.
+    expect(payload.crew).toEqual([
+      { userId: "u2", username: "ana", episodes: 1 },
+      { userId: "u3", username: "bo", episodes: 1 },
+    ]);
+    for (const member of payload.crew) {
+      expect(member).not.toHaveProperty("hours");
+      expect(member).not.toHaveProperty("topShowTmdbId");
+    }
     expect(payload.compare).toEqual([
       {
         userId: "u2",
@@ -1212,7 +1224,14 @@ describe("getOrGenerateSnapshot", () => {
 
   it("regenerates a snapshot written against an older schema version", async () => {
     setResults([
-      [{ payload: { schemaVersion: 0 }, schemaVersion: 0 }],
+      // The version before the current one, not 0: a bump must regenerate
+      // the rows the previous release wrote.
+      [
+        {
+          payload: { schemaVersion: SERIES_FINALE_SCHEMA_VERSION - 1 },
+          schemaVersion: SERIES_FINALE_SCHEMA_VERSION - 1,
+        },
+      ],
       [{ timezone: "UTC" }],
       // first activity: episodes, statuses
       [{ first: new Date("2025-06-01T00:00:00Z") }],
@@ -1402,8 +1421,8 @@ describe("getOrGenerateSnapshot", () => {
 
   it("drops withdrawn or deleted collaborators from a stored snapshot and returns the rest as frozen", async () => {
     const base = emptyPayload();
-    const ana: CrewMemberTotals = { userId: "a", username: "ana", episodes: 40, hours: 30, topShowTmdbId: 1 };
-    const bo: CrewMemberTotals = { userId: "b", username: "bo", episodes: 20, hours: 15, topShowTmdbId: 1 };
+    const ana: CrewMemberTotals = { userId: "a", username: "ana", episodes: 40 };
+    const bo: CrewMemberTotals = { userId: "b", username: "bo", episodes: 20 };
     const compareRow = (userId: string, username: string) => ({
       userId,
       username,
@@ -1453,8 +1472,8 @@ describe("getOrGenerateSnapshot", () => {
 
   it("shows a renamed collaborator under their current name in crew, compare and alsoTopFor", async () => {
     const base = emptyPayload();
-    const ana: CrewMemberTotals = { userId: "a", username: "ana", episodes: 40, hours: 30, topShowTmdbId: 1 };
-    const bo: CrewMemberTotals = { userId: "b", username: "bo", episodes: 20, hours: 15, topShowTmdbId: 1 };
+    const ana: CrewMemberTotals = { userId: "a", username: "ana", episodes: 40 };
+    const bo: CrewMemberTotals = { userId: "b", username: "bo", episodes: 20 };
     const compareRow = (userId: string, username: string) => ({
       userId,
       username,
@@ -1606,7 +1625,13 @@ describe("listAvailableSnapshots", () => {
       [{ timezone: "UTC" }],
       [{ first: new Date("2025-03-01T00:00:00Z") }],
       [{ first: null }],
-      [{ periodStart: period2025.start, periodEnd: period2025.end, schemaVersion: 0 }],
+      [
+        {
+          periodStart: period2025.start,
+          periodEnd: period2025.end,
+          schemaVersion: SERIES_FINALE_SCHEMA_VERSION - 1,
+        },
+      ],
       [], // episodes
       [], // statuses
       [], // collaborator list ids
