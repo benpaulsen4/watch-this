@@ -47,5 +47,6 @@ export function toClientUser(user: DbUser): ClientUser {
     profilePictureUrl: user.profilePictureUrl ?? "",
     timezone: user.timezone,
     createdAt: user.createdAt.toISOString(),
+    shareStatsWithCollaborators: user.shareStatsWithCollaborators,
   };
 }

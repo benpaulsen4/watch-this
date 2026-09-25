@@ -13,7 +13,7 @@ import ListDetailsPage from "./lists/[id]/page";
 import ArchivedListsPage from "./lists/archived/page";
 import ListsPage from "./lists/page";
 import ProfilePage from "./profile/page";
-import { requireUser } from "./requireUser";
+import { requireUser, toClientUser } from "./requireUser";
 import SearchPage from "./search/page";
 import SeriesFinalePage from "./series-finale/[period]/page";
 import SeriesFinaleStoryPage from "./series-finale/[period]/story/page";
@@ -91,6 +91,31 @@ describe("requireUser", () => {
     await requireUser("/dashboard");
 
     expect(getCurrentUser).toHaveBeenCalledWith("token");
+  });
+});
+
+// S12: toClientUser must mirror GET /api/auth/session's projection field for
+// field, or a component would see different data depending on whether it was
+// seeded by the server or refreshed by the client.
+describe("toClientUser", () => {
+  const dbUser = {
+    id: "u1",
+    username: "alice",
+    profilePictureUrl: null,
+    timezone: "UTC",
+    country: null,
+    shareStatsWithCollaborators: false,
+    tokenVersion: 0,
+    createdAt: new Date("2024-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+  };
+
+  it("mirrors shareStatsWithCollaborators", () => {
+    expect(toClientUser(dbUser).shareStatsWithCollaborators).toBe(false);
+    expect(
+      toClientUser({ ...dbUser, shareStatsWithCollaborators: true })
+        .shareStatsWithCollaborators,
+    ).toBe(true);
   });
 });
 

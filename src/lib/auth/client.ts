@@ -209,4 +209,5 @@ export type User = {
   profilePictureUrl: string;
   timezone: string;
   createdAt: string;
+  shareStatsWithCollaborators: boolean;
 };

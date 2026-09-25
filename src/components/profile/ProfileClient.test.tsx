@@ -28,6 +28,18 @@ vi.mock("./DataExportImport", () => ({
 vi.mock("./StreamingPreferences", () => ({
   StreamingPreferences: () => <div>StreamingPreferences</div>,
 }));
+vi.mock("@/components/series-finale/ProfileFinaleRows", () => ({
+  ProfileFinaleRows: () => <div>ProfileFinaleRows</div>,
+}));
+// Renders the flag it is handed, so a test can tell which user object made it
+// down, the same reason UsernameChanger is stubbed the same way above.
+vi.mock("@/components/series-finale/CrewComparisonToggle", () => ({
+  CrewComparisonToggle: ({
+    user,
+  }: {
+    user: { shareStatsWithCollaborators: boolean };
+  }) => <div>{`CrewComparisonToggle:${user.shareStatsWithCollaborators}`}</div>,
+}));
 
 // The user this page is rendered with server-side. ProfileClient must not need
 // the auth context to have resolved before it can show this.
@@ -37,6 +49,7 @@ const SERVER_USER = {
   profilePictureUrl: "https://example.com/p.jpg",
   timezone: "UTC",
   createdAt: new Date("2024-01-01").toISOString(),
+  shareStatsWithCollaborators: true,
 };
 
 // Mutable so a test can put the context in its pre-resolution state, which is
@@ -116,6 +129,10 @@ describe("ProfileClient", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /data management/i }));
     expect(screen.getByText("DataExportImport")).toBeInTheDocument();
+    expect(screen.getByText("ProfileFinaleRows")).toBeInTheDocument();
+    expect(
+      screen.getByText("CrewComparisonToggle:true"),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /streaming/i }));
     expect(screen.getByText("StreamingPreferences")).toBeInTheDocument();
