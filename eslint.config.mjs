@@ -55,7 +55,12 @@ const config = [
     },
   },
   {
-    files: ["src/components/ui/QRCode.tsx"],
+    // share-card.tsx is drawn by Satori (next/og), which knows plain <img>
+    // and nothing of next/image.
+    files: [
+      "src/components/ui/QRCode.tsx",
+      "src/lib/series-finale/share-card.tsx",
+    ],
     rules: {
       "@next/next/no-img-element": "off",
     },
