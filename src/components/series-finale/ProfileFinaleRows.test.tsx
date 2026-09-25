@@ -104,4 +104,20 @@ describe("ProfileFinaleRows", () => {
       expect(screen.getByText("1 episode · 1 title")).toBeInTheDocument(),
     );
   });
+
+  it("reports a failed fetch plainly instead of claiming there is nothing yet", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }),
+    );
+
+    render(<ProfileFinaleRows />, { wrapper });
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Couldn't load your Series Finale archive/),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/No Series Finale yet/)).not.toBeInTheDocument();
+  });
 });

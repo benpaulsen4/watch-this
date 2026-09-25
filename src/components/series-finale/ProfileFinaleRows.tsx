@@ -4,6 +4,7 @@ import { BarChart3, Sparkle } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/Button";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useSeriesFinaleList } from "@/hooks/useSeriesFinale";
 import { cn } from "@/lib/utils";
 
@@ -26,9 +27,29 @@ import { pluralise } from "./format";
  * has been dismissed.
  */
 export function ProfileFinaleRows() {
-  const { data: periods, isLoading } = useSeriesFinaleList();
+  const { data: periods, isLoading, isError } = useSeriesFinaleList();
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <LoadingSpinner
+        size="sm"
+        text="Loading your Series Finale archive..."
+        centered
+      />
+    );
+  }
+
+  // A failed fetch still leaves `data` undefined, same as "nothing generated
+  // yet" -- without this branch it would fall into the empty state below and
+  // claim "No Series Finale yet", which is false: the archive may well have
+  // entries, the request just failed.
+  if (isError) {
+    return (
+      <p className="text-sm text-gray-500">
+        Couldn&apos;t load your Series Finale archive. Try again later.
+      </p>
+    );
+  }
 
   if (!periods || periods.length === 0) {
     return (

@@ -73,15 +73,13 @@ export function CrewComparisonToggle({ user, onUpdate }: Props) {
   };
 
   return (
-    <div className="space-y-2">
-      <Switch
-        label="Include me in crew comparisons"
-        helperText={DESCRIPTION}
-        isSelected={checked}
-        onChange={handleChange}
-        isDisabled={mutation.isPending}
-      />
-      {error && <p className="text-xs text-red-400">{error}</p>}
-    </div>
+    <Switch
+      label="Include me in crew comparisons"
+      helperText={DESCRIPTION}
+      error={error ?? undefined}
+      isSelected={checked}
+      onChange={handleChange}
+      isDisabled={mutation.isPending}
+    />
   );
 }
