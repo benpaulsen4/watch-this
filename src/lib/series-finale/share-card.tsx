@@ -21,6 +21,17 @@ import { TMDB_LOGO_SVG, WATCHTHIS_LOGO_SVG } from "./share-card-logos";
  * Built from plain function calls rather than child components so the element
  * this returns is the whole tree, fully expanded: the route's privacy test
  * serialises it and checks that nobody else's name is anywhere in it.
+ *
+ * Glyphs outside the bundled font are fetched at render time. next/og always
+ * installs a dynamic-asset loader, whatever `fonts` it is given: a character
+ * Geist Regular lacks (CJK, Thai, Arabic, most symbols) makes it fetch a
+ * subset from fonts.googleapis.com, and an emoji fetches from the twemoji
+ * CDN. Those requests have no timeout -- the poster's budget does not cover
+ * them -- so a slow response stalls the render, and a failure is logged with
+ * the text it was for. Only TMDB titles can trigger it (usernames are ASCII
+ * by validation), so nothing personal leaves, but it is a third-party call
+ * this code does not control; `ImageResponse` offers no way to switch it off.
+ * The real-render tests stay offline only while their fixtures stay Latin.
  */
 
 export const SHARE_CARD_WIDTH = 1080;
@@ -161,6 +172,9 @@ function titleLine(label: string, title: string) {
           // Two lines each keeps both titles inside the poster's height.
           display: "block",
           lineClamp: 2,
+          // See the username line: a title with no spaces breaks mid-word
+          // rather than running off the card.
+          wordBreak: "break-word",
         }}
       >
         {title}
@@ -270,6 +284,12 @@ export function renderShareCard({
             textTransform: "uppercase",
             color: white(0.5),
             marginBottom: 24,
+            // Underscores are not break opportunities, so a 50-character
+            // username can be one unbreakable word wider than the card.
+            // "break-word" breaks inside a word only when it would overflow
+            // -- Satori's equivalent of `overflow-wrap: anywhere`, which it
+            // does not accept -- so ordinary names still wrap at word edges.
+            wordBreak: "break-word",
           }}
         >
           {`${username} watched`}

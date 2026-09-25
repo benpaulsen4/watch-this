@@ -111,6 +111,39 @@ describe("renderShareCard under the real ImageResponse", () => {
     expect(pngSize(png)).toEqual({ width: 1080, height: 1350 });
     await keepForInspection("share-card-sparse", png);
   }, 30_000);
+
+  // Hyphens are line-break opportunities; underscores are not. A username at
+  // the 50-character limit with only underscores, or a title with no spaces,
+  // is one unbreakable word that ran past the padding and off the card before
+  // the text was allowed to break inside a word. The render not throwing is
+  // all this can assert; the PNG is for looking at.
+  it("keeps an unbreakable username and unbreakable titles inside the card", async () => {
+    const username = "benjamin_paulsen_the_third_of_his_name_12345678901";
+    expect(username).toHaveLength(50);
+
+    const unbreakable: ShareablePayload = {
+      ...card(),
+      topShow: {
+        title: "Supercalifragilisticexpialidocious_Pneumonoultramicroscopic",
+        posterPath: null,
+      },
+      // Three lines' worth with no break in it: the two-line clamp holds.
+      niche: {
+        title:
+          "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch".repeat(2),
+      },
+    };
+
+    const png = await render({
+      card: unbreakable,
+      username,
+      qr: null,
+      poster: null,
+    });
+
+    expect(pngSize(png)).toEqual({ width: 1080, height: 1350 });
+    await keepForInspection("share-card-unbreakable", png);
+  }, 30_000);
 });
 
 /** The text children of an element tree, in reading order (styles skipped). */
