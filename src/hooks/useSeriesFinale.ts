@@ -34,9 +34,11 @@ async function getJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+const LIST_KEY = ["series-finale", "list"] as const;
+
 export function useSeriesFinaleList() {
   return useQuery({
-    queryKey: ["series-finale", "list"],
+    queryKey: LIST_KEY,
     queryFn: async () => {
       const data = await getJson<{ periods: SeriesFinaleListItem[] }>(
         "/api/series-finale",
@@ -63,6 +65,16 @@ export function useSeriesFinale(period: string) {
   });
 }
 
+/**
+ * Dismiss a period's banner, optimistically.
+ *
+ * The list the banner reads is `GET /api/series-finale`, which generates any
+ * missing year before it answers and can take seconds for a long history --
+ * so waiting for its refetch would leave "Not now" looking like it did
+ * nothing. The cached list is marked dismissed at once instead, put back if
+ * the POST fails, and refetched either way. `onSettled` returns the
+ * invalidation so the mutation stays pending until the list has caught up.
+ */
 export function useDismissSeriesFinale() {
   const queryClient = useQueryClient();
 
@@ -73,8 +85,25 @@ export function useDismissSeriesFinale() {
       });
       if (!response.ok) throw new Error("Dismiss failed");
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["series-finale", "list"] });
+    onMutate: async (period: string) => {
+      // An in-flight list fetch would land after this and overwrite it.
+      await queryClient.cancelQueries({ queryKey: LIST_KEY });
+      const previous =
+        queryClient.getQueryData<SeriesFinaleListItem[]>(LIST_KEY);
+      queryClient.setQueryData<SeriesFinaleListItem[]>(LIST_KEY, (periods) =>
+        periods?.map((item) =>
+          item.label === period
+            ? { ...item, dismissedAt: new Date().toISOString() }
+            : item,
+        ),
+      );
+      return { previous };
     },
+    onError: (_error, _period, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(LIST_KEY, context.previous);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: LIST_KEY }),
   });
 }

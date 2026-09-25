@@ -22,6 +22,10 @@ import { isThinPeriod, pluralise } from "./format";
  * instead of just going quiet for the rest of the visit -- and a gap year's
  * headline would read "0 episodes. 0 titles."
  *
+ * "Not now" hides the banner at once (the list is updated optimistically --
+ * see `useDismissSeriesFinale`). If the dismissal fails the banner comes
+ * back, with a line saying so.
+ *
  * Renders nothing rather than an empty shell when there is no eligible
  * period -- for most of the year that is the correct state, not an error.
  *
@@ -75,6 +79,11 @@ export function SeriesFinaleBanner() {
         >
           Not now
         </Button>
+        {dismiss.isError ? (
+          <p role="alert" className="text-xs text-red-400">
+            Could not dismiss that. Try again.
+          </p>
+        ) : null}
       </div>
     </Card>
   );
