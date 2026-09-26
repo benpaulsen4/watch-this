@@ -71,5 +71,10 @@ export default defineConfig({
     url: `${E2E_BASE_URL}/auth`,
     reuseExistingServer: true,
     timeout: 120_000,
+    // run.ts start runs next in its own process group (so it can be stopped
+    // for certain), which Playwright's default SIGKILL of the command's group
+    // would not reach. A SIGTERM lets run.ts stop it -- SIGTERM, then SIGKILL
+    // after 10 s -- before this timeout.
+    gracefulShutdown: { signal: "SIGTERM", timeout: 15_000 },
   },
 });

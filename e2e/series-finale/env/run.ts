@@ -51,10 +51,52 @@ function resetEvidence(): void {
 
 /**
  * `next start` as a child in its own process group, so stopping it stops the
- * server npx spawned rather than just npx.
+ * server npx spawned rather than just npx. From here until it exits, a SIGINT
+ * or SIGTERM to this process stops the server first -- with `stopServer`'s
+ * escalation -- and only then exits; a repeated signal while it stops is
+ * absorbed rather than killing this process before the server is gone. On any
+ * other exit it is SIGKILLed synchronously, so no path leaves it behind.
  */
 function startServer(env: NodeJS.ProcessEnv): ChildProcess {
-  return spawn("npx", ["next", "start", "-p", String(E2E_PORT)], { stdio: "inherit", env, detached: true });
+  const server = spawn("npx", ["next", "start", "-p", String(E2E_PORT)], { stdio: "inherit", env, detached: true });
+  let stopping = false;
+  const onSignal = (code: number) => () => {
+    if (stopping) return;
+    stopping = true;
+    void stopServer(server).finally(() => process.exit(code));
+  };
+  const onInterrupt = onSignal(130);
+  const onTerminate = onSignal(143);
+  const onExit = () => {
+    if (server.pid !== undefined && server.exitCode === null && server.signalCode === null) {
+      try {
+        process.kill(-server.pid, "SIGKILL");
+      } catch {
+        // already gone
+      }
+    }
+  };
+  process.on("SIGINT", onInterrupt);
+  process.on("SIGTERM", onTerminate);
+  process.on("exit", onExit);
+  server.once("exit", () => {
+    process.off("SIGINT", onInterrupt);
+    process.off("SIGTERM", onTerminate);
+    process.off("exit", onExit);
+  });
+  return server;
+}
+
+/** Runs the server until it exits (or this process is signalled, see `startServer`). */
+function serve(env: NodeJS.ProcessEnv): Promise<void> {
+  const server = startServer(env);
+  return new Promise((resolve, reject) => {
+    server.on("error", reject);
+    server.on("exit", (code, signal) => {
+      if (code === 0) resolve();
+      else reject(new Error(`next start exited with ${signal ?? `code ${code}`}`));
+    });
+  });
 }
 
 function stopServer(server: ChildProcess): Promise<void> {
@@ -120,23 +162,6 @@ async function runAll(env: NodeJS.ProcessEnv): Promise<void> {
   await run("npx", ["next", "build"], env);
 
   const server = startServer(env);
-  const stop = () => {
-    if (server.pid !== undefined) {
-      try {
-        process.kill(-server.pid, "SIGTERM");
-      } catch {
-        // already gone
-      }
-    }
-  };
-  process.once("SIGINT", () => {
-    stop();
-    process.exit(130);
-  });
-  process.once("SIGTERM", () => {
-    stop();
-    process.exit(143);
-  });
   try {
     await waitForServer(server);
     await run("npx", ["tsx", "e2e/series-finale/env/register.ts"], env);
@@ -148,9 +173,10 @@ async function runAll(env: NodeJS.ProcessEnv): Promise<void> {
       await run("npx", ["playwright", "test"], env);
     } catch (error) {
       failure = error;
-    } finally {
-      scanSecrets(env);
+      // Said now, so a secret-scan failure below cannot hide it.
+      console.error(`e2e all: ${error instanceof Error ? error.message : String(error)}`);
     }
+    scanSecrets(env);
     console.log("e2e all: gallery skipped -- not implemented yet (Task 9)");
     if (failure) throw failure;
   } finally {
@@ -189,7 +215,7 @@ async function main(): Promise<void> {
     case "build":
       return run("npx", ["next", "build"], env);
     case "start":
-      return run("npx", ["next", "start", "-p", String(E2E_PORT)], env);
+      return serve(env);
     case "test":
       // Extra argv goes to Playwright (e.g. `-- --project=desktop <spec>`);
       // the secret scan runs whether or not the tests passed.

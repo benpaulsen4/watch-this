@@ -11,14 +11,13 @@
 //   npm run e2e:seed -- --resolve-only  just resolve catalogue.lock.json
 //
 // Everything that touches the database is imported dynamically, AFTER the
-// DATABASE_URL guard: a static import of src/lib/db would build its pool from
-// whatever DATABASE_URL the process happened to have before the guard ran.
+// DATABASE_URL guard at the top of main(): a static import of src/lib/db
+// would build its pool from whatever DATABASE_URL the process happened to
+// have before the guard ran. Importing this module runs nothing.
 import { assertE2eDatabaseUrl } from "../env/test-env";
 import type { CatalogueEntry } from "./catalogue";
 import { generate } from "./generate";
 import { PERSONAS, type PersonaSpec, UNKNOWN_RUNTIME_EPISODES } from "./personas";
-
-assertE2eDatabaseUrl(process.env.DATABASE_URL ?? "");
 
 /**
  * Inserted (non-signing) users get default random ids, except jon: the crew
@@ -84,6 +83,7 @@ async function exitAfterFlush(code: number): Promise<never> {
 }
 
 async function main(): Promise<void> {
+  assertE2eDatabaseUrl(process.env.DATABASE_URL ?? "");
   const { resolveCatalogue } = await import("./catalogue");
 
   // 1. The catalogue.
@@ -391,9 +391,11 @@ async function main(): Promise<void> {
   console.log(`  ${snapshotCount[0]?.count ?? 0} snapshots stored (ava's are generated in the browser)`);
 }
 
-main()
-  .then(() => exitAfterFlush(0))
-  .catch(async (error: unknown) => {
-    console.error(error instanceof Error ? (error.stack ?? error.message) : error);
-    await exitAfterFlush(1);
-  });
+if (process.argv[1]?.endsWith("seed.ts")) {
+  main()
+    .then(() => exitAfterFlush(0))
+    .catch(async (error: unknown) => {
+      console.error(error instanceof Error ? (error.stack ?? error.message) : error);
+      await exitAfterFlush(1);
+    });
+}
