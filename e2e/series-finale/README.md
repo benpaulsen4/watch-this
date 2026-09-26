@@ -20,7 +20,8 @@ cached, stop and ask before downloading anything.
 npm run e2e:db:up       # starts postgres:17 in podman, localhost:5433 only
 npm run e2e:migrate     # drizzle-kit migrate against the e2e database
 npm run e2e:build       # next build (production)
-npm run e2e:register -- <username>...  # passkey accounts via /auth (app must be up: e2e:start)
+npm run e2e:register    # passkeys for every signing-in persona via /auth (app must be up: e2e:start);
+                        # `-- <username>...` registers just those
 npm run e2e:test        # npx playwright test (starts/reuses next start -p 3100)
 npm run e2e:db:down     # stops and removes the throwaway container
 ```
@@ -56,6 +57,16 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
   line to `artifacts/evidence.jsonl`.
 - `support/db.ts` -- `psql` through `db.sh` (podman exec, no
   `DATABASE_URL`), `userExists`, `deleteUser`.
+- `seed/catalogue.ts` + `seed/catalogue.lock.json` -- the real TMDB titles
+  the cast watches, pinned by id with TV season shapes (aired episodes only).
+  `resolveCatalogue()` fills in unresolved entries and rewrites the lock; it
+  needs `TMDB_API_KEY`, so run it under `buildE2eEnv()`.
+- `seed/personas.ts` -- the cast (`PERSONAS`): each account's zone, creation
+  date, per-year shows/films/rhythm, planning list and owned lists.
+- `seed/generate.ts` + `seed/prng.ts` -- `generate(persona, catalogue)` turns
+  a persona into episode and status rows, deterministically (seeded by
+  username and year). `seed/generate.test.ts` checks the generator and pins
+  the cast's designed statistics with the engine's own pure functions.
 - `specs/` -- Playwright spec files, numbered so alphabetical order is also
   run order within a project: `00`-`79` are read-only, `80`-`99` (or any
   `*.mutating.e2e.ts`) mutate shared state and run last, in the

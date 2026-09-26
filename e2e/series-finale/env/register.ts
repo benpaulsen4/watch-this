@@ -4,8 +4,9 @@
 // the passkey (`<username>.credential.json`) and a signed-in Playwright
 // storage state (`<username>.json`).
 //
-// Usage: npm run e2e:register -- <username>...   (needs the app on E2E_BASE_URL)
-// Task 3's PERSONAS list replaces the argv usernames.
+// Usage: npm run e2e:register              every PERSONAS entry with signsIn
+//        npm run e2e:register -- <user>...  just these (an override)
+// Needs the app on E2E_BASE_URL.
 //
 // Re-run safe: a user whose credential file exists AND whose row exists is
 // skipped. Registration creates the row with created_at = now(); the seeder
@@ -14,6 +15,7 @@ import { existsSync } from "node:fs";
 
 import { chromium } from "@playwright/test";
 
+import { PERSONAS } from "../seed/personas";
 import { credentialPath, enableVirtualAuthenticator, exportCredential, registerViaUi, storageStatePath } from "../support/auth";
 import { assertUsername, userExists } from "../support/db";
 import { E2E_BASE_URL } from "./test-env";
@@ -27,8 +29,8 @@ async function assertServerUp(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const usernames = process.argv.slice(2);
-  if (usernames.length === 0) throw new Error("usage: register.ts <username>...");
+  const override = process.argv.slice(2);
+  const usernames = override.length > 0 ? override : PERSONAS.filter((p) => p.signsIn).map((p) => p.username);
   usernames.forEach(assertUsername);
   await assertServerUp();
 
