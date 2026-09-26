@@ -24,6 +24,7 @@
     "e2e:migrate": "tsx e2e/series-finale/env/run.ts migrate",
     "e2e:build": "tsx e2e/series-finale/env/run.ts build",
     "e2e:start": "tsx e2e/series-finale/env/run.ts start",
+    "e2e:dbcheck": "tsx e2e/series-finale/env/run.ts dbcheck",
     "e2e:register": "tsx e2e/series-finale/env/run.ts register",
     "e2e:seed": "tsx e2e/series-finale/env/run.ts seed",
     "e2e:oracle": "tsx e2e/series-finale/env/run.ts oracle",

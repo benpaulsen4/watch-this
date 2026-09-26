@@ -21,4 +21,24 @@ describe("assertE2eDatabaseUrl", () => {
   ])("refuses %s", (url) => {
     expect(() => assertE2eDatabaseUrl(url)).toThrow(/e2e database/i);
   });
+
+  // E4: the podman Postgres has TLS off, so the URL must be able to carry
+  // ?sslmode=disable (src/lib/db otherwise forces ssl:"require" under
+  // NODE_ENV=production). The check only looks at host/port/pathname, so a
+  // query string must neither be required nor let a bad host sneak past.
+  it("accepts the local e2e database with a query string", () => {
+    expect(() =>
+      assertE2eDatabaseUrl(
+        "postgresql://e2e:e2e@localhost:5433/watchthis_e2e?sslmode=disable",
+      ),
+    ).not.toThrow();
+  });
+
+  it("still refuses a remote host even with ?sslmode=disable", () => {
+    expect(() =>
+      assertE2eDatabaseUrl(
+        "postgresql://u:p@db.example.com:5433/watchthis_e2e?sslmode=disable",
+      ),
+    ).toThrow(/e2e database/i);
+  });
 });

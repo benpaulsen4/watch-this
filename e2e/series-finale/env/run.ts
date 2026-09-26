@@ -10,6 +10,7 @@ const SUBCOMMANDS = [
   "migrate",
   "build",
   "start",
+  "dbcheck",
   "register",
   "seed",
   "oracle",
@@ -53,6 +54,12 @@ async function main(): Promise<void> {
       return run("npx", ["next", "start", "-p", String(E2E_PORT)], env);
     case "test":
       return run("npx", ["playwright", "test"], env);
+    case "dbcheck":
+      // A real DB round trip through the app's own src/lib/db, under the
+      // exact env (NODE_ENV=production) a real request would use -- proves
+      // E2E_DATABASE_URL actually connects (see E4), not just that
+      // assertE2eDatabaseUrl's string check passes.
+      return run("npx", ["tsx", "e2e/series-finale/env/dbcheck.ts"], env);
     case "register":
     case "seed":
     case "oracle":

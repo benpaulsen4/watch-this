@@ -2,8 +2,12 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+// E4: the podman Postgres has TLS off (the default), but src/lib/db forces
+// `ssl: "require"` under NODE_ENV=production (which buildE2eEnv() always
+// sets) unless the URL itself names sslmode/ssl -- so this must disable TLS
+// explicitly, or every real DB call hangs until the socket is dropped.
 export const E2E_DATABASE_URL =
-  "postgresql://e2e:e2e@localhost:5433/watchthis_e2e";
+  "postgresql://e2e:e2e@localhost:5433/watchthis_e2e?sslmode=disable";
 export const E2E_PORT = 3100;
 export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
 export const E2E_DIR = join(process.cwd(), "e2e", "series-finale");
