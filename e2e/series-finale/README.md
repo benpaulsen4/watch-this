@@ -81,6 +81,11 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
   network idle), `banner` / `BANNER_READY` (the dashboard banner),
   `becomesVisible` (a soft visibility wait whose result goes through
   `check()`), and `pluralise` (the app's count wording).
+- `support/recap.ts` -- the recap page's sections, found by role, heading
+  or text (src/ has no test ids): `recapSection(page, section)` for each of
+  `RECAP_SECTIONS`, `openRecap` (waits for the hero or the thin card),
+  `loadAllImages` (scrolls so lazy posters load before a screenshot) and
+  `textOf`.
 - `support/db.ts` -- `psql` through `db.sh` (podman exec, no
   `DATABASE_URL`), `userExists`, `deleteUser`.
 - `seed/catalogue.ts` + `seed/catalogue.lock.json` -- the real TMDB titles
@@ -117,6 +122,16 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
   - `30-banner` -- the dashboard banner: who sees it, its text, its link.
   - `31-banner.mutating` -- "Not now": optimistic hide, persistence, and a
     forced failure that leaves bo undismissed.
+  - `40-recap` -- ava's 2025 recap, section by section, against the oracle
+    (hero, tiles, top show, niche, shame, big day, crew, compare, header,
+    footer); the crew-cap rule is recorded as an informational app finding.
+  - `41-recap-visual` (desktop, phone; webkit-phone skips where WebKit does
+    not launch) -- full-page and per-section screenshots,
+    `recap/<user>-<year>/<section>`, for ava 2025/2024/2023, bo, bat and flo
+    2025 and flo 2024; which sections render is checked against the oracle,
+    plus no sideways scroll and a header title that fits.
+  - `42-recap-states` -- loading, load failure then Retry, and unavailable,
+    each forced with `page.route` on the period's GET.
 - `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET`, saved passkeys
   (private keys included) and storage state.
 - `artifacts/` (gitignored) -- screenshots, traces, the HTML report,

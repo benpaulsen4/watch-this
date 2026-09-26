@@ -31,6 +31,8 @@ export interface OracleYear {
   /** Math.round(minutes / 60), as the headline and the hero show it (aggregate.ts:831, RecapClient.tsx:324). */
   hours: number;
   titlesCompleted: number;
+  /** Films completed in the period: `finished.films`, the hero sentence's "and N films" (aggregate.ts:80-89). */
+  filmsCompleted: number;
   titlesDropped: number;
   namedDropped: string[];
   topShow: string | null;
@@ -171,8 +173,9 @@ async function oracleYear(user: { id: string; username: string; timezone: string
 
   // Completed films in the period, dated by updated_at; runtime from the movie
   // cache row (runtime.ts loadFilmRuntimes), same positive-only rule.
-  const [films] = await sql<{ minutes: number; unknown: number }[]>`
-    select coalesce(sum(c.runtime) filter (where c.runtime > 0), 0)::int as minutes,
+  const [films] = await sql<{ n: number; minutes: number; unknown: number }[]>`
+    select count(*)::int as n,
+           coalesce(sum(c.runtime) filter (where c.runtime > 0), 0)::int as minutes,
            (count(*) filter (where c.runtime is null or c.runtime <= 0))::int as unknown
     from user_content_status s
     left join tmdb_cache c on c.tmdb_id = s.tmdb_id and c.content_type = 'movie'
@@ -337,6 +340,7 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     minutes,
     hours: Math.round(minutes / 60),
     titlesCompleted,
+    filmsCompleted: films!.n,
     titlesDropped: counts!.dropped,
     namedDropped: namedDropped.map((row) => row.title),
     topShow,
