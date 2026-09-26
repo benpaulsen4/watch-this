@@ -20,6 +20,7 @@ cached, stop and ask before downloading anything.
 npm run e2e:db:up       # starts postgres:17 in podman, localhost:5433 only
 npm run e2e:migrate     # drizzle-kit migrate against the e2e database
 npm run e2e:build       # next build (production)
+npm run e2e:register -- <username>...  # passkey accounts via /auth (app must be up: e2e:start)
 npm run e2e:test        # npx playwright test (starts/reuses next start -p 3100)
 npm run e2e:db:down     # stops and removes the throwaway container
 ```
@@ -40,14 +41,27 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
   `.env.local`'s real `DATABASE_URL` is never inherited.
 - `env/run.ts` -- `npm run e2e:*` scripts all funnel through this so every
   subcommand asserts the database URL before doing anything. `migrate`,
-  `build`, `start` and `test` are implemented here; `register`, `seed`,
-  `oracle`, `gallery` and `all` are wired up in later tasks.
+  `build`, `start`, `dbcheck`, `register` and `test` are implemented here;
+  `seed`, `oracle`, `gallery` and `all` are wired up in later tasks.
+- `env/register.ts` -- registers accounts through the real `/auth` UI and
+  saves `.auth/<username>.credential.json` (the passkey) and
+  `.auth/<username>.json` (signed-in storage state). Re-run safe.
+- `support/auth.ts` -- Chromium's CDP virtual authenticator:
+  `registerViaUi`, `signInAs` (swaps the saved passkey into the
+  authenticator and refreshes its sign counter afterwards), `signOut`
+  (through the profile page's Logout), `storageStatePath`.
+- `support/shots.ts` -- `shot` / `shotElement` write
+  `artifacts/screenshots/<project>/<name>.png`.
+- `support/evidence.ts` -- `check()`: a soft assertion that also appends a
+  line to `artifacts/evidence.jsonl`.
+- `support/db.ts` -- `psql` through `db.sh` (podman exec, no
+  `DATABASE_URL`), `userExists`, `deleteUser`.
 - `specs/` -- Playwright spec files, numbered so alphabetical order is also
   run order within a project: `00`-`79` are read-only, `80`-`99` (or any
   `*.mutating.e2e.ts`) mutate shared state and run last, in the
   `desktop-mutating` project only, after every read-only project.
-- `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET` and, in later
-  tasks, saved storage state.
+- `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET`, saved passkeys
+  (private keys included) and storage state.
 - `artifacts/` (gitignored) -- screenshots, traces, the HTML report and
   `results.json`.
 

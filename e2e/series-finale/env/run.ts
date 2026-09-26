@@ -61,6 +61,8 @@ async function main(): Promise<void> {
       // assertE2eDatabaseUrl's string check passes.
       return run("npx", ["tsx", "e2e/series-finale/env/dbcheck.ts"], env);
     case "register":
+      // Usernames on argv until Task 3's PERSONAS list lands.
+      return run("npx", ["tsx", "e2e/series-finale/env/register.ts", ...process.argv.slice(3)], env);
     case "seed":
     case "oracle":
     case "gallery":
