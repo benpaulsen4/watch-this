@@ -18,7 +18,18 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "backfill:runtimes": "tsx tools/backfill-runtimes.ts"
+    "backfill:runtimes": "tsx tools/backfill-runtimes.ts",
+    "e2e:db:up": "bash e2e/series-finale/env/db.sh up",
+    "e2e:db:down": "bash e2e/series-finale/env/db.sh down",
+    "e2e:migrate": "tsx e2e/series-finale/env/run.ts migrate",
+    "e2e:build": "tsx e2e/series-finale/env/run.ts build",
+    "e2e:start": "tsx e2e/series-finale/env/run.ts start",
+    "e2e:register": "tsx e2e/series-finale/env/run.ts register",
+    "e2e:seed": "tsx e2e/series-finale/env/run.ts seed",
+    "e2e:oracle": "tsx e2e/series-finale/env/run.ts oracle",
+    "e2e:test": "tsx e2e/series-finale/env/run.ts test",
+    "e2e:gallery": "tsx e2e/series-finale/env/run.ts gallery",
+    "e2e:all": "tsx e2e/series-finale/env/run.ts all"
   },
   "dependencies": {
     "@braintree/sanitize-url": "^7.1.2",
@@ -50,6 +61,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "^4.3.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
