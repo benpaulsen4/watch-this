@@ -37,7 +37,6 @@ const AVA_LIKE: PersonaSpec = {
       films: [
         { key: "f1", outcome: "completed", on: "2025-05-03" },
         { key: "f2", outcome: "completed" },
-        { key: "f3", outcome: "dropped" },
       ],
       weekdayWeights: [0.34, 0.08, 0.08, 0.1, 0.1, 0.14, 0.16],
       soloShare: 0.5,
@@ -212,13 +211,13 @@ describe("generate", () => {
   it("dates completed and dropped statuses inside the year, on outcomeOn when given", () => {
     const status = (tmdbId: number) => rows.statuses.find((row) => row.tmdbId === tmdbId);
 
-    for (const tmdbId of [101, 102, 201, 202, 203]) {
+    for (const tmdbId of [101, 102, 201, 202]) {
       expect(inside(status(tmdbId)!.updatedAt, year2025), String(tmdbId)).toBe(true);
     }
     expect(status(101)).toMatchObject({ contentType: "tv", status: "completed" });
     expect(status(102)).toMatchObject({ contentType: "tv", status: "dropped" });
     expect(status(103)).toMatchObject({ contentType: "tv", status: "watching" });
-    expect(status(203)).toMatchObject({ contentType: "movie", status: "dropped" });
+    expect(status(202)).toMatchObject({ contentType: "movie", status: "completed" });
     expect(getTimezoneDateKey(status(102)!.updatedAt, BRISBANE)).toBe("2025-10-12");
     expect(getTimezoneDateKey(status(201)!.updatedAt, BRISBANE)).toBe("2025-05-03");
 
@@ -267,6 +266,13 @@ describe("generate", () => {
     };
     expect(() => generate(tooMany, CATALOGUE)).toThrow(/gamma/);
   });
+
+  it("refuses a dropped film, a state the app cannot produce", () => {
+    const year = THIN.years[2023]!;
+    const droppedFilm = { key: "f3", outcome: "dropped" } as unknown as (typeof year.films)[number];
+    const spec: PersonaSpec = { ...THIN, years: { 2023: { ...year, films: [...year.films, droppedFilm] } } };
+    expect(() => generate(spec, CATALOGUE)).toThrow(/f3/);
+  });
 });
 
 // The real cast against the committed lock: the properties the specs and the
@@ -289,12 +295,17 @@ describe("the cast", () => {
         .map((row) => titleKey(row.tmdbId, row.contentType)),
     );
 
-  /** The engine's payload for one persona-year, with every title resolvable. */
+  // What the seeder leaves out of tmdb_cache.
+  const uncached = new Set(
+    PERSONAS.flatMap((p) => Object.values(p.years).flatMap((y) => y.shows.filter((s) => s.uncached).map((s) => s.key))),
+  );
+
+  /** The engine's payload for one persona-year, with every cached title resolvable. */
   function payloadFor(username: string, year: number) {
     const persona = PERSONAS.find((p) => p.username === username)!;
     const window = localYear(year, persona.timezone === "UTC" ? 0 : 10);
     const titles = new Map<string, TitleMeta>(
-      [...catalogue.values()].map((entry) => [
+      [...catalogue.values()].filter((entry) => !uncached.has(entry.key)).map((entry) => [
         titleKey(entry.tmdbId, entry.type),
         { tmdbId: entry.tmdbId, contentType: entry.type, title: entry.title, posterPath: null, genreIds: [], popularity: 0, runtime: null },
       ]),
@@ -339,7 +350,10 @@ describe("the cast", () => {
     expect(ava.headline.episodes).toBe(230);
     expect(ava.topShow?.title).toBe("The Bear");
     expect(ava.finished).toEqual({ films: 22, shows: 4, total: 26 });
-    expect(ava.headline.titlesDropped).toBe(4); // 2 shows + 2 films, one of them left uncached
+    // Five dropped shows, one of them left uncached: four named -> "And one more."
+    expect(ava.headline.titlesDropped).toBe(5);
+    expect(ava.shame.dropped.map((show) => show.title).sort()).toEqual(["Andor", "Hacks", "Mr. Robot", "The Last of Us"]);
+    expect([...uncached]).toEqual(["station-eleven"]);
     expect(ava.soloTickTotal).toBeGreaterThanOrEqual(120);
     expect(ava.rhythm.lateShare).toBeCloseTo(0.45, 1);
     // Sunday-heavy weights with big Sunday sittings: rule 3, ahead of the
@@ -357,7 +371,7 @@ describe("the cast", () => {
     expect(payloadFor("e2e_ava", 2023)).toMatchObject({ thin: true, headline: { episodes: 6, titlesCompleted: 2 } });
   });
 
-  it("leaves Hacks and Decision to Leave to ava alone, and she watched the unknown-runtime episodes in 2025", () => {
+  it("leaves Hacks and Station Eleven to ava alone, and she watched the unknown-runtime episodes in 2025", () => {
     const avaEpisodes = new Set(episodesIn("e2e_ava").map((row) => `${row.tmdbId}:${row.seasonNumber}:${row.episodeNumber}`));
     for (const { key, season, episode } of UNKNOWN_RUNTIME_EPISODES) {
       expect(avaEpisodes.has(`${idOf(key)}:${season}:${episode}`)).toBe(true);
@@ -365,7 +379,7 @@ describe("the cast", () => {
     for (const [username, rows] of generated) {
       if (username === "e2e_ava") continue;
       expect(rows.episodes.some((row) => row.tmdbId === idOf("hacks")), username).toBe(false);
-      expect(rows.statuses.some((row) => row.tmdbId === idOf("decision-to-leave")), username).toBe(false);
+      expect(rows.statuses.some((row) => row.tmdbId === idOf("station-eleven")), username).toBe(false);
     }
   });
 
@@ -402,6 +416,12 @@ describe("the cast", () => {
     const [list] = owners[0]!.lists!;
     expect(list?.name).toBe("Couch Crew");
     expect(list?.collaborators).toEqual(["e2e_bo", "e2e_cy", "e2e_dee", "e2e_eli", "e2e_fay", "e2e_gus", "e2e_hal", "e2e_ivy", "e2e_jon"]);
+  });
+
+  it("never seeds a dropped film for anyone", () => {
+    for (const [username, rows] of generated) {
+      expect(rows.statuses.filter((row) => row.contentType === "movie" && row.status === "dropped"), username).toEqual([]);
+    }
   });
 
   it("covers the edge accounts: thin tia, empty neo, batch-only bat, films-only flo", () => {

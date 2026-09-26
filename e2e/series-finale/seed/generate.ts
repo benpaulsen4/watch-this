@@ -351,6 +351,8 @@ export function generate(persona: PersonaSpec, catalogue: Map<string, CatalogueE
     for (let day = dayNumber(firstFilmDay); day < dayNumber(`${year}-12-31`); day += 1) filmDays.push(dateKeyOf(day));
     for (const film of spec.films) {
       const entry = entryFor(catalogue, film.key, "movie", where);
+      // The type already says so; this catches a spec built from untyped data.
+      if (film.outcome !== "completed") throw new Error(`${where}: film "${film.key}" can only be completed, not ${String(film.outcome)}`);
       const date = film.on ?? filmDays[randomInt(rng, 0, filmDays.length - 1)]!;
       const updatedAt = localInstant(offset, date, randomInt(rng, FILM_FIRST_MINUTE, FILM_LAST_MINUTE));
       const addedAt = new Date(updatedAt.getTime() - randomInt(rng, 1, 60) * DAY_MS);

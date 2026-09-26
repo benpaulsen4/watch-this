@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-import { buildE2eEnv, E2E_BASE_URL, E2E_PORT } from "./e2e/series-finale/env/test-env";
+import { E2E_BASE_URL } from "./e2e/series-finale/env/test-env";
 
 // Mutating specs (dismiss, opt-out, rename, account switch) change shared
 // state, so they run last, in their own project, after every read-only
@@ -62,11 +62,14 @@ export default defineConfig({
       dependencies: ["desktop", "phone", "small-phone"],
     },
   ],
+  // No `env` here, and no buildE2eEnv() at config load: Playwright's reporters
+  // serialise the config, and a webServer env once wrote the real TMDB key
+  // into artifacts/results.json (E7). run.ts builds the env for the server
+  // itself, and `npm run e2e:test` scans artifacts/ for secrets afterwards.
   webServer: {
-    command: `npx next start -p ${E2E_PORT}`,
+    command: "npx tsx e2e/series-finale/env/run.ts start",
     url: `${E2E_BASE_URL}/auth`,
     reuseExistingServer: true,
     timeout: 120_000,
-    env: buildE2eEnv() as Record<string, string>,
   },
 });

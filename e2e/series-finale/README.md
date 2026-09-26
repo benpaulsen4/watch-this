@@ -22,7 +22,9 @@ npm run e2e:migrate     # drizzle-kit migrate against the e2e database
 npm run e2e:build       # next build (production)
 npm run e2e:register    # passkeys for every signing-in persona via /auth (app must be up: e2e:start);
                         # `-- <username>...` registers just those
-npm run e2e:test        # npx playwright test (starts/reuses next start -p 3100)
+npm run e2e:test        # npx playwright test (starts/reuses the app via run.ts start),
+                        # then scans artifacts/ for secrets; `-- <playwright args>` pass through
+npm run e2e:scan-secrets  # fail if any artifact holds the TMDB key or WebAuthn secret (names files only)
 npm run e2e:db:down     # stops and removes the throwaway container
 ```
 
@@ -44,6 +46,10 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
   subcommand asserts the database URL before doing anything. `migrate`,
   `build`, `start`, `dbcheck`, `register` and `test` are implemented here;
   `seed`, `oracle`, `gallery` and `all` are wired up in later tasks.
+- `env/scan-secrets.ts` -- `findSecretLeaks`: a byte scan of `artifacts/`
+  for the run's secrets. `playwright.config.ts` holds no secrets and never
+  calls `buildE2eEnv()` (its reporters serialise the config); the web server
+  is started through `run.ts start`, which builds the env itself.
 - `env/register.ts` -- registers accounts through the real `/auth` UI and
   saves `.auth/<username>.credential.json` (the passkey) and
   `.auth/<username>.json` (signed-in storage state). Re-run safe.

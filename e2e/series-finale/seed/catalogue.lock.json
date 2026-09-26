@@ -3,7 +3,8 @@
     "Real TMDB titles for the Series Finale e2e cast. Resolved by resolveCatalogue() (exact title or original title, same first-air/release year); TV seasons hold aired episodes only, season 0 excluded.",
     "jeanne-dielman: the brief listed \"Jeanne Dielman, 23 quai du Commerce, 1080 Bruxelles\" (1975). TMDB (44012) titles it with a comma after \"23\" and dates its release 1976-01-21, so the lock uses TMDB's title and year. Same film, not a substitution.",
     "past-lives: TMDB has two exact \"Past Lives\" (2023) results; the resolver takes the one with the most votes (666277, the Celine Song feature).",
-    "Additions beyond the brief's list: parasite, portrait, moonlight, lady-bird, roma, worst-person, banshees, decision-to-leave, godzilla-minus-one, florida-project, minari, nomadland. A user holds one status per title, and e2e_ava alone needs 38 distinct films (22 completed + 2 dropped + 4 planning in 2025, 8 in 2024, 2 in 2023) against the 29 listed. Minari and Nomadland carry TMDB's release year (2021), not their 2020 premieres."
+    "Additions beyond the brief's list: parasite, portrait, moonlight, lady-bird, roma, worst-person, banshees, godzilla-minus-one, florida-project, minari, nomadland. A user holds one status per title, and e2e_ava alone needs 36 distinct films (22 completed + 4 planning in 2025, 8 in 2024, 2 in 2023) against the 29 listed. Minari and Nomadland carry TMDB's release year (2021), not their 2020 premieres.",
+    "station-eleven: added (fix round 1, ruling E6). Films cannot be dropped in the app, so ava's uncached dropped title is a show that nobody else watches; the seeder deletes its tmdb_cache row after warming."
   ],
   "entries": [
     {
@@ -434,6 +435,19 @@
       ]
     },
     {
+      "key": "station-eleven",
+      "title": "Station Eleven",
+      "year": 2021,
+      "type": "tv",
+      "tmdbId": 90972,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 10
+        }
+      ]
+    },
+    {
       "key": "dune-2",
       "title": "Dune: Part Two",
       "year": 2024,
@@ -684,13 +698,6 @@
       "year": 2022,
       "type": "movie",
       "tmdbId": 674324
-    },
-    {
-      "key": "decision-to-leave",
-      "title": "Decision to Leave",
-      "year": 2022,
-      "type": "movie",
-      "tmdbId": 705996
     },
     {
       "key": "godzilla-minus-one",

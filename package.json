@@ -29,6 +29,7 @@
     "e2e:seed": "tsx e2e/series-finale/env/run.ts seed",
     "e2e:oracle": "tsx e2e/series-finale/env/run.ts oracle",
     "e2e:test": "tsx e2e/series-finale/env/run.ts test",
+    "e2e:scan-secrets": "tsx e2e/series-finale/env/run.ts scan-secrets",
     "e2e:gallery": "tsx e2e/series-finale/env/run.ts gallery",
     "e2e:all": "tsx e2e/series-finale/env/run.ts all"
   },

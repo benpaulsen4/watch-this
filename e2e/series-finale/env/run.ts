@@ -4,7 +4,8 @@
 // stray invocation can never fall back to .env.local's real DATABASE_URL.
 import { spawn } from "node:child_process";
 
-import { assertE2eDatabaseUrl, buildE2eEnv, E2E_PORT } from "./test-env";
+import { findSecretLeaks } from "./scan-secrets";
+import { ARTIFACTS_DIR, assertE2eDatabaseUrl, buildE2eEnv, E2E_PORT } from "./test-env";
 
 const SUBCOMMANDS = [
   "migrate",
@@ -15,6 +16,7 @@ const SUBCOMMANDS = [
   "seed",
   "oracle",
   "test",
+  "scan-secrets",
   "gallery",
   "all",
 ] as const;
@@ -36,6 +38,21 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv): Promise<v
   });
 }
 
+/**
+ * Fails (naming files only) if any artifact holds a secret this run was given.
+ * Runs after every `test`, and on its own as `npm run e2e:scan-secrets`.
+ */
+function scanSecrets(env: NodeJS.ProcessEnv): void {
+  const leaks = findSecretLeaks(ARTIFACTS_DIR, [
+    { name: "TMDB_API_KEY", value: env.TMDB_API_KEY },
+    { name: "WEBAUTHN_SECRET", value: env.WEBAUTHN_SECRET },
+  ]);
+  if (leaks.length > 0) {
+    throw new Error(`Secrets found in e2e artifacts -- delete these files:\n  ${leaks.join("\n  ")}`);
+  }
+  console.log("e2e scan-secrets: no secrets in artifacts/");
+}
+
 async function main(): Promise<void> {
   const subcommand = process.argv[2];
   if (!isSubcommand(subcommand)) {
@@ -53,7 +70,16 @@ async function main(): Promise<void> {
     case "start":
       return run("npx", ["next", "start", "-p", String(E2E_PORT)], env);
     case "test":
-      return run("npx", ["playwright", "test"], env);
+      // Extra argv goes to Playwright (e.g. `-- --project=desktop <spec>`);
+      // the secret scan runs whether or not the tests passed.
+      try {
+        await run("npx", ["playwright", "test", ...process.argv.slice(3)], env);
+      } finally {
+        scanSecrets(env);
+      }
+      return;
+    case "scan-secrets":
+      return scanSecrets(env);
     case "dbcheck":
       // A real DB round trip through the app's own src/lib/db, under the
       // exact env (NODE_ENV=production) a real request would use -- proves

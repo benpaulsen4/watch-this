@@ -13,12 +13,17 @@
 //   than almost every rival's, so "The Bear is top" is kept strictly ahead
 //   rather than left to a tie.
 // - Hacks is watched by e2e_ava alone, so nulling three of its runtimes
-//   (UNKNOWN_RUNTIME_EPISODES) touches nobody else's hours; Decision to Leave
-//   is referenced by ava alone, so deleting its cache row does the same.
+//   (UNKNOWN_RUNTIME_EPISODES) touches nobody else's hours; Station Eleven is
+//   watched by ava alone, so deleting its cache row (`uncached`) does the same.
+// - Only states the app can produce: films are planning or completed, never
+//   dropped.
 
 export interface YearSpec {
-  shows: { key: string; episodes: number; outcome?: "completed" | "dropped" | "watching"; outcomeOn?: string }[];
-  films: { key: string; outcome: "completed" | "dropped"; on?: string; uncached?: true }[];
+  // `uncached`: the seeder deletes this title's tmdb_cache row after warming.
+  shows: { key: string; episodes: number; outcome?: "completed" | "dropped" | "watching"; outcomeOn?: string; uncached?: true }[];
+  // Films are only ever completed: the app has no dropped state for a film
+  // (MovieWatchStatus is planning/completed; the status API rejects the rest).
+  films: { key: string; outcome: "completed"; on?: string }[];
   weekdayWeights: [number, number, number, number, number, number, number]; // Sun..Sat
   soloShare: number; // 0..1 of episodes ticked alone
   lateShareOfSolo: number; // 0..1 of solo ticks after 21:00 local
@@ -139,26 +144,27 @@ export const PERSONAS: PersonaSpec[] = [
       2025: {
         shows: [
           { key: "bear", episodes: 38, outcome: "completed" }, // top show: S1-S4, all of it by 2025
-          { key: "taskmaster", episodes: 37 },
+          { key: "taskmaster", episodes: 27 },
           { key: "office", episodes: 36 }, // + the 2025-01-01 zone-edge episode = 37
           { key: "succession", episodes: 29, outcome: "completed" },
           { key: "severance", episodes: 19, outcome: "completed" },
           { key: "shogun", episodes: 10, outcome: "completed" },
           // Dropped as of the last episode watched. bo finishes Mr. Robot in 2025.
+          // Five dropped against 26 completed keeps rule 2 (completionist,
+          // >= 0.9) well out of reach: 26/31 = 0.839.
           { key: "mr-robot", episodes: 30, outcome: "dropped" },
           { key: "hacks", episodes: 30, outcome: "dropped" },
+          { key: "last-of-us", episodes: 3, outcome: "dropped" }, // S2, after S1 in 2024
+          { key: "andor", episodes: 4, outcome: "dropped" }, // S2, after S1 in 2024
+          // Left out of tmdb_cache by the seeder: the headline dropped count (5)
+          // exceeds the named dropped titles (4) -> "And one more."
+          { key: "station-eleven", episodes: 3, outcome: "dropped", uncached: true },
         ],
         films: [
-          ...[
-            "dune-2", "oppenheimer", "poor-things", "eeaao", "substance", "brutalist", "furiosa", "anora",
-            "perfect-days", "challengers", "past-lives", "aftersun", "anatomy", "conclave", "holdovers", "flow",
-            "real-pain", "zone-of-interest", "tv-glow", "monster", "evil", "ich-war-zuhause",
-          ].map((key) => ({ key, outcome: "completed" as const })),
-          { key: "drive-my-car", outcome: "dropped", on: "2025-08-17" },
-          // Deliberately left out of tmdb_cache by the seeder: headline dropped
-          // count (4) exceeds the named dropped titles (3) -> "And one more."
-          { key: "decision-to-leave", outcome: "dropped", on: "2025-09-06", uncached: true },
-        ],
+          "dune-2", "oppenheimer", "poor-things", "eeaao", "substance", "brutalist", "furiosa", "anora",
+          "perfect-days", "challengers", "past-lives", "aftersun", "anatomy", "conclave", "holdovers", "flow",
+          "real-pain", "zone-of-interest", "tv-glow", "monster", "evil", "ich-war-zuhause",
+        ].map((key) => ({ key, outcome: "completed" as const })),
         weekdayWeights: SUNDAY_HEAVY,
         soloShare: 0.55,
         lateShareOfSolo: 0.45,
