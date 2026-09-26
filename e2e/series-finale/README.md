@@ -76,6 +76,11 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
   (timings) that never fails the test.
 - `support/oracle.ts` -- `oracleYear(username, year)` and
   `oracleAvailableYears(username)`, read from `artifacts/oracle.json`.
+- `support/pages.ts` -- shared page helpers: `listResponse` (the page's
+  `GET /api/series-finale`), `openDashboard` (waits for that list and
+  network idle), `banner` / `BANNER_READY` (the dashboard banner),
+  `becomesVisible` (a soft visibility wait whose result goes through
+  `check()`), and `pluralise` (the app's count wording).
 - `support/db.ts` -- `psql` through `db.sh` (podman exec, no
   `DATABASE_URL`), `userExists`, `deleteUser`.
 - `seed/catalogue.ts` + `seed/catalogue.lock.json` -- the real TMDB titles
