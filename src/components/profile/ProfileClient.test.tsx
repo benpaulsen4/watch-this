@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProfileClient } from "./ProfileClient";
 
@@ -60,6 +60,7 @@ const { authState } = vi.hoisted(() => ({
       user: null as typeof SERVER_USER | null,
       loading: true,
       refreshSession: vi.fn(),
+      clearAuth: vi.fn(),
     },
   },
 }));
@@ -89,6 +90,7 @@ describe("ProfileClient", () => {
       user: SERVER_USER,
       loading: false,
       refreshSession: vi.fn(),
+      clearAuth: vi.fn(),
     };
   });
 
@@ -130,9 +132,7 @@ describe("ProfileClient", () => {
     fireEvent.click(screen.getByRole("button", { name: /data management/i }));
     expect(screen.getByText("DataExportImport")).toBeInTheDocument();
     expect(screen.getByText("ProfileFinaleRows")).toBeInTheDocument();
-    expect(
-      screen.getByText("CrewComparisonToggle:true"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("CrewComparisonToggle:true")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /streaming/i }));
     expect(screen.getByText("StreamingPreferences")).toBeInTheDocument();
@@ -172,6 +172,7 @@ describe("ProfileClient", () => {
       user: null,
       loading: true,
       refreshSession: vi.fn(),
+      clearAuth: vi.fn(),
     };
 
     render(<ProfileClient initialUser={SERVER_USER} />);
@@ -179,9 +180,7 @@ describe("ProfileClient", () => {
     // Fully rendered, not a spinner, and showing the server-resolved user.
     expect(screen.getByText(/profile information/i)).toBeInTheDocument();
     expect(screen.getByText("UsernameChanger:alice")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /logout/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /logout/i })).toBeInTheDocument();
 
     // And it did not go asking for the session it was already handed.
     expect(global.fetch).not.toHaveBeenCalledWith(
@@ -199,6 +198,7 @@ describe("ProfileClient", () => {
       user: { ...SERVER_USER, username: "renamed" },
       loading: false,
       refreshSession: vi.fn(),
+      clearAuth: vi.fn(),
     };
 
     render(<ProfileClient initialUser={SERVER_USER} />);
@@ -206,6 +206,19 @@ describe("ProfileClient", () => {
     // The refreshed name, not the one baked into the server render.
     expect(screen.getByText("UsernameChanger:renamed")).toBeInTheDocument();
     expect(screen.queryByText("UsernameChanger:alice")).not.toBeInTheDocument();
+  });
+
+  // Signing out has to reach the auth context, or it goes on holding the old
+  // user and the query cache keyed to them survives into the next sign-in.
+  it("clears the auth context on logout", async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      { ok: true, json: async () => ({}) },
+    );
+    render(<ProfileClient initialUser={SERVER_USER} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /logout/i }));
+
+    await waitFor(() => expect(authState.current.clearAuth).toHaveBeenCalled());
   });
 
   it("logs out and navigates to /auth", async () => {

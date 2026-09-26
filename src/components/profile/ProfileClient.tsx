@@ -34,7 +34,7 @@ const PROFILE_TABS: ProfileTab[] = [
 
 export function ProfileClient({ initialUser }: { initialUser: User }) {
   const router = useRouter();
-  const { user: contextUser, refreshSession } = useAuth();
+  const { user: contextUser, refreshSession, clearAuth } = useAuth();
 
   // Seeded from the server render, so there is nothing to wait on: the page has
   // already resolved the session. The context takes over once refreshSession()
@@ -52,6 +52,10 @@ export function ProfileClient({ initialUser }: { initialUser: User }) {
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/signout", { method: "POST" });
+      // Navigation alone leaves the context holding this user. Clearing it
+      // is what makes AuthProvider drop the query cache, so the next person
+      // to sign in on this tab never sees this user's cached data.
+      clearAuth();
       router.push("/auth");
     } catch (error) {
       console.error("Logout failed:", error);
