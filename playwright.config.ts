@@ -7,6 +7,15 @@ import { E2E_BASE_URL } from "./e2e/series-finale/env/test-env";
 // project has finished. Numbered 80-99, or named `*.mutating.e2e.ts`.
 const MUTATING_SPEC_PATTERN = /(8\d|9\d)-.*\.e2e\.ts$|.*\.mutating\.e2e\.ts$/;
 
+// `run.ts test` runs Playwright twice -- the read-only projects, then
+// desktop-mutating -- and names each invocation here, so each keeps its own
+// JSON results, HTML report and test output (results-readonly.json,
+// playwright-report-readonly/, test-output-readonly/, and the same for
+// "mutating"). A direct `npx playwright test` has no name and writes
+// results.json, playwright-report/ and test-output/.
+const REPORT_RUN = process.env.E2E_REPORT_RUN;
+const REPORT_SUFFIX = REPORT_RUN && /^[a-z-]+$/.test(REPORT_RUN) ? `-${REPORT_RUN}` : "";
+
 export default defineConfig({
   testDir: "./e2e/series-finale/specs",
   testMatch: /.*\.e2e\.ts$/,
@@ -15,11 +24,11 @@ export default defineConfig({
   retries: 0,
   timeout: 90_000,
   expect: { timeout: 15_000 },
-  outputDir: "./e2e/series-finale/artifacts/test-output",
+  outputDir: `./e2e/series-finale/artifacts/test-output${REPORT_SUFFIX}`,
   reporter: [
     ["list"],
-    ["json", { outputFile: "e2e/series-finale/artifacts/results.json" }],
-    ["html", { outputFolder: "e2e/series-finale/artifacts/playwright-report", open: "never" }],
+    ["json", { outputFile: `e2e/series-finale/artifacts/results${REPORT_SUFFIX}.json` }],
+    ["html", { outputFolder: `e2e/series-finale/artifacts/playwright-report${REPORT_SUFFIX}`, open: "never" }],
   ],
   use: {
     baseURL: E2E_BASE_URL,
@@ -56,10 +65,11 @@ export default defineConfig({
       name: "desktop-mutating",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
       testMatch: MUTATING_SPEC_PATTERN,
-      // webkit-phone is best-effort (E2): this host is missing the system
-      // libraries WebKit needs (browserType.launch fails outright), so it
-      // cannot gate the mutating project. Re-add it once WebKit runs here.
-      dependencies: ["desktop", "phone", "small-phone"],
+      // No `dependencies` (E8): Playwright skips a project whose dependency
+      // failed, so an app finding in a read-only project would silently stop
+      // every mutating spec. Ordering is run.ts's job instead: `e2e:test` and
+      // `e2e:all` run the read-only projects to completion first, then this
+      // project on its own, whatever the first run's result.
     },
   ],
   // No `env` here, and no buildE2eEnv() at config load: Playwright's reporters

@@ -25,9 +25,11 @@ npm run e2e:register    # passkeys for every signing-in persona via /auth (app m
 npm run e2e:seed        # the cast's history, lists, TMDB caches and the 2025 cohort snapshots
                         # (needs e2e:register first); `-- --resolve-only` just resolves the catalogue lock
 npm run e2e:oracle      # artifacts/oracle.json: what each recap must show, from plain SQL
-npm run e2e:test        # empties artifacts/evidence.jsonl, runs npx playwright test (starts/reuses the
-                        # app via run.ts start), then scans artifacts/ for secrets;
-                        # `-- <playwright args>` pass through
+npm run e2e:test        # empties artifacts/evidence.jsonl, runs Playwright twice (starts/reuses the
+                        # app via run.ts start): the read-only projects, then desktop-mutating
+                        # whatever the first run's result; fails if either failed; then scans
+                        # artifacts/ for secrets. `-- <playwright args>` go to both runs; args
+                        # with --project run as one plain `playwright test` instead
 npm run e2e:scan-secrets  # fail if any artifact holds the TMDB key or WebAuthn secret (names files only)
 npm run e2e:db:reset    # a fresh, empty container (down + up)
 npm run e2e:db:down     # stops and removes the throwaway container
@@ -37,7 +39,7 @@ Or everything in one go:
 
 ```bash
 npm run e2e:all   # evidence reset, db reset, migrate, build, start the app, register, seed,
-                  # oracle, playwright test, secret scan (gallery: Task 9). Stops the app it
+                  # oracle, the two Playwright runs as e2e:test, secret scan (gallery: Task 9). Stops the app it
                   # started; leaves the database up and seeded -- npm run e2e:db:down removes it.
 ```
 
@@ -46,6 +48,10 @@ Individual Playwright invocations work too, e.g.:
 ```bash
 npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
 ```
+
+A bare `npx playwright test` runs every project, `desktop-mutating` last by
+config order, but nothing holds it back if a read-only project is still
+failing or was not selected -- `npm run e2e:test` is the ordered way.
 
 ## Layout
 
@@ -134,19 +140,29 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
     each forced with `page.route` on the period's GET.
 - `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET`, saved passkeys
   (private keys included) and storage state.
-- `artifacts/` (gitignored) -- screenshots, traces, the HTML report,
-  `results.json`, `evidence.jsonl` and `oracle.json`.
+- `artifacts/` (gitignored) -- screenshots, `evidence.jsonl`, `oracle.json`,
+  and per Playwright invocation its JSON results, HTML report and test
+  output (traces): `results-readonly.json`, `playwright-report-readonly/`,
+  `test-output-readonly/`, and the same with `-mutating` (a direct
+  `npx playwright test` writes the unsuffixed `results.json`,
+  `playwright-report/`, `test-output/`).
 
 ## Projects
 
 `playwright.config.ts` runs projects in this order: `desktop`, `phone`,
 `small-phone` (story specs only), `webkit-phone` (best-effort; recap/story
-visual specs only), then `desktop-mutating` last, which depends on `desktop`,
-`phone` and `small-phone` finishing first. This keeps mutating specs from
-running before a read-only project gets to see the state they'd disturb.
+visual specs only), then `desktop-mutating` last. The mutating specs must not
+run before a read-only project gets to see the state they'd disturb, and
+`run.ts test` (so `e2e:test` and `e2e:all`) enforces that with two Playwright
+invocations: the four read-only projects to completion, then
+`desktop-mutating` on its own.
 
-`webkit-phone` is **not** in `desktop-mutating`'s dependencies: this dev
-host is missing the system libraries WebKit needs
-(`browserType.launch` fails outright -- `sudo npx playwright install-deps`
-would fix it, but that's out of scope here). If WebKit starts working in a
-given environment, add it back to the dependency list.
+`desktop-mutating` has **no** Playwright `dependencies` (ruling E8):
+Playwright skips a project whose dependency failed, so a genuine app finding
+failing in `phone` would have silently stopped every mutating spec. The
+second invocation runs whatever the first one's result, and `run.ts` exits
+non-zero if either failed.
+
+`webkit-phone` cannot launch on this dev host (missing system libraries;
+`sudo npx playwright install-deps` would fix it, but that's out of scope), so
+the visual specs skip it with that reason.

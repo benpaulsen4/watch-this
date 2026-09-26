@@ -170,7 +170,7 @@ async function runAll(env: NodeJS.ProcessEnv): Promise<void> {
     // Playwright's webServer reuses the server already on the port.
     let failure: unknown = null;
     try {
-      await run("npx", ["playwright", "test"], env);
+      await runPlaywright(env, []);
     } catch (error) {
       failure = error;
       // Said now, so a secret-scan failure below cannot hide it.
@@ -183,6 +183,45 @@ async function runAll(env: NodeJS.ProcessEnv): Promise<void> {
     await stopServer(server);
     console.log("e2e all: the app server is stopped; the e2e database is still up for inspection (npm run e2e:db:down removes it)");
   }
+}
+
+/** Every project but desktop-mutating, in playwright.config.ts's order. */
+const READ_ONLY_PROJECTS = ["desktop", "phone", "small-phone", "webkit-phone"];
+
+/**
+ * The specs, in two Playwright invocations (E8): the read-only projects, then
+ * desktop-mutating on its own -- run whatever the first one's result, so an
+ * app finding in a read-only project cannot stop the mutating specs (as a
+ * project `dependencies` entry would). Each invocation writes its own
+ * results-<name>.json, playwright-report-<name>/ and test-output-<name>/
+ * (E2E_REPORT_RUN, read by playwright.config.ts). Throws after both if either
+ * failed. `args` (spec paths, --grep, ...) go to both, with
+ * --pass-with-no-tests so a filter matching only one side is not a failure;
+ * args that pick projects themselves run as one plain invocation instead.
+ */
+async function runPlaywright(env: NodeJS.ProcessEnv, args: string[]): Promise<void> {
+  if (args.some((arg) => arg === "--project" || arg.startsWith("--project="))) {
+    await run("npx", ["playwright", "test", ...args], env);
+    return;
+  }
+
+  const invocations = [
+    { name: "readonly", projects: READ_ONLY_PROJECTS },
+    { name: "mutating", projects: ["desktop-mutating"] },
+  ];
+  const failures: string[] = [];
+  for (const { name, projects } of invocations) {
+    try {
+      const projectArgs = projects.map((project) => `--project=${project}`);
+      await run("npx", ["playwright", "test", ...projectArgs, "--pass-with-no-tests", ...args], { ...env, E2E_REPORT_RUN: name });
+      console.log(`e2e playwright (${name}): passed`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push(`${name}: ${message}`);
+      console.error(`e2e playwright (${name}): failed -- ${message}`);
+    }
+  }
+  if (failures.length > 0) throw new Error(`playwright failed -- ${failures.join("; ")}`);
 }
 
 /**
@@ -221,7 +260,7 @@ async function main(): Promise<void> {
       // the secret scan runs whether or not the tests passed.
       resetEvidence();
       try {
-        await run("npx", ["playwright", "test", ...process.argv.slice(3)], env);
+        await runPlaywright(env, process.argv.slice(3));
       } finally {
         scanSecrets(env);
       }
