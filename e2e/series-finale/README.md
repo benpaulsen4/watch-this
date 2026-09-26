@@ -72,7 +72,10 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
 - `support/shots.ts` -- `shot` / `shotElement` write
   `artifacts/screenshots/<project>/<name>.png`.
 - `support/evidence.ts` -- `check()`: a soft assertion that also appends a
-  line to `artifacts/evidence.jsonl`.
+  line to `artifacts/evidence.jsonl`; `note()`: an informational line
+  (timings) that never fails the test.
+- `support/oracle.ts` -- `oracleYear(username, year)` and
+  `oracleAvailableYears(username)`, read from `artifacts/oracle.json`.
 - `support/db.ts` -- `psql` through `db.sh` (podman exec, no
   `DATABASE_URL`), `userExists`, `deleteUser`.
 - `seed/catalogue.ts` + `seed/catalogue.lock.json` -- the real TMDB titles
@@ -101,6 +104,14 @@ npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
   run order within a project: `00`-`79` are read-only, `80`-`99` (or any
   `*.mutating.e2e.ts`) mutate shared state and run last, in the
   `desktop-mutating` project only, after every read-only project.
+  - `10-gating` -- who gets a recap: no completed year, a year not over, a
+    malformed period (404 page), thin years, signed out.
+  - `20-api-and-card` (desktop only) -- the list and payload routes, the
+    card's status matrix, card PNGs saved to `artifacts/cards/`, the
+    first-generation time (`note`), and a card privacy byte check.
+  - `30-banner` -- the dashboard banner: who sees it, its text, its link.
+  - `31-banner.mutating` -- "Not now": optimistic hide, persistence, and a
+    forced failure that leaves bo undismissed.
 - `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET`, saved passkeys
   (private keys included) and storage state.
 - `artifacts/` (gitignored) -- screenshots, traces, the HTML report,

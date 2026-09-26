@@ -17,6 +17,8 @@ export interface Evidence {
   expected: unknown;
   actual: unknown;
   pass: boolean;
+  /** Set by note(): recorded for the report, never fails the test. */
+  informational?: true;
 }
 
 export function check(id: string, description: string, expected: unknown, actual: unknown): void {
@@ -27,6 +29,20 @@ export function check(id: string, description: string, expected: unknown, actual
   const pass = info.errors.length === errorsBefore;
 
   const line: Evidence = { id, project: info.project.name, description, expected, actual, pass };
+  mkdirSync(ARTIFACTS_DIR, { recursive: true });
+  appendFileSync(EVIDENCE_PATH, `${JSON.stringify(line)}\n`);
+}
+
+/**
+ * An evidence line that is informational only -- timings and the like, where
+ * the brief wants the number in the report but a slow run is not a failure.
+ * `pass` says whether it met `expected`; the test is not failed either way.
+ */
+export function note(id: string, description: string, expected: unknown, actual: unknown, pass: boolean): void {
+  const info = test.info();
+  info.annotations.push({ type: "note", description: `${id}: ${JSON.stringify(actual)} (expected ${JSON.stringify(expected)})` });
+
+  const line: Evidence = { id, project: info.project.name, description, expected, actual, pass, informational: true };
   mkdirSync(ARTIFACTS_DIR, { recursive: true });
   appendFileSync(EVIDENCE_PATH, `${JSON.stringify(line)}\n`);
 }
