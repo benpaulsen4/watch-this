@@ -21,6 +21,7 @@
     "backfill:runtimes": "tsx tools/backfill-runtimes.ts",
     "e2e:db:up": "bash e2e/series-finale/env/db.sh up",
     "e2e:db:down": "bash e2e/series-finale/env/db.sh down",
+    "e2e:db:reset": "bash e2e/series-finale/env/db.sh reset",
     "e2e:migrate": "tsx e2e/series-finale/env/run.ts migrate",
     "e2e:build": "tsx e2e/series-finale/env/run.ts build",
     "e2e:start": "tsx e2e/series-finale/env/run.ts start",
