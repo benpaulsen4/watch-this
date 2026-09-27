@@ -8,7 +8,8 @@ import { join } from "node:path";
 
 import { writeGallery } from "../report/gallery";
 import { findSecretLeaks } from "./scan-secrets";
-import { ARTIFACTS_DIR, assertE2eDatabaseUrl, buildE2eEnv, E2E_BASE_URL, E2E_DIR, E2E_PORT } from "./test-env";
+import { assertE2eServer, assertNoForeignServer } from "./server-guard";
+import { ARTIFACTS_DIR, assertE2eDatabaseUrl, assertSuiteInDate, buildE2eEnv, E2E_BASE_URL, E2E_DIR, E2E_PORT } from "./test-env";
 
 const SUBCOMMANDS = [
   "migrate",
@@ -184,6 +185,7 @@ async function runAll(env: NodeJS.ProcessEnv): Promise<void> {
   const server = startServer(env);
   try {
     await waitForServer(server);
+    assertE2eServer();
     await run("npx", ["tsx", "e2e/series-finale/env/register.ts"], env);
     await run("npx", ["tsx", "e2e/series-finale/seed/seed.ts"], env);
     await run("npx", ["tsx", "e2e/series-finale/seed/oracle.ts"], env);
@@ -274,6 +276,9 @@ async function main(): Promise<void> {
 
   const env = buildE2eEnv();
   assertE2eDatabaseUrl(env.DATABASE_URL!);
+  // Rebuilding the report or scanning artifacts is fine at any date; anything
+  // that seeds, serves or tests is not once the cast's year is over (I6).
+  if (subcommand !== "gallery" && subcommand !== "scan-secrets") assertSuiteInDate();
 
   switch (subcommand) {
     case "migrate":
@@ -285,6 +290,9 @@ async function main(): Promise<void> {
     case "test":
       // Extra argv goes to Playwright (e.g. `-- --project=desktop <spec>`);
       // the secret scan runs whether or not the tests passed.
+      // A server already on the port is reused by Playwright, so it must be
+      // the e2e one (global-setup.ts checks again, for direct invocations).
+      assertNoForeignServer();
       resetEvidence();
       try {
         await runPlaywright(env, process.argv.slice(3));

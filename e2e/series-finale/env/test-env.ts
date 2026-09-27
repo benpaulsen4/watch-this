@@ -31,6 +31,29 @@ export function assertE2eDatabaseUrl(url: string): void {
   }
 }
 
+/**
+ * The cast is dated for runs in 2026: 2025 is the newest completed year, 2026
+ * is "not over", neo joins in 2026 and ava has a 2026-01-01 edge episode and a
+ * 2026 planning film. Once 2026 ends -- in Australia/Brisbane, the cast's
+ * earliest zone -- the app completes 2026 and a wave of checks would fail as if
+ * the app had regressed, so the suite refuses to run instead.
+ */
+export const SUITE_LAST_DAY = "2026-12-31";
+const SUITE_EARLIEST_ZONE = "Australia/Brisbane";
+
+/** Throws once SUITE_LAST_DAY has passed in the cast's earliest zone. */
+export function assertSuiteInDate(now: Date = new Date()): void {
+  const today = now.toLocaleDateString("en-CA", { timeZone: SUITE_EARLIEST_ZONE }); // YYYY-MM-DD
+  if (today > SUITE_LAST_DAY) {
+    throw new Error(
+      `Refusing to run: the e2e cast is dated for 2026 and it is now ${today} in ${SUITE_EARLIEST_ZONE}. ` +
+        "Move the cast forward a year before running (see README, \"Dated for 2026\"): LAST_COMPLETED_YEAR and YEARS in " +
+        "seed/oracle.ts, every year the specs hard-code (grep specs/ for 2023-2026), neo's createdAt and ava's 2026 " +
+        "edge episodes and planning film in seed/personas.ts, then SUITE_LAST_DAY here.",
+    );
+  }
+}
+
 /** The TMDB key from the env, else the one line in .env.local. Never logged. */
 export function readTmdbKey(): string {
   if (process.env.TMDB_API_KEY) return process.env.TMDB_API_KEY;

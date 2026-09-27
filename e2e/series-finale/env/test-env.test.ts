@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assertE2eDatabaseUrl } from "./test-env";
+import { assertE2eDatabaseUrl, assertSuiteInDate } from "./test-env";
 
 describe("assertE2eDatabaseUrl", () => {
   it("accepts the local e2e database", () => {
@@ -40,5 +40,18 @@ describe("assertE2eDatabaseUrl", () => {
         "postgresql://u:p@db.example.com:5433/watchthis_e2e?sslmode=disable",
       ),
     ).toThrow(/e2e database/i);
+  });
+});
+
+describe("assertSuiteInDate", () => {
+  it("runs on the cast's last day, in Brisbane", () => {
+    expect(() => assertSuiteInDate(new Date("2026-09-27T00:00:00Z"))).not.toThrow();
+    // 2026-12-31 13:59 UTC is 23:59 on the 31st in Brisbane.
+    expect(() => assertSuiteInDate(new Date("2026-12-31T13:59:00Z"))).not.toThrow();
+  });
+
+  it("refuses once 2027 has begun in Brisbane, even while it is still 2026 in UTC", () => {
+    expect(() => assertSuiteInDate(new Date("2026-12-31T14:00:00Z"))).toThrow(/dated for 2026 and it is now 2027-01-01/);
+    expect(() => assertSuiteInDate(new Date("2027-06-01T00:00:00Z"))).toThrow(/Refusing to run/);
   });
 });

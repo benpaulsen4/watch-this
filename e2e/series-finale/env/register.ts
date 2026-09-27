@@ -6,7 +6,7 @@
 //
 // Usage: npm run e2e:register              every PERSONAS entry with signsIn
 //        npm run e2e:register -- <user>...  just these (an override)
-// Needs the app on E2E_BASE_URL.
+// Needs the e2e app on E2E_BASE_URL (npm run e2e:start in another terminal).
 //
 // Re-run safe: a user whose credential file exists AND whose row exists is
 // skipped. Registration creates the row with created_at = now(); the seeder
@@ -18,21 +18,16 @@ import { chromium } from "@playwright/test";
 import { PERSONAS } from "../seed/personas";
 import { credentialPath, enableVirtualAuthenticator, exportCredential, registerViaUi, storageStatePath } from "../support/auth";
 import { assertUsername, userExists } from "../support/db";
+import { assertE2eServer } from "./server-guard";
 import { E2E_BASE_URL } from "./test-env";
-
-async function assertServerUp(): Promise<void> {
-  try {
-    await fetch(`${E2E_BASE_URL}/auth`);
-  } catch {
-    throw new Error(`The app is not answering on ${E2E_BASE_URL}; start it first (npm run e2e:start)`);
-  }
-}
 
 async function main(): Promise<void> {
   const override = process.argv.slice(2);
   const usernames = override.length > 0 ? override : PERSONAS.filter((p) => p.signsIn).map((p) => p.username);
   usernames.forEach(assertUsername);
-  await assertServerUp();
+  // The server on the port must be the e2e one (its DATABASE_URL is checked):
+  // registering through any other would create accounts in its database.
+  assertE2eServer();
 
   const browser = await chromium.launch();
   try {
@@ -58,6 +53,11 @@ async function main(): Promise<void> {
         const page = await context.newPage();
         const auth = await enableVirtualAuthenticator(page);
         await registerViaUi(page, username);
+        // The row must be in the e2e database (read through podman, not the
+        // app): if it is not, the server that took the registration is not ours.
+        if (!userExists(username)) {
+          throw new Error(`${username} registered through ${E2E_BASE_URL}, but no such row is in the e2e database; stop that server`);
+        }
         await exportCredential(auth, username);
         await context.storageState({ path: storageStatePath(username) });
         console.log(`${username}: registered`);

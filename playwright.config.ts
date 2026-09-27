@@ -19,6 +19,9 @@ const REPORT_SUFFIX = REPORT_RUN && /^[a-z-]+$/.test(REPORT_RUN) ? `-${REPORT_RU
 export default defineConfig({
   testDir: "./e2e/series-finale/specs",
   testMatch: /.*\.e2e\.ts$/,
+  // After the webServer step: refuses a server on the port that is not the
+  // e2e build's (its DATABASE_URL is checked), and a run after 2026 (I5, I6).
+  globalSetup: "./e2e/series-finale/env/global-setup.ts",
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -79,6 +82,8 @@ export default defineConfig({
   webServer: {
     command: "npx tsx e2e/series-finale/env/run.ts start",
     url: `${E2E_BASE_URL}/auth`,
+    // Reused only if it is the e2e server: global-setup.ts checks the
+    // listener's DATABASE_URL before any spec runs.
     reuseExistingServer: true,
     timeout: 120_000,
     // run.ts start runs next in its own process group (so it can be stopped
