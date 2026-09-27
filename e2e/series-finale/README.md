@@ -73,7 +73,9 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   `.auth/<username>.json` (signed-in storage state). Re-run safe.
 - `support/auth.ts` -- Chromium's CDP virtual authenticator:
   `registerViaUi`, `signInAs` (swaps the saved passkey into the
-  authenticator and refreshes its sign counter afterwards), `signOut`
+  authenticator and refreshes its sign counter afterwards; with
+  `{ navigate: false }` it signs in on the /auth page already showing, with
+  no page load, so an account switch stays in one document), `signOut`
   (through the profile page's Logout), `storageStatePath`.
 - `support/shots.ts` -- `shot` / `shotElement` write
   `artifacts/screenshots/<project>/<name>.png`.
@@ -88,12 +90,22 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   `becomesVisible` (a soft visibility wait whose result goes through
   `check()`), and the app's wording rules: `pluralise` (counts),
   `words` / `wordValue` (small numbers in words, both ways),
-  `capitalise` and `dayMonth` (a date key as "28 December").
+  `capitalise`, `dayMonth` (a date key as "28 December") and
+  `alsoTopForLine` ("Also number one for a and b.").
 - `support/recap.ts` -- the recap page's sections, found by role, heading
   or text (src/ has no test ids): `recapSection(page, section)` for each of
   `RECAP_SECTIONS`, `openRecap` (waits for the hero or the thin card),
   `loadAllImages` (scrolls so lazy posters load before a screenshot),
-  `tileValue` (a stat tile's figure) and `textOf`.
+  `tileValue` (a stat tile's figure), `crewRows` (CrewRanking's rows, in the
+  recap's crew panel or the story's crew card) and `textOf`.
+- `support/profile.ts` -- the profile page: `openProfileTab` (by URL
+  fragment) and `clickProfileTab` (no page load), the Data Management tab's
+  Series Finale card (`finaleCard`, `finaleRows`, `readFinaleRows`), the
+  crew-comparison switch (`crewSwitch`, `crewSwitchLine`,
+  `toggleCrewSwitch`) with its expected copy, `sessionPut` and
+  `logoutButton`.
+- `support/cards.ts` -- `CARDS_DIR`, `CARD_SIZE` and `pngSize` (a PNG's
+  dimensions from its IHDR chunk).
 - `support/story.ts` -- the story reel (`/series-finale/<period>/story`),
   found by its own roles and names: the current card is the
   `role="group"` "Card i of N" with its Shell's `data-card`; `openStory`,
@@ -162,6 +174,26 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
     `story/<user>-2025/<nn>-<heading-slug>` (the card id where a card has
     no h2), for ava, bat and flo, and tia's thin story; which cards appear
     is checked against the oracle.
+  - `60-profile` (desktop, phone) -- ava's Data Management tab: the archive
+    rows against the oracle (newest first and highlighted, each opening its
+    recap, the thin 2023 listed), a forced list failure, the crew switch on
+    with its consent text, and a forced failed save that reverts.
+  - `70-share-button` (desktop, phone) -- the recap header's Share: the
+    mount-time prefetch; on desktop the download (saved as
+    `cards/ava-2025-downloaded.png`); on the phone `navigator.share`
+    (stubbed with `addInitScript`) handed exactly one PNG file, a cancel
+    that is not a failure, and the story summary's Share; on both a forced
+    card failure and its line.
+  - `80-consent-and-rename` (desktop-mutating) -- cy opts out of crew
+    comparisons; ava's recap withholds her on read while the stored
+    snapshot still names her; bo renames himself `e2e_bo_renamed`, and
+    ava's recap and story, and bo's own card, show the new name. Leaves bo
+    renamed and cy opted out: re-seeding afterwards needs a database reset.
+  - `90-account-switch` (desktop-mutating) -- the same-tab account switch
+    (ava out, bat in, one document): bat's recap and card are his own, and a
+    MutationObserver sees none of ava's crew after her Logout; plus the
+    logout transition screenshots (P19) from the Security and Streaming
+    tabs.
 - `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET`, saved passkeys
   (private keys included) and storage state.
 - `artifacts/` (gitignored) -- screenshots, `evidence.jsonl`, `oracle.json`,

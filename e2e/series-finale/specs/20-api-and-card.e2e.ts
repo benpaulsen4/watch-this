@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import { type APIRequestContext, type Browser, type BrowserContext, test } from "@playwright/test";
 
-import { ARTIFACTS_DIR } from "../env/test-env";
 import { storageStatePath } from "../support/auth";
+import { CARDS_DIR, pngSize } from "../support/cards";
 import { psql } from "../support/db";
 import { check, note } from "../support/evidence";
 import { oracleAvailableYears, oracleYear } from "../support/oracle";
@@ -25,7 +25,6 @@ const FLO = "e2e_flo_watches_only_films_and_has_a_long_name";
 const TIA = "e2e_tia";
 const POP12 = "e2e_pop12";
 
-const CARDS_DIR = join(ARTIFACTS_DIR, "cards");
 const NO_STORE = "private, no-store";
 const GEN_BUDGET_MS = 10_000;
 
@@ -72,14 +71,6 @@ function snapshotStored(username: string, label: string): boolean {
       { u: username, p: label },
     ) !== "0"
   );
-}
-
-/** Width and height from a PNG's IHDR chunk, or null if `bytes` is not a PNG. */
-function pngSize(bytes: Buffer): { width: number; height: number } | null {
-  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  if (bytes.length < 24 || !bytes.subarray(0, 8).equals(signature)) return null;
-  if (bytes.subarray(12, 16).toString("latin1") !== "IHDR") return null;
-  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
 test("GET /api/series-finale/2025 as ava: the payload, its crew, and the first generation's time", async ({ browser }) => {

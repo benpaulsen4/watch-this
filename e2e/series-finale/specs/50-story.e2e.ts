@@ -4,7 +4,7 @@ import { storageStatePath } from "../support/auth";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { becomesVisible, dayMonth, pluralise, words, wordValue } from "../support/pages";
-import { openRecap, recapSection, textOf, tileValue } from "../support/recap";
+import { crewRows, openRecap, recapSection, textOf, tileValue } from "../support/recap";
 import {
   type CardState,
   cardState,
@@ -211,13 +211,7 @@ test("the crew card: the top five with rank numbers, ava at her rank, and the re
   const expectedRows = avaRow && !top.includes(avaRow) ? [...top, avaRow] : top;
   const shownAs = (username: string) => (username === AVA ? "you" : username);
 
-  const rows = await card.locator("ol > li").evaluateAll((items) =>
-    items.map((item) => ({
-      rank: item.querySelector("[data-rank]")?.textContent?.trim() ?? null,
-      name: item.querySelector("[data-name]")?.textContent?.trim() ?? null,
-      episodes: item.querySelector("[data-name] + span")?.textContent?.trim() ?? null,
-    })),
-  );
+  const rows = await crewRows(card);
   check(
     "story-crew-rows",
     `the crew card shows the oracle's top ${CREW_SHOWN} with their rank numbers, plus ava at her real rank if below them`,

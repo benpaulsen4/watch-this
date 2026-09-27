@@ -113,13 +113,23 @@ export async function exportCredential(auth: VirtualAuthenticator, username: str
   writeFileSync(credentialPath(username), JSON.stringify(credential, null, 2));
 }
 
+export interface SignInOptions {
+  /**
+   * false: sign in on the /auth page the tab is already showing (e.g. where
+   * the profile's Logout left it), with no page load -- so the app's
+   * in-memory state (its query cache) carries over, as it would for a real
+   * person switching accounts in one tab. Default true: open /auth afresh.
+   */
+  navigate?: boolean;
+}
+
 /**
  * Signs in as `username` with its saved credential through /auth's
  * discoverable-credential sign-in; resolves on /dashboard. The saved file is
  * refreshed afterwards so its signCount keeps up with the server's counter
  * (a replayed, stale counter would be rejected on the next sign-in).
  */
-export async function signInAs(page: Page, username: string): Promise<void> {
+export async function signInAs(page: Page, username: string, { navigate = true }: SignInOptions = {}): Promise<void> {
   const path = credentialPath(username);
   if (!existsSync(path)) {
     throw new Error(`No saved credential for ${username} (${path}); run e2e:register first`);
@@ -133,7 +143,8 @@ export async function signInAs(page: Page, username: string): Promise<void> {
     credential,
   });
 
-  await page.goto("/auth");
+  if (navigate) await page.goto("/auth");
+  else await page.waitForURL("**/auth");
   await page.getByRole("button", { name: "Sign In with Passkey" }).click();
   await waitForDashboard(page, `Signing in as ${username}`);
 

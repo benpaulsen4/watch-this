@@ -3,8 +3,8 @@ import { type Locator, type Page, test } from "@playwright/test";
 import { storageStatePath } from "../support/auth";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
-import { becomesVisible, capitalise, dayMonth, pluralise, words } from "../support/pages";
-import { openRecap, recapSection, textOf, tileValue } from "../support/recap";
+import { alsoTopForLine, becomesVisible, capitalise, dayMonth, pluralise, words } from "../support/pages";
+import { crewRows, openRecap, recapSection, textOf, tileValue } from "../support/recap";
 
 // ava's 2025 recap, section by section, against the SQL oracle (desktop +
 // phone; read-only). Each test opens the page from ava's saved storage state.
@@ -118,7 +118,7 @@ test("top show, 'also number one for', and the niche film", async ({ page }) => 
   check(
     "recap-also-top-for",
     "'Also number one for' names the oracle's alsoTopFor (bo and cy)",
-    `Also number one for ${alsoTopFor.slice(0, -1).join(", ")}${alsoTopFor.length > 1 ? " and " : ""}${alsoTopFor.slice(-1).join("")}.`,
+    alsoTopForLine(alsoTopFor),
     await textOf(topShow.getByText(/^Also number one for /)),
   );
 
@@ -185,13 +185,7 @@ test("the crew: eight collaborators and ava, ranked as the oracle", async ({ pag
   const crew = recapSection(page, "crew");
   check("recap-crew-shown", "the crew panel is shown", true, await becomesVisible(crew));
 
-  // `[data-name]` is CrewRanking's name span; the count is the span after it.
-  const rows = await crew.locator("ol > li").evaluateAll((items) =>
-    items.map((item) => ({
-      name: item.querySelector("[data-name]")?.textContent?.trim() ?? null,
-      episodes: item.querySelector("[data-name] + span")?.textContent?.trim() ?? null,
-    })),
-  );
+  const rows = (await crewRows(crew)).map(({ name, episodes }) => ({ name, episodes }));
   const shownAs = (username: string) => (username === AVA ? "you" : username);
   check(
     "recap-crew-rows",

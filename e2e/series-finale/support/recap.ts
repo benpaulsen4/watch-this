@@ -134,3 +134,27 @@ export async function tileValue(page: Page, label: string | RegExp): Promise<str
   const tile = recapSection(page, "tiles").locator(":scope > div").filter({ hasText: label });
   return textOf(tile.locator(":scope > div").first());
 }
+
+export interface CrewRow {
+  /** The row's rank number: the story's large list prints one, the recap's does not (null). */
+  rank: string | null;
+  /** The name as shown: a username, or "you" for the viewer. */
+  name: string | null;
+  /** "230 episodes". */
+  episodes: string | null;
+}
+
+/**
+ * CrewRanking's rows inside `container` (the recap's crew panel or the
+ * story's crew card): `[data-rank]`, the `[data-name]` span, and the count
+ * in the span after it.
+ */
+export async function crewRows(container: Locator): Promise<CrewRow[]> {
+  return container.locator("ol > li").evaluateAll((items) =>
+    items.map((item) => ({
+      rank: item.querySelector("[data-rank]")?.textContent?.trim() ?? null,
+      name: item.querySelector("[data-name]")?.textContent?.trim() ?? null,
+      episodes: item.querySelector("[data-name] + span")?.textContent?.trim() ?? null,
+    })),
+  );
+}

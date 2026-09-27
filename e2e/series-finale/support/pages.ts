@@ -75,3 +75,10 @@ export function capitalise(text: string): string {
 export function dayMonth(key: string): string {
   return new Date(`${key}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
 }
+
+/** The app's alsoTopForLine() (format.ts): "Also number one for ana and marcus." -- null for nobody. */
+export function alsoTopForLine(usernames: string[]): string | null {
+  if (usernames.length === 0) return null;
+  const joined = usernames.length === 1 ? usernames.join("") : `${usernames.slice(0, -1).join(", ")} and ${usernames.slice(-1).join("")}`;
+  return `Also number one for ${joined}.`;
+}
