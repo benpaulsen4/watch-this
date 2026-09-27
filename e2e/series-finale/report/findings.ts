@@ -44,7 +44,7 @@ export const FINDINGS: FindingDef[] = [
     title: "Crew capped by user id, before activity is loaded",
     where: "src/lib/series-finale/service.ts:238-275 (loadCollaboratorIds)",
     diagnosis:
-      "Consenting collaborators are sorted by user id and the first 8 kept before any activity is loaded, so which busy collaborator is left out depends on random registration ids, not on how much they watched. Informational.",
+      "Consenting collaborators are sorted by user id and the first 8 kept before any activity is loaded, so who is left out depends on ids, not on how much they watched. Informational: the note compares the crew the app stored for e2e_jon (nine consenting collaborators) with the oracle's 8 most active, and is met once the cap goes by activity.",
     kind: "note",
     matches: (e) => e.id === "crew-cap-rule",
   },
@@ -59,10 +59,10 @@ export const FINDINGS: FindingDef[] = [
   },
   {
     id: "F5",
-    title: "Compare disc label clipped on phones",
-    where: "src/components/series-finale/CompareSplit.tsx:117 (large variant, truncate)",
+    title: "Compare disc label clipped on phones (story and recap)",
+    where: "src/components/series-finale/CompareSplit.tsx:113-123 (line 117: the peer label's truncate, in both the default and the large variant)",
     diagnosis:
-      "The large disc label is exactly as wide as its box and overflow-hidden, so at DPR 2 the last glyph's ink is cut: \"only e2e_bo\" reads \"only e2e_bc\". DOM widths cannot see it; the verdict is by eye. Informational.",
+      "The peer's disc label is exactly as wide as its box and overflow-hidden, so at DPR 2 the last glyph's ink is cut: \"only e2e_bo\" reads \"only e2e_bc\" on the story card's large disc and on the recap panel's default one. DOM widths cannot see it; the verdict is a person's reading of the phone screenshots (Task 7 review, final review), recorded as a manual observation. Informational.",
     kind: "note",
     matches: (e) => e.id === "F5-compare-disc-label-clipped",
   },
@@ -79,11 +79,21 @@ export const FINDINGS: FindingDef[] = [
 
 export interface FindingStatus {
   def: FindingDef;
-  /** Evidence indexes that show the finding: failing checks, or unmet notes. */
+  /** Evidence indexes that show the finding: failing checks, or unmet notes (never a manual observation). */
   showing: number[];
   /** Every evidence index the finding covers, shown or not. */
   covered: number[];
+  /** Every covering line is a manual observation: this run cannot say whether the finding still holds. */
+  manualOnly: boolean;
   extra: string | null;
+}
+
+/** A finding's status in words, for the gallery and the report. */
+export function findingState(s: FindingStatus): string {
+  if (s.covered.length === 0) return "no evidence this run";
+  if (s.manualOnly) return "manual observation; not re-verified by this run";
+  if (s.showing.length === 0) return "not reproduced this run";
+  return s.def.kind === "check" ? `reproduced: ${s.showing.length} failing check(s)` : "reproduced (note not met)";
 }
 
 /** F3's run-specific detail: who the id rule leaves out of e2e_jon's own 2025 crew. */
@@ -92,9 +102,10 @@ function jonCrewDetail(oracle: Oracle | null): string | null {
   if (!jon || !oracle) return null;
   const left = jon.crewCappedOut.map((u) => `${u} (${oracle[u]?.["2025"]?.episodes ?? "?"} episodes in 2025)`);
   return (
-    `e2e_jon's 2025 crew leaves out ${left.join(", ") || "nobody"}; ava's leaves out ` +
-    `${oracle.e2e_ava?.["2025"]?.crewCappedOut.join(", ") || "nobody"}. The one left out of jon's varies with the random ` +
-    "registration ids (earlier runs dropped e2e_ava, 230 episodes, and e2e_eli, 185)."
+    `By the id rule, e2e_jon's 2025 crew leaves out ${left.join(", ") || "nobody"}; ava's leaves out ` +
+    `${oracle.e2e_ava?.["2025"]?.crewCappedOut.join(", ") || "nobody"}. The seeder pins dee's id to sort last among jon's ` +
+    "collaborators, so the rule leaves out a busy collaborator every run; the status compares the crew the app stored for " +
+    "jon with his 8 most active (crew-cap-rule)."
   );
 }
 
@@ -104,7 +115,8 @@ export function findingStatuses(a: Pick<Artifacts, "evidence" | "oracle">): Find
     return {
       def,
       covered,
-      showing: covered.filter((i) => !a.evidence[i]!.pass),
+      showing: covered.filter((i) => !a.evidence[i]!.pass && !a.evidence[i]!.manual),
+      manualOnly: covered.length > 0 && covered.every((i) => a.evidence[i]!.manual),
       extra: def.id === "F3" ? jonCrewDetail(a.oracle) : null,
     };
   });
@@ -147,6 +159,38 @@ export const NOTES: NoteDef[] = [
     title: "P19 logout flash not reproduced",
     ids: ["P19-logout-flash-security", "P19-logout-flash-streaming"],
     text: "No error line was seen between clicking Logout and /auth on either tab; the transition screenshots are kept for the visual review.",
+  },
+];
+
+/**
+ * What the suite does not check automatically (the final review's M8), so the
+ * report's coverage story is honest. Each is visual, manual, or left to unit
+ * tests.
+ */
+export const NOT_AUTOMATED: { title: string; text: string }[] = [
+  {
+    title: "The percentile line's absence above 50",
+    text: "No signing-in persona ranks below the top half, so the recap is never seen without its percentile line. pop12's stored percentile (> 50) is checked (api-pop12-percentile); hiding the line is left to the unit tests (format.ts percentileLine). ava's own value (Top 14%) is a note: it depends on the cohort at generation time.",
+  },
+  {
+    title: "A gap year",
+    text: "No persona has an empty year between two active ones; thin, none and not-over periods are covered.",
+  },
+  {
+    title: "The share card's content",
+    text: "Satori draws the card's text as paths, so its numbers (hours, episodes, titles, dropped, top show, niche), flo's long name wrapping and the QR code's target are checked by eye in the saved cards only. Its size, statuses, cache headers and privacy (byte identity across other people's changes, privacy-ava-card-unchanged) are automated.",
+  },
+  {
+    title: "F5, the clipped disc label",
+    text: "Only visible in the phone screenshots; recorded as a manual observation with the screenshot paths and DOM widths, never as reproduced or fixed by a run.",
+  },
+  {
+    title: "WebKit",
+    text: "webkit-phone cannot launch on this host (missing system libraries), so there is no Safari-engine run or screenshot.",
+  },
+  {
+    title: "The P19 logout flash",
+    text: "Recorded as a note with transition screenshots; it did not reproduce, and a flash too short to sample would not show.",
   },
 ];
 

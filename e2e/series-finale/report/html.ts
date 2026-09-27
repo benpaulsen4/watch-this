@@ -3,8 +3,8 @@
 // grouped by surface with its projects side by side. Images are referenced by
 // relative path and the page has no scripts.
 import type { Evidence } from "../support/evidence";
-import { countTests, type FindingStatus, findingStatuses, I1_SENSITIVE, mutationVerdict, NOTES, overallLine, projectCounts, skipReasons } from "./findings";
-import { clip, esc, groupBy, json, seconds, specOf } from "./format";
+import { countTests, findingState, type FindingStatus, findingStatuses, I1_SENSITIVE, mutationVerdict, NOT_AUTOMATED, NOTES, overallLine, projectCounts, skipReasons } from "./findings";
+import { clip, esc, groupBy, json, resultLabel, seconds, specOf } from "./format";
 import { type Artifacts, type CardAt, cardLookup, type Invocation, relatedChecks, type Shot } from "./load";
 
 /** Why a project has no shot: its tests' skip reason, when they were all skipped. */
@@ -64,7 +64,7 @@ class Page {
   }
 
   chip(e: Evidence, anchor: string, times = 1): string {
-    const cls = e.informational ? (e.pass ? "note" : "note unmet") : e.pass ? "pass" : "fail";
+    const cls = e.informational ? (e.manual ? "note manual" : e.pass ? "note" : "note unmet") : e.pass ? "pass" : "fail";
     const title = `${e.description}\nexpected: ${clip(json(e.expected), 300)}\nactual: ${clip(json(e.actual), 300)}`;
     return `<a class="chip ${cls}" href="#${anchor}" title="${esc(title)}">${esc(e.id)}${times > 1 ? ` ×${times}` : ""}</a>`;
   }
@@ -146,7 +146,7 @@ class Page {
     const cards = statuses
       .map((s) => {
         const shown = s.showing.length > 0;
-        const state = s.covered.length === 0 ? "no evidence this run" : shown ? (s.def.kind === "check" ? `${s.showing.length} failing check(s)` : "note not met") : "not reproduced this run";
+        const state = findingState(s);
         const evidenceIdx = shown ? s.showing : s.covered;
         const found = shotsFor(evidenceIdx);
         const shots = found
@@ -230,7 +230,7 @@ class Page {
     const rows = m.evidence
       .map(
         (e, i) =>
-          `<tr id="m${i}" class="${e.informational ? "info" : e.pass ? "" : "failrow"}"><td><code>${esc(e.id)}</code></td><td>${e.informational ? (e.pass ? "note met" : "note not met") : e.pass ? "PASS" : "FAIL"}</td>` +
+          `<tr id="m${i}" class="${e.informational ? "info" : e.pass ? "" : "failrow"}"><td><code>${esc(e.id)}</code></td><td>${resultLabel(e)}</td>` +
           `<td><pre>${esc(clip(json(e.expected), 400))}</pre></td><td><pre>${esc(clip(json(e.actual), 400))}</pre></td></tr>`,
       )
       .join("");
@@ -260,13 +260,15 @@ class Page {
       .map(
         ({ e, i }) =>
           `<tr><td><a href="#e${i}"><code>${esc(e.id)}</code></a></td><td>${esc(e.project)}</td><td>${esc(e.description)}</td>` +
-          `<td>${e.pass ? "met" : "not met"}</td><td><pre>${esc(clip(json(e.actual), 500))}</pre></td></tr>`,
+          `<td>${resultLabel(e)}</td><td><pre>${esc(clip(json(e.actual), 500))}</pre></td></tr>`,
       )
       .join("");
     return this.section(
       "notes",
       "Notes",
-      `<ul class="notes">${listed}</ul><h3>Every informational evidence line</h3><table class="wide"><tr><th>note</th><th>project</th><th>what</th><th>expected met?</th><th>actual</th></tr>${rows}</table>`,
+      `<ul class="notes">${listed}</ul>` +
+        `<h3>Not automated</h3><ul class="notes">${NOT_AUTOMATED.map((n) => `<li><b>${esc(n.title)}.</b> ${esc(n.text)}</li>`).join("")}</ul>` +
+        `<h3>Every informational evidence line</h3><table class="wide"><tr><th>note</th><th>project</th><th>what</th><th>result</th><th>actual</th></tr>${rows}</table>`,
       "Informational lines (<code>note()</code>) never fail a test.",
     );
   }
@@ -405,7 +407,7 @@ class Page {
             .map(
               ({ e, i }) =>
                 `<tr id="e${i}" class="${e.informational ? "info" : e.pass ? "" : "failrow"}"><td><code>${esc(e.id)}</code></td><td>${esc(e.project)}</td>` +
-                `<td>${e.informational ? (e.pass ? "note met" : "note not met") : e.pass ? "PASS" : "FAIL"}</td><td>${esc(e.description)}</td>` +
+                `<td>${resultLabel(e)}</td><td>${esc(e.description)}</td>` +
                 `<td><pre>${esc(clip(json(e.expected), 500))}</pre></td><td><pre>${esc(clip(json(e.actual), 500))}</pre></td></tr>`,
             )
             .join("") +
@@ -492,6 +494,7 @@ ul.notes li{margin:6px 0}
 .chip.fail{color:#000;background:var(--bad);border-color:var(--bad)}
 .chip.note{color:var(--muted)}
 .chip.note.unmet{color:var(--warn);border-color:rgba(231,181,74,.5)}
+.chip.note.manual{color:var(--accent);border-style:dashed}
 .grid{margin:6px 0 16px}
 .cells{display:grid;gap:12px;align-items:start}
 .cells.head{position:sticky;top:0;z-index:1;background:var(--bg);padding:4px 0}

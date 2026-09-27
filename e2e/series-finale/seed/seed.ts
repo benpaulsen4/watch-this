@@ -20,13 +20,19 @@ import { generate } from "./generate";
 import { PERSONAS, type PersonaSpec, UNKNOWN_RUNTIME_EPISODES } from "./personas";
 
 /**
- * Inserted (non-signing) users get default random ids, except jon: the crew
+ * Inserted (non-signing) users get default random ids, except two: the crew
  * is capped at 8 collaborators by sorted user id before anyone's activity is
- * loaded (service.ts `loadCollaboratorIds`), and ava's list has 9. The
- * all-f id sorts last, so jon is always the one left out (ruling E5).
+ * loaded (service.ts `loadCollaboratorIds`), and ava's list has 9.
+ * - jon's all-f id sorts last, so he is always the one left out of ava's crew
+ *   (ruling E5).
+ * - dee's sorts last among jon's nine collaborators, so jon's own crew always
+ *   leaves out dee -- one of the most active -- and finding F3 (the cap
+ *   ignores activity) reproduces every run instead of depending on random
+ *   registration ids.
  */
 const FIXED_IDS: Record<string, string> = {
   e2e_jon: "ffffffff-ffff-4fff-bfff-ffffffffffff",
+  e2e_dee: "fffffffe-ffff-4fff-bfff-ffffffffffff",
 };
 
 /**

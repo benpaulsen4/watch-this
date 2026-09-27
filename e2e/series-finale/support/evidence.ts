@@ -19,6 +19,12 @@ export interface Evidence {
   pass: boolean;
   /** Set by note(): recorded for the report, never fails the test. */
   informational?: true;
+  /**
+   * Set by manualObservation(): the verdict is a person's reading of the
+   * screenshots, which this run did not re-verify -- only `actual`'s
+   * measurements are this run's. `pass` is false and means nothing.
+   */
+  manual?: true;
   /** The spec file that wrote the line (e.g. `40-recap.e2e.ts`), so the report can group by spec. */
   spec?: string;
 }
@@ -52,6 +58,32 @@ export function note(id: string, description: string, expected: unknown, actual:
     actual,
     pass,
     informational: true,
+    spec: basename(info.file),
+  };
+  mkdirSync(ARTIFACTS_DIR, { recursive: true });
+  appendFileSync(EVIDENCE_PATH, `${JSON.stringify(line)}\n`);
+}
+
+/**
+ * An informational line for a finding only a person can see (a clipped glyph
+ * in a screenshot): `description` says what was observed, by whom, and in
+ * which screenshots; `actual` holds what this run did measure (paths, DOM
+ * widths). The report shows it as a manual observation, never as reproduced
+ * or fixed by this run.
+ */
+export function manualObservation(id: string, description: string, expected: unknown, actual: unknown): void {
+  const info = test.info();
+  info.annotations.push({ type: "note", description: `${id}: manual observation, not re-verified by this run` });
+
+  const line: Evidence = {
+    id,
+    project: info.project.name,
+    description,
+    expected,
+    actual,
+    pass: false,
+    informational: true,
+    manual: true,
     spec: basename(info.file),
   };
   mkdirSync(ARTIFACTS_DIR, { recursive: true });

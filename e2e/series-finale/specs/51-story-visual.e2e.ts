@@ -2,7 +2,7 @@ import { type Page, test } from "@playwright/test";
 
 import type { OracleYear } from "../seed/oracle";
 import { storageStatePath } from "../support/auth";
-import { check, note } from "../support/evidence";
+import { check, manualObservation } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { shot } from "../support/shots";
 import {
@@ -38,16 +38,18 @@ const STORIES: { user: string; slug: string }[] = [
 ];
 
 /**
- * APP FINDING F5, recorded as a named note: on the phones (DPR 2) the story
- * compare card's large "only <peer>" disc label loses the last glyph's right
- * edge -- "only e2e_bo" reads "e2e_bc" in the phone and small-phone shots of
- * ava's compare card; desktop (DPR 1) draws it whole. CompareSplit's large
- * label is `truncate` (overflow hidden) and its text is exactly as wide as
- * its box, so the ink of the final glyph is cut with no room for an
- * ellipsis. The verdict is by eye (the review zoomed into both shots); the
- * DOM widths are recorded beside it.
+ * APP FINDING F5, a manual visual observation: on the phones (DPR 2) the
+ * compare disc's "only <peer>" label loses the last glyph's right edge --
+ * "only e2e_bo" reads "e2e_bc" -- in both CompareSplit variants: the story
+ * card's large disc and the recap panel's default one. Desktop (DPR 1) draws
+ * both whole. The label is `truncate` (overflow hidden) and its text is
+ * exactly as wide as its box, so the final glyph's ink is cut with no room for
+ * an ellipsis. Only a person looking at the screenshots can see it (the DOM
+ * widths fit), so this run records the screenshot paths and the widths it
+ * measured, and the report shows the verdict as a manual observation (Task 7
+ * review, story; final review, recap) rather than as reproduced or fixed.
  */
-async function noteCompareDiscLabel(page: Page, oracle: OracleYear, shotName: string): Promise<void> {
+async function observeCompareDiscLabel(page: Page, oracle: OracleYear, shotName: string): Promise<void> {
   const peer = Object.keys(oracle.compare)[0] ?? "";
   const project = test.info().project.name;
   const widths = await storyCard(page)
@@ -63,21 +65,20 @@ async function noteCompareDiscLabel(page: Page, oracle: OracleYear, shotName: st
       { timeout: 2_000 },
     )
     .catch(() => null);
-  const clippedByEye = project === "phone" || project === "small-phone";
-  note(
+  manualObservation(
     "F5-compare-disc-label-clipped",
-    `APP FINDING F5: the story compare card's 'only ${peer}' disc label is drawn whole. Screenshots: ` +
-      "artifacts/screenshots/phone/story/ava-2025/13-a-shared-list-and-some-shared-taste.png, " +
-      "artifacts/screenshots/small-phone/story/ava-2025/13-a-shared-list-and-some-shared-taste.png (clipped); " +
-      "artifacts/screenshots/desktop/story/ava-2025/13-a-shared-list-and-some-shared-taste.png (whole)",
-    `'only ${peer}' fully visible`,
+    `APP FINDING F5 (manual visual observation, not re-verified by this run): on phone and small-phone the compare disc's 'only ${peer}' label ` +
+      `reads 'only ${peer.slice(0, -1)}c' -- its last glyph is cut -- in the story card's large disc and the recap panel's default one; ` +
+      "desktop draws both whole. Look at: artifacts/screenshots/phone/story/ava-2025/13-a-shared-list-and-some-shared-taste.png, " +
+      "artifacts/screenshots/small-phone/story/ava-2025/13-a-shared-list-and-some-shared-taste.png, " +
+      "artifacts/screenshots/phone/recap/ava-2025/compare.png; whole: the desktop counterparts.",
+    `'only ${peer}' fully visible in both disc variants`,
     {
-      screenshot: `artifacts/screenshots/${project}/${shotName}.png`,
-      byEye: clippedByEye ? `final glyph cut: reads 'only ${peer.slice(0, -1)}c'` : "drawn whole",
+      storyScreenshot: `artifacts/screenshots/${project}/${shotName}.png`,
+      recapScreenshot: `artifacts/screenshots/${project}/recap/ava-2025/compare.png`,
       devicePixelRatio: await page.evaluate(() => window.devicePixelRatio),
-      dom: widths,
+      storyLabelDom: widths,
     },
-    !clippedByEye,
   );
 }
 
@@ -137,7 +138,7 @@ for (const story of STORIES) {
         const shotName = `story/${name}/${nn}-${label}`;
         await shot(page, shotName, { fullPage: true });
 
-        if (story.slug === "ava" && state.id === "compare") await noteCompareDiscLabel(page, oracle, shotName);
+        if (story.slug === "ava" && state.id === "compare") await observeCompareDiscLabel(page, oracle, shotName);
       }
 
       check(

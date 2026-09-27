@@ -66,6 +66,13 @@ export interface OracleYear {
   /** How the crew was capped, and who the cap left out. */
   crewCapRule: string;
   crewCappedOut: string[];
+  /**
+   * The consenting collaborators a cap by activity would keep: the 8 with most
+   * episodes in the viewer's window, a tie to the username by code unit. Not
+   * the app's rule (that is the id cap above); finding F3 compares the crew
+   * the app stored with this.
+   */
+  crewTopByActivity: string[];
   /** Per crew member, keys in the order the compare rows render. */
   compare: Record<
     string,
@@ -332,6 +339,12 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     return row!.username;
   };
   const crewCappedOut = await Promise.all(sortedIds.slice(CREW_LIMIT).map(usernameOf));
+  const everyone = [];
+  for (const id of sortedIds) everyone.push({ username: await usernameOf(id), episodes: await episodeCount(id, w) });
+  const crewTopByActivity = everyone
+    .sort((a, b) => b.episodes - a.episodes || byCodeUnit(a.username, b.username))
+    .slice(0, CREW_LIMIT)
+    .map((person) => person.username);
 
   // Each kept collaborator counted in the VIEWER's window (service.ts:303-306, :346).
   const collaborators = [];
@@ -418,6 +431,7 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     crew,
     crewCapRule: CREW_CAP_RULE,
     crewCappedOut,
+    crewTopByActivity,
     compare,
     alsoTopFor,
     percentile: null,

@@ -1,6 +1,7 @@
 import { type Locator, type Page, test } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
+import { psql } from "../support/db";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { alsoTopForLine, becomesVisible, capitalise, dayMonth, monthName, percent, pluralise, weekdayName, words } from "../support/pages";
@@ -299,22 +300,30 @@ test("the crew: eight collaborators and ava, ranked as the oracle", async ({ pag
     false,
   );
 
-  // E5 APP FINDING, informational: CREW_LIMIT keeps the first 8 consenting
-  // collaborators by user id, before any activity is loaded. In ava's 2025
-  // the rule drops e2e_jon (seeded with the all-f id), who also happens to
-  // have watched nothing; jon's own crew shows the rule dropping someone busy.
+  // APP FINDING F3 (E5), informational: CREW_LIMIT keeps the first 8
+  // consenting collaborators by user id, before any activity is loaded. In
+  // ava's 2025 the rule drops e2e_jon (seeded with the all-f id), who also
+  // watched nothing, so her crew cannot show it. e2e_jon's own 2025 can: he
+  // has nine consenting collaborators, and the seeder generated his snapshot
+  // through the app. The note compares the crew the app stored for him with
+  // the 8 most active (the oracle's crewTopByActivity): met once the app caps
+  // by activity.
   const jon = oracleYear("e2e_jon", YEAR);
-  const jonDropped = jon.crewCappedOut.map((username) => {
-    const episodes = oracleYear(username, YEAR).episodes;
-    return `${username} (${pluralise(episodes, "episode")})`;
-  });
+  const jonStored = psql(
+    `select coalesce(json_agg(c->>'username'), '[]'::json) from series_finale s join users u on u.id = s.user_id,
+       jsonb_array_elements(s.payload->'crew') c
+     where u.username = 'e2e_jon' and s.period_label = :'p';`,
+    { p: YEAR },
+  );
+  const stored = (JSON.parse(jonStored || "[]") as string[]).sort();
+  const byActivity = [...jon.crewTopByActivity].sort();
+  const episodesOf = (username: string) => `${username} (${pluralise(oracleYear(username, YEAR).episodes, "episode")})`;
   note(
     "crew-cap-rule",
-    `APP FINDING (E5): how the crew is capped at 8. ${oracle.crewCapRule}`,
-    "cap by activity: the 8 most active consenting collaborators are kept",
-    `cap by user id; e2e_jon excluded while listed on ava's shared list (ava's crew: ${oracle.crewCappedOut.join(", ")} left out); ` +
-      `in e2e_jon's own 2025 the id rule leaves out ${jonDropped.join(", ")}`,
-    false,
+    `APP FINDING F3 (E5): which 8 collaborators the crew keeps, in e2e_jon's 2025 (nine consent). ${oracle.crewCapRule}`,
+    { storedCrew: byActivity },
+    { storedCrew: stored, moreActiveButLeftOut: byActivity.filter((username) => !stored.includes(username)).map(episodesOf) },
+    stored.length > 0 && JSON.stringify(stored) === JSON.stringify(byActivity),
   );
 });
 

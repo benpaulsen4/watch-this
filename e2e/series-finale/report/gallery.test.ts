@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Oracle } from "../seed/oracle";
 import type { Evidence } from "../support/evidence";
-import { findingStatuses, mutationVerdict } from "./findings";
+import { RECAP_SECTIONS } from "../support/recap";
+import { findingState, findingStatuses, mutationVerdict } from "./findings";
 import { renderHtml } from "./html";
 import { type Artifacts, cardLookup, parseInvocation, readEvidence, readJson, relatedChecks, type Shot } from "./load";
 import { renderMarkdown } from "./markdown";
@@ -179,6 +180,56 @@ describe("findingStatuses", () => {
     expect(byId.get("F3")?.showing).toEqual([3]);
     expect(byId.get("F3")?.extra).toContain("e2e_ivy (40 episodes in 2025)");
     expect(byId.get("F6")?.covered).toEqual([]);
+  });
+
+  it("reports a manual observation as such, never as reproduced or fixed", () => {
+    const manual = { informational: true, manual: true } as const;
+    const [f5] = findingStatuses({
+      oracle: null,
+      evidence: [ev("F5-compare-disc-label-clipped", "phone", false, manual), ev("F5-compare-disc-label-clipped", "desktop", false, manual)],
+    }).filter((s) => s.def.id === "F5");
+    expect(f5).toMatchObject({ covered: [0, 1], showing: [], manualOnly: true });
+    expect(findingState(f5!)).toBe("manual observation; not re-verified by this run");
+  });
+
+  it("derives F3 from its note: reproduced while unmet, not reproduced once met", () => {
+    const f3 = (pass: boolean) =>
+      findingStatuses({ oracle: null, evidence: [ev("crew-cap-rule", "desktop", pass, { informational: true })] }).find((s) => s.def.id === "F3")!;
+    expect(findingState(f3(false))).toBe("reproduced (note not met)");
+    expect(findingState(f3(true))).toBe("not reproduced this run");
+  });
+});
+
+describe("every recap screenshot links to a check", () => {
+  // The shots 41-recap-visual takes for ava's 2025 (every section, the full
+  // page) and the lines it and 40-recap always write for that recap. A shot
+  // or check renamed without report/load.ts RULES would drop its chips.
+  const evidence = [
+    ev("visual-ava-2025-rendered", "desktop"),
+    ev("visual-ava-2025-sections", "desktop"),
+    ev("visual-ava-2025-late-share", "desktop"),
+    ev("recap-ava-rendered", "desktop"),
+    ev("recap-hero-hours", "desktop"),
+    ev("recap-tile-episodes", "desktop"),
+    ev("recap-months-bars", "desktop"),
+    ev("recap-rhythm-late-share", "desktop"),
+    ev("recap-top-show-title", "desktop"),
+    ev("recap-niche-title", "desktop"),
+    ev("recap-big-day", "desktop"),
+    ev("recap-shame-count", "desktop"),
+    ev("recap-crew-rows", "desktop"),
+    ev("recap-compare-e2e_bo-split", "desktop"),
+    ev("recap-footer-tmdb-logo", "desktop"),
+  ];
+  const cardAt = cardLookup(evidence);
+
+  it.each(["full", ...RECAP_SECTIONS])("desktop/recap/ava-2025/%s", (section) => {
+    expect(relatedChecks(shot("desktop", `recap/ava-2025/${section}`), evidence, cardAt).length).toBeGreaterThan(0);
+  });
+
+  it.each(RECAP_SECTIONS.filter((section) => section !== "genres"))("desktop/recap/ava-2025/%s links a 40-recap check", (section) => {
+    const linked = relatedChecks(shot("desktop", `recap/ava-2025/${section}`), evidence, cardAt).map((i) => evidence[i]!.id);
+    expect(linked.some((id) => id.startsWith("recap-"))).toBe(true);
   });
 });
 

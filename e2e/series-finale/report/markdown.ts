@@ -2,8 +2,8 @@
 // seeded cast, ava's oracle block, timings, skips and every check.
 import type { Oracle, OracleYear } from "../seed/oracle";
 import { PERSONAS } from "../seed/personas";
-import { countTests, findingStatuses, I1_SENSITIVE, mutationVerdict, NOTES, overallLine, projectCounts, skipReasons } from "./findings";
-import { clip, groupBy, json, seconds, specOf } from "./format";
+import { countTests, findingState, findingStatuses, I1_SENSITIVE, mutationVerdict, NOT_AUTOMATED, NOTES, overallLine, projectCounts, skipReasons } from "./findings";
+import { clip, groupBy, json, resultLabel, seconds, specOf } from "./format";
 import { type Artifacts, cardLookup, relatedChecks } from "./load";
 
 function cell(text: string): string {
@@ -79,7 +79,7 @@ export function renderMarkdown(a: Artifacts): string {
   for (const s of statuses) {
     const shown = s.showing.length > 0;
     const idx = shown ? s.showing : s.covered;
-    const state = s.covered.length === 0 ? "no evidence this run" : shown ? (s.def.kind === "check" ? `reproduced: ${s.showing.length} failing check(s)` : "reproduced (note not met)") : "not reproduced this run";
+    const state = findingState(s);
     out.push(`### ${s.def.id}: ${s.def.title}`, "");
     out.push(`- **Status:** ${state} (${s.def.kind === "check" ? "failing check" : "informational note"})`);
     out.push(`- **Where:** \`${s.def.where}\``);
@@ -103,6 +103,17 @@ export function renderMarkdown(a: Artifacts): string {
     out.push("", "### Unclassified failing checks", "");
     for (const e of unclassified) out.push(`- \`${e.id}\` (${e.project}, ${specOf(e)}): expected ${json(e.expected)}, actual ${json(e.actual)}`);
   }
+
+  out.push("", "### Not automated", "");
+  for (const n of NOT_AUTOMATED) out.push(`- **${n.title}.** ${n.text}`);
+  const cardAt = cardLookup(a.evidence);
+  const unlinked = a.shots.filter((shot) => relatedChecks(shot, a.evidence, cardAt).length === 0);
+  out.push("", "### Screenshots no check links to", "");
+  out.push(
+    unlinked.length === 0
+      ? "None: every screenshot links to at least one check or note."
+      : `${unlinked.length} -- a renamed shot or check can drop its link (report/load.ts RULES): ${unlinked.map((s) => `\`${s.src}\``).join(", ")}`,
+  );
 
   out.push("", "## Mutation check (I1)", "");
   const v = mutationVerdict(a.mutation);
@@ -165,15 +176,15 @@ export function renderMarkdown(a: Artifacts): string {
   for (const t of failedTests) out.push(`- ${t.file} › ${t.title} [${t.project}]: ${cell(clip(t.errors[0]?.split("\n")[0] ?? "", 300))}`);
 
   out.push("", "## Notes (informational evidence)", "");
-  out.push("| note | project | met | actual |", "|---|---|---|---|");
-  for (const e of a.evidence.filter((x) => x.informational)) out.push(`| \`${e.id}\` | ${e.project} | ${e.pass ? "yes" : "no"} | ${codeCell(e.actual, 300)} |`);
+  out.push("| note | project | result | actual |", "|---|---|---|---|");
+  for (const e of a.evidence.filter((x) => x.informational)) out.push(`| \`${e.id}\` | ${e.project} | ${resultLabel(e)} | ${codeCell(e.actual, 300)} |`);
 
   out.push("", "## Every check", "");
   out.push("Values longer than 400 characters are clipped; `evidence.jsonl` holds them whole.", "");
   for (const [spec, lines] of [...groupBy(a.evidence, specOf)].sort(([x], [y]) => x.localeCompare(y))) {
     out.push(`### ${spec}`, "", "| check | project | expected | actual | result |", "|---|---|---|---|---|");
     for (const e of lines) {
-      const result = e.informational ? (e.pass ? "note (met)" : "note (not met)") : e.pass ? "PASS" : "**FAIL**";
+      const result = !e.informational && !e.pass ? "**FAIL**" : resultLabel(e);
       out.push(`| \`${e.id}\` | ${e.project} | ${codeCell(e.expected)} | ${codeCell(e.actual)} | ${result} |`);
     }
     out.push("");
