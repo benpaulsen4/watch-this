@@ -230,7 +230,7 @@ test("share card PNGs for ava, bo, bat and flo", async ({ browser }) => {
   );
 });
 
-test("privacy: ava's card carries no collaborator's username as text", async ({ browser }) => {
+test("privacy: ava's payload names collaborators; her card's bytes are kept for the mutating run", async ({ browser }) => {
   const ava = await requestAs(browser, AVA);
   const payload = ((await (await ava.get("/api/series-finale/2025")).json()) as { payload?: Payload }).payload;
   const collaborators = [
@@ -238,12 +238,23 @@ test("privacy: ava's card carries no collaborator's username as text", async ({ 
   ].filter((username) => username !== AVA);
   check(
     "privacy-payload-has-collaborators",
-    "ava's payload names collaborators (so the card check below is not vacuous)",
-    true,
-    collaborators.length > 0,
+    "ava's payload names collaborators, cy and bo among them (so a card drawn from them would change when cy opts out or bo renames)",
+    { any: true, cy: true, bo: true },
+    { any: collaborators.length > 0, cy: collaborators.includes("e2e_cy"), bo: collaborators.includes(BO) },
   );
 
+  // The real privacy check is 80-consent-and-rename's
+  // privacy-ava-card-unchanged: ava's card must be byte-identical to
+  // cards/ava-2025.png (saved above) after cy's opt-out and bo's rename. This
+  // byte scan cannot fail -- Satori draws text as paths, so no name is ever in
+  // the PNG as text -- and is kept only as a sanity note.
   const png = await (await ava.get("/api/series-finale/2025/card")).body();
   const leaked = collaborators.filter((username) => png.includes(Buffer.from(username, "utf8")));
-  check("privacy-card-no-usernames", "no collaborator username appears in ava's card PNG bytes", [], leaked);
+  note(
+    "privacy-card-bytes-sanity",
+    "sanity only (cannot fail: the card's text is drawn as paths): no collaborator username appears as text in ava's card PNG bytes",
+    [],
+    leaked,
+    leaked.length === 0,
+  );
 });

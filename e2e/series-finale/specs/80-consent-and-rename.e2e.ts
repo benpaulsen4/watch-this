@@ -302,3 +302,25 @@ test("ava's recap and story show bo under his new name", async ({ page }) => {
   check("rename-story-compare-card", "still on the compare card", "compare", (await cardState(page)).id);
   await shot(page, "story/ava-2025-after-rename/compare", { fullPage: true });
 });
+
+test("privacy: ava's card is unchanged by cy's opt-out and bo's rename", async ({ page }) => {
+  // The share card must carry no collaborator data at all (spec privacy rule
+  // 2), so nothing another person does may change ava's card. Its text is
+  // drawn as paths, so this compares the whole image: byte-identical to the
+  // one 20-api-and-card saved before any mutation.
+  await signInAs(page, AVA);
+  const card = await page.request.get(`/api/series-finale/${YEAR}/card`);
+  const bytes = await card.body();
+  const before = join(CARDS_DIR, `ava-${YEAR}.png`);
+  if (!existsSync(before)) {
+    note("privacy-ava-card-unchanged", `no cards/ava-${YEAR}.png from before the mutations (20-api-and-card did not run); nothing to compare`, "a card from before", null, false);
+    return;
+  }
+  check(
+    "privacy-ava-card-unchanged",
+    `after e2e_cy opted out and e2e_bo renamed himself, ava's 2025 card is byte-identical to cards/ava-${YEAR}.png from before`,
+    { status: 200, identical: true },
+    { status: card.status(), identical: bytes.equals(readFileSync(before)) },
+  );
+  if (!bytes.equals(readFileSync(before))) writeFileSync(join(CARDS_DIR, `ava-${YEAR}-after-mutations.png`), bytes);
+});
