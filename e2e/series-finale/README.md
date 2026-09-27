@@ -14,14 +14,19 @@ The matching Playwright browsers must already be cached locally
 `npx playwright --version` or the browser revisions don't match what's
 cached, stop and ask before downloading anything.
 
+The seeder fetches the cast's TMDB metadata through the app's own cache
+code, so a run needs network access to TMDB and `TMDB_API_KEY` (from the
+environment, else the one line in the repo's `.env.local`; never printed).
+
 ## Running
 
 ```bash
 npm run e2e:db:up       # starts postgres:17 in podman, localhost:5433 only
 npm run e2e:migrate     # drizzle-kit migrate against the e2e database
 npm run e2e:build       # next build (production)
-npm run e2e:register    # passkeys for every signing-in persona via /auth (app must be up: e2e:start);
-                        # `-- <username>...` registers just those
+npm run e2e:start       # the app on :3100, built env; keep it running in another terminal for:
+npm run e2e:register    # passkeys for every signing-in persona via /auth; refuses unless the server
+                        # on :3100 is the e2e one (see "Safety"); `-- <username>...` registers just those
 npm run e2e:seed        # the cast's history, lists, TMDB caches and the 2025 cohort snapshots
                         # (needs e2e:register first); `-- --resolve-only` just resolves the catalogue lock
 npm run e2e:oracle      # artifacts/oracle.json: what each recap must show, from plain SQL
@@ -40,7 +45,8 @@ npm run e2e:db:down     # stops and removes the throwaway container
 Or everything in one go:
 
 ```bash
-npm run e2e:all   # evidence, screenshots, cards and the old gallery/report cleared; db reset,
+npm run e2e:all   # about 8-10 minutes; nothing may be listening on :3100 when it starts.
+                  # evidence, screenshots, cards and the old gallery/report cleared; db reset,
                   # migrate, build, start the app, register, seed, oracle, the two Playwright
                   # runs as e2e:test, the gallery and report (built even when tests fail), secret
                   # scan. Stops the app it started; leaves the database up -- after the mutating
@@ -58,6 +64,41 @@ A bare `npx playwright test` runs every project, `desktop-mutating` last by
 config order, but nothing holds it back if a read-only project is still
 failing or was not selected -- `npm run e2e:test` is the ordered way.
 
+## Safety: the server on port 3100
+
+Playwright reuses whatever answers on `http://localhost:3100`, and the specs
+register accounts, rename users and withdraw consent through it. A server
+started any other way -- a plain `npx next start -p 3100` loads
+`.env.local`, whose `DATABASE_URL` is the real database -- would take all of
+that. So before anything signs in, the process listening on 3100 must have
+been started with `DATABASE_URL` equal to the e2e URL (read from
+`/proc/<pid>/environ`; the value is never printed), else the run stops with
+"Refusing to run":
+
+- `env/global-setup.ts` (Playwright's `globalSetup`, after the `webServer`
+  step): every `e2e:test`, `e2e:all` and direct `npx playwright test`;
+- `e2e:test` before it starts Playwright (a foreign listener; nothing
+  listening is fine, Playwright then starts `run.ts start`);
+- `e2e:register` (the e2e server must be up), which also fails unless each
+  new account's row is in the e2e database (read through podman);
+- `e2e:all` refuses anything already listening before it starts its own.
+
+Stop the other server and run again. A listener this user cannot inspect
+counts as foreign.
+
+## Dated for 2026
+
+The cast is written for runs during 2026: 2025 is the newest completed year
+and 2026 is "not over"; e2e_neo joins in 2026; ava has 2026-01-01 zone-edge
+episodes and a 2026 planning film. Once 2026 ends (in Australia/Brisbane,
+the cast's earliest zone) the app completes 2026, and a wave of checks would
+fail as if the app had regressed. So `run.ts` (every subcommand but
+`gallery` and `scan-secrets`) and the Playwright global setup refuse to run
+from 2027-01-01 Brisbane time. To run again, move the cast forward a year:
+`LAST_COMPLETED_YEAR` and `YEARS` in `seed/oracle.ts`, the years the specs
+hard-code (grep `specs/` for 2023-2026), neo's `createdAt` and ava's 2026
+dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
+
 ## Layout
 
 - `env/db.sh` -- up/down/reset/psql for the throwaway podman Postgres
@@ -68,13 +109,20 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   `.env.local`'s real `DATABASE_URL` is never inherited.
 - `env/run.ts` -- `npm run e2e:*` scripts all funnel through this so every
   subcommand asserts the database URL before doing anything.
+- `env/server-guard.ts` -- who listens on 3100 (`/proc/net/tcp{,6}` and
+  `/proc/<pid>/fd`) and whether it was started with the e2e `DATABASE_URL`:
+  `assertE2eServer`, `assertNoForeignServer` (see "Safety").
+- `env/global-setup.ts` -- Playwright's `globalSetup`: the date guard and
+  `assertE2eServer` before any spec.
 - `env/scan-secrets.ts` -- `findSecretLeaks`: a byte scan of `artifacts/`
   for the run's secrets. `playwright.config.ts` holds no secrets and never
   calls `buildE2eEnv()` (its reporters serialise the config); the web server
   is started through `run.ts start`, which builds the env itself.
 - `env/register.ts` -- registers accounts through the real `/auth` UI and
   saves `.auth/<username>.credential.json` (the passkey) and
-  `.auth/<username>.json` (signed-in storage state). Re-run safe.
+  `.auth/<username>.json` (signed-in storage state). Re-run safe. Refuses
+  unless the e2e server is the one on 3100, and fails if a registered row is
+  not in the e2e database.
 - `support/auth.ts` -- Chromium's CDP virtual authenticator:
   `registerViaUi`, `signInAs` (swaps the saved passkey into the
   authenticator and refreshes its sign counter afterwards; with
@@ -82,13 +130,23 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   no page load, so an account switch stays in one document), `signOut`
   (through the profile page's Logout), `storageStatePath`.
 - `support/shots.ts` -- `shot` / `shotElement` write
-  `artifacts/screenshots/<project>/<name>.png`.
+  `artifacts/screenshots/<project>/<name>.png`. `shotElement` crops the
+  element out of a full-page capture by its document box: on a phone page
+  wider than the viewport (F1) mobile emulation zooms out and Playwright's
+  own element shots drift down the page.
 - `support/evidence.ts` -- `check()`: a soft assertion that also appends a
   line to `artifacts/evidence.jsonl`; `note()`: an informational line
-  (timings) that never fails the test. Each line records its spec file.
-- `report/gallery.ts` -- `npm run e2e:gallery` (and the end of `e2e:all`):
-  reads evidence.jsonl, both invocations' results JSON, oracle.json, the
-  screenshots and cards (and `artifacts/mutation-i1/` if present) and writes
+  (timings) that never fails the test; `manualObservation()`: a finding only
+  a person can see in the screenshots (F5), recorded with this run's paths
+  and measurements and reported as a manual observation, never as
+  reproduced or fixed. Each line records its spec file.
+- `report/` -- `npm run e2e:gallery` (and the end of `e2e:all`).
+  `load.ts` reads evidence.jsonl, both invocations' results JSON (a
+  truncated file is named, not stack-traced), oracle.json, the screenshots
+  and cards (and `artifacts/mutation-i1/` if present) and links each
+  screenshot to its checks (`RULES`); `findings.ts` holds the findings, the
+  notes, the "not automated" list and the counts; `html.ts` and
+  `markdown.ts` render; `gallery.ts` writes
   - `artifacts/index.html`: a dark, script-free page with relative image
     paths -- findings F1-F6 with their failing checks and screenshots,
     counts per invocation and project, failed checks (expected vs actual),
@@ -98,7 +156,8 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
     caption linking the checks it illustrates (`RULES`, by shot name), and
     every check at the end;
   - `artifacts/report.md`: the same as text, plus the environment, the
-    seeded cast, ava's 2025 oracle block, timings and skips.
+    seeded cast, ava's 2025 oracle block, timings, skips, what is not
+    automated, and every screenshot no check links to.
 
   The findings' diagnoses are written in `FINDINGS`; whether each one
   reproduced, and its evidence, comes from the run. A failing check no
@@ -111,14 +170,17 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   `becomesVisible` (a soft visibility wait whose result goes through
   `check()`), and the app's wording rules: `pluralise` (counts),
   `words` / `wordValue` (small numbers in words, both ways),
-  `capitalise`, `dayMonth` (a date key as "28 December") and
+  `capitalise`, `dayMonth` (a date key as "28 December"),
+  `monthName` / `weekdayName` (Monday first) / `percent` and
   `alsoTopForLine` ("Also number one for a and b.").
 - `support/recap.ts` -- the recap page's sections, found by role, heading
   or text (src/ has no test ids): `recapSection(page, section)` for each of
   `RECAP_SECTIONS`, `openRecap` (waits for the hero or the thin card),
   `loadAllImages` (scrolls so lazy posters load before a screenshot),
   `tileValue` (a stat tile's figure), `crewRows` (CrewRanking's rows, in the
-  recap's crew panel or the story's crew card) and `textOf`.
+  recap's crew panel or the story's crew card), `readCompare` (CompareSplit's
+  discs and CompareFacts' facts, in the recap panel or the story card) and
+  `textOf`.
 - `support/profile.ts` -- the profile page: `openProfileTab` (by URL
   fragment) and `clickProfileTab` (no page load), the Data Management tab's
   Series Finale card (`finaleCard`, `finaleRows`, `readFinaleRows`), the
@@ -142,14 +204,17 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   `resolveCatalogue()` fills in unresolved entries and rewrites the lock; it
   needs `TMDB_API_KEY`, so run it under `buildE2eEnv()`.
 - `seed/personas.ts` -- the cast (`PERSONAS`): each account's zone, creation
-  date, per-year shows/films/rhythm, planning list and owned lists.
+  date, per-year shows/films/rhythm, planning list and owned lists. ava's
+  zone-edge episodes are lopsided (one at 2025's start, two at its end), so
+  her 2025 holds 230 episodes in Brisbane and 231 in UTC.
 - `seed/generate.ts` + `seed/prng.ts` -- `generate(persona, catalogue)` turns
   a persona into episode and status rows, deterministically (seeded by
   username and year). `seed/generate.test.ts` checks the generator and pins
   the cast's designed statistics with the engine's own pure functions.
 - `seed/seed.ts` -- the seeder: users (signing-in ones looked up, the rest
   inserted; `e2e_jon` gets the all-f id so the id-ordered crew cap always
-  drops him), history, the shared list, then TMDB metadata via the app's
+  drops him from ava's crew, and `e2e_dee` the next id down so it always
+  drops her from jon's -- finding F3), history, the shared list, then TMDB metadata via the app's
   `addToCache`, runtimes via `ensureSeasonsCached` and the backfill's film
   loop, three nulled runtimes, and the 2025 snapshots of everyone but ava
   (pops first, pop12 last of them). Re-runnable: it clears the cast's rows
@@ -157,8 +222,11 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
 - `seed/oracle.ts` -- independent of the app's engine: plain SQL plus the
   spec's rules, each open rule cited to the line of `aggregate.ts` /
   `service.ts` it matches. Writes `artifacts/oracle.json`
-  (`Record<username, Record<year, OracleYear>>`). The percentile is `null`
-  by design; specs test its presence.
+  (`Record<username, Record<year, OracleYear>>`): counts, minutes, local
+  months, weekdays and the after-21:00 share (`AT TIME ZONE`), the crew and
+  compare, `episodesIfUtcWindow` (the zone-edge precondition) and
+  `crewTopByActivity` (what F3 compares). The percentile is `null` by
+  design; specs test its presence.
 - `specs/` -- Playwright spec files, numbered so alphabetical order is also
   run order within a project: `00`-`79` are read-only, `80`-`99` (or any
   `*.mutating.e2e.ts`) mutate shared state and run last, in the
@@ -167,25 +235,30 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
     malformed period (404 page), thin years, signed out.
   - `20-api-and-card` (desktop only) -- the list and payload routes, the
     card's status matrix, card PNGs saved to `artifacts/cards/`, the
-    first-generation time (`note`), and a card privacy byte check.
+    first-generation time (`note`), the payload's local buckets (months,
+    weekdays, late share) against the oracle, and ava's card saved for the
+    privacy check in 80.
   - `30-banner` -- the dashboard banner: who sees it, its text, its link.
   - `31-banner.mutating` -- "Not now": optimistic hide, persistence, and a
     forced failure that leaves bo undismissed.
   - `40-recap` -- ava's 2025 recap, section by section, against the oracle
-    (hero, tiles, top show, niche, shame, big day, crew, compare, header,
-    footer); the crew-cap rule is recorded as an informational app finding.
+    (hero, tiles and the zone-edge precondition, months, type, top show,
+    niche, shame, big day, crew, compare, header, footer); the crew-cap rule
+    (F3) is a note comparing jon's stored crew with his most active.
   - `41-recap-visual` (desktop, phone; webkit-phone skips where WebKit does
     not launch) -- full-page and per-section screenshots,
     `recap/<user>-<year>/<section>`, for ava 2025/2024/2023, bo, bat and flo
     2025 and flo 2024; which sections render is checked against the oracle,
-    plus no sideways scroll and a header title that fits.
+    plus no sideways scroll, a header title that fits, and each type panel's
+    after-21:00 share (ava's shown, bat's absent) against the oracle.
   - `42-recap-states` -- loading, load failure then Retry, and unavailable,
     each forced with `page.route` on the period's GET.
   - `50-story` (desktop, phone, small-phone) -- ava's 2025 story: the walk
     by ArrowRight (one h1, progress bars, each card's h2 recorded, no
     sideways scroll), ArrowLeft and both ends, taps on the right and left
     thirds (touch on phones), Close and Escape, the crew card's top five
-    with ranks and "And N more.", the summary card's Share (with
+    with ranks and "And N more.", the compare card's discs and facts for
+    every peer (the closest, then each swapped in), the summary card's Share (with
     `navigator.share` stubbed) leaving the reel where it is, the small
     phone's tall cards scrolled to their bottom (TMDB attribution, swap
     controls) with the scroll reset on the next card, and wording that
@@ -208,15 +281,19 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   - `80-consent-and-rename` (desktop-mutating) -- cy opts out of crew
     comparisons; ava's recap withholds her on read while the stored
     snapshot still names her; bo renames himself `e2e_bo_renamed`, and
-    ava's recap and story, and bo's own card, show the new name. Leaves bo
-    renamed and cy opted out: re-seeding afterwards needs a database reset.
+    ava's recap and story, and bo's own card, show the new name; ava's own
+    card stays byte-identical throughout (privacy). Leaves bo renamed and cy
+    opted out: re-seeding afterwards needs a database reset.
   - `90-account-switch` (desktop-mutating) -- the same-tab account switch
     (ava out, bat in, one document): bat's recap and card are his own, and a
     MutationObserver sees none of ava's crew after her Logout; plus the
     logout transition screenshots (P19) from the Security and Streaming
     tabs.
-- `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET`, saved passkeys
-  (private keys included) and storage state.
+- `.auth/` (gitignored) -- the app's `WEBAUTHN_SECRET` (`run-secret`:
+  random, made on first use and kept across runs so saved storage state
+  stays valid between `e2e:test` invocations; delete it for a new one, then
+  run `e2e:all`, since saved storage state signed with the old one stops
+  working), saved passkeys (private keys included) and storage state.
 - `artifacts/` (gitignored) -- `index.html` and `report.md` (the gallery and
   report), screenshots, share cards, `evidence.jsonl`, `oracle.json`,
   and per Playwright invocation its JSON results, HTML report and test
