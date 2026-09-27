@@ -1,6 +1,7 @@
 // Page-level helpers shared by the specs: waiting on the Series Finale list
 // the dashboard and profile read, locating the dashboard banner, soft
-// visibility waits, and the app's pluralisation rule for expected copy.
+// visibility waits, and the app's pluralisation and number-word rules for
+// expected copy.
 import type { Locator, Page, Response } from "@playwright/test";
 
 /** The banner's title line, for any year: "Your 2025 Series Finale is ready". */
@@ -45,4 +46,27 @@ export async function becomesVisible(locator: Locator, timeout?: number): Promis
 /** The app's pluralise() (components/series-finale/format.ts): "1 episode", "1,234 episodes" (en-GB grouping). */
 export function pluralise(value: number, noun: string): string {
   return `${value.toLocaleString("en-GB")} ${value === 1 ? noun : `${noun}s`}`;
+}
+
+/** The app's numberWords() for the small counts its sentences open with (format.ts). */
+const WORDS = [
+  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+  "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+];
+
+/** 5 -> "five", for counts below twenty (throws beyond, where the table stops). */
+export function words(value: number): string {
+  const word = WORDS[value];
+  if (word === undefined) throw new Error(`no word for ${value} in this spec's table`);
+  return word;
+}
+
+/** "five" (any case) -> 5; null for a word outside the table. */
+export function wordValue(word: string): number | null {
+  const index = WORDS.indexOf(word.toLowerCase());
+  return index < 0 ? null : index;
+}
+
+export function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

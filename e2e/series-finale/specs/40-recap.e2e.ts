@@ -3,8 +3,8 @@ import { type Locator, type Page, test } from "@playwright/test";
 import { storageStatePath } from "../support/auth";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
-import { becomesVisible, pluralise } from "../support/pages";
-import { openRecap, recapSection, textOf } from "../support/recap";
+import { becomesVisible, capitalise, pluralise, words } from "../support/pages";
+import { openRecap, recapSection, textOf, tileValue } from "../support/recap";
 
 // ava's 2025 recap, section by section, against the SQL oracle (desktop +
 // phone; read-only). Each test opens the page from ava's saved storage state.
@@ -14,22 +14,6 @@ import { openRecap, recapSection, textOf } from "../support/recap";
 
 const AVA = "e2e_ava";
 const YEAR = "2025";
-
-/** The app's numberWords() for the small counts these sentences open with (format.ts). */
-const WORDS = [
-  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-  "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
-];
-
-function words(value: number): string {
-  const word = WORDS[value];
-  if (word === undefined) throw new Error(`no word for ${value} in this spec's table`);
-  return word;
-}
-
-function capitalise(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
 
 /** "28 December" for "2025-12-28" -- a local date key, read back in UTC so it never shifts. */
 function dayMonth(key: string): string {
@@ -46,12 +30,6 @@ async function openAvaRecap(page: Page): Promise<void> {
   const rendered = await openRecap(page, YEAR);
   check("recap-ava-rendered", "ava's 2025 recap renders its hero", true, rendered);
   if (!rendered) throw new Error("ava's 2025 recap did not render; nothing else can be checked");
-}
-
-/** A stat tile's big number, found by its label. */
-async function tileValue(page: Page, label: string | RegExp): Promise<string | null> {
-  const tile = recapSection(page, "tiles").locator(":scope > div").filter({ hasText: label });
-  return textOf(tile.locator(":scope > div").first());
 }
 
 /** A badge list's titles: "Mr. Robot · S2E4" and "Nickel Boys · 312 days" read as the title alone. */

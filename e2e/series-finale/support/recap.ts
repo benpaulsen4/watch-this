@@ -128,3 +128,9 @@ export async function textOf(locator: Locator): Promise<string | null> {
   const text = await locator.first().textContent({ timeout: 1_000 }).catch(() => null);
   return text === null ? null : text.replace(/\s+/g, " ").trim();
 }
+
+/** A stat tile's big number, found by its label. */
+export async function tileValue(page: Page, label: string | RegExp): Promise<string | null> {
+  const tile = recapSection(page, "tiles").locator(":scope > div").filter({ hasText: label });
+  return textOf(tile.locator(":scope > div").first());
+}

@@ -86,12 +86,22 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   `GET /api/series-finale`), `openDashboard` (waits for that list and
   network idle), `banner` / `BANNER_READY` (the dashboard banner),
   `becomesVisible` (a soft visibility wait whose result goes through
-  `check()`), and `pluralise` (the app's count wording).
+  `check()`), and the app's wording rules: `pluralise` (counts),
+  `words` / `wordValue` (small numbers in words, both ways) and
+  `capitalise`.
 - `support/recap.ts` -- the recap page's sections, found by role, heading
   or text (src/ has no test ids): `recapSection(page, section)` for each of
   `RECAP_SECTIONS`, `openRecap` (waits for the hero or the thin card),
-  `loadAllImages` (scrolls so lazy posters load before a screenshot) and
-  `textOf`.
+  `loadAllImages` (scrolls so lazy posters load before a screenshot),
+  `tileValue` (a stat tile's figure) and `textOf`.
+- `support/story.ts` -- the story reel (`/series-finale/<period>/story`),
+  found by its own roles and names: the current card is the
+  `role="group"` "Card i of N" with its Shell's `data-card`; `openStory`,
+  `cardState` (id, label, h2), `progressState`, `pressTo` / `goToCard`
+  (arrow keys, soft), `expectedCards` (StoryReel's `hasContent` applied to
+  the oracle; genres and rhythm are not predicted), `pageScroll`,
+  `onScreenAndReachable` (in the viewport and hit at its centre) and
+  `slug` for screenshot names.
 - `support/db.ts` -- `psql` through `db.sh` (podman exec, no
   `DATABASE_URL`), `userExists`, `deleteUser`.
 - `seed/catalogue.ts` + `seed/catalogue.lock.json` -- the real TMDB titles
@@ -138,6 +148,20 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
     plus no sideways scroll and a header title that fits.
   - `42-recap-states` -- loading, load failure then Retry, and unavailable,
     each forced with `page.route` on the period's GET.
+  - `50-story` (desktop, phone, small-phone) -- ava's 2025 story: the walk
+    by ArrowRight (one h1, progress bars, each card's h2 recorded, no
+    sideways scroll), ArrowLeft and both ends, taps on the right and left
+    thirds (touch on phones), Close and Escape, the crew card's top five
+    with ranks and "And N more.", the summary card's Share (with
+    `navigator.share` stubbed) leaving the reel where it is, the small
+    phone's tall cards scrolled to their bottom (TMDB attribution, swap
+    controls) with the scroll reset on the next card, and wording that
+    matches the recap.
+  - `51-story-visual` (desktop, phone, small-phone; webkit-phone skips
+    where WebKit does not launch) -- one full-page shot per card,
+    `story/<user>-2025/<nn>-<heading-slug>` (the card id where a card has
+    no h2), for ava, bat and flo, and tia's thin story; which cards appear
+    is checked against the oracle.
 - `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET`, saved passkeys
   (private keys included) and storage state.
 - `artifacts/` (gitignored) -- screenshots, `evidence.jsonl`, `oracle.json`,
