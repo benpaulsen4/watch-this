@@ -366,6 +366,15 @@ describe("the cast", () => {
     expect(ava.thin).toBe(false);
   });
 
+  it("gives ava zone edges that tell her Brisbane window from a UTC one", () => {
+    // One edge episode early on 2025-01-01 Brisbane time (still 2024 in UTC)
+    // and two early on 2026-01-01 (still 2025 in UTC): 230 in her own window,
+    // 231 if the app bucketed her year in UTC -- the edges must not cancel out.
+    const utcWindow = localYear(2025, 0);
+    expect(episodesIn("e2e_ava")).toHaveLength(230);
+    expect(episodesIn("e2e_ava", utcWindow)).toHaveLength(231);
+  });
+
   it("gives ava a non-thin 2024 and a thin 2023", () => {
     expect(payloadFor("e2e_ava", 2024)).toMatchObject({ thin: false, finished: { films: 8 } });
     expect(payloadFor("e2e_ava", 2023)).toMatchObject({ thin: true, headline: { episodes: 6, titlesCompleted: 2 } });

@@ -71,6 +71,24 @@ export function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/** The app's monthName() (format.ts): 1 -> "January". */
+export function monthName(month: number): string {
+  return MONTHS[month - 1] ?? "";
+}
+
+/** The app's weekdayName() (format.ts): Monday-first, 0 -> "Monday". */
+export function weekdayName(index: number): string {
+  return WEEKDAYS[index] ?? "";
+}
+
+/** The app's percentOf() (format.ts): a share as a whole percentage. */
+export function percent(part: number, whole: number): number {
+  return Math.round((part / whole) * 100);
+}
+
 /** The app's formatDateKey(): "28 December" for "2025-12-28" -- a local date key, read back in UTC so it never shifts. */
 export function dayMonth(key: string): string {
   return new Date(`${key}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });

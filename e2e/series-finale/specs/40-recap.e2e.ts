@@ -3,7 +3,7 @@ import { type Locator, type Page, test } from "@playwright/test";
 import { storageStatePath } from "../support/auth";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
-import { alsoTopForLine, becomesVisible, capitalise, dayMonth, pluralise, words } from "../support/pages";
+import { alsoTopForLine, becomesVisible, capitalise, dayMonth, monthName, percent, pluralise, weekdayName, words } from "../support/pages";
 import { crewRows, openRecap, recapSection, textOf, tileValue } from "../support/recap";
 
 // ava's 2025 recap, section by section, against the SQL oracle (desktop +
@@ -55,14 +55,11 @@ test("hero: hours, the sentence, the date range, percentile and the runtime disc
   );
 
   const sentence = await textOf(lines.nth(2));
-  // The weekday comes from rhythm.topWeekday, which the oracle does not
-  // compute; it is read from the page and must be a real weekday.
-  const weekday = /most often on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s,/.exec(sentence ?? "")?.[1] ?? "<a weekday>";
   const straightDays = Math.floor(oracle.minutes / (24 * 60));
   check(
     "recap-hero-sentence",
-    "the hero sentence states the oracle's episodes and films, and its minutes as whole straight days",
-    `${pluralise(oracle.episodes, "episode")}, most often on ${weekday}s, and ${pluralise(oracle.filmsCompleted, "film")}. ` +
+    "the hero sentence states the oracle's episodes, top local weekday and films, and its minutes as whole straight days",
+    `${pluralise(oracle.episodes, "episode")}, most often on ${weekdayName(oracle.topWeekday ?? -1)}s, and ${pluralise(oracle.filmsCompleted, "film")}. ` +
       `${capitalise(words(straightDays))} straight ${straightDays === 1 ? "day" : "days"} of screen, if you had done it all at once.`,
     sentence,
   );
@@ -89,7 +86,15 @@ test("hero: hours, the sentence, the date range, percentile and the runtime disc
 test("stat tiles: episodes, completed, streak, dropped", async ({ page }) => {
   const oracle = oracleYear(AVA, YEAR);
   await openAvaRecap(page);
-  check("recap-tile-episodes", "'Episodes watched' is the oracle's episodes", oracle.episodes.toLocaleString("en-GB"), await tileValue(page, "Episodes watched"));
+  // The count below only proves zone handling if ava's zone edges do not
+  // cancel out: bucketed in UTC her year would hold a different number.
+  check(
+    "recap-zone-edges-discriminate",
+    `precondition: ava's 2025 holds ${oracle.episodes} episodes in her Brisbane window and ${oracle.episodesIfUtcWindow} in a UTC one -- they must differ (the seeded zone edges are lopsided)`,
+    true,
+    oracle.episodesIfUtcWindow !== oracle.episodes,
+  );
+  check("recap-tile-episodes", "'Episodes watched' is the oracle's episodes, counted in ava's own zone", oracle.episodes.toLocaleString("en-GB"), await tileValue(page, "Episodes watched"));
   check(
     "recap-tile-completed",
     "'Titles completed' is the oracle's titlesCompleted",
@@ -98,6 +103,71 @@ test("stat tiles: episodes, completed, streak, dropped", async ({ page }) => {
   );
   check("recap-tile-streak", "the day-streak tile is the oracle's longest streak", String(oracle.longestStreak), await tileValue(page, /Day streak/));
   check("recap-tile-dropped", "'Shows dropped' is the oracle's titlesDropped", String(oracle.titlesDropped), await tileValue(page, "Shows dropped"));
+});
+
+test("watched by month: every local month's bar, and the peak", async ({ page }) => {
+  const oracle = oracleYear(AVA, YEAR);
+  await openAvaRecap(page);
+  const panel = recapSection(page, "months");
+
+  // Bar heights are a share of the axis's top tick (BarChart.tsx), so each
+  // month's count is read back as height x top / 100.
+  const chart = await panel
+    .getByRole("img")
+    .evaluate((plot) => {
+      const axis = plot.parentElement?.parentElement?.firstElementChild;
+      return {
+        top: Number(axis?.querySelector("span")?.textContent ?? Number.NaN),
+        heights: Array.from(plot.querySelectorAll<HTMLElement>("[data-bar]")).map((bar) => Number.parseFloat(bar.style.height)),
+      };
+    }, undefined, { timeout: 5_000 })
+    .catch(() => null);
+  check(
+    "recap-months-bars",
+    "the twelve bars are the oracle's local-month counts (episodes and completed films, in Brisbane) -- January holds the 2025-01-01 edge episode and December not the 2026-01-01 ones",
+    oracle.months,
+    chart ? chart.heights.map((height) => Math.round((height * chart.top) / 100)) : null,
+  );
+
+  // peakMonth (format.ts): the first month with the most, if any has one.
+  const peak = Math.max(...oracle.months);
+  const peakMonth = oracle.months.indexOf(peak) + 1;
+  check(
+    "recap-months-peak",
+    "the panel names the oracle's peak month and its count",
+    peak > 0 ? `Peak: ${monthName(peakMonth)}, ${peak.toLocaleString("en-GB")}` : null,
+    await textOf(panel.getByText(/^Peak: /)),
+  );
+});
+
+test("your type: the top weekday's share and the after-21:00 share", async ({ page }) => {
+  const oracle = oracleYear(AVA, YEAR);
+  await openAvaRecap(page);
+  const panel = recapSection(page, "rhythm");
+  const text = (await textOf(panel)) ?? "";
+
+  const top = oracle.topWeekday;
+  const total = oracle.weekdayCounts.reduce((sum, count) => sum + count, 0);
+  check(
+    "recap-rhythm-top-weekday",
+    "the type panel gives the oracle's top local weekday and its share of episodes",
+    top === null ? null : `${percent(oracle.weekdayCounts[top] ?? 0, total)}% of your episodes landed on a ${weekdayName(top)}.`,
+    /\d+% of your episodes landed on a \w+\./.exec(text)?.[0] ?? null,
+  );
+  check(
+    "recap-rhythm-weekday-strip",
+    "the weekday strip highlights the oracle's top weekday",
+    top === null ? "Episodes by weekday." : `Episodes by weekday. Peak ${weekdayName(top)}.`,
+    await panel.getByRole("img").getAttribute("aria-label", { timeout: 1_000 }).catch(() => null),
+  );
+  // The positive side of bat's "no share" (41-recap-visual): ava ticks enough
+  // episodes one at a time, so hers is shown, and must be the oracle's.
+  check(
+    "recap-rhythm-late-share",
+    `the type panel gives the oracle's after-21:00 share of solo ticks (${oracle.lateSoloTicks} of ${oracle.soloTicks}, local time)`,
+    oracle.lateShare === null ? null : `${percent(oracle.lateShare, 1)}% of the episodes you ticked one at a time came after 21:00.`,
+    /\d+% of the episodes you ticked one at a time came after 21:00\./.exec(text)?.[0] ?? null,
+  );
 });
 
 test("top show, 'also number one for', and the niche film", async ({ page }) => {

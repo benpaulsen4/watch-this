@@ -276,10 +276,12 @@ const re = (source: string) => new RegExp(source);
 /** 40-recap's checks per recap section (ava 2025 only). */
 const RECAP_SECTION_CHECKS: Record<string, RegExp[]> = {
   hero: [/^recap-hero-/],
-  tiles: [/^recap-tile-/],
+  tiles: [/^recap-tile-/, /^recap-zone-edges-discriminate$/],
   "top-show": [/^recap-top-show-/, /^recap-also-top-for$/],
   niche: [/^recap-niche-/],
   shame: [/^recap-shame-/],
+  months: [/^recap-months-/],
+  rhythm: [/^recap-rhythm-/],
   "big-day": [/^recap-big-day$/],
   crew: [/^recap-crew-/, /^crew-cap-rule$/],
   compare: [/^recap-compare-/],
@@ -326,7 +328,7 @@ const RULES: Rule[] = [
   [/^recap\/([a-z]+)-(\d{4})\/([\w-]+)$/, (m) => [
     re(`^visual-${m[1]}-${m[2]}-sections$`),
     ...(m[3] === "big-day" ? [re(`^visual-${m[1]}-${m[2]}-clock-disclosure$`)] : []),
-    ...(m[3] === "rhythm" ? [re(`^visual-${m[1]}-${m[2]}-no-late-share$`)] : []),
+    ...(m[3] === "rhythm" ? [re(`^visual-${m[1]}-${m[2]}-late-share$`)] : []),
     ...(m[1] === "ava" && m[2] === "2025" ? (RECAP_SECTION_CHECKS[m[3]!] ?? []) : []),
   ]],
   [/^recap\/ava-2025-after-cy-optout\//, () => [/^consent-after-/]],

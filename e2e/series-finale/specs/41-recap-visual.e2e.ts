@@ -4,8 +4,8 @@ import type { OracleYear } from "../seed/oracle";
 import { storageStatePath } from "../support/auth";
 import { check } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
-import { becomesVisible } from "../support/pages";
-import { loadAllImages, openRecap, RECAP_SECTIONS, type RecapSection, recapSection, thinYearHeading } from "../support/recap";
+import { becomesVisible, percent } from "../support/pages";
+import { loadAllImages, openRecap, RECAP_SECTIONS, type RecapSection, recapSection, textOf, thinYearHeading } from "../support/recap";
 import { shot, shotElement } from "../support/shots";
 
 // The recap's screenshot set (desktop, phone; webkit-phone where WebKit
@@ -109,21 +109,27 @@ for (const { user, slug, year } of RECAPS) {
         await shotElement(thinCard.locator("xpath=.."), `recap/${name}/thin-card`);
       }
 
+      // The type panel's after-21:00 share: the oracle's, or none below the
+      // solo-tick floor. ava's year shows one (the positive control); bat's
+      // has no episode ticked alone, so it must show none.
+      if (shown.rhythm) {
+        const late = await textOf(recapSection(page, "rhythm").getByText(/after 21:00/));
+        check(
+          `visual-${name}-late-share`,
+          `${slug}'s ${year} type panel gives the oracle's after-21:00 share of solo ticks (${oracle.lateSoloTicks} of ${oracle.soloTicks}), or none below the floor`,
+          oracle.lateShare === null ? null : `${percent(oracle.lateShare, 1)}% of the episodes you ticked one at a time came after 21:00.`,
+          /\d+% of the episodes you ticked one at a time came after 21:00\./.exec(late ?? "")?.[0] ?? late,
+        );
+      }
+
       if (slug === "bat") {
         // bat's year has no episode ticked alone: the biggest day says so
-        // instead of drawing its clock, and the type panel drops its
-        // after-21:00 share (lateShare is null).
+        // instead of drawing its clock.
         check(
           `visual-${name}-clock-disclosure`,
           "bat's biggest day discloses why there is no timeline instead of drawing one",
           true,
           await becomesVisible(recapSection(page, "big-day").getByText(/ticked one at a time.*(nothing|too few) to put on a clock/), 1_000),
-        );
-        check(
-          `visual-${name}-no-late-share`,
-          "bat's type panel states no after-21:00 share",
-          0,
-          await recapSection(page, "rhythm").getByText(/after 21:00/).count(),
         );
       }
     });

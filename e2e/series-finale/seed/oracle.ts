@@ -26,6 +26,13 @@ export interface OracleYear {
   available: boolean;
   thin: boolean;
   episodes: number;
+  /**
+   * Episodes had the year been bucketed in UTC rather than the user's zone. A
+   * precondition, not a statistic: for ava (Brisbane) it must differ from
+   * `episodes`, or the zone-edge episodes cancel out and a UTC-bucketing app
+   * would pass every count check.
+   */
+  episodesIfUtcWindow: number;
   /** Known minutes: episodes watched plus films completed in the period. */
   minutes: number;
   /** Math.round(minutes / 60), as the headline and the hero show it (aggregate.ts:831, RecapClient.tsx:324). */
@@ -42,6 +49,18 @@ export interface OracleYear {
   unknownRuntime: number;
   bigDay: { date: string; episodes: number } | null;
   longestStreak: number;
+  /** Episodes plus completed films per local month, January first (aggregate.ts:130-170 buildMonths). */
+  months: number[];
+  /** Episodes per local weekday, Monday first (aggregate.ts:588-617 buildRhythm; time.ts:97-105 WEEKDAY_TO_INDEX). */
+  weekdayCounts: number[];
+  /** The first weekday (Monday = 0) with the most episodes; null with none (aggregate.ts:605-607). */
+  topWeekday: number | null;
+  /** Episodes ticked alone: a watched_at no other episode of the period shares (solo-ticks.ts partitionSoloTicks). */
+  soloTicks: number;
+  /** Solo ticks from local 21:00 on (aggregate.ts:609-614, buildRhythm). */
+  lateSoloTicks: number;
+  /** lateSoloTicks / soloTicks; null below SOLO_TICK_FLOOR (types.ts:24) solo ticks, when the app shows no share. */
+  lateShare: number | null;
   /** Consenting collaborators kept by the cap, plus the viewer, as CrewRanking orders and ranks them. Empty without collaborators. */
   crew: { username: string; episodes: number; rank: number }[];
   /** How the crew was capped, and who the cap left out. */
@@ -67,6 +86,9 @@ const LAST_COMPLETED_YEAR = 2025;
 // BOTH (aggregate.ts:857-858).
 const THIN_YEAR_EPISODES = 10;
 const THIN_YEAR_TITLES = 5;
+
+// types.ts:24 -- below this many solo ticks the late share is null.
+const SOLO_TICK_FLOOR = 50;
 
 // service.ts:224 and :275 -- ids sorted as strings, the first 8 kept, before
 // any activity is loaded.
@@ -253,6 +275,42 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     )
     select max(n)::int as days from (select count(*) as n from islands group by island) runs`;
 
+  // The same count over the year's UTC window: see `episodesIfUtcWindow`.
+  const utc = await windowOf("UTC", year);
+  const episodesIfUtcWindow = await episodeCount(u, utc);
+
+  // Months: episodes by watched_at and completed films by updated_at, in the
+  // user's zone; the window already confines both to the year.
+  const monthRows = await sql<{ m: number; n: number }[]>`
+    select m, count(*)::int as n from (
+      select extract(month from watched_at at time zone ${w.zone})::int as m from episode_watch_status
+      where user_id = ${u} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
+      union all
+      select extract(month from updated_at at time zone ${w.zone})::int as m from user_content_status
+      where user_id = ${u} and content_type = 'movie' and status = 'completed'
+        and updated_at >= ${w.start} and updated_at < ${w.end}
+    ) rows group by m`;
+  const months = Array.from({ length: 12 }, (_, i) => monthRows.find((row) => row.m === i + 1)?.n ?? 0);
+
+  // Weekdays, Monday first: isodow is 1 (Monday) to 7 (Sunday).
+  const weekdayRows = await sql<{ d: number; n: number }[]>`
+    select extract(isodow from watched_at at time zone ${w.zone})::int as d, count(*)::int as n from episode_watch_status
+    where user_id = ${u} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
+    group by d`;
+  const weekdayCounts = Array.from({ length: 7 }, (_, i) => weekdayRows.find((row) => row.d === i + 1)?.n ?? 0);
+  const weekdayPeak = Math.max(...weekdayCounts);
+  const topWeekday = weekdayPeak === 0 ? null : weekdayCounts.indexOf(weekdayPeak);
+
+  // Solo ticks, and those from local 21:00 on.
+  const [ticks] = await sql<{ solo: number; late: number }[]>`
+    select count(*)::int as solo,
+           (count(*) filter (where extract(hour from watched_at at time zone ${w.zone}) >= 21))::int as late
+    from (
+      select watched_at from episode_watch_status
+      where user_id = ${u} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
+      group by watched_at having count(*) = 1
+    ) solo`;
+
   // --- Crew and compare --------------------------------------------------
   // service.ts:238-276: every list the viewer owns or joined; their owners and
   // collaborators who consent, minus the viewer; sorted by id; first 8.
@@ -337,6 +395,7 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     available,
     thin: eps!.n < THIN_YEAR_EPISODES && titlesCompleted < THIN_YEAR_TITLES,
     episodes: eps!.n,
+    episodesIfUtcWindow,
     minutes,
     hours: Math.round(minutes / 60),
     titlesCompleted,
@@ -350,6 +409,12 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     unknownRuntime: eps!.unknown + films!.unknown,
     bigDay: bigDay ?? null,
     longestStreak: streak?.days ?? 0,
+    months,
+    weekdayCounts,
+    topWeekday,
+    soloTicks: ticks!.solo,
+    lateSoloTicks: ticks!.late,
+    lateShare: ticks!.solo >= SOLO_TICK_FLOOR ? ticks!.late / ticks!.solo : null,
     crew,
     crewCapRule: CREW_CAP_RULE,
     crewCappedOut,

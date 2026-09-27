@@ -170,11 +170,16 @@ export const PERSONAS: PersonaSpec[] = [
         lateShareOfSolo: 0.45,
         bigDay: { date: "2025-03-15", episodes: 14 },
         streak: { start: "2025-07-04", days: 17 },
+        // Zone edges, deliberately lopsided -- one at the year's start, two at
+        // its end -- so they do not cancel out: 230 episodes in ava's Brisbane
+        // window, 231 had her year been read in UTC (the oracle's
+        // episodesIfUtcWindow, which a spec checks differs).
         extraEpisodes: [
           // 2024-12-31 19:00 UTC: counts in ava's 2025.
           { key: "office", season: 1, episode: 1, localDateTime: "2025-01-01T05:00" },
-          // 2025-12-31 22:00 UTC: does not.
+          // 2025-12-31 22:00 and 23:00 UTC: neither does.
           { key: "office", season: 3, episode: 10, localDateTime: "2026-01-01T08:00" },
+          { key: "office", season: 3, episode: 11, localDateTime: "2026-01-01T09:00" },
         ],
       },
     },

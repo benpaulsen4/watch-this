@@ -41,6 +41,8 @@ interface Payload {
   crew: { username: string; episodes: number }[];
   compare: { username: string }[];
   thin: boolean;
+  months: { month: number; episodes: number }[];
+  rhythm: { weekdayCounts: number[]; topWeekday: number | null; lateShare: number | null };
 }
 
 test.beforeEach(() => {
@@ -103,6 +105,25 @@ test("GET /api/series-finale/2025 as ava: the payload, its crew, and the first g
     "the payload's crew usernames are the oracle's (viewer excluded), in order",
     oracle.crew.filter((member) => member.username !== AVA).map((member) => member.username),
     body.payload?.crew.map((member) => member.username),
+  );
+  // Every bucket here is a local one: the oracle computes them with
+  // Postgres' AT TIME ZONE in ava's Brisbane, the app with Intl.
+  const sixPlaces = (value: number | null | undefined) => (value === null || value === undefined ? value : Math.round(value * 1e6) / 1e6);
+  check(
+    "api-payload-local-buckets",
+    "the payload's months (episodes + completed films), weekday counts (Monday first), top weekday and after-21:00 share are the oracle's, in ava's zone",
+    {
+      months: oracle.months,
+      weekdayCounts: oracle.weekdayCounts,
+      topWeekday: oracle.topWeekday,
+      lateShare: sixPlaces(oracle.lateShare),
+    },
+    {
+      months: body.payload?.months.map((month) => month.episodes),
+      weekdayCounts: body.payload?.rhythm.weekdayCounts,
+      topWeekday: body.payload?.rhythm.topWeekday,
+      lateShare: sixPlaces(body.payload?.rhythm.lateShare),
+    },
   );
   note(
     "gen-time",
