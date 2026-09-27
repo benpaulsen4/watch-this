@@ -3,9 +3,10 @@
 // explicit e2e env and asserts the database URL before doing anything, so a
 // stray invocation can never fall back to .env.local's real DATABASE_URL.
 import { type ChildProcess, spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { writeGallery } from "../report/gallery";
 import { findSecretLeaks } from "./scan-secrets";
 import { ARTIFACTS_DIR, assertE2eDatabaseUrl, buildE2eEnv, E2E_BASE_URL, E2E_DIR, E2E_PORT } from "./test-env";
 
@@ -47,6 +48,24 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv): Promise<v
 function resetEvidence(): void {
   mkdirSync(ARTIFACTS_DIR, { recursive: true });
   writeFileSync(join(ARTIFACTS_DIR, "evidence.jsonl"), "");
+}
+
+/**
+ * Removes the previous run's screenshots, share cards, gallery and report, so
+ * everything the new gallery shows was produced by this run. (`e2e:test` keeps
+ * them: a filtered run only replaces the files it writes.) artifacts/mutation-i1/,
+ * the one-off I1 mutation check's evidence (ruling E9), is kept.
+ */
+function resetRunOutput(): void {
+  for (const name of ["screenshots", "cards", "index.html", "report.md"]) {
+    rmSync(join(ARTIFACTS_DIR, name), { recursive: true, force: true });
+  }
+}
+
+/** Writes artifacts/index.html and artifacts/report.md from whatever artifacts/ holds. */
+function gallery(): void {
+  const { html, markdown } = writeGallery(ARTIFACTS_DIR);
+  console.log(`e2e gallery: ${html}\ne2e gallery: ${markdown}`);
 }
 
 /**
@@ -157,6 +176,7 @@ async function runAll(env: NodeJS.ProcessEnv): Promise<void> {
     throw new Error(`something is already serving ${E2E_BASE_URL}; stop it before e2e:all`);
   }
   resetEvidence();
+  resetRunOutput();
   await run("bash", [join(E2E_DIR, "env", "db.sh"), "reset"], env);
   await run("npx", ["drizzle-kit", "migrate"], env);
   await run("npx", ["next", "build"], env);
@@ -176,8 +196,15 @@ async function runAll(env: NodeJS.ProcessEnv): Promise<void> {
       // Said now, so a secret-scan failure below cannot hide it.
       console.error(`e2e all: ${error instanceof Error ? error.message : String(error)}`);
     }
+    // The gallery reports the failures above, so it is built either way, and
+    // before the secret scan so the scan covers index.html and report.md too.
+    try {
+      gallery();
+    } catch (error) {
+      console.error(`e2e all: gallery failed -- ${error instanceof Error ? error.message : String(error)}`);
+      failure ??= error;
+    }
     scanSecrets(env);
-    console.log("e2e all: gallery skipped -- not implemented yet (Task 9)");
     if (failure) throw failure;
   } finally {
     await stopServer(server);
@@ -284,7 +311,8 @@ async function main(): Promise<void> {
     case "all":
       return runAll(env);
     case "gallery":
-      throw new Error(`e2e ${subcommand}: not implemented yet`);
+      gallery();
+      return scanSecrets(env);
   }
 }
 

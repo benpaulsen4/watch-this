@@ -31,6 +31,8 @@ npm run e2e:test        # empties artifacts/evidence.jsonl, runs Playwright twic
                         # artifacts/ for secrets. `-- <playwright args>` go to both runs; args
                         # with --project run as one plain `playwright test` instead
 npm run e2e:scan-secrets  # fail if any artifact holds the TMDB key or WebAuthn secret (names files only)
+npm run e2e:gallery     # artifacts/index.html + artifacts/report.md from whatever artifacts/ holds
+                        # (no db, no app), then the secret scan
 npm run e2e:db:reset    # a fresh, empty container (down + up)
 npm run e2e:db:down     # stops and removes the throwaway container
 ```
@@ -38,9 +40,12 @@ npm run e2e:db:down     # stops and removes the throwaway container
 Or everything in one go:
 
 ```bash
-npm run e2e:all   # evidence reset, db reset, migrate, build, start the app, register, seed,
-                  # oracle, the two Playwright runs as e2e:test, secret scan (gallery: Task 9). Stops the app it
-                  # started; leaves the database up and seeded -- npm run e2e:db:down removes it.
+npm run e2e:all   # evidence, screenshots, cards and the old gallery/report cleared; db reset,
+                  # migrate, build, start the app, register, seed, oracle, the two Playwright
+                  # runs as e2e:test, the gallery and report (built even when tests fail), secret
+                  # scan. Stops the app it started; leaves the database up -- after the mutating
+                  # specs it holds bo renamed and cy opted out, so `npm run e2e:seed` alone cannot
+                  # restore it (reset first, or rename bo back); npm run e2e:db:down removes it.
 ```
 
 Individual Playwright invocations work too, e.g.:
@@ -62,8 +67,7 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   (migrate, seed, build, start, Playwright's own `webServer`) is given.
   `.env.local`'s real `DATABASE_URL` is never inherited.
 - `env/run.ts` -- `npm run e2e:*` scripts all funnel through this so every
-  subcommand asserts the database URL before doing anything. Every
-  subcommand but `gallery` (Task 9) is implemented.
+  subcommand asserts the database URL before doing anything.
 - `env/scan-secrets.ts` -- `findSecretLeaks`: a byte scan of `artifacts/`
   for the run's secrets. `playwright.config.ts` holds no secrets and never
   calls `buildE2eEnv()` (its reporters serialise the config); the web server
@@ -81,7 +85,24 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   `artifacts/screenshots/<project>/<name>.png`.
 - `support/evidence.ts` -- `check()`: a soft assertion that also appends a
   line to `artifacts/evidence.jsonl`; `note()`: an informational line
-  (timings) that never fails the test.
+  (timings) that never fails the test. Each line records its spec file.
+- `report/gallery.ts` -- `npm run e2e:gallery` (and the end of `e2e:all`):
+  reads evidence.jsonl, both invocations' results JSON, oracle.json, the
+  screenshots and cards (and `artifacts/mutation-i1/` if present) and writes
+  - `artifacts/index.html`: a dark, script-free page with relative image
+    paths -- findings F1-F6 with their failing checks and screenshots,
+    counts per invocation and project, failed checks (expected vs actual),
+    the I1 mutation check, notes, then every screenshot by surface (share
+    cards, banner, recap, story, profile, states, consent and rename before
+    and after, account switch) with its projects side by side and each
+    caption linking the checks it illustrates (`RULES`, by shot name), and
+    every check at the end;
+  - `artifacts/report.md`: the same as text, plus the environment, the
+    seeded cast, ava's 2025 oracle block, timings and skips.
+
+  The findings' diagnoses are written in `FINDINGS`; whether each one
+  reproduced, and its evidence, comes from the run. A failing check no
+  finding explains is listed as unclassified.
 - `support/oracle.ts` -- `oracleYear(username, year)` and
   `oracleAvailableYears(username)`, read from `artifacts/oracle.json`.
 - `support/pages.ts` -- shared page helpers: `listResponse` (the page's
@@ -196,12 +217,16 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
     tabs.
 - `.auth/` (gitignored) -- the per-run `WEBAUTHN_SECRET`, saved passkeys
   (private keys included) and storage state.
-- `artifacts/` (gitignored) -- screenshots, `evidence.jsonl`, `oracle.json`,
+- `artifacts/` (gitignored) -- `index.html` and `report.md` (the gallery and
+  report), screenshots, share cards, `evidence.jsonl`, `oracle.json`,
   and per Playwright invocation its JSON results, HTML report and test
   output (traces): `results-readonly.json`, `playwright-report-readonly/`,
   `test-output-readonly/`, and the same with `-mutating` (a direct
   `npx playwright test` writes the unsuffixed `results.json`,
-  `playwright-report/`, `test-output/`).
+  `playwright-report/`, `test-output/`). `mutation-i1/` holds the one-off
+  I1 mutation check (ruling E9: 90-account-switch against a build with
+  AuthProvider's cache clear reverted, in a scratch worktree); `e2e:all`
+  keeps it and the gallery reports it.
 
 ## Projects
 
