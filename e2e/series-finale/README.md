@@ -45,7 +45,7 @@ npm run e2e:db:down     # stops and removes the throwaway container
 Or everything in one go:
 
 ```bash
-npm run e2e:all   # about 8-10 minutes; nothing may be listening on :3100 when it starts.
+npm run e2e:all   # about 5-10 minutes; nothing may be listening on :3100 when it starts.
                   # evidence, screenshots, cards and the old gallery/report cleared; db reset,
                   # migrate, build, start the app, register, seed, oracle, the two Playwright
                   # runs as e2e:test, the gallery and report (built even when tests fail), secret

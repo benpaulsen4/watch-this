@@ -45,7 +45,11 @@ export async function shotElement(locator: Locator, name: string): Promise<void>
       }));
     return Promise.race([Promise.all(pending), new Promise((resolve) => setTimeout(resolve, 10_000))]);
   });
+  // Back to the top before the capture: a full-page capture draws the sticky
+  // header where the page is scrolled to, which would lay it over a tall
+  // element's top.
   const clip = await element.evaluate((node) => {
+    window.scrollTo(0, 0);
     const box = node.getBoundingClientRect();
     return { x: box.left + window.scrollX, y: box.top + window.scrollY, width: box.width, height: box.height };
   });
