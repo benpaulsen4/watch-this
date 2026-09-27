@@ -1,18 +1,15 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { Oracle } from "../seed/oracle";
 import type { Evidence } from "../support/evidence";
-import {
-  type Artifacts,
-  cardLookup,
-  findingStatuses,
-  mutationVerdict,
-  parseInvocation,
-  relatedChecks,
-  renderHtml,
-  renderMarkdown,
-  type Shot,
-} from "./gallery";
+import { findingStatuses, mutationVerdict } from "./findings";
+import { renderHtml } from "./html";
+import { type Artifacts, cardLookup, parseInvocation, readEvidence, readJson, relatedChecks, type Shot } from "./load";
+import { renderMarkdown } from "./markdown";
 
 const ev = (id: string, project: string, pass = true, extra: Partial<Evidence> = {}): Evidence => ({
   id,
@@ -240,5 +237,27 @@ describe("renderMarkdown", () => {
     const md = renderMarkdown(artifacts([ev("something-else", "desktop", false)]));
     expect(md).toContain("1 failing check(s) belong to no known finding");
     expect(md).toContain("### Unclassified failing checks");
+  });
+});
+
+describe("reading artifacts", () => {
+  const dir = mkdtempSync(join(tmpdir(), "e2e-gallery-"));
+
+  it("names a truncated results file and says what to do", () => {
+    const path = join(dir, "results-readonly.json");
+    writeFileSync(path, '{"suites": [');
+    expect(() => readJson(path)).toThrow(`${path} is not valid JSON`);
+    expect(() => readJson(path)).toThrow("re-run the specs, or delete the file");
+  });
+
+  it("names the evidence line that does not parse", () => {
+    const path = join(dir, "evidence.jsonl");
+    writeFileSync(path, '{"id":"a"}\n\n{"id":\n');
+    expect(() => readEvidence(path)).toThrow(`${path}:3 is not valid JSON`);
+  });
+
+  it("reads a missing file as absent", () => {
+    expect(readJson(join(dir, "missing.json"))).toBeNull();
+    expect(readEvidence(join(dir, "missing.jsonl"))).toEqual([]);
   });
 });
