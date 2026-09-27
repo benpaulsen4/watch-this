@@ -4,7 +4,7 @@ import { storageStatePath } from "../support/auth";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { becomesVisible, dayMonth, pluralise, words, wordValue } from "../support/pages";
-import { crewRows, openRecap, recapSection, textOf, tileValue } from "../support/recap";
+import { crewRows, openRecap, readCompare, recapSection, textOf, tileValue } from "../support/recap";
 import {
   type CardState,
   cardState,
@@ -242,6 +242,43 @@ test("the crew card: the top five with rank numbers, ava at her rank, and the re
         ? `You out-watched ${beaten === 1 ? "one person" : `${words(beaten)} people`} who ${beaten === 1 ? "was" : "were"} also trying`
         : `You out-watched ${words(beaten)} of the ${words(others.length)} people who were also trying`;
   check("story-crew-headline", "the crew card's headline counts those ava out-watched (a tie is not out-watching)", headline, (await cardState(page)).heading);
+});
+
+test("the compare card: every peer's split and named facts, the closest first, then each swapped in", async ({ page, hasTouch }) => {
+  const oracle = oracleYear(AVA, YEAR);
+  await openAvaStory(page);
+  await reachCard(page, "compare");
+  const card = storyCard(page);
+  const peers = Object.keys(oracle.compare);
+
+  for (const [index, peer] of peers.entries()) {
+    const expected = oracle.compare[peer]!;
+    if (index > 0) {
+      // "Swap in" lists every peer but the one shown.
+      const swap = card.getByText("Swap in", { exact: true }).locator("xpath=..").getByRole("button", { name: peer, exact: true });
+      const tapped = await tapCentre(page, swap, hasTouch);
+      check(`story-compare-${peer}-swapped`, `tapping '${peer}' in the swap row shows 'You & ${peer}', still on the compare card`, { tapped: true, eyebrow: true, card: "compare" }, {
+        tapped,
+        eyebrow: await becomesVisible(card.getByText(`You & ${peer}`, { exact: true }), 5_000),
+        card: (await cardState(page)).id,
+      });
+    } else {
+      check("story-compare-first-peer", "the card opens on the oracle's closest peer", true, await becomesVisible(card.getByText(`You & ${peer}`, { exact: true }), 5_000));
+    }
+    const shown = await readCompare(card, peer);
+    check(
+      `story-compare-${peer}-split`,
+      `the large discs show only you / both / only ${peer} as the oracle`,
+      { onlyYou: expected.onlyYou, both: expected.both, onlyThem: expected.onlyThem },
+      { onlyYou: shown.onlyYou, both: shown.both, onlyThem: shown.onlyThem },
+    );
+    check(
+      `story-compare-${peer}-facts`,
+      `'${peer} finished, you dropped' and 'On both lists, neither started' name the oracle's titles (or are absent)`,
+      { theyFinishedYouDropped: expected.theyFinishedYouDropped, bothPlanning: expected.bothPlanning },
+      { theyFinishedYouDropped: shown.theyFinishedYouDropped, bothPlanning: shown.bothPlanning },
+    );
+  }
 });
 
 test("the summary card: 'Share your card' shares, and the reel neither advances nor closes", async ({ page, hasTouch }) => {

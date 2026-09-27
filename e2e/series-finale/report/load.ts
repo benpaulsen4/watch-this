@@ -296,7 +296,7 @@ const STORY_CARD_CHECKS: Record<string, RegExp[]> = {
   topShow: [/^story-reach-topShow$/, /^story-parity-last-watched$/],
   shame: [/^story-reach-shame$/, /^story-small-shame-/],
   crew: [/^story-reach-crew$/, /^story-crew-/, /^story-small-crew-/],
-  compare: [/^story-small-compare-/],
+  compare: [/^story-compare-/, /^story-small-compare-/],
   summary: [/^story-reach-summary$/, /^story-right-at-end$/, /^story-share-/, /^story-parity-summary-/, /^story-small-summary-/],
 };
 

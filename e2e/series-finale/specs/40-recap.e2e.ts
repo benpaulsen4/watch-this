@@ -4,7 +4,7 @@ import { storageStatePath } from "../support/auth";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { alsoTopForLine, becomesVisible, capitalise, dayMonth, monthName, percent, pluralise, weekdayName, words } from "../support/pages";
-import { crewRows, openRecap, recapSection, textOf, tileValue } from "../support/recap";
+import { crewRows, openRecap, readCompare, recapSection, textOf, tileValue } from "../support/recap";
 
 // ava's 2025 recap, section by section, against the SQL oracle (desktop +
 // phone; read-only). Each test opens the page from ava's saved storage state.
@@ -328,27 +328,24 @@ test("compare: the split and the named facts for the peer shown", async ({ page 
 
   for (const peer of peers) {
     const expected = oracle.compare[peer];
-    const panel = recapSection(page, "compare").filter({ hasText: `You & ${peer}` });
-    const disc = async (label: string) =>
-      Number(await textOf(panel.getByText(label, { exact: true }).locator("xpath=preceding-sibling::div[1]")));
+    const shown = await readCompare(recapSection(page, "compare").filter({ hasText: `You & ${peer}` }), peer);
     check(
       `recap-compare-${peer}-split`,
       `only you / both / only ${peer} are the oracle's`,
       expected ? { onlyYou: expected.onlyYou, both: expected.both, onlyThem: expected.onlyThem } : null,
-      { onlyYou: await disc("only you"), both: await disc("both"), onlyThem: await disc(`only ${peer}`) },
+      { onlyYou: shown.onlyYou, both: shown.both, onlyThem: shown.onlyThem },
     );
-    const fact = (label: string) => textOf(panel.locator("dt", { hasText: label }).locator("xpath=following-sibling::dd[1]"));
     check(
       `recap-compare-${peer}-finished-you-dropped`,
       `'${peer} finished, you dropped' names the oracle's title`,
       expected?.theyFinishedYouDropped ?? null,
-      await fact(`${peer} finished, you dropped`),
+      shown.theyFinishedYouDropped,
     );
     check(
       `recap-compare-${peer}-both-planning`,
       "'On both lists, neither started' names the oracle's shared planning film",
       expected?.bothPlanning ?? null,
-      await fact("On both lists, neither started"),
+      shown.bothPlanning,
     );
   }
 });

@@ -158,3 +158,33 @@ export async function crewRows(container: Locator): Promise<CrewRow[]> {
     })),
   );
 }
+
+/** What a compare panel or card shows for one peer: CompareSplit's three discs and CompareFacts' two named facts. */
+export interface ComparedPeer {
+  onlyYou: number | null;
+  both: number | null;
+  onlyThem: number | null;
+  theyFinishedYouDropped: string | null;
+  bothPlanning: string | null;
+}
+
+/**
+ * Reads CompareSplit and CompareFacts inside `container` (the recap's compare
+ * panel or the story's compare card) for `peer`: each disc's count is the
+ * div before its label, each fact the <dd> after its <dt>. Absent parts read
+ * null.
+ */
+export async function readCompare(container: Locator, peer: string): Promise<ComparedPeer> {
+  const disc = async (label: string) => {
+    const count = await textOf(container.getByText(label, { exact: true }).locator("xpath=preceding-sibling::div[1]"));
+    return count === null ? null : Number(count.replace(/[^\d]/g, ""));
+  };
+  const fact = (label: string) => textOf(container.locator("dt", { hasText: label }).locator("xpath=following-sibling::dd[1]"));
+  return {
+    onlyYou: await disc("only you"),
+    both: await disc("both"),
+    onlyThem: await disc(`only ${peer}`),
+    theyFinishedYouDropped: await fact(`${peer} finished, you dropped`),
+    bothPlanning: await fact("On both lists, neither started"),
+  };
+}
