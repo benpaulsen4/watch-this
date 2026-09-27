@@ -1,7 +1,8 @@
-import { test } from "@playwright/test";
+import { type Page, test } from "@playwright/test";
 
+import type { OracleYear } from "../seed/oracle";
 import { storageStatePath } from "../support/auth";
-import { check } from "../support/evidence";
+import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { shot } from "../support/shots";
 import {
@@ -35,6 +36,50 @@ const STORIES: { user: string; slug: string }[] = [
   { user: "e2e_bat", slug: "bat" },
   { user: FLO, slug: "flo" },
 ];
+
+/**
+ * APP FINDING F5, recorded as a named note: on the phones (DPR 2) the story
+ * compare card's large "only <peer>" disc label loses the last glyph's right
+ * edge -- "only e2e_bo" reads "e2e_bc" in the phone and small-phone shots of
+ * ava's compare card; desktop (DPR 1) draws it whole. CompareSplit's large
+ * label is `truncate` (overflow hidden) and its text is exactly as wide as
+ * its box, so the ink of the final glyph is cut with no room for an
+ * ellipsis. The verdict is by eye (the review zoomed into both shots); the
+ * DOM widths are recorded beside it.
+ */
+async function noteCompareDiscLabel(page: Page, oracle: OracleYear, shotName: string): Promise<void> {
+  const peer = Object.keys(oracle.compare)[0] ?? "";
+  const project = test.info().project.name;
+  const widths = await storyCard(page)
+    .getByText(`only ${peer}`, { exact: true })
+    .evaluate(
+      (element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const round = (value: number) => Math.round(value * 100) / 100;
+        return { textWidth: round(range.getBoundingClientRect().width), boxWidth: round(element.getBoundingClientRect().width) };
+      },
+      undefined,
+      { timeout: 2_000 },
+    )
+    .catch(() => null);
+  const clippedByEye = project === "phone" || project === "small-phone";
+  note(
+    "F5-compare-disc-label-clipped",
+    `APP FINDING F5: the story compare card's 'only ${peer}' disc label is drawn whole. Screenshots: ` +
+      "artifacts/screenshots/phone/story/ava-2025/13-a-shared-list-and-some-shared-taste.png, " +
+      "artifacts/screenshots/small-phone/story/ava-2025/13-a-shared-list-and-some-shared-taste.png (clipped); " +
+      "artifacts/screenshots/desktop/story/ava-2025/13-a-shared-list-and-some-shared-taste.png (whole)",
+    `'only ${peer}' fully visible`,
+    {
+      screenshot: `artifacts/screenshots/${project}/${shotName}.png`,
+      byEye: clippedByEye ? `final glyph cut: reads 'only ${peer.slice(0, -1)}c'` : "drawn whole",
+      devicePixelRatio: await page.evaluate(() => window.devicePixelRatio),
+      dom: widths,
+    },
+    !clippedByEye,
+  );
+}
 
 // WebKit cannot launch on this host (Task 1: missing system libraries), so the
 // webkit-phone project skips rather than failing at browser launch.
@@ -89,7 +134,10 @@ for (const story of STORIES) {
         );
 
         const label = (state.heading && slug(state.heading)) || state.id || "card";
-        await shot(page, `story/${name}/${nn}-${label}`, { fullPage: true });
+        const shotName = `story/${name}/${nn}-${label}`;
+        await shot(page, shotName, { fullPage: true });
+
+        if (story.slug === "ava" && state.id === "compare") await noteCompareDiscLabel(page, oracle, shotName);
       }
 
       check(

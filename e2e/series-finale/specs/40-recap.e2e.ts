@@ -3,7 +3,7 @@ import { type Locator, type Page, test } from "@playwright/test";
 import { storageStatePath } from "../support/auth";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
-import { becomesVisible, capitalise, pluralise, words } from "../support/pages";
+import { becomesVisible, capitalise, dayMonth, pluralise, words } from "../support/pages";
 import { openRecap, recapSection, textOf, tileValue } from "../support/recap";
 
 // ava's 2025 recap, section by section, against the SQL oracle (desktop +
@@ -14,11 +14,6 @@ import { openRecap, recapSection, textOf, tileValue } from "../support/recap";
 
 const AVA = "e2e_ava";
 const YEAR = "2025";
-
-/** "28 December" for "2025-12-28" -- a local date key, read back in UTC so it never shifts. */
-function dayMonth(key: string): string {
-  return new Date(`${key}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
-}
 
 /** "Saturday" for "2025-03-15". */
 function weekdayOf(key: string): string {

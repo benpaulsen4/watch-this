@@ -87,8 +87,8 @@ failing or was not selected -- `npm run e2e:test` is the ordered way.
   network idle), `banner` / `BANNER_READY` (the dashboard banner),
   `becomesVisible` (a soft visibility wait whose result goes through
   `check()`), and the app's wording rules: `pluralise` (counts),
-  `words` / `wordValue` (small numbers in words, both ways) and
-  `capitalise`.
+  `words` / `wordValue` (small numbers in words, both ways),
+  `capitalise` and `dayMonth` (a date key as "28 December").
 - `support/recap.ts` -- the recap page's sections, found by role, heading
   or text (src/ has no test ids): `recapSection(page, section)` for each of
   `RECAP_SECTIONS`, `openRecap` (waits for the hero or the thin card),

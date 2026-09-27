@@ -70,3 +70,8 @@ export function wordValue(word: string): number | null {
 export function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
+/** The app's formatDateKey(): "28 December" for "2025-12-28" -- a local date key, read back in UTC so it never shifts. */
+export function dayMonth(key: string): string {
+  return new Date(`${key}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
+}

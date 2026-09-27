@@ -3,7 +3,7 @@ import { type Locator, type Page, test } from "@playwright/test";
 import { storageStatePath } from "../support/auth";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
-import { becomesVisible, pluralise, words, wordValue } from "../support/pages";
+import { becomesVisible, dayMonth, pluralise, words, wordValue } from "../support/pages";
 import { openRecap, recapSection, textOf, tileValue } from "../support/recap";
 import {
   type CardState,
@@ -39,11 +39,6 @@ const RECAP_PATH = `/series-finale/${YEAR}`;
 const CREW_SHOWN = 5;
 
 const two = (position: number) => String(position).padStart(2, "0");
-
-/** "28 December" for "2025-12-28" -- a local date key, read back in UTC so it never shifts. */
-function dayMonth(key: string): string {
-  return new Date(`${key}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
-}
 
 /** Opens ava's 2025 story; logs whether it rendered, and stops the test if it did not. Returns the reel's length. */
 async function openAvaStory(page: Page): Promise<number> {
@@ -385,7 +380,9 @@ test("small phone: the tallest cards scroll to their bottom, and each next card 
       );
 
       // The peer's disc label ("only e2e_bo") truncates by design (CompareSplit's
-      // max-w-[5rem]); recorded so a short name that is clipped shows up.
+      // max-w-[5rem]). Its DOM widths are recorded here; they cannot see the
+      // clipped last glyph the phone screenshots show -- that is finding F5,
+      // noted by 51-story-visual.
       const peerLabel = await storyCard(page)
         .getByText(`only ${peers[0] ?? ""}`, { exact: true })
         .evaluate((element) => {
@@ -398,7 +395,7 @@ test("small phone: the tallest cards scroll to their bottom, and each next card 
         .catch(() => null);
       note(
         "story-small-compare-peer-label-fits",
-        `the compare disc's 'only ${peers[0] ?? ""}' label fits its width, uncut`,
+        `the compare disc's 'only ${peers[0] ?? ""}' label's text is no wider than its box (DOM only; see F5 for what the screenshots show)`,
         "textWidth <= boxWidth",
         peerLabel,
         !!peerLabel && peerLabel.textWidth <= peerLabel.boxWidth,
