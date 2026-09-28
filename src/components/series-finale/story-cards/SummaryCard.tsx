@@ -1,5 +1,11 @@
-import Image from "next/image";
+"use client";
 
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useRef } from "react";
+
+import { Button } from "@/components/ui/Button";
+import { useCompleteStory, useStoryCompletedAt } from "@/hooks/useSeriesFinale";
 import type { SummaryCardData } from "@/lib/series-finale/share";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +14,12 @@ import { ShareButton } from "../ShareButton";
 import type { Viewer } from "../viewer";
 import { Enter, Shell } from "./StoryShell";
 
-/** The story's closing card: the year in four figures and three names. */
+/**
+ * The story's closing card: the year in four figures and three names.
+ *
+ * Reaching it is going through the story, so it records that on the account
+ * -- which is what opens the recap on a phone -- and then offers the recap.
+ */
 export function SummaryCard({
   summary,
   viewer,
@@ -16,6 +27,25 @@ export function SummaryCard({
   summary: SummaryCardData;
   viewer: Viewer;
 }) {
+  const period = summary.period.label;
+  const recapHref = `/series-finale/${period}`;
+  const { data: storyCompletedAt } = useStoryCompletedAt(period);
+  const completeStory = useCompleteStory();
+  const { mutate: markComplete } = completeStory;
+
+  // Never for a story already gone through, so coming back to this card
+  // (the cache holds the completion by then) posts nothing more; the ref
+  // covers StrictMode's second effect and the moment before the cache does.
+  const marked = useRef(false);
+  useEffect(() => {
+    if (marked.current || storyCompletedAt !== null) return;
+    marked.current = true;
+    markComplete(period);
+  }, [storyCompletedAt, markComplete, period]);
+
+  // A failed POST is rolled back, and on a phone the recap would send the
+  // reader straight back into the story -- so offer a retry, not the link.
+  const unsaved = completeStory.isError && !storyCompletedAt;
   const { hours, episodes, titlesCompleted, titlesDropped } = summary.headline;
   const type = archetypeName(summary.rhythm);
   const rows = [
@@ -94,6 +124,30 @@ export function SummaryCard({
           label="Share your card"
           size="lg"
         />
+      </Enter>
+      <Enter
+        delay={240}
+        className="relative z-20 mt-3 flex flex-col items-center gap-1"
+      >
+        {unsaved ? (
+          <>
+            <p role="alert" className="text-xs text-red-400">
+              Could not save that you finished.
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => markComplete(period)}
+              disabled={completeStory.isPending}
+            >
+              Try again
+            </Button>
+          </>
+        ) : (
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={recapHref}>See the full recap</Link>
+          </Button>
+        )}
       </Enter>
     </Shell>
   );

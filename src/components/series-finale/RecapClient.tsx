@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Children, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { Children, type ReactNode, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { usePhoneViewport } from "@/hooks/usePhoneViewport";
 import {
   SeriesFinaleUnavailableError,
   useSeriesFinale,
+  useStoryCompletedAt,
 } from "@/hooks/useSeriesFinale";
 import type {
   ArchetypeId,
@@ -64,8 +67,48 @@ interface RecapClientProps {
   user: Viewer;
 }
 
+/**
+ * On a phone the story is the default: the recap opens only once the story
+ * has been gone through (`storyCompletedAt`, kept on the account), and until
+ * then this route hands over to the story. A desktop always gets the recap.
+ */
 export function RecapClient({ period, user }: RecapClientProps) {
+  const router = useRouter();
+  const isPhone = usePhoneViewport();
   const { data: payload, isLoading, error, refetch } = useSeriesFinale(period);
+  const { data: storyCompletedAt } = useStoryCompletedAt(period);
+
+  // Nothing is decided until the viewport is known and, on a phone, the year
+  // has loaded. A thin year has no story to finish, and a failed load no year
+  // to gate, so both render here as they always have.
+  const known = isPhone === false || (isPhone === true && !isLoading);
+  const toStory =
+    isPhone === true &&
+    payload !== undefined &&
+    !payload.thin &&
+    storyCompletedAt === null;
+
+  // Once a year has been shown, it stays: a completion rolled back after a
+  // failed POST, or a window narrowed past the breakpoint, never pulls the
+  // page out from under its reader.
+  const [yearShown, setYearShown] = useState(false);
+  const showPage = yearShown || (known && !toStory);
+  if (showPage && payload !== undefined && !yearShown) setYearShown(true);
+
+  const handOver = !showPage && toStory;
+  useEffect(() => {
+    // `replace`, so Back from the story skips this page instead of looping.
+    if (handOver) router.replace(`/series-finale/${period}/story`);
+  }, [handOver, router, period]);
+
+  // Until then only a spinner, so a phone never glimpses the recap.
+  if (!showPage) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <LoadingSpinner text="Putting your year together" />
+      </div>
+    );
+  }
 
   return (
     <>

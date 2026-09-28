@@ -1,6 +1,11 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 
@@ -56,25 +61,40 @@ interface SeriesFinalePeriodResponse {
 
 const periodQueryKey = (period: string) => ["series-finale", period] as const;
 
-function periodQueryFn(period: string) {
-  return () =>
-    getJson<SeriesFinalePeriodResponse>(`/api/series-finale/${period}`);
-}
-
-export function useSeriesFinale(period: string) {
-  return useQuery({
+/**
+ * The one query both period hooks observe. The cache holds
+ * `{ payload, storyCompletedAt }` (see `useCompleteStory`, which needs
+ * somewhere to write the latter optimistically); each hook `select`s its half.
+ */
+function periodQueryOptions(period: string) {
+  return queryOptions({
     queryKey: periodQueryKey(period),
-    queryFn: periodQueryFn(period),
-    // The cache holds `{ payload, storyCompletedAt }` (see
-    // `useCompleteStory`, which needs somewhere to write the latter
-    // optimistically); `select` keeps this hook's own consumers reading just
-    // the payload, as before.
-    select: (data) => data.payload,
+    queryFn: () =>
+      getJson<SeriesFinalePeriodResponse>(`/api/series-finale/${period}`),
     // A snapshot is frozen, so there is nothing to refetch for.
     staleTime: Infinity,
     // A 404 means "not available", not "try again" -- and the first
     // generation runs the whole aggregation, which can take seconds either way.
     retry: false,
+  });
+}
+
+export function useSeriesFinale(period: string) {
+  return useQuery({
+    ...periodQueryOptions(period),
+    select: (data) => data.payload,
+  });
+}
+
+/**
+ * When the viewer finished this period's story, or null if they have not:
+ * the phone recap's gate. Undefined until the period has loaded. Shares the
+ * payload's query, so it costs no request of its own.
+ */
+export function useStoryCompletedAt(period: string) {
+  return useQuery({
+    ...periodQueryOptions(period),
+    select: (data) => data.storyCompletedAt,
   });
 }
 
@@ -124,9 +144,9 @@ export function useDismissSeriesFinale() {
 /**
  * Record that the viewer has gone through the whole story, optimistically.
  *
- * Task 3 gates the phone recap on this: the story is the default there, and
- * the recap unlocks once `storyCompletedAt` is set, remembered on the
- * account so it holds across devices. Both caches that carry it -- this
+ * The phone recap is gated on this (see `RecapClient`): the story is the
+ * default there, and the recap opens once `storyCompletedAt` is set,
+ * remembered on the account so it holds across devices. Both caches that carry it -- this
  * period's payload query and the dashboard/profile list -- are updated at
  * once, the same way `useDismissSeriesFinale` updates the list, and rolled
  * back if the POST fails.

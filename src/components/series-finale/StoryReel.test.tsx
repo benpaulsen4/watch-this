@@ -108,6 +108,51 @@ const advanceTo = async (container: HTMLElement, card: string) => {
   throw new Error(`never reached ${card}`);
 };
 
+/** A phone-width (or desktop) viewport, as `usePhoneViewport` reads it. */
+const mockViewport = (phone: boolean) =>
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((media: string) => ({
+      matches: phone,
+      media,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+
+const COMPLETE_URL = "/api/series-finale/2026/story-complete";
+
+/**
+ * The period GET answers with `body`, and the completion POST with
+ * `completeOk`. Like the server, a completion that succeeds is remembered:
+ * later GETs carry its timestamp.
+ */
+const mockPeriod = (
+  body: { payload: unknown; storyCompletedAt: string | null },
+  completeOk = true,
+) => {
+  let storyCompletedAt = body.storyCompletedAt;
+  const fetchMock = vi.fn((url: string) => {
+    if (url === COMPLETE_URL) {
+      if (completeOk) storyCompletedAt ??= "2027-01-02T10:00:00.000Z";
+      return Promise.resolve({
+        ok: completeOk,
+        status: completeOk ? 200 : 500,
+        json: async () => ({}),
+      });
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ ...body, storyCompletedAt }),
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+};
+
+const completionCalls = (fetchMock: ReturnType<typeof mockPeriod>) =>
+  fetchMock.mock.calls.filter(([url]) => url === COMPLETE_URL);
+
 beforeEach(() => push.mockClear());
 
 afterEach(() => {
@@ -346,6 +391,124 @@ describe("StoryReel", () => {
     await waitFor(() =>
       expect(screen.getByText("No Series Finale for 2026")).toBeInTheDocument(),
     );
+    await userEvent.click(screen.getByRole("button", { name: "Close story" }));
+    expect(push).toHaveBeenLastCalledWith("/series-finale/2026");
+  });
+});
+
+describe("StoryReel on a phone", () => {
+  const closeTarget = async () => {
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Close story" }),
+    );
+    return push.mock.lastCall?.[0];
+  };
+
+  it("closes to the dashboard before the story has been gone through", async () => {
+    mockViewport(true);
+    mockPeriod({ payload: payload(), storyCompletedAt: null });
+    renderReel();
+
+    await screen.findByText("Series Finale");
+    expect(await closeTarget()).toBe("/dashboard");
+
+    push.mockClear();
+    await userEvent.keyboard("{Escape}");
+    expect(push).toHaveBeenLastCalledWith("/dashboard");
+  });
+
+  it("closes to the dashboard while the year is still loading", async () => {
+    mockViewport(true);
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    renderReel();
+
+    expect(await closeTarget()).toBe("/dashboard");
+  });
+
+  it("closes to the recap once the story has been gone through", async () => {
+    mockViewport(true);
+    mockPeriod({
+      payload: payload(),
+      storyCompletedAt: "2027-01-02T10:00:00.000Z",
+    });
+    renderReel();
+
+    await screen.findByText("Series Finale");
+    expect(await closeTarget()).toBe("/series-finale/2026");
+  });
+
+  it("closes a thin year to its recap, as it has no story to finish", async () => {
+    mockViewport(true);
+    mockPeriod({ payload: payload({ thin: true }), storyCompletedAt: null });
+    renderReel();
+
+    await screen.findByText(/Not much of a 2026/);
+    expect(await closeTarget()).toBe("/series-finale/2026");
+  });
+
+  it("marks the story complete on reaching the summary, and closes to the recap", async () => {
+    mockViewport(true);
+    const fetchMock = mockPeriod({ payload: payload(), storyCompletedAt: null });
+    const { container } = renderReel();
+
+    await screen.findByText("Series Finale");
+    await advanceTo(container, "summary");
+
+    await waitFor(() => expect(completionCalls(fetchMock)).toHaveLength(1));
+    expect(
+      await screen.findByRole("link", { name: "See the full recap" }),
+    ).toHaveAttribute("href", "/series-finale/2026");
+    expect(await closeTarget()).toBe("/series-finale/2026");
+  });
+});
+
+describe("StoryReel completion", () => {
+  it("marks the story complete once, however often the summary comes round", async () => {
+    mockViewport(false);
+    const fetchMock = mockPeriod({ payload: payload(), storyCompletedAt: null });
+    const { container } = renderReel();
+
+    await screen.findByText("Series Finale");
+    await advanceTo(container, "summary");
+    await waitFor(() => expect(completionCalls(fetchMock)).toHaveLength(1));
+
+    await userEvent.keyboard("{ArrowLeft}");
+    await userEvent.keyboard("{ArrowRight}");
+    expect(currentCard(container)).toBe("summary");
+    await screen.findByRole("link", { name: "See the full recap" });
+    expect(completionCalls(fetchMock)).toHaveLength(1);
+  });
+
+  it("does not mark a story already gone through", async () => {
+    mockViewport(false);
+    const fetchMock = mockPeriod({
+      payload: payload(),
+      storyCompletedAt: "2027-01-02T10:00:00.000Z",
+    });
+    const { container } = renderReel();
+
+    await screen.findByText("Series Finale");
+    await advanceTo(container, "summary");
+    await screen.findByRole("link", { name: "See the full recap" });
+    expect(completionCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("does not mark it before the summary", async () => {
+    mockViewport(false);
+    const fetchMock = mockPeriod({ payload: payload(), storyCompletedAt: null });
+    const { container } = renderReel();
+
+    await screen.findByText("Series Finale");
+    await advanceTo(container, "months");
+    expect(completionCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("closes to the recap on a desktop, gone through or not", async () => {
+    mockViewport(false);
+    mockPeriod({ payload: payload(), storyCompletedAt: null });
+    renderReel();
+
+    await screen.findByText("Series Finale");
     await userEvent.click(screen.getByRole("button", { name: "Close story" }));
     expect(push).toHaveBeenLastCalledWith("/series-finale/2026");
   });

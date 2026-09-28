@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 
@@ -13,6 +14,42 @@ const wrapper = ({ children }: { children: ReactNode }) => {
   });
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 };
+
+const COMPLETE_URL = "/api/series-finale/2026/story-complete";
+
+/**
+ * The period GET and the completion POST, as the server answers them: a
+ * completion that succeeds is remembered, so later GETs carry its timestamp.
+ * `completeOk` answers each POST in turn, the last answer repeating.
+ */
+const mockServer = ({
+  storyCompletedAt = null as string | null,
+  completeOk = [true],
+} = {}) => {
+  let completed = storyCompletedAt;
+  let posts = 0;
+  const fetchMock = vi.fn((url: string) => {
+    if (url === COMPLETE_URL) {
+      const ok = completeOk[Math.min(posts, completeOk.length - 1)] ?? true;
+      posts += 1;
+      if (ok) completed ??= "2027-01-02T10:00:00.000Z";
+      return Promise.resolve({ ok, status: ok ? 200 : 500 });
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ payload, storyCompletedAt: completed }),
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return {
+    posts: () =>
+      fetchMock.mock.calls.filter(([url]) => url === COMPLETE_URL).length,
+  };
+};
+
+beforeEach(() => {
+  mockServer();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -137,5 +174,75 @@ describe("SummaryCard", () => {
     ]) {
       expect(container.textContent).not.toContain(name);
     }
+  });
+
+  it("offers the full recap beneath Share", async () => {
+    render(
+      <SummaryCard
+        summary={payload}
+        viewer={{ username: "ben", profilePictureUrl: "" }}
+      />,
+      { wrapper },
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "See the full recap" }),
+    ).toHaveAttribute("href", "/series-finale/2026");
+  });
+
+  it("records the story as gone through, once", async () => {
+    const server = mockServer();
+    const viewer = { username: "ben", profilePictureUrl: "" };
+    const { rerender } = render(
+      <SummaryCard summary={payload} viewer={viewer} />,
+      { wrapper },
+    );
+
+    await waitFor(() => expect(server.posts()).toBe(1));
+    rerender(<SummaryCard summary={payload} viewer={viewer} />);
+    await screen.findByRole("link", { name: "See the full recap" });
+    expect(server.posts()).toBe(1);
+  });
+
+  it("records nothing for a story already gone through", async () => {
+    const server = mockServer({ storyCompletedAt: "2027-01-02T10:00:00.000Z" });
+    render(
+      <SummaryCard
+        summary={payload}
+        viewer={{ username: "ben", profilePictureUrl: "" }}
+      />,
+      { wrapper },
+    );
+
+    await screen.findByRole("link", { name: "See the full recap" });
+    // Give a stray POST the chance to go out.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    expect(server.posts()).toBe(0);
+  });
+
+  it("offers a retry, not the recap, when that cannot be saved", async () => {
+    const server = mockServer({ completeOk: [false, true] });
+    render(
+      <SummaryCard
+        summary={payload}
+        viewer={{ username: "ben", profilePictureUrl: "" }}
+      />,
+      { wrapper },
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not save that you finished.",
+    );
+    expect(
+      screen.queryByRole("link", { name: "See the full recap" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(
+      await screen.findByRole("link", { name: "See the full recap" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(server.posts()).toBe(2);
   });
 });

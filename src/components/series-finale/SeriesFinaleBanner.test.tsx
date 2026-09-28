@@ -23,6 +23,7 @@ const item = (overrides: Record<string, unknown> = {}) => ({
   label: "2026",
   generatedAt: "2027-01-01T00:00:00.000Z",
   dismissedAt: null,
+  storyCompletedAt: null,
   headline: { episodes: 1208, titlesCompleted: 47, hours: 412 },
   ...overrides,
 });
@@ -40,6 +41,15 @@ describe("SeriesFinaleBanner", () => {
     await waitFor(() =>
       expect(screen.getByText(/Your 2026 Series Finale is ready/)).toBeInTheDocument(),
     );
+  });
+
+  it("opens the recap, which hands a phone on to the story", async () => {
+    listResponse([item()]);
+    render(<SeriesFinaleBanner />, { wrapper });
+
+    expect(
+      await screen.findByRole("link", { name: "See your Series Finale" }),
+    ).toHaveAttribute("href", "/series-finale/2026");
   });
 
   it("renders nothing when the period is dismissed", async () => {

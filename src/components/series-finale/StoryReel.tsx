@@ -12,9 +12,11 @@ import {
 } from "react";
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { usePhoneViewport } from "@/hooks/usePhoneViewport";
 import {
   SeriesFinaleUnavailableError,
   useSeriesFinale,
+  useStoryCompletedAt,
 } from "@/hooks/useSeriesFinale";
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 import { cn } from "@/lib/utils";
@@ -110,11 +112,15 @@ interface StoryReelProps {
 /**
  * The fourteen-card story. Tap the right two-thirds (or ArrowRight) to
  * advance, the left third (or ArrowLeft) to go back; it stops at either end
- * rather than wrapping. Close, or Escape, returns to the recap page.
+ * rather than wrapping. Close, or Escape, returns to the recap page -- except
+ * on a phone before the story has been gone through, where the recap would
+ * only send the reader straight back here, so it goes to the dashboard.
  */
 export function StoryReel({ period, user }: StoryReelProps) {
   const router = useRouter();
+  const isPhone = usePhoneViewport();
   const { data: payload, isLoading, error, refetch } = useSeriesFinale(period);
+  const { data: storyCompletedAt } = useStoryCompletedAt(period);
   const [index, setIndex] = useState(0);
 
   const cards = useMemo(
@@ -128,9 +134,12 @@ export function StoryReel({ period, user }: StoryReelProps) {
   // The reel's one h1; each card's headline is an h2 beneath it.
   const title = `Series Finale ${period}`;
 
+  // The recap's own gate, read the other way: unless it is known to be open
+  // (gone through, or a thin year with no story), a phone is kept off it.
+  const recapClosed = isPhone === true && !payload?.thin && !storyCompletedAt;
   const close = useCallback(
-    () => router.push(`/series-finale/${period}`),
-    [router, period],
+    () => router.push(recapClosed ? "/dashboard" : `/series-finale/${period}`),
+    [router, period, recapClosed],
   );
 
   const go = useCallback(

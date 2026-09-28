@@ -9,6 +9,7 @@ import {
   useDismissSeriesFinale,
   useSeriesFinale,
   useSeriesFinaleList,
+  useStoryCompletedAt,
 } from "./useSeriesFinale";
 
 const wrapper = ({ children }: { children: ReactNode }) => {
@@ -80,6 +81,54 @@ describe("useSeriesFinale", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).not.toBeInstanceOf(SeriesFinaleUnavailableError);
+  });
+});
+
+describe("useStoryCompletedAt", () => {
+  it("reads the completion beside the payload, from the same request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        payload: { schemaVersion: 1 },
+        storyCompletedAt: "2027-01-02T10:00:00.000Z",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(
+      () => ({
+        payload: useSeriesFinale("2026"),
+        completedAt: useStoryCompletedAt("2026"),
+      }),
+      { wrapper },
+    );
+
+    await waitFor(() =>
+      expect(result.current.completedAt.isSuccess).toBe(true),
+    );
+    expect(result.current.completedAt.data).toBe("2027-01-02T10:00:00.000Z");
+    expect(result.current.payload.data).toEqual({ schemaVersion: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("is null for a story not yet gone through", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          payload: { schemaVersion: 1 },
+          storyCompletedAt: null,
+        }),
+      }),
+    );
+
+    const { result } = renderHook(() => useStoryCompletedAt("2026"), {
+      wrapper,
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toBeNull();
   });
 });
 

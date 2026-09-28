@@ -67,9 +67,8 @@ export function SeriesFinaleBanner() {
       </div>
       <div className="flex flex-none flex-col items-center gap-2.5 md:items-end">
         <Button variant="entertainment" size="lg" asChild>
-          <Link href={`/series-finale/${label}/story`}>
-            See your Series Finale
-          </Link>
+          {/* The recap route; on a phone it hands on to the story. */}
+          <Link href={`/series-finale/${label}`}>See your Series Finale</Link>
         </Button>
         <Button
           variant="ghost"

@@ -1,10 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecapClient } from "./RecapClient";
+
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace, push: vi.fn() }),
+}));
 
 const wrapper = ({ children }: { children: ReactNode }) => {
   const client = new QueryClient({
@@ -75,9 +81,145 @@ const mockFetchStatus = (status: number) =>
 const renderRecap = () =>
   render(<RecapClient period="2026" user={viewer} />, { wrapper });
 
+/** A phone-width (or desktop) viewport, as `usePhoneViewport` reads it. */
+const mockViewport = (phone: boolean) =>
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((media: string) => ({
+      matches: phone,
+      media,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+
+beforeEach(() => replace.mockClear());
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("RecapClient on a phone", () => {
+  it("sends a story not yet gone through to the story, recap unseen", async () => {
+    mockViewport(true);
+    mockFetch({ payload: payload(), storyCompletedAt: null });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith("/series-finale/2026/story"),
+    );
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("412")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Series Finale 2026" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("shows nothing of the recap while the year is still loading", async () => {
+    mockViewport(true);
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    renderRecap();
+
+    expect(screen.getByText("Putting your year together")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Series Finale 2026" }))
+      .not.toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("shows the recap once the story has been gone through", async () => {
+    mockViewport(true);
+    mockFetch({
+      payload: payload(),
+      storyCompletedAt: "2027-01-02T10:00:00.000Z",
+    });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("shows a thin year's recap, which has no story to finish", async () => {
+    mockViewport(true);
+    mockFetch({ payload: payload({ thin: true }), storyCompletedAt: null });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("Not much of a 2026")).toBeInTheDocument(),
+    );
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("says when the period is unavailable rather than sending it on", async () => {
+    mockViewport(true);
+    mockFetchStatus(404);
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("No Series Finale for 2026")).toBeInTheDocument(),
+    );
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("still sends the story on once a failed load is retried", async () => {
+    mockViewport(true);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+        .mockResolvedValue({
+          ok: true,
+          json: async () => ({ payload: payload(), storyCompletedAt: null }),
+        }),
+    );
+    renderRecap();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
+
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith("/series-finale/2026/story"),
+    );
+    expect(screen.queryByText("412")).not.toBeInTheDocument();
+  });
+
+  it("keeps a recap it has shown, even if the completion is rolled back", async () => {
+    mockViewport(true);
+    mockFetch({
+      payload: payload(),
+      storyCompletedAt: "2027-01-02T10:00:00.000Z",
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <RecapClient period="2026" user={viewer} />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+
+    // What `useCompleteStory` does when its POST fails.
+    act(() => {
+      client.setQueryData(["series-finale", "2026"], {
+        payload: payload(),
+        storyCompletedAt: null,
+      });
+    });
+
+    expect(screen.getByText("412")).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("RecapClient on a desktop", () => {
+  it("never sends anyone to the story", async () => {
+    mockViewport(false);
+    mockFetch({ payload: payload(), storyCompletedAt: null });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    expect(replace).not.toHaveBeenCalled();
+  });
 });
 
 describe("RecapClient", () => {
