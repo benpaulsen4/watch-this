@@ -51,6 +51,10 @@ function cardQueryOptions(period: string, username: string) {
   });
 }
 
+/** What a failed share says, wherever it is shown. */
+export const SHARE_FAILURE_LINE =
+  "That card could not be made. Try again in a moment.";
+
 interface ShareButtonProps {
   period: string;
   /** The viewer's username, which the server draws on the card. */
@@ -58,6 +62,18 @@ interface ShareButtonProps {
   /** "Share" in the recap header, "Share your card" on the story's close. */
   label?: string;
   size?: "sm" | "lg";
+  /**
+   * Below `sm`, show only the icon; the label stays the button's accessible
+   * name. For the recap header, where a phone has no room for the words.
+   */
+  collapse?: boolean;
+  /**
+   * When given, a failure is the caller's to show (with
+   * `SHARE_FAILURE_LINE`), and the button draws no line of its own: the recap
+   * header's bar has a fixed height, so the line goes below it. Called with
+   * true on a failure and false when the next attempt starts.
+   */
+  onFailureChange?: (failed: boolean) => void;
 }
 
 /**
@@ -78,12 +94,18 @@ export function ShareButton({
   username,
   label = "Share",
   size = "sm",
+  collapse = false,
+  onFailureChange,
 }: ShareButtonProps) {
   const queryClient = useQueryClient();
   const options = cardQueryOptions(period, username);
   const { data: cardFile } = useQuery(options);
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailedState] = useState(false);
+  const setFailed = (value: boolean) => {
+    setFailedState(value);
+    onFailureChange?.(value);
+  };
 
   const share = async () => {
     setBusy(true);
@@ -138,16 +160,22 @@ export function ShareButton({
       <Button
         variant="gradient"
         size={size}
+        className={cn(collapse && "px-2.5 sm:px-3")}
         onClick={() => void share()}
         disabled={busy}
       >
-        <Share2 className="mr-2 h-4 w-4" />
-        {label}
+        <Share2
+          aria-hidden="true"
+          className={cn("h-4 w-4", collapse ? "sm:mr-2" : "mr-2")}
+        />
+        {collapse ? (
+          <span className="sr-only sm:not-sr-only">{label}</span>
+        ) : (
+          label
+        )}
       </Button>
-      {failed && (
-        <span className="mt-1 text-xs text-gray-500">
-          That card could not be made. Try again in a moment.
-        </span>
+      {failed && !onFailureChange && (
+        <span className="mt-1 text-xs text-gray-500">{SHARE_FAILURE_LINE}</span>
       )}
     </div>
   );

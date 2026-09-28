@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecapClient } from "./RecapClient";
@@ -111,8 +112,18 @@ describe("RecapClient on a phone", () => {
     );
     expect(replace).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("412")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Series Finale 2026" }))
-      .not.toBeInTheDocument();
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    // The header's title and way back only: nothing of the year, and no
+    // Share to prefetch a card for a page that is being left.
+    expect(
+      screen.getByRole("heading", { name: "Series Finale 2026" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Play as story" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Share" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows nothing of the recap while the year is still loading", async () => {
@@ -121,8 +132,13 @@ describe("RecapClient on a phone", () => {
     renderRecap();
 
     expect(screen.getByText("Putting your year together")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Series Finale 2026" }))
-      .not.toBeInTheDocument();
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Series Finale 2026" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Play as story" }),
+    ).not.toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -212,6 +228,22 @@ describe("RecapClient on a phone", () => {
 });
 
 describe("RecapClient on a desktop", () => {
+  it("carries its header from the first render, before the viewport is known", () => {
+    // The server (and hydration) render has no viewport: a full page load
+    // spends that render waiting, and must not do it header-less (G1).
+    const client = new QueryClient();
+    const html = renderToString(
+      <QueryClientProvider client={client}>
+        <RecapClient period="2026" user={viewer} />
+      </QueryClientProvider>,
+    );
+
+    expect(html).toContain("Series Finale 2026");
+    expect(html).toContain('aria-label="Back to profile"');
+    expect(html).toContain("Putting your year together");
+    expect(html).not.toContain("<main");
+  });
+
   it("never sends anyone to the story", async () => {
     mockViewport(false);
     mockFetch({ payload: payload(), storyCompletedAt: null });
@@ -345,6 +377,35 @@ describe("RecapClient", () => {
         screen.getByText("ben · 1 January – 31 December 2026"),
       ).toBeInTheDocument(),
     );
+  });
+
+  it("wraps a long username in the hero rather than letting it run off", async () => {
+    mockFetch({ payload: payload() });
+    render(
+      <RecapClient
+        period="2026"
+        user={{
+          username: "e2e_flo_watches_only_films_and_has_a_long_name",
+          profilePictureUrl: "",
+        }}
+      />,
+      { wrapper },
+    );
+
+    expect(
+      await screen.findByText(/^e2e_flo_watches_only_films_and_has_a_long_name ·/),
+    ).toHaveClass("[overflow-wrap:anywhere]");
+  });
+
+  it("names each month by its initial below sm, where three letters do not fit", async () => {
+    mockFetch({ payload: payload() });
+    renderRecap();
+
+    await screen.findByRole("img", { name: /by month/ });
+    const july = screen.getByText("Jul");
+    expect(july).toHaveClass("hidden", "sm:inline");
+    expect(july.previousElementSibling).toHaveTextContent("J");
+    expect(july.previousElementSibling).toHaveClass("sm:hidden");
   });
 
   it("dates the year from its label, not from the snapshot's instants", async () => {
@@ -482,6 +543,47 @@ describe("RecapClient", () => {
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument(),
+    );
+  });
+
+  it("folds the header's actions to icons below sm, so the title fits beside them", async () => {
+    mockFetch({ payload: payload() });
+    renderRecap();
+
+    const story = await screen.findByRole("link", { name: "Play as story" });
+    expect(screen.getByText("Play as story")).toHaveClass(
+      "sr-only",
+      "sm:not-sr-only",
+    );
+    expect(story.querySelector("svg")).toHaveClass("sm:hidden");
+    expect(screen.getByText("Share")).toHaveClass("sr-only", "sm:not-sr-only");
+  });
+
+  it("says a card could not be made below the header, not inside it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith("/card")
+            ? { ok: false, status: 500 }
+            : { ok: true, json: async () => ({ payload: payload() }) },
+        ),
+      ),
+    );
+    renderRecap();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Share" }),
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "That card could not be made. Try again in a moment.",
+    );
+    expect(screen.getByRole("banner")).not.toContainElement(alert);
+    // The Share button stays where it was.
+    expect(screen.getByRole("banner")).toContainElement(
+      screen.getByRole("button", { name: "Share" }),
     );
   });
 
@@ -733,6 +835,29 @@ describe("RecapClient", () => {
     ).toBeInTheDocument();
   });
 
+  it("holds the posters to 7rem from lg, so their card is no taller than Genres", async () => {
+    mockFetch({
+      payload: payload({
+        niche: {
+          tmdbId: 2,
+          title: "Heat",
+          posterPath: "/heat.jpg",
+          popularity: 2.1,
+          medianPopularity: 68,
+          mostPopular: null,
+          filmPopularities: [2.1, 68],
+        },
+      }),
+    });
+    renderRecap();
+
+    const poster = (await screen.findByText("Heat"))
+      .closest("div")
+      ?.querySelector('img[alt=""]')
+      ?.closest(".aspect-\\[2\\/3\\]");
+    expect(poster).toHaveClass("lg:w-28");
+  });
+
   it("dates the top show's last episode watched", async () => {
     mockFetch({
       payload: payload({
@@ -975,7 +1100,9 @@ describe("RecapClient", () => {
     for (const title of ["Watched by month", "Biggest day"]) {
       const row = screen.getByText(title).closest(".grid");
       expect(row?.children).toHaveLength(1);
-      expect(row?.className).not.toMatch(/grid-cols/);
+      // One explicit, shrinkable column: a wide chart cannot widen the page.
+      expect(row).toHaveClass("grid-cols-1");
+      expect(row?.className).not.toMatch(/lg:grid-cols/);
     }
   });
 
@@ -999,6 +1126,46 @@ describe("RecapClient", () => {
     );
     const row = screen.getByText("Watched by month").closest(".grid");
     expect(row?.children).toHaveLength(2);
-    expect(row?.className).toMatch(/lg:grid-cols-\[1\.55fr_1fr\]/);
+    // One column below lg; from lg, the mock's 1.55 : 1 in columns that may
+    // shrink below their content's width (F1).
+    expect(row).toHaveClass(
+      "grid-cols-1",
+      "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]",
+    );
+  });
+
+  it("gives every row of panels one shrinkable column below lg", async () => {
+    mockFetch({
+      payload: payload({
+        genres: [{ name: "Drama", percent: 100 }],
+        niche: {
+          tmdbId: 1,
+          title: "Heat",
+          posterPath: null,
+          popularity: 1.2,
+          medianPopularity: 20,
+          mostPopular: null,
+          filmPopularities: [1.2, 20, 30],
+        },
+        crew: [{ userId: "u2", username: "ana", episodes: 10 }],
+        compare: [
+          {
+            userId: "u2",
+            username: "ana",
+            onlyYou: 1,
+            both: 1,
+            onlyThem: 1,
+            theyFinishedYouDropped: null,
+            bothPlanningNeitherStarted: null,
+          },
+        ],
+      }),
+    });
+    renderRecap();
+
+    for (const title of ["Least known", "The crew"]) {
+      const row = (await screen.findByText(title)).closest(".grid");
+      expect(row).toHaveClass("grid-cols-1", "lg:grid-cols-2");
+    }
   });
 });

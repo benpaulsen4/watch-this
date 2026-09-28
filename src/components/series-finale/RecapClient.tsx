@@ -1,5 +1,6 @@
 "use client";
 
+import { Play } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Children, type ReactNode, useEffect, useState } from "react";
@@ -55,7 +56,7 @@ import {
   UnavailableNotice,
 } from "./SeriesFinaleNotices";
 import { DroppedBadges, PlanningBadges } from "./ShameBadges";
-import { ShareButton } from "./ShareButton";
+import { SHARE_FAILURE_LINE, ShareButton } from "./ShareButton";
 import { StatTile } from "./StatTile";
 import { ThinYearCard } from "./ThinYearCard";
 import { TmdbAttribution } from "./TmdbAttribution";
@@ -101,14 +102,13 @@ export function RecapClient({ period, user }: RecapClientProps) {
     if (handOver) router.replace(`/series-finale/${period}/story`);
   }, [handOver, router, period]);
 
-  // Until then only a spinner, so a phone never glimpses the recap.
-  if (!showPage) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <LoadingSpinner text="Putting your year together" />
-      </div>
-    );
-  }
+  // The header's bar is a fixed height, so a failed share is said below it.
+  const [shareFailed, setShareFailed] = useState(false);
+
+  // The header is there from the first render, a full page load's included;
+  // its actions wait for a year to act on, and never appear for a phone being
+  // handed on to the story (Share would prefetch a card for nothing).
+  const actions = showPage && payload !== undefined && !payload.thin;
 
   return (
     <>
@@ -117,26 +117,75 @@ export function RecapClient({ period, user }: RecapClientProps) {
         backLinkHref={PROFILE_DATA_TAB}
         backLinkLabel="Back to profile"
       >
-        {payload && !payload.thin ? (
+        {actions ? (
           <>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/series-finale/${period}/story`}>Play as story</Link>
+            {/* Below sm, both fold to icons so the title keeps its line. */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="px-2.5 sm:px-3"
+              asChild
+            >
+              <Link href={`/series-finale/${period}/story`}>
+                <Play aria-hidden="true" className="h-4 w-4 sm:hidden" />
+                <span className="sr-only sm:not-sr-only">Play as story</span>
+              </Link>
             </Button>
-            <ShareButton period={period} username={user.username} />
+            <ShareButton
+              period={period}
+              username={user.username}
+              collapse
+              onFailureChange={setShareFailed}
+            />
           </>
         ) : null}
       </PageHeader>
-      <main>
-        <RecapBody
-          period={period}
-          user={user}
-          payload={payload}
-          isLoading={isLoading}
-          error={error}
-          onRetry={() => void refetch()}
-        />
-      </main>
+      {actions && shareFailed ? <ShareFailureNotice /> : null}
+      {showPage ? (
+        <main>
+          <RecapBody
+            period={period}
+            user={user}
+            payload={payload}
+            isLoading={isLoading}
+            error={error}
+            onRetry={() => void refetch()}
+          />
+        </main>
+      ) : (
+        // Until then only a spinner, so a phone never glimpses the recap.
+        <PageSpinner />
+      )}
     </>
+  );
+}
+
+/** The same wait before the viewport is known as while the year loads. */
+function PageSpinner() {
+  return (
+    <div className="flex min-h-64 items-center justify-center">
+      <LoadingSpinner text="Putting your year together" />
+    </div>
+  );
+}
+
+/**
+ * A failed share, said just under the header and kept there as the page
+ * scrolls. It takes no room in the page: it floats over the hero's top
+ * padding, or over whatever has scrolled beneath the header.
+ */
+function ShareFailureNotice() {
+  return (
+    <div className="pointer-events-none sticky top-16 z-40 h-0">
+      <div className="mx-auto flex max-w-7xl justify-end px-4 sm:px-6 lg:px-8">
+        <p
+          role="alert"
+          className="pointer-events-auto mt-2 rounded-md border border-gray-700 bg-gray-900/95 px-3 py-1.5 text-xs text-gray-300 shadow-lg shadow-black/25"
+        >
+          {SHARE_FAILURE_LINE}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -155,13 +204,7 @@ function RecapBody({
   error: Error | null;
   onRetry: () => void;
 }) {
-  if (isLoading) {
-    return (
-      <div className="flex min-h-64 items-center justify-center">
-        <LoadingSpinner text="Putting your year together" />
-      </div>
-    );
-  }
+  if (isLoading) return <PageSpinner />;
 
   if (error instanceof SeriesFinaleUnavailableError) {
     return (
@@ -275,6 +318,10 @@ function Container({
  * A row of panels, two abreast from `lg`. Absent panels (null children) are
  * dropped, and a lone survivor takes the full width rather than half a row.
  * `wide` gives the first column the mock's 1.55 : 1 share.
+ *
+ * Every column is `minmax(0, …)` (`grid-cols-1` and `grid-cols-2` are too):
+ * an implicit column would grow to its widest panel's content, and a chart's
+ * min-content width then pushes a phone's page sideways.
  */
 function Band({
   children,
@@ -290,9 +337,11 @@ function Band({
   return (
     <div
       className={cn(
-        "grid gap-4",
+        "grid grid-cols-1 gap-4",
         present.length > 1 &&
-          (wide ? "lg:grid-cols-[1.55fr_1fr]" : "lg:grid-cols-2"),
+          (wide
+            ? "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]"
+            : "lg:grid-cols-2"),
       )}
     >
       {present}
@@ -318,7 +367,7 @@ function Panel({
     <Card className={cn("flex flex-col", className)}>
       <div className="mb-5">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-lg leading-tight font-semibold text-gray-100">
+          <h2 className="min-w-0 text-lg leading-tight font-semibold [overflow-wrap:anywhere] text-gray-100">
             {title}
           </h2>
           {aside ? (
@@ -360,7 +409,7 @@ function Hero({
         className="pointer-events-none absolute inset-x-0 -bottom-px h-56 bg-gradient-to-b from-gray-950/0 via-gray-950/70 to-gray-950"
       />
       <Container className="relative pt-16 pb-[76px] text-center">
-        <p className="mb-6 text-xs font-semibold tracking-[0.28em] text-white/50 uppercase">
+        <p className="mb-6 text-xs font-semibold tracking-[0.28em] [overflow-wrap:anywhere] text-white/50 uppercase">
           {user.username} · {periodRange(payload.period.label)}
         </p>
         <p className="text-7xl leading-[0.86] font-bold tracking-[-0.055em] text-gray-50 tabular-nums sm:text-9xl">

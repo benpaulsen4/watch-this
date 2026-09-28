@@ -22,6 +22,7 @@ const SIZES = {
     outerCount: "text-[19px] text-gray-100",
     outerLabel: "mt-1 text-[11px] text-gray-400",
     themLabelWidth: "max-w-[4.25rem]",
+    belowWidth: "w-[108px]",
     middle: "h-[72px] w-[72px] shadow-[0_8px_24px_-6px_rgba(220,38,38,0.6)]",
     middleCount: "text-[21px]",
     middleLabel: "mt-0.5 text-[10px] text-white/80",
@@ -35,11 +36,19 @@ const SIZES = {
     outerCount: "text-2xl text-white",
     outerLabel: "mt-1 text-[11px] text-white/60",
     themLabelWidth: "max-w-[5rem]",
+    belowWidth: "w-32",
     middle: "h-[88px] w-[88px] shadow-[0_10px_30px_-8px_rgba(220,38,38,0.7)]",
     middleCount: "text-[26px]",
     middleLabel: "mt-[3px] text-[11px] text-white/80",
   },
 } as const;
+
+/**
+ * The longest username whose "only {name}" still fits inside its disc: on
+ * two lines, "only" and the name, at either size. A longer one is set
+ * beneath the disc instead, where it can wrap as far as it needs.
+ */
+const NAME_FITS_DISC = 12;
 
 /**
  * Titles finished in the period: only you, both of you, only them -- as the
@@ -53,75 +62,97 @@ export function CompareSplit({
   size?: keyof typeof SIZES;
 }) {
   const styles = SIZES[size];
+  const themLabel = `only ${peer.username}`;
+  const labelInDisc = peer.username.length <= NAME_FITS_DISC;
+  // Wrapped, never truncated: a box exactly as wide as its text, with
+  // overflow hidden, cut the last glyph's ink at DPR 2 (F5).
+  const themLabelClass = cn(
+    "leading-tight [overflow-wrap:anywhere]",
+    styles.outerLabel,
+  );
 
   return (
-    <div className="flex items-center justify-center">
-      <div
-        data-disc=""
-        className={cn(
-          "flex flex-none items-center justify-center rounded-full border",
-          styles.outer,
-          styles.you,
-        )}
-      >
-        <div className="text-center">
+    <div className="flex justify-center">
+      <div className="flex flex-col items-end">
+        <div className="flex items-center justify-center">
           <div
+            data-disc=""
             className={cn(
-              "leading-none font-bold tabular-nums",
-              styles.outerCount,
+              "flex flex-none items-center justify-center rounded-full border",
+              styles.outer,
+              styles.you,
             )}
           >
-            {formatCount(peer.onlyYou)}
+            <div className="text-center">
+              <div
+                className={cn(
+                  "leading-none font-bold tabular-nums",
+                  styles.outerCount,
+                )}
+              >
+                {formatCount(peer.onlyYou)}
+              </div>
+              <div className={cn("leading-none", styles.outerLabel)}>
+                only you
+              </div>
+            </div>
           </div>
-          <div className={cn("leading-none", styles.outerLabel)}>only you</div>
+          <div
+            data-disc=""
+            className={cn(
+              "relative z-10 flex flex-none items-center justify-center rounded-full bg-gradient-to-br from-red-600 to-orange-500",
+              styles.middle,
+            )}
+          >
+            <div className="text-center">
+              <div
+                className={cn(
+                  "leading-none font-bold text-white tabular-nums",
+                  styles.middleCount,
+                )}
+              >
+                {formatCount(peer.both)}
+              </div>
+              <div className={cn("leading-none", styles.middleLabel)}>both</div>
+            </div>
+          </div>
+          <div
+            data-disc=""
+            className={cn(
+              "flex flex-none items-center justify-center rounded-full border",
+              styles.outer,
+              styles.them,
+            )}
+          >
+            <div className="min-w-0 text-center">
+              <div
+                className={cn(
+                  "leading-none font-bold tabular-nums",
+                  styles.outerCount,
+                )}
+              >
+                {formatCount(peer.onlyThem)}
+              </div>
+              {labelInDisc ? (
+                <div className={cn(themLabelClass, styles.themLabelWidth)}>
+                  {themLabel}
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
-      </div>
-      <div
-        data-disc=""
-        className={cn(
-          "relative z-10 flex flex-none items-center justify-center rounded-full bg-gradient-to-br from-red-600 to-orange-500",
-          styles.middle,
+        {labelInDisc ? null : (
+          <div
+            className={cn(
+              "text-center",
+              themLabelClass,
+              styles.belowWidth,
+              "mt-2",
+            )}
+          >
+            {themLabel}
+          </div>
         )}
-      >
-        <div className="text-center">
-          <div
-            className={cn(
-              "leading-none font-bold text-white tabular-nums",
-              styles.middleCount,
-            )}
-          >
-            {formatCount(peer.both)}
-          </div>
-          <div className={cn("leading-none", styles.middleLabel)}>both</div>
-        </div>
-      </div>
-      <div
-        data-disc=""
-        className={cn(
-          "flex flex-none items-center justify-center rounded-full border",
-          styles.outer,
-          styles.them,
-        )}
-      >
-        <div className="min-w-0 text-center">
-          <div
-            className={cn(
-              "leading-none font-bold tabular-nums",
-              styles.outerCount,
-            )}
-          >
-            {formatCount(peer.onlyThem)}
-          </div>
-          <div
-            className={cn(
-              "truncate leading-none",
-              styles.outerLabel,
-              styles.themLabelWidth,
-            )}
-          >
-            only {peer.username}
-          </div>
-        </div>
       </div>
     </div>
   );

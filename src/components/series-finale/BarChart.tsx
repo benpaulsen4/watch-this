@@ -2,6 +2,11 @@ import { cn } from "@/lib/utils";
 
 interface Bar {
   label: string;
+  /**
+   * Shown below `sm` in place of `label`, where the bars are too narrow for
+   * it: twelve three-letter months would force a phone's page sideways.
+   */
+  narrowLabel?: string;
   value: number;
   highlight?: boolean;
 }
@@ -133,11 +138,18 @@ export function BarChart({
           <span
             key={index}
             className={cn(
-              "flex-1 text-center text-xs",
+              "min-w-0 flex-1 text-center text-xs",
               bar.highlight ? "font-semibold text-red-400" : "text-gray-500",
             )}
           >
-            {bar.label}
+            {bar.narrowLabel ? (
+              <>
+                <span className="sm:hidden">{bar.narrowLabel}</span>
+                <span className="hidden sm:inline">{bar.label}</span>
+              </>
+            ) : (
+              bar.label
+            )}
           </span>
         ))}
       </div>

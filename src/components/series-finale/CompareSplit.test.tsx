@@ -25,6 +25,41 @@ describe("CompareSplit", () => {
     expect(screen.getByText("only ana")).toBeInTheDocument();
   });
 
+  it("never clips the peer's label: it wraps instead of truncating", () => {
+    for (const size of ["default", "large"] as const) {
+      const { unmount } = render(<CompareSplit peer={peer} size={size} />);
+
+      const label = screen.getByText("only ana");
+      // `truncate` clipped the last glyph's ink at DPR 2 ("e2e_bo" read "e2e_bc").
+      expect(label).not.toHaveClass("truncate");
+      expect(label).not.toHaveClass("overflow-hidden");
+      expect(label).toHaveClass("[overflow-wrap:anywhere]");
+      unmount();
+    }
+  });
+
+  it("sets a name too long for its disc beneath the disc, whole", () => {
+    const username = "e2e_flo_watches_only_films_and_has_a_long_name";
+    for (const size of ["default", "large"] as const) {
+      const { unmount } = render(
+        <CompareSplit peer={{ ...peer, username }} size={size} />,
+      );
+
+      const label = screen.getByText(`only ${username}`);
+      expect(label.closest("[data-disc]")).toBeNull();
+      expect(label).toHaveClass("[overflow-wrap:anywhere]");
+      // The count stays in its disc.
+      expect(screen.getByText("28").closest("[data-disc]")).not.toBeNull();
+      unmount();
+    }
+  });
+
+  it("keeps a short name inside its disc", () => {
+    render(<CompareSplit peer={peer} />);
+
+    expect(screen.getByText("only ana").closest("[data-disc]")).not.toBeNull();
+  });
+
   it("draws the recap's discs by default", () => {
     render(<CompareSplit peer={peer} />);
 

@@ -15,8 +15,8 @@ type Payload = SeriesFinalePayload;
 
 /**
  * Episodes and films by month, the peak highlighted and named in the label.
- * The recap draws it with an axis and three-letter months (1e); the story
- * bare, with initials (1c).
+ * The recap draws it with an axis and three-letter months (1e), initials
+ * below `sm`; the story bare, with initials (1c).
  */
 export function MonthsChart({
   months,
@@ -42,6 +42,8 @@ export function MonthsChart({
           labels === "initial"
             ? monthInitial(month.month)
             : monthLabel(month.month),
+        narrowLabel:
+          labels === "initial" ? undefined : monthInitial(month.month),
         value: month.episodes,
         highlight: peak !== null && month.month === peak.month,
       }))}

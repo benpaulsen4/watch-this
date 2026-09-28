@@ -52,6 +52,32 @@ describe("SeriesFinaleBanner", () => {
     ).toHaveAttribute("href", "/series-finale/2026");
   });
 
+  it("leads with the year's figures and nothing more", async () => {
+    listResponse([item()]);
+    render(<SeriesFinaleBanner />, { wrapper });
+
+    expect(
+      await screen.findByText("1,208 episodes. 47 titles."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/A card at a time/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the CTA and Not now together: stacked full width on phones, side by side from md", async () => {
+    listResponse([item()]);
+    render(<SeriesFinaleBanner />, { wrapper });
+
+    const cta = await screen.findByRole("link", {
+      name: "See your Series Finale",
+    });
+    const notNow = screen.getByRole("button", { name: "Not now" });
+    const group = cta.parentElement;
+    expect(notNow.parentElement).toBe(group);
+    expect(group).toHaveClass("flex-col", "md:flex-row", "md:items-center");
+    for (const action of [cta, notNow]) {
+      expect(action).toHaveClass("w-full", "md:w-auto");
+    }
+  });
+
   it("renders nothing when the period is dismissed", async () => {
     listResponse([item({ dismissedAt: "2027-01-02T00:00:00.000Z" })]);
     const { container } = render(<SeriesFinaleBanner />, { wrapper });

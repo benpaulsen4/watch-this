@@ -85,7 +85,8 @@ export function SummaryCard({
             {summary.period.label}
           </span>
         </div>
-        <div className="mb-[22px] text-[26px] leading-tight font-bold tracking-[-0.03em] text-white">
+        {/* Underscores are no break opportunity, so a long name may break anywhere. */}
+        <div className="mb-[22px] text-[26px] leading-tight font-bold tracking-[-0.03em] [overflow-wrap:anywhere] text-white">
           {`${viewer.username}'s year`}
         </div>
         <dl className="grid grid-cols-2 gap-x-3.5 gap-y-[18px]">
@@ -132,7 +133,7 @@ export function SummaryCard({
         {unsaved ? (
           <>
             <p role="alert" className="text-xs text-red-400">
-              Could not save that you finished.
+              Could not save your progress. Try again.
             </p>
             <Button
               variant="ghost"

@@ -301,6 +301,42 @@ describe("ShareButton", () => {
     );
   });
 
+  it("hands the failure to a caller that shows it elsewhere, and shows no line itself", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500 }),
+    );
+    const onFailureChange = vi.fn();
+
+    render(
+      <ShareButton
+        period="2026"
+        username="ben"
+        onFailureChange={onFailureChange}
+      />,
+      { wrapper },
+    );
+    await clickShare();
+
+    await waitFor(() => expect(onFailureChange).toHaveBeenLastCalledWith(true));
+    expect(screen.queryByText(/could not be made/i)).not.toBeInTheDocument();
+
+    // A second press clears the failure while it tries again.
+    onFailureChange.mockClear();
+    await clickShare();
+    expect(onFailureChange).toHaveBeenCalledWith(false);
+  });
+
+  it("can fold down to its icon below sm, keeping its name", async () => {
+    mockCardFetch();
+    render(<ShareButton period="2026" username="ben" collapse />, { wrapper });
+
+    const button = screen.getByRole("button", { name: "Share" });
+    expect(screen.getByText("Share")).toHaveClass("sr-only", "sm:not-sr-only");
+    expect(button.querySelector("svg")).toHaveClass("sm:mr-2");
+    expect(button.querySelector("svg")).not.toHaveClass("mr-2");
+  });
+
   it("uses the given label and size, as the story summary card does", async () => {
     mockCardFetch();
     renderButton({ label: "Share your card", size: "lg" });

@@ -50,36 +50,43 @@ export function SeriesFinaleBanner() {
   return (
     <Card
       variant="entertainment"
-      className="mb-8 flex flex-col items-center gap-6 p-6 text-center sm:p-8 md:flex-row md:items-center md:justify-between md:text-left"
+      className="mb-8 flex flex-col gap-6 p-6 sm:p-8 md:flex-row md:items-center md:justify-between md:gap-10"
     >
-      <div>
-        <div className="flex items-center justify-center gap-2 text-xs font-semibold tracking-[0.16em] text-red-400 uppercase md:justify-start">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.16em] text-red-400 uppercase">
+          <Sparkles className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
           Your {label} Series Finale is ready
         </div>
         <p className="mt-3 text-2xl font-semibold text-gray-50 sm:text-3xl">
           {pluralise(headline.episodes, "episode")}.{" "}
           {pluralise(headline.titlesCompleted, "title")}.
         </p>
-        <p className="mt-2 text-sm text-gray-300">
-          A card at a time on your year.
-        </p>
       </div>
-      <div className="flex flex-none flex-col items-center gap-2.5 md:items-end">
-        <Button variant="entertainment" size="lg" asChild>
-          {/* The recap route; on a phone it hands on to the story. */}
-          <Link href={`/series-finale/${label}`}>See your Series Finale</Link>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => dismiss.mutate(label)}
-          disabled={dismiss.isPending}
-        >
-          Not now
-        </Button>
+      {/* One action group: stacked full width on a phone; from md, side by
+          side at the right, centred on the text beside it. */}
+      <div className="flex flex-none flex-col gap-2.5 md:items-end">
+        <div className="flex flex-col gap-2.5 md:flex-row md:items-center">
+          <Button
+            variant="entertainment"
+            size="lg"
+            className="w-full md:w-auto"
+            asChild
+          >
+            {/* The recap route; on a phone it hands on to the story. */}
+            <Link href={`/series-finale/${label}`}>See your Series Finale</Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="lg"
+            className="w-full md:w-auto md:px-5"
+            onClick={() => dismiss.mutate(label)}
+            disabled={dismiss.isPending}
+          >
+            Not now
+          </Button>
+        </div>
         {dismiss.isError ? (
-          <p role="alert" className="text-xs text-red-400">
+          <p role="alert" className="text-center text-xs text-red-400">
             Could not dismiss that. Try again.
           </p>
         ) : null}

@@ -142,6 +142,19 @@ describe("SummaryCard", () => {
     expect(screen.getByText("The Completionist")).toBeInTheDocument();
   });
 
+  it("wraps a long username inside the card rather than running out of it", () => {
+    const username = "e2e_flo_watches_only_films_and_has_a_long_name";
+    render(
+      <SummaryCard summary={payload} viewer={{ username, profilePictureUrl: "" }} />,
+      { wrapper },
+    );
+
+    // Underscores give no break opportunity, so the line may break anywhere.
+    expect(screen.getByText(`${username}'s year`)).toHaveClass(
+      "[overflow-wrap:anywhere]",
+    );
+  });
+
   it("offers to share the card", () => {
     render(
       <SummaryCard
@@ -231,7 +244,7 @@ describe("SummaryCard", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Could not save that you finished.",
+      "Could not save your progress. Try again.",
     );
     expect(
       screen.queryByRole("link", { name: "See the full recap" }),

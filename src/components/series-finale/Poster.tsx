@@ -5,15 +5,16 @@ import { getImageUrl } from "@/lib/tmdb/client";
 import { cn } from "@/lib/utils";
 
 /**
- * "default" fills the recap's panel column (1e); "large" is the story's
- * 190px poster with its drop shadow (1c).
+ * "default" fills the recap's panel column (1e) until `lg`, where it is held
+ * to 7rem so its card, beside Genres, is no taller than Genres; "large" is
+ * the story's 190px poster with its drop shadow (1c).
  */
 const SIZES = {
   default: {
-    frame: "rounded-[10px] bg-gray-800",
+    frame: "rounded-[10px] bg-gray-800 lg:w-28",
     placeholder: "rounded-[10px] border-gray-600",
     icon: "h-5 w-5 text-gray-500",
-    sizes: "(min-width: 1024px) 14rem, 45vw",
+    sizes: "(min-width: 1024px) 7rem, 45vw",
   },
   large: {
     frame:
