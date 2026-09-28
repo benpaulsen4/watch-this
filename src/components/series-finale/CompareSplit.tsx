@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 import { cn } from "@/lib/utils";
 
@@ -10,49 +12,45 @@ import { formatCount } from "./format";
 type Peer = SeriesFinalePayload["compare"][number];
 
 /**
- * Disc geometry and type per surface: "default" is the recap's panel (1e),
- * "large" the story's card (1c). Only the classes differ; the content and the
- * red / gradient / purple treatment are one implementation.
+ * Size and type per surface: "default" is the recap's panel (1e), "large" the
+ * story's card (1c). Both scale with their column up to `frame`; only the
+ * classes differ, and the content and the red / gradient / purple treatment
+ * are one implementation.
  */
 const SIZES = {
   default: {
-    outer: "h-[108px] w-[108px]",
-    you: "-mr-[34px] pr-9 border-red-600/45 bg-red-600/20",
-    them: "-ml-[34px] pl-9 border-purple-500/40 bg-purple-500/20",
-    outerCount: "text-[19px] text-gray-100",
-    outerLabel: "mt-1 text-[11px] text-gray-400",
-    themLabelWidth: "max-w-[4.25rem]",
-    belowWidth: "w-[108px]",
-    middle: "h-[72px] w-[72px] shadow-[0_8px_24px_-6px_rgba(220,38,38,0.6)]",
-    middleCount: "text-[21px]",
-    middleLabel: "mt-0.5 text-[10px] text-white/80",
+    frame: "max-w-[25rem]",
+    you: "fill-red-600/20 stroke-red-600/45",
+    them: "fill-purple-500/20 stroke-purple-500/40",
+    count: "text-[26px] sm:text-[30px]",
+    outerCount: "text-gray-100",
+    label: "mt-2 text-xs text-gray-400",
   },
   large: {
-    outer: "h-32 w-32",
-    // 128 + 88 + 128 - 2 * 48 = 248px, inside the 260px a 320px phone
-    // leaves between the story's 30px gutters.
-    you: "-mr-12 pr-12 border-red-400/45 bg-red-600/25",
-    them: "-ml-12 pl-12 border-purple-400/40 bg-purple-500/20",
-    outerCount: "text-2xl text-white",
-    outerLabel: "mt-1 text-[11px] text-white/60",
-    themLabelWidth: "max-w-[5rem]",
-    belowWidth: "w-32",
-    middle: "h-[88px] w-[88px] shadow-[0_10px_30px_-8px_rgba(220,38,38,0.7)]",
-    middleCount: "text-[26px]",
-    middleLabel: "mt-[3px] text-[11px] text-white/80",
+    frame: "max-w-[18rem]",
+    you: "fill-red-600/25 stroke-red-400/45",
+    them: "fill-purple-500/20 stroke-purple-400/40",
+    count: "text-[30px]",
+    outerCount: "text-white",
+    label: "mt-2.5 text-[13px] text-white/60",
   },
 } as const;
 
 /**
- * The longest username whose "only {name}" still fits inside its disc: on
- * two lines, "only" and the name, at either size. A longer one is set
- * beneath the disc instead, where it can wrap as far as it needs.
+ * Two discs of radius 100 in a 300 x 200 box, their centres one radius apart,
+ * so the left lune, the lens and the right lune are each a third of the width
+ * across the middle -- and each region's number sits at the centre of its
+ * third. The lens is the discs' intersection: an arc of each between the
+ * points where they cross, (150, 100 +/- 50 * sqrt 3).
  */
-const NAME_FITS_DISC = 12;
+const LENS = "M150 13.397A100 100 0 0 1 150 186.603A100 100 0 0 1 150 13.397Z";
 
 /**
- * Titles finished in the period: only you, both of you, only them -- as the
- * mock's three overlapping discs, with the shared middle on top.
+ * Titles finished in the period: only you, both of you, only them -- two
+ * overlapping discs with the shared lens in the brand gradient. Each number
+ * sits in its region and its label beneath the picture in the same third,
+ * wrapping as far as it needs: a name of any length is set whole, never cut
+ * (F5), and nothing depends on how wide its glyphs are.
  */
 export function CompareSplit({
   peer,
@@ -62,97 +60,88 @@ export function CompareSplit({
   size?: keyof typeof SIZES;
 }) {
   const styles = SIZES[size];
-  const themLabel = `only ${peer.username}`;
-  const labelInDisc = peer.username.length <= NAME_FITS_DISC;
-  // Wrapped, never truncated: a box exactly as wide as its text, with
-  // overflow hidden, cut the last glyph's ink at DPR 2 (F5).
-  const themLabelClass = cn(
-    "leading-tight [overflow-wrap:anywhere]",
-    styles.outerLabel,
-  );
+  // `useId`'s colons are not safe in a `url(#...)` reference.
+  const gradient = `compare-lens-${useId().replace(/[^\w-]/g, "")}`;
+  const regions = [
+    {
+      key: "you",
+      count: peer.onlyYou,
+      label: "only you",
+      tone: styles.outerCount,
+    },
+    { key: "both", count: peer.both, label: "both", tone: "text-white" },
+    {
+      key: "them",
+      count: peer.onlyThem,
+      label: `only ${peer.username}`,
+      tone: styles.outerCount,
+    },
+  ];
 
   return (
-    <div className="flex justify-center">
-      <div className="flex flex-col items-end">
-        <div className="flex items-center justify-center">
+    <div className={cn("relative mx-auto w-full", styles.frame)}>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 300 200"
+        className="absolute inset-x-0 top-0 aspect-[3/2] w-full overflow-visible"
+      >
+        <defs>
+          <linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1">
+            <stop
+              offset="0"
+              stopColor="currentColor"
+              className="text-red-600"
+            />
+            <stop
+              offset="1"
+              stopColor="currentColor"
+              className="text-orange-500"
+            />
+          </linearGradient>
+        </defs>
+        <circle
+          cx="100"
+          cy="100"
+          r="100"
+          vectorEffect="non-scaling-stroke"
+          className={styles.you}
+        />
+        <circle
+          cx="200"
+          cy="100"
+          r="100"
+          vectorEffect="non-scaling-stroke"
+          className={styles.them}
+        />
+        <path d={LENS} fill={`url(#${gradient})`} />
+      </svg>
+      <div className="relative grid grid-cols-3">
+        {regions.map((region) => (
           <div
-            data-disc=""
-            className={cn(
-              "flex flex-none items-center justify-center rounded-full border",
-              styles.outer,
-              styles.you,
-            )}
+            key={region.key}
+            data-region=""
+            className="flex min-w-0 flex-col items-center text-center"
           >
-            <div className="text-center">
-              <div
-                className={cn(
-                  "leading-none font-bold tabular-nums",
-                  styles.outerCount,
-                )}
-              >
-                {formatCount(peer.onlyYou)}
-              </div>
-              <div className={cn("leading-none", styles.outerLabel)}>
-                only you
-              </div>
+            {/* A third of the width, the full height: its region's middle. */}
+            <div
+              className={cn(
+                "flex aspect-[1/2] w-full items-center justify-center leading-none font-bold tabular-nums",
+                styles.count,
+                region.tone,
+              )}
+            >
+              {formatCount(region.count)}
+            </div>
+            <div
+              className={cn(
+                "w-full px-1 leading-tight [overflow-wrap:anywhere]",
+                styles.label,
+              )}
+            >
+              {region.label}
             </div>
           </div>
-          <div
-            data-disc=""
-            className={cn(
-              "relative z-10 flex flex-none items-center justify-center rounded-full bg-gradient-to-br from-red-600 to-orange-500",
-              styles.middle,
-            )}
-          >
-            <div className="text-center">
-              <div
-                className={cn(
-                  "leading-none font-bold text-white tabular-nums",
-                  styles.middleCount,
-                )}
-              >
-                {formatCount(peer.both)}
-              </div>
-              <div className={cn("leading-none", styles.middleLabel)}>both</div>
-            </div>
-          </div>
-          <div
-            data-disc=""
-            className={cn(
-              "flex flex-none items-center justify-center rounded-full border",
-              styles.outer,
-              styles.them,
-            )}
-          >
-            <div className="min-w-0 text-center">
-              <div
-                className={cn(
-                  "leading-none font-bold tabular-nums",
-                  styles.outerCount,
-                )}
-              >
-                {formatCount(peer.onlyThem)}
-              </div>
-              {labelInDisc ? (
-                <div className={cn(themLabelClass, styles.themLabelWidth)}>
-                  {themLabel}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-        {labelInDisc ? null : (
-          <div
-            className={cn(
-              "text-center",
-              themLabelClass,
-              styles.belowWidth,
-              "mt-2",
-            )}
-          >
-            {themLabel}
-          </div>
-        )}
+        ))}
       </div>
     </div>
   );

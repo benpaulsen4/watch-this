@@ -338,6 +338,7 @@ export function StoryCard({
             <BigDayTimeline
               bigDay={bigDay}
               soloTickTotal={payload.soloTickTotal}
+              timeZone={payload.period.timezone}
               size="large"
             />
           </Enter>

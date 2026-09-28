@@ -23,6 +23,7 @@ import type {
 import { cn } from "@/lib/utils";
 
 import { BigDayTimeline } from "./BigDayTimeline";
+import { ComparePeerPicker, useComparePeer } from "./ComparePeerPicker";
 import { CompareFacts, CompareSplit } from "./CompareSplit";
 import { CrewRanking } from "./CrewRanking";
 import { FilmGrain } from "./FilmGrain";
@@ -241,8 +242,6 @@ function RecapBody({
   const { topShow, niche, bigDay, shame } = payload;
   const { titlesDropped } = payload.headline;
   const hasShame = titlesDropped > 0 || shame.stillPlanning.length > 0;
-  // `compare` arrives ordered by titles in common, so this is the closest peer.
-  const [peer] = payload.compare;
 
   return (
     <>
@@ -270,6 +269,7 @@ function RecapBody({
             <BigDayPanel
               bigDay={bigDay}
               soloTickTotal={payload.soloTickTotal}
+              timeZone={payload.period.timezone}
             />
           ) : null}
           {hasShame ? (
@@ -292,7 +292,9 @@ function RecapBody({
               />
             </Panel>
           ) : null}
-          {peer ? <ComparePanel peer={peer} /> : null}
+          {payload.compare.length > 0 ? (
+            <ComparePanel compare={payload.compare} />
+          ) : null}
         </Band>
         <Footer />
       </Container>
@@ -568,13 +570,19 @@ function TopTitlesPanel({
 function BigDayPanel({
   bigDay,
   soloTickTotal,
+  timeZone,
 }: {
   bigDay: NonNullable<SeriesFinalePayload["bigDay"]>;
   soloTickTotal: number;
+  timeZone: string;
 }) {
   return (
     <Panel title="Biggest day" intro={bigDayLine(bigDay)}>
-      <BigDayTimeline bigDay={bigDay} soloTickTotal={soloTickTotal} />
+      <BigDayTimeline
+        bigDay={bigDay}
+        soloTickTotal={soloTickTotal}
+        timeZone={timeZone}
+      />
     </Panel>
   );
 }
@@ -615,17 +623,30 @@ function ShamePanel({
   );
 }
 
-/** One peer's comparison; the page passes the one it overlaps with most. */
+/**
+ * One peer's comparison at a time, the closest first (`compare` arrives
+ * ordered by titles in common); the others can be swapped in, as on the
+ * story's card.
+ */
 function ComparePanel({
-  peer,
+  compare,
 }: {
-  peer: SeriesFinalePayload["compare"][number];
+  compare: SeriesFinalePayload["compare"];
 }) {
+  const [peer, setPeer] = useComparePeer(compare);
+  if (!peer) return null;
+
   return (
     <Panel title={`You & ${peer.username}`} intro={overlapLine(peer)}>
       <CompareSplit peer={peer} />
       <div className="mt-auto pt-5">
         <CompareFacts peer={peer} />
+        <ComparePeerPicker
+          peers={compare}
+          selected={peer.userId}
+          onSelect={setPeer}
+          className="mt-4"
+        />
       </div>
     </Panel>
   );

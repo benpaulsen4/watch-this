@@ -948,7 +948,7 @@ describe("RecapClient", () => {
     ).toBeInTheDocument();
   });
 
-  it("spreads the biggest day's solo ticks from first to last", async () => {
+  it("puts the biggest day's solo ticks on the snapshot zone's clock", async () => {
     mockFetch({
       payload: payload({
         bigDay: {
@@ -970,10 +970,13 @@ describe("RecapClient", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "3 of these were ticked one at a time, 9h 40m from first to last.",
+          "First at 10:00, last at 19:40 · 3 episodes ticked one at a time",
         ),
       ).toBeInTheDocument(),
     );
+    expect(
+      screen.getByRole("img", { name: "14:50 · The Bear S2E02" }),
+    ).toHaveAttribute("title", "14:50 · The Bear S2E02");
     expect(
       screen.queryByText(/too few to put on a clock/),
     ).not.toBeInTheDocument();
@@ -1036,7 +1039,7 @@ describe("RecapClient", () => {
     expect(screen.queryByText(/finished, you dropped/)).not.toBeInTheDocument();
   });
 
-  it("compares with the closest peer only, and states the facts it has", async () => {
+  it("compares with the closest peer first, and states the facts it has", async () => {
     mockFetch({
       payload: payload({
         compare: [
@@ -1068,6 +1071,87 @@ describe("RecapClient", () => {
     );
     expect(screen.queryByText("You & marcus")).not.toBeInTheDocument();
     expect(screen.queryByText(/On both lists/)).not.toBeInTheDocument();
+  });
+
+  it("swaps another peer into the comparison", async () => {
+    mockFetch({
+      payload: payload({
+        compare: [
+          {
+            userId: "u1",
+            username: "ana",
+            onlyYou: 62,
+            both: 34,
+            onlyThem: 28,
+            theyFinishedYouDropped: "Foundation",
+            bothPlanningNeitherStarted: null,
+          },
+          {
+            userId: "u2",
+            username: "marcus",
+            onlyYou: 90,
+            both: 6,
+            onlyThem: 12,
+            theyFinishedYouDropped: null,
+            bothPlanningNeitherStarted: "Dune: Part Two",
+          },
+        ],
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("You & ana")).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: "ana" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "marcus" }));
+
+    expect(screen.getByText("You & marcus")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "marcus" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "ana" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    // The Venn, the overlap line and both fact rows follow the swap.
+    expect(screen.getByText("only marcus")).toBeInTheDocument();
+    expect(screen.queryByText("only ana")).not.toBeInTheDocument();
+    expect(screen.getByText("90")).toBeInTheDocument();
+    expect(
+      screen.getByText("6 titles in common out of 108. A 6% overlap."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/finished, you dropped/)).not.toBeInTheDocument();
+    expect(screen.getByText("Dune: Part Two")).toBeInTheDocument();
+  });
+
+  it("offers no swap with a single peer", async () => {
+    mockFetch({
+      payload: payload({
+        compare: [
+          {
+            userId: "u1",
+            username: "ana",
+            onlyYou: 62,
+            both: 34,
+            onlyThem: 28,
+            theyFinishedYouDropped: null,
+            bothPlanningNeitherStarted: null,
+          },
+        ],
+      }),
+    });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText("You & ana")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Swap in")).not.toBeInTheDocument();
   });
 
   it("omits the comparison when there is nobody to compare with", async () => {

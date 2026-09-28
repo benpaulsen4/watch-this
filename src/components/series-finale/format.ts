@@ -13,6 +13,7 @@ import {
   THIN_YEAR_EPISODES,
   THIN_YEAR_TITLES,
 } from "@/lib/series-finale/types";
+import { resolveTimeZone } from "@/lib/time";
 
 import { ARCHETYPE_LABELS } from "./ARCHETYPE_LABELS";
 
@@ -619,37 +620,68 @@ export function topShowStats(
     .join(" · ");
 }
 
+/** One `Intl` clock per zone: building a formatter costs far more than using one. */
+const clockFormatters = new Map<string, Intl.DateTimeFormat>();
+
 /**
- * Where each of the biggest day's solo ticks falls between the first and the
- * last, as 0-100, and the minutes between them. Elapsed time is the same in
- * every zone, so this needs no clock -- the timeline's instants carry none.
- * Null when the ticks span no time at all: one tick, or a batch sharing one
- * instant, is not a session.
+ * "13:05": `at` on a 24-hour clock in `timeZone`, the snapshot's zone
+ * (`period.timezone`), never the browser's -- a recap opened abroad keeps the
+ * hours its episodes were watched at. A zone `Intl` does not know reads as
+ * UTC, as everywhere else. Null for an instant that does not parse.
  */
-export function timelineSpread(
-  ats: string[],
-): { offsets: number[]; minutes: number } | null {
-  const times = ats
-    .map((at) => new Date(at).getTime())
-    .filter((time) => !Number.isNaN(time));
-  if (times.length < 2) return null;
+export function clockTime(at: string, timeZone: string): string | null {
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return null;
 
-  const first = Math.min(...times);
-  const span = Math.max(...times) - first;
-  if (span <= 0) return null;
-
-  return {
-    offsets: times.map((time) => Math.round(((time - first) / span) * 100)),
-    minutes: Math.round(span / 60_000),
-  };
+  const zone = resolveTimeZone(timeZone);
+  let formatter = clockFormatters.get(zone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-GB", {
+      timeZone: zone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    clockFormatters.set(zone, formatter);
+  }
+  return formatter.format(date);
 }
 
-/** "8 of these were ticked one at a time, 9h 40m from first to last." */
-export function timelineLine(soloTicks: number, minutes: number): string {
-  const ticked = `${formatCount(soloTicks)} of these ${soloTicks === 1 ? "was" : "were"} ticked one at a time`;
-  return minutes > 0
-    ? `${ticked}, ${formatHoursMinutes(minutes)} from first to last.`
-    : `${ticked}.`;
+type TimelinePoint = NonNullable<
+  NonNullable<Payload["bigDay"]>["timeline"]
+>[number];
+
+/**
+ * "13:05 · The Bear S2E03": one solo tick, as its point's accessible name and
+ * hover title. A show with no cached title is its episode code alone
+ * ("13:05 · S2E03"), never a made-up name. Null when `at` does not parse.
+ */
+export function timelinePointLabel(
+  point: TimelinePoint,
+  timeZone: string,
+): string | null {
+  const time = clockTime(point.at, timeZone);
+  if (time === null) return null;
+  const episode = point.title
+    ? `${point.title} ${point.episode}`
+    : point.episode;
+  return `${time} · ${episode}`;
+}
+
+/**
+ * "First at 13:05, last at 23:35 · 14 episodes ticked one at a time", under
+ * the biggest day's axis. `soloTicks` is the day's `soloTickCount`. Ticks
+ * that all share one minute are "All at 13:05", not a span from a time to
+ * itself.
+ */
+export function timelineSummary(
+  first: string,
+  last: string,
+  soloTicks: number,
+): string {
+  const when =
+    first === last ? `All at ${first}` : `First at ${first}, last at ${last}`;
+  return `${when} · ${pluralise(soloTicks, "episode")} ticked one at a time`;
 }
 
 /** When a non-null timeline still holds too few points to place on a line. */

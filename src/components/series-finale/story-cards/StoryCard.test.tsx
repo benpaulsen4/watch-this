@@ -307,6 +307,37 @@ describe("StoryCard", () => {
     expect(container.textContent).not.toMatch(/\d{1,2}:\d{2}|food/);
   });
 
+  it("puts the biggest day's episodes on the snapshot zone's clock", () => {
+    renderCard("bigDay", {
+      period: { ...payload().period, timezone: "Europe/Berlin" },
+      soloTickTotal: 120,
+      bigDay: {
+        date: "2026-03-14",
+        episodes: 11,
+        minutes: 500,
+        timeline: [
+          { at: "2026-03-14T12:05:00.000Z", title: "The Bear", episode: "S2E01" },
+          { at: "2026-03-14T17:20:00.000Z", title: null, episode: "S2E02" },
+          { at: "2026-03-14T22:35:00.000Z", title: "The Bear", episode: "S2E03" },
+        ],
+        soloTickCount: 3,
+        streak: null,
+      },
+    });
+
+    expect(
+      screen.getByRole("img", { name: "13:05 · The Bear S2E01" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "18:20 · S2E02" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "First at 13:05, last at 23:35 · 3 episodes ticked one at a time",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("names the watching type and says what rhythm measures", () => {
     renderCard("rhythm", {
       rhythm: {
@@ -469,13 +500,25 @@ describe("StoryCard", () => {
       screen.queryByText(/She|He finished|joint streak/),
     ).not.toBeInTheDocument();
 
+    expect(screen.getByRole("button", { name: "ana" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
     await userEvent.click(screen.getByRole("button", { name: "marcus" }));
 
     expect(screen.getByText("You & marcus")).toBeInTheDocument();
     expect(
       screen.getByText("A shared list, and almost no shared taste"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "ana" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "marcus" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "ana" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("renders the summary card", () => {

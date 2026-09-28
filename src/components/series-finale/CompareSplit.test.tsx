@@ -13,6 +13,19 @@ const peer = {
   bothPlanningNeitherStarted: null,
 };
 
+/** Every element from `element` up to (not including) `root`. */
+const ancestors = (element: HTMLElement, root: HTMLElement) => {
+  const chain: HTMLElement[] = [];
+  for (
+    let node: HTMLElement | null = element;
+    node && node !== root;
+    node = node.parentElement
+  ) {
+    chain.push(node);
+  }
+  return chain;
+};
+
 describe("CompareSplit", () => {
   it("shows what only you, both, and only they finished", () => {
     render(<CompareSplit peer={peer} />);
@@ -25,60 +38,72 @@ describe("CompareSplit", () => {
     expect(screen.getByText("only ana")).toBeInTheDocument();
   });
 
-  it("never clips the peer's label: it wraps instead of truncating", () => {
-    for (const size of ["default", "large"] as const) {
-      const { unmount } = render(<CompareSplit peer={peer} size={size} />);
+  it("sets each label under its own number, one region per third", () => {
+    const { container } = render(<CompareSplit peer={peer} />);
 
-      const label = screen.getByText("only ana");
-      // `truncate` clipped the last glyph's ink at DPR 2 ("e2e_bo" read "e2e_bc").
-      expect(label).not.toHaveClass("truncate");
-      expect(label).not.toHaveClass("overflow-hidden");
-      expect(label).toHaveClass("[overflow-wrap:anywhere]");
-      unmount();
-    }
-  });
-
-  it("sets a name too long for its disc beneath the disc, whole", () => {
-    const username = "e2e_flo_watches_only_films_and_has_a_long_name";
-    for (const size of ["default", "large"] as const) {
-      const { unmount } = render(
-        <CompareSplit peer={{ ...peer, username }} size={size} />,
+    const regions = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-region]"),
+    );
+    expect(regions.map((region) => region.textContent)).toEqual([
+      "62only you",
+      "34both",
+      "28only ana",
+    ]);
+    // Three equal columns: the left lune, the lens and the right lune.
+    expect(regions[0]!.parentElement).toHaveClass("grid-cols-3");
+    for (const [count, label] of [
+      ["62", "only you"],
+      ["34", "both"],
+      ["28", "only ana"],
+    ] as const) {
+      // The number directly above its label, as the e2e reads it.
+      expect(screen.getByText(label).previousElementSibling).toHaveTextContent(
+        count,
       );
-
-      const label = screen.getByText(`only ${username}`);
-      expect(label.closest("[data-disc]")).toBeNull();
-      expect(label).toHaveClass("[overflow-wrap:anywhere]");
-      // The count stays in its disc.
-      expect(screen.getByText("28").closest("[data-disc]")).not.toBeNull();
-      unmount();
     }
   });
 
-  it("keeps a short name inside its disc", () => {
-    render(<CompareSplit peer={peer} />);
+  it("never clips the peer's label, however long: it wraps", () => {
+    const username = "e2e_flo_watches_only_films_and_has_a_long_name_WWWW";
+    for (const size of ["default", "large"] as const) {
+      for (const name of ["ana", username]) {
+        const { container, unmount } = render(
+          <CompareSplit peer={{ ...peer, username: name }} size={size} />,
+        );
 
-    expect(screen.getByText("only ana").closest("[data-disc]")).not.toBeNull();
+        const label = screen.getByText(`only ${name}`);
+        expect(label).toHaveClass("[overflow-wrap:anywhere]");
+        // `truncate` clipped the last glyph's ink at DPR 2 ("e2e_bo" read
+        // "e2e_bc"); nothing between the label and the page may cut it.
+        for (const element of ancestors(label, container)) {
+          expect(element).not.toHaveClass("truncate");
+          expect(element).not.toHaveClass("overflow-hidden");
+        }
+        // A long name is placed exactly as a short one: no length rule.
+        expect(label.closest("[data-region]")).toHaveTextContent(
+          `28only ${name}`,
+        );
+        unmount();
+      }
+    }
   });
 
-  it("draws the recap's discs by default", () => {
-    render(<CompareSplit peer={peer} />);
+  it("draws the discs as a picture the page reads as numbers", () => {
+    const { container } = render(<CompareSplit peer={peer} />);
 
-    expect(screen.getByText("62").closest("[data-disc]")).toHaveClass(
-      "h-[108px]",
-    );
-    expect(screen.getByText("34").closest("[data-disc]")).toHaveClass(
-      "h-[72px]",
-    );
+    const svg = container.querySelector("svg");
+    expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(svg?.querySelectorAll("circle")).toHaveLength(2);
+    expect(svg?.querySelector("path")).not.toBeNull();
   });
 
-  it("draws the story's larger discs when asked", () => {
-    render(<CompareSplit peer={peer} size="large" />);
+  it("draws the recap's size by default and the story's when asked", () => {
+    const { container, unmount } = render(<CompareSplit peer={peer} />);
+    expect(container.firstElementChild).toHaveClass("max-w-[25rem]");
+    unmount();
 
-    expect(screen.getByText("62").closest("[data-disc]")).toHaveClass("h-32");
-    expect(screen.getByText("34").closest("[data-disc]")).toHaveClass(
-      "h-[88px]",
-    );
-    expect(screen.getByText("28").closest("[data-disc]")).toHaveClass("h-32");
+    const large = render(<CompareSplit peer={peer} size="large" />);
+    expect(large.container.firstElementChild).toHaveClass("max-w-[18rem]");
   });
 });
 

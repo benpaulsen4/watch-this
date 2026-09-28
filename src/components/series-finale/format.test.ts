@@ -8,6 +8,7 @@ import {
   archetypeName,
   bigDayLine,
   bigDaySentence,
+  clockTime,
   compareHeadline,
   crewHeadline,
   dateKeyWeekday,
@@ -44,8 +45,8 @@ import {
   streakLabel,
   streakLine,
   TIMELINE_TOO_FEW,
-  timelineLine,
-  timelineSpread,
+  timelinePointLabel,
+  timelineSummary,
   topShowStats,
   unknownRuntimeNote,
   weekdayInitial,
@@ -612,31 +613,63 @@ describe("alsoTopForLine", () => {
   });
 });
 
-describe("timelineSpread", () => {
-  it("places each solo tick along the span from first to last", () => {
-    expect(
-      timelineSpread([
-        "2026-03-14T10:00:00.000Z",
-        "2026-03-14T14:50:00.000Z",
-        "2026-03-14T19:40:00.000Z",
-      ]),
-    ).toEqual({ offsets: [0, 50, 100], minutes: 580 });
+describe("clockTime", () => {
+  it("reads an instant on a 24-hour clock in the snapshot's zone", () => {
+    expect(clockTime("2026-03-14T13:05:00.000Z", "UTC")).toBe("13:05");
+    expect(clockTime("2026-03-14T13:05:00.000Z", "Europe/Berlin")).toBe(
+      "14:05",
+    );
+    expect(clockTime("2026-03-14T13:05:00.000Z", "Asia/Kolkata")).toBe("18:35");
+    expect(clockTime("2026-03-14T23:30:00.000Z", "Europe/London")).toBe(
+      "23:30",
+    );
+    expect(clockTime("2026-03-15T00:00:00.000Z", "UTC")).toBe("00:00");
   });
 
-  it("returns null when the ticks do not span any time", () => {
-    expect(timelineSpread(["2026-03-14T10:00:00.000Z"])).toBeNull();
-    expect(
-      timelineSpread(["2026-03-14T10:00:00.000Z", "2026-03-14T10:00:00.000Z"]),
-    ).toBeNull();
+  it("falls back to UTC for a zone Intl does not know", () => {
+    expect(clockTime("2026-03-14T13:05:00.000Z", "Not/AZone")).toBe("13:05");
+  });
+
+  it("has no time for an instant that does not parse", () => {
+    expect(clockTime("not a date", "UTC")).toBeNull();
   });
 });
 
-describe("timelineLine", () => {
-  it("states how the solo ticks spread across the day", () => {
-    expect(timelineLine(8, 580)).toBe(
-      "8 of these were ticked one at a time, 9h 40m from first to last.",
+describe("timelinePointLabel", () => {
+  it("names the time, the show and the episode", () => {
+    expect(
+      timelinePointLabel(
+        {
+          at: "2026-03-14T13:05:00.000Z",
+          title: "The Bear",
+          episode: "S2E03",
+        },
+        "UTC",
+      ),
+    ).toBe("13:05 · The Bear S2E03");
+  });
+
+  it("gives the time and episode alone when the show has no title", () => {
+    expect(
+      timelinePointLabel(
+        { at: "2026-03-14T13:05:00.000Z", title: null, episode: "S2E03" },
+        "UTC",
+      ),
+    ).toBe("13:05 · S2E03");
+  });
+});
+
+describe("timelineSummary", () => {
+  it("states the first and last times and the solo ticks", () => {
+    expect(timelineSummary("13:05", "23:35", 14)).toBe(
+      "First at 13:05, last at 23:35 · 14 episodes ticked one at a time",
     );
-    expect(timelineLine(1, 0)).toBe("1 of these was ticked one at a time.");
+  });
+
+  it("does not invent a span when every tick shares a minute", () => {
+    expect(timelineSummary("13:05", "13:05", 3)).toBe(
+      "All at 13:05 · 3 episodes ticked one at a time",
+    );
   });
 });
 
@@ -708,9 +741,7 @@ describe("episodesPerDayLine", () => {
   });
 
   it("turns a rate under one a day into a gap between episodes", () => {
-    expect(episodesPerDayLine(0.3)).toBe(
-      "About one every 3 days, on average.",
-    );
+    expect(episodesPerDayLine(0.3)).toBe("About one every 3 days, on average.");
   });
 
   it("says one a day when the gap rounds to a day", () => {
@@ -737,9 +768,9 @@ describe("topShowStats", () => {
   });
 
   it("leaves out an unknown runtime or date", () => {
-    expect(
-      topShowStats({ episodes: 1, minutes: 0, finishedAt: null }),
-    ).toBe("1 episode");
+    expect(topShowStats({ episodes: 1, minutes: 0, finishedAt: null })).toBe(
+      "1 episode",
+    );
     expect(
       topShowStats({ episodes: 1, minutes: 0, finishedAt: "nonsense" }),
     ).toBe("1 episode");
@@ -820,31 +851,33 @@ describe("monthsHeadline", () => {
     counts.map((episodes, index) => ({ month: index + 1, episodes }));
 
   it("names the peak and the quietest month when the gap is at least fourfold", () => {
-    expect(monthsHeadline(months([90, 60, 174, 80, 40, 20, 29, 30, 60, 70, 80, 90]))).toBe(
-      "March happened. June, not so much.",
-    );
+    expect(
+      monthsHeadline(months([90, 60, 174, 80, 40, 20, 29, 30, 60, 70, 80, 90])),
+    ).toBe("March happened. June, not so much.");
   });
 
   it("names an empty month outright", () => {
-    expect(monthsHeadline(months([90, 60, 174, 80, 40, 20, 0, 30, 60, 70, 80, 90]))).toBe(
-      "March happened. July did not.",
-    );
+    expect(
+      monthsHeadline(months([90, 60, 174, 80, 40, 20, 0, 30, 60, 70, 80, 90])),
+    ).toBe("March happened. July did not.");
   });
 
   it("counts several empty months", () => {
-    expect(monthsHeadline(months([0, 0, 174, 80, 40, 20, 0, 30, 60, 70, 80, 0]))).toBe(
-      "March happened. Four months did not.",
-    );
+    expect(
+      monthsHeadline(months([0, 0, 174, 80, 40, 20, 0, 30, 60, 70, 80, 0])),
+    ).toBe("March happened. Four months did not.");
   });
 
   it("calls an even year steady", () => {
-    expect(monthsHeadline(months([90, 60, 100, 80, 40, 50, 29, 30, 60, 70, 80, 90]))).toBe(
-      "A steady year, peaking in March.",
-    );
+    expect(
+      monthsHeadline(months([90, 60, 100, 80, 40, 50, 29, 30, 60, 70, 80, 90])),
+    ).toBe("A steady year, peaking in March.");
   });
 
   it("has nothing to say about an empty year", () => {
-    expect(monthsHeadline(months(Array.from({ length: 12 }, () => 0)))).toBeNull();
+    expect(
+      monthsHeadline(months(Array.from({ length: 12 }, () => 0))),
+    ).toBeNull();
   });
 });
 
@@ -871,12 +904,12 @@ describe("bigDaySentence", () => {
 
 describe("streakLine", () => {
   it("dates the longest streak", () => {
-    expect(streakLine({ days: 23, start: "2026-01-02", end: "2026-01-24" })).toBe(
-      "Longest streak: 23 days, 2–24 Jan",
-    );
-    expect(streakLine({ days: 1, start: "2026-01-02", end: "2026-01-02" })).toBe(
-      "Longest streak: 1 day, 2 Jan",
-    );
+    expect(
+      streakLine({ days: 23, start: "2026-01-02", end: "2026-01-24" }),
+    ).toBe("Longest streak: 23 days, 2–24 Jan");
+    expect(
+      streakLine({ days: 1, start: "2026-01-02", end: "2026-01-02" }),
+    ).toBe("Longest streak: 1 day, 2 Jan");
   });
 });
 
@@ -921,7 +954,8 @@ describe("andMore", () => {
 });
 
 describe("crewHeadline", () => {
-  const crew = (...episodes: number[]) => episodes.map((count) => ({ episodes: count }));
+  const crew = (...episodes: number[]) =>
+    episodes.map((count) => ({ episodes: count }));
 
   it("counts everyone the viewer out-watched, by episodes", () => {
     expect(crewHeadline(1208, crew(1041, 760, 512, 88))).toBe(
