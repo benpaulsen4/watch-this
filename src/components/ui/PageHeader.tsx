@@ -36,7 +36,10 @@ export function PageHeader({
             )}
             <div className="flex min-w-0 flex-col gap-1">
               {title ? (
-                <h1 className="truncate text-xl font-bold text-gray-100">
+                <h1
+                  title={title}
+                  className="truncate text-xl font-bold text-gray-100"
+                >
                   {title}
                 </h1>
               ) : (

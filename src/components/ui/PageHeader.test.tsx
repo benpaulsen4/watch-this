@@ -49,6 +49,8 @@ describe("PageHeader", () => {
     const title = screen.getByRole("heading", { name: "Series Finale 2025" });
     // Truncates rather than wrapping out of the fixed-height bar (F2).
     expect(title).toHaveClass("truncate");
+    // A truncated title is still whole on hover.
+    expect(title).toHaveAttribute("title", "Series Finale 2025");
     for (let el = title.parentElement; el && el.tagName !== "HEADER"; el = el.parentElement) {
       if (el.classList.contains("h-16")) break;
       expect(el).toHaveClass("min-w-0");
