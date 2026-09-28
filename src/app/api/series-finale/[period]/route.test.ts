@@ -10,9 +10,12 @@ vi.mock("@/lib/auth/webauthn", () => ({
 }));
 
 const getOrGenerateSnapshot = vi.fn();
+const loadStoryCompletedAt = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/series-finale/service", () => ({
   getOrGenerateSnapshot: (...args: unknown[]) =>
     getOrGenerateSnapshot(...args),
+  loadStoryCompletedAt: (...args: unknown[]) =>
+    loadStoryCompletedAt(...args),
 }));
 
 const { GET } = await import("./route");
@@ -56,9 +59,10 @@ describe("GET /api/series-finale/[period]", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
-  it("returns the payload the service resolves", async () => {
+  it("returns the payload the service resolves, with storyCompletedAt null when the story hasn't been finished", async () => {
     const payload = { headline: { minutes: 500 } };
     getOrGenerateSnapshot.mockResolvedValue(payload);
+    loadStoryCompletedAt.mockResolvedValue(null);
 
     const response = await GET(
       authedRequest("http://localhost/api/series-finale/2025"),
@@ -69,7 +73,38 @@ describe("GET /api/series-finale/[period]", () => {
       "user-1",
       expect.objectContaining({ label: "2025" }),
     );
-    await expect(response.json()).resolves.toEqual({ payload });
+    await expect(response.json()).resolves.toEqual({
+      payload,
+      storyCompletedAt: null,
+    });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+
+  it("carries storyCompletedAt beside the payload, not folded into it", async () => {
+    const payload = { headline: { minutes: 500 } };
+    const completedAt = new Date("2026-01-03T00:00:00Z");
+    getOrGenerateSnapshot.mockResolvedValue(payload);
+    loadStoryCompletedAt.mockResolvedValue(completedAt);
+
+    const response = await GET(
+      authedRequest("http://localhost/api/series-finale/2025"),
+    );
+
+    expect(loadStoryCompletedAt).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ label: "2025" }),
+    );
+    await expect(response.json()).resolves.toEqual({
+      payload,
+      storyCompletedAt: completedAt.toISOString(),
+    });
+  });
+
+  it("does not look up story completion when the period is unavailable", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(null);
+
+    await GET(authedRequest("http://localhost/api/series-finale/2025"));
+
+    expect(loadStoryCompletedAt).not.toHaveBeenCalled();
   });
 });

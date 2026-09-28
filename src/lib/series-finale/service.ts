@@ -966,6 +966,32 @@ export async function getOrGenerateSnapshot(
 }
 
 /**
+ * Row metadata for one snapshot's story-completion state, read the same way
+ * `listSnapshots` reads `dismissedAt`: a plain column, never folded into the
+ * frozen jsonb payload. Null covers both "not completed yet" and "no such
+ * row" -- callers that already know the row exists (the payload route, after
+ * `getOrGenerateSnapshot` returned non-null) don't need to tell those apart.
+ */
+export async function loadStoryCompletedAt(
+  userId: string,
+  period: Period,
+): Promise<Date | null> {
+  const [row] = await db
+    .select({ storyCompletedAt: seriesFinale.storyCompletedAt })
+    .from(seriesFinale)
+    .where(
+      and(
+        eq(seriesFinale.userId, userId),
+        eq(seriesFinale.periodStart, period.start),
+        eq(seriesFinale.periodEnd, period.end),
+      ),
+    )
+    .limit(1);
+
+  return row?.storyCompletedAt ?? null;
+}
+
+/**
  * Remove, from a frozen payload, every collaborator who has since withdrawn
  * from crew comparisons or no longer exists, and show the ones who remain
  * under their CURRENT usernames.
@@ -1151,6 +1177,7 @@ export async function listSnapshots(userId: string): Promise<
     label: string;
     generatedAt: Date;
     dismissedAt: Date | null;
+    storyCompletedAt: Date | null;
     headline: SeriesFinalePayload["headline"];
   }[]
 > {
@@ -1159,6 +1186,7 @@ export async function listSnapshots(userId: string): Promise<
       periodLabel: seriesFinale.periodLabel,
       generatedAt: seriesFinale.generatedAt,
       dismissedAt: seriesFinale.dismissedAt,
+      storyCompletedAt: seriesFinale.storyCompletedAt,
       // Decoded like the jsonb column itself, whichever form the driver hands
       // back.
       headline: sql`${seriesFinale.payload}->'headline'`.mapWith(
@@ -1173,6 +1201,7 @@ export async function listSnapshots(userId: string): Promise<
     label: row.periodLabel,
     generatedAt: row.generatedAt,
     dismissedAt: row.dismissedAt,
+    storyCompletedAt: row.storyCompletedAt,
     headline: row.headline as SeriesFinalePayload["headline"],
   }));
 }

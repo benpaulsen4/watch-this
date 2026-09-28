@@ -416,6 +416,10 @@ export const seriesFinale = pgTable(
       .notNull(),
     // Dashboard banner "Not now". Per-recap, so it needs no table of its own.
     dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    // Set once the viewer has gone through the whole story on a phone, so the
+    // recap can unlock there and stay unlocked across devices. Per-recap, like
+    // `dismissedAt`; the first write wins and later ones are no-ops.
+    storyCompletedAt: timestamp("story_completed_at", { withTimezone: true }),
   },
   (table) => [
     unique().on(table.userId, table.periodStart, table.periodEnd),

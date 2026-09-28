@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   SeriesFinaleUnavailableError,
+  useCompleteStory,
   useDismissSeriesFinale,
   useSeriesFinale,
   useSeriesFinaleList,
@@ -112,5 +113,110 @@ describe("useDismissSeriesFinale", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["series-finale", "list"],
     });
+  });
+});
+
+describe("useCompleteStory", () => {
+  it("posts to the story-complete endpoint and invalidates both caches on success", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useCompleteStory(), {
+      wrapper: localWrapper,
+    });
+
+    result.current.mutate("2026");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/series-finale/2026/story-complete",
+      { method: "POST" },
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["series-finale", "2026"],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["series-finale", "list"],
+    });
+  });
+
+  it("optimistically marks the period query and the list item completed, then rolls back on failure", async () => {
+    // onMutate finishes (and its optimistic writes with it) before
+    // `mutationFn` even calls `fetch` -- so a fetch that doesn't resolve
+    // until told to lets this test observe the optimistic state before
+    // deciding how the request turns out.
+    let settle: ((response: { ok: boolean; status: number }) => void) | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    client.setQueryData(["series-finale", "2026"], {
+      payload: { schemaVersion: 1 },
+      storyCompletedAt: null,
+    });
+    client.setQueryData(
+      ["series-finale", "list"],
+      [{ label: "2026", storyCompletedAt: null }],
+    );
+    const localWrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useCompleteStory(), {
+      wrapper: localWrapper,
+    });
+
+    result.current.mutate("2026");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    expect(
+      client.getQueryData<{ storyCompletedAt: string | null }>([
+        "series-finale",
+        "2026",
+      ])?.storyCompletedAt,
+    ).not.toBeNull();
+    expect(
+      (
+        client.getQueryData<
+          { label: string; storyCompletedAt: string | null }[]
+        >(["series-finale", "list"]) ?? []
+      )[0]?.storyCompletedAt,
+    ).not.toBeNull();
+
+    settle?.({ ok: false, status: 500 });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(
+      client.getQueryData<{ storyCompletedAt: string | null }>([
+        "series-finale",
+        "2026",
+      ])?.storyCompletedAt,
+    ).toBeNull();
+    expect(
+      (
+        client.getQueryData<
+          { label: string; storyCompletedAt: string | null }[]
+        >(["series-finale", "list"]) ?? []
+      )[0]?.storyCompletedAt,
+    ).toBeNull();
   });
 });

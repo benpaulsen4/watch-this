@@ -8,6 +8,7 @@ export interface SeriesFinaleListItem {
   label: string;
   generatedAt: string;
   dismissedAt: string | null;
+  storyCompletedAt: string | null;
   headline: SeriesFinalePayload["headline"];
 }
 
@@ -48,15 +49,27 @@ export function useSeriesFinaleList() {
   });
 }
 
+interface SeriesFinalePeriodResponse {
+  payload: SeriesFinalePayload;
+  storyCompletedAt: string | null;
+}
+
+const periodQueryKey = (period: string) => ["series-finale", period] as const;
+
+function periodQueryFn(period: string) {
+  return () =>
+    getJson<SeriesFinalePeriodResponse>(`/api/series-finale/${period}`);
+}
+
 export function useSeriesFinale(period: string) {
   return useQuery({
-    queryKey: ["series-finale", period],
-    queryFn: async () => {
-      const data = await getJson<{ payload: SeriesFinalePayload }>(
-        `/api/series-finale/${period}`,
-      );
-      return data.payload;
-    },
+    queryKey: periodQueryKey(period),
+    queryFn: periodQueryFn(period),
+    // The cache holds `{ payload, storyCompletedAt }` (see
+    // `useCompleteStory`, which needs somewhere to write the latter
+    // optimistically); `select` keeps this hook's own consumers reading just
+    // the payload, as before.
+    select: (data) => data.payload,
     // A snapshot is frozen, so there is nothing to refetch for.
     staleTime: Infinity,
     // A 404 means "not available", not "try again" -- and the first
@@ -105,5 +118,81 @@ export function useDismissSeriesFinale() {
       }
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: LIST_KEY }),
+  });
+}
+
+/**
+ * Record that the viewer has gone through the whole story, optimistically.
+ *
+ * Task 3 gates the phone recap on this: the story is the default there, and
+ * the recap unlocks once `storyCompletedAt` is set, remembered on the
+ * account so it holds across devices. Both caches that carry it -- this
+ * period's payload query and the dashboard/profile list -- are updated at
+ * once, the same way `useDismissSeriesFinale` updates the list, and rolled
+ * back if the POST fails.
+ *
+ * The route is idempotent (the first completed timestamp wins), and the
+ * optimistic update mirrors that: it only fills in a timestamp where one
+ * isn't already cached, rather than overwriting an earlier completion.
+ */
+export function useCompleteStory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (period: string) => {
+      const response = await fetch(
+        `/api/series-finale/${period}/story-complete`,
+        { method: "POST" },
+      );
+      if (!response.ok) throw new Error("Story completion failed");
+    },
+    onMutate: async (period: string) => {
+      const queryKey = periodQueryKey(period);
+      // In-flight fetches for either cache would otherwise land after this
+      // and overwrite it.
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey }),
+        queryClient.cancelQueries({ queryKey: LIST_KEY }),
+      ]);
+
+      const previousPeriod =
+        queryClient.getQueryData<SeriesFinalePeriodResponse>(queryKey);
+      const previousList =
+        queryClient.getQueryData<SeriesFinaleListItem[]>(LIST_KEY);
+
+      const completedAt = new Date().toISOString();
+
+      queryClient.setQueryData<SeriesFinalePeriodResponse>(queryKey, (data) =>
+        data
+          ? { ...data, storyCompletedAt: data.storyCompletedAt ?? completedAt }
+          : data,
+      );
+      queryClient.setQueryData<SeriesFinaleListItem[]>(LIST_KEY, (periods) =>
+        periods?.map((item) =>
+          item.label === period
+            ? {
+                ...item,
+                storyCompletedAt: item.storyCompletedAt ?? completedAt,
+              }
+            : item,
+        ),
+      );
+
+      return { queryKey, previousPeriod, previousList };
+    },
+    onError: (_error, _period, context) => {
+      if (!context) return;
+      if (context.previousPeriod !== undefined) {
+        queryClient.setQueryData(context.queryKey, context.previousPeriod);
+      }
+      if (context.previousList !== undefined) {
+        queryClient.setQueryData(LIST_KEY, context.previousList);
+      }
+    },
+    onSettled: (_data, _error, period) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: periodQueryKey(period) }),
+        queryClient.invalidateQueries({ queryKey: LIST_KEY }),
+      ]),
   });
 }

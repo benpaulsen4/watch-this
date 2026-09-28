@@ -1,0 +1,1 @@
+ALTER TABLE "series_finale" ADD COLUMN "story_completed_at" timestamp with time zone;

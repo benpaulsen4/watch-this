@@ -6,7 +6,10 @@ import {
   withAuth,
 } from "@/lib/auth/api-middleware";
 import { parsePeriodLabel } from "@/lib/series-finale/periods";
-import { getOrGenerateSnapshot } from "@/lib/series-finale/service";
+import {
+  getOrGenerateSnapshot,
+  loadStoryCompletedAt,
+} from "@/lib/series-finale/service";
 
 // GET /api/series-finale/[period] - the frozen payload, generated if absent.
 // The path is parsed from `request.url` rather than a route-params argument
@@ -33,7 +36,11 @@ const handler = withAuth(async (request: AuthenticatedRequest) => {
       );
     }
 
-    return NextResponse.json({ payload });
+    // Row metadata, read the same way `listSnapshots` reads `dismissedAt` --
+    // never folded into the frozen payload itself (task-2-brief.md).
+    const storyCompletedAt = await loadStoryCompletedAt(request.user.id, period);
+
+    return NextResponse.json({ payload, storyCompletedAt });
   } catch (error) {
     return handleApiError(error, "Series Finale payload");
   }

@@ -121,6 +121,7 @@ vi.mock("../db/schema", () => ({
     schemaVersion: { column: "series_finale.schema_version" },
     generatedAt: { column: "series_finale.generated_at" },
     dismissedAt: { column: "series_finale.dismissed_at" },
+    storyCompletedAt: { column: "series_finale.story_completed_at" },
   },
   ContentType: { MOVIE: "movie", TV: "tv" },
 }));
@@ -164,6 +165,7 @@ import {
   loadCollaboratorSlices,
   loadFirstActivity,
   loadGenreNames,
+  loadStoryCompletedAt,
   loadUserRows,
   mostActiveCollaborators,
   PERCENTILE_COHORT_MINIMUM,
@@ -1691,18 +1693,55 @@ describe("getOrGenerateSnapshot", () => {
   });
 });
 
+describe("loadStoryCompletedAt", () => {
+  const period = calendarYearPeriod(2026);
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns the stored timestamp for the user's snapshot", async () => {
+    const storyCompletedAt = new Date("2027-01-03T00:00:00Z");
+    setResults([[{ storyCompletedAt }]]);
+
+    expect(await loadStoryCompletedAt("viewer", period)).toEqual(
+      storyCompletedAt,
+    );
+    expect(getQueries()[0]?.from).toBe(seriesFinale);
+  });
+
+  it("returns null when the story has not been completed", async () => {
+    setResults([[{ storyCompletedAt: null }]]);
+
+    expect(await loadStoryCompletedAt("viewer", period)).toBeNull();
+  });
+
+  it("returns null when there is no row for the user and period", async () => {
+    setResults([[]]);
+
+    expect(await loadStoryCompletedAt("viewer", period)).toBeNull();
+  });
+});
+
 describe("listSnapshots", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns each period's label, dates and headline", async () => {
     const { headline } = emptyPayload();
     const generatedAt = new Date("2027-01-02T00:00:00Z");
+    const storyCompletedAt = new Date("2027-01-03T00:00:00Z");
     setResults([
-      [{ periodLabel: "2026", generatedAt, dismissedAt: null, headline }],
+      [
+        {
+          periodLabel: "2026",
+          generatedAt,
+          dismissedAt: null,
+          storyCompletedAt,
+          headline,
+        },
+      ],
     ]);
 
     expect(await listSnapshots("viewer")).toEqual([
-      { label: "2026", generatedAt, dismissedAt: null, headline },
+      { label: "2026", generatedAt, dismissedAt: null, storyCompletedAt, headline },
     ]);
   });
 
