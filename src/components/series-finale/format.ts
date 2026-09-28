@@ -669,6 +669,16 @@ export function timelinePointLabel(
 }
 
 /**
+ * "The Bear · S2E03": one row of the biggest day's episode list, beside its
+ * time. A show with no cached title is its episode code alone ("S2E03").
+ */
+export function timelineEpisode(
+  point: Pick<TimelinePoint, "title" | "episode">,
+): string {
+  return point.title ? `${point.title} · ${point.episode}` : point.episode;
+}
+
+/**
  * "First at 13:05, last at 23:35 · 14 episodes ticked one at a time", under
  * the biggest day's axis. `soloTicks` is the day's `soloTickCount`. Ticks
  * that all share one minute are "All at 13:05", not a span from a time to

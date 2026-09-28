@@ -2,9 +2,11 @@ import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 import { cn } from "@/lib/utils";
 
 import {
+  andMore,
   clockTime,
   soloTickDisclosure,
   TIMELINE_TOO_FEW,
+  timelineEpisode,
   timelinePointLabel,
   timelineSummary,
 } from "./format";
@@ -16,7 +18,10 @@ type Timeline = NonNullable<BigDay["timeline"]>;
 const SIZES = {
   default: {
     text: "text-xs text-gray-500",
-    list: "text-sm text-gray-300",
+    listColumns: "gap-x-8 lg:columns-2",
+    rowTime: "text-gray-500",
+    rowEpisode: "text-gray-300",
+    row: "py-1 text-[13px]",
     track: "bg-gray-700",
     tick: "bg-gray-700",
     tickLabel: "text-[11px] text-gray-500",
@@ -24,7 +29,10 @@ const SIZES = {
   },
   large: {
     text: "text-sm text-white/60",
-    list: "text-[15px] text-white/85",
+    listColumns: "",
+    rowTime: "text-white/50",
+    rowEpisode: "text-white/85",
+    row: "py-0.5 text-[13px]",
     track: "bg-white/25",
     tick: "bg-white/25",
     tickLabel: "text-[11px] text-white/50",
@@ -36,6 +44,13 @@ const HOUR = 3_600_000;
 
 /** Fewer points than this are a list, not a line: two dots are not a day. */
 const AXIS_MIN_POINTS = 3;
+
+/**
+ * The most episodes listed under the axis; the rest are counted. Sixteen is
+ * eight rows a column on a desktop panel, and keeps the story's card a short
+ * scroll on a 360 x 640 phone.
+ */
+const LISTED = 16;
 
 /**
  * How many hour labels fit: the story's card and a phone's panel are about
@@ -73,7 +88,10 @@ function localHourStart(time: number, clock: string): number {
 interface Placed {
   time: number;
   clock: string;
+  /** "13:05 · The Bear S2E03", the dot's accessible name and hover title. */
   label: string;
+  /** "The Bear · S2E03", the list row beside the time. */
+  episode: string;
 }
 
 function place(timeline: Timeline, timeZone: string): Placed[] {
@@ -84,7 +102,7 @@ function place(timeline: Timeline, timeZone: string): Placed[] {
       const label = timelinePointLabel(point, timeZone);
       return Number.isNaN(time) || clock === null || label === null
         ? []
-        : [{ time, clock, label }];
+        : [{ time, clock, label, episode: timelineEpisode(point) }];
     })
     .sort((a, b) => a.time - b.time);
 }
@@ -129,9 +147,9 @@ function layout(points: Placed[], timeZone: string) {
 
 /**
  * How the biggest day went: each episode ticked one at a time, placed at the
- * local time it was ticked on an hour axis. With too few for an axis they
- * are simply listed; with no timeline at all, it says why, quoting the
- * period's total.
+ * local time it was ticked on an hour axis as the overview, then listed by
+ * time and name underneath. With too few for an axis they are only listed;
+ * with no timeline at all, it says why, quoting the period's total.
  */
 export function BigDayTimeline({
   bigDay,
@@ -159,11 +177,7 @@ export function BigDayTimeline({
     return (
       <>
         {points.length > 0 ? (
-          <ol className={cn("mb-3 space-y-1 tabular-nums", styles.list)}>
-            {points.map((point, index) => (
-              <li key={index}>{point.label}</li>
-            ))}
-          </ol>
+          <EpisodeList points={points} size={size} className="mb-3" />
         ) : null}
         <p className={text}>{TIMELINE_TOO_FEW}</p>
       </>
@@ -237,6 +251,54 @@ export function BigDayTimeline({
       <p className={cn("mt-2", text)}>
         {timelineSummary(first.clock, last.clock, bigDay.soloTickCount)}
       </p>
+      <EpisodeList points={points} size={size} className="mt-4" />
     </>
+  );
+}
+
+/**
+ * The day's episodes as rows, "13:05  The Bear · S2E03", in time order: what
+ * each dot is, readable without hovering. At most `LISTED`, the rest counted.
+ * Two columns on a desktop panel, one on a phone and on the story's card.
+ */
+function EpisodeList({
+  points,
+  size,
+  className,
+}: {
+  points: Placed[];
+  size: keyof typeof SIZES;
+  className?: string;
+}) {
+  const styles = SIZES[size];
+  const more = andMore(points.length - LISTED);
+
+  return (
+    <div className={className}>
+      <ol className={styles.listColumns}>
+        {points.slice(0, LISTED).map((point, index) => (
+          <li
+            key={index}
+            data-episode-row=""
+            className={cn("flex gap-3 break-inside-avoid", styles.row)}
+          >
+            {/* A set width too: the brand face's digits are not all
+                tabular, and the names should start on one line. */}
+            <span className={cn("w-11 flex-none tabular-nums", styles.rowTime)}>
+              {point.clock}
+            </span>
+            <span
+              className={cn(
+                "min-w-0 leading-snug [overflow-wrap:anywhere]",
+                styles.rowEpisode,
+              )}
+            >
+              {point.episode}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {more ? <p className={cn("mt-2", styles.text)}>{more}</p> : null}
+    </div>
   );
 }

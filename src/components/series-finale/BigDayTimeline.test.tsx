@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { BigDayTimeline } from "./BigDayTimeline";
@@ -33,6 +33,18 @@ const tickLabels = (container: HTMLElement) =>
   Array.from(container.querySelectorAll<HTMLElement>("[data-tick-label]")).map(
     (label) => label.textContent,
   );
+
+/** The episode list's rows, as [time, episode]. */
+const episodeRows = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll<HTMLElement>("[data-episode-row]")).map(
+    (row) => Array.from(row.children).map((cell) => cell.textContent),
+  );
+
+/** `count` solo ticks, ten minutes apart from 13:00 UTC. */
+const everyTenMinutes = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    at: new Date(Date.UTC(2026, 2, 14, 13, index * 10)).toISOString(),
+  }));
 
 const evening = [
   { at: "2026-03-14T13:05:00.000Z" },
@@ -115,10 +127,95 @@ describe("BigDayTimeline", () => {
       "title",
       "18:20 · S2E02",
     );
-    expect(screen.getByRole("list")).toBeInTheDocument();
-    expect(within(screen.getByRole("list")).getAllByRole("img")).toHaveLength(
-      3,
+    expect(screen.getAllByRole("img")).toHaveLength(3);
+  });
+
+  it("lists the day's episodes under the axis, each by its local time", () => {
+    const { container } = render(
+      <BigDayTimeline
+        soloTickTotal={120}
+        timeZone="Europe/Berlin"
+        bigDay={bigDay([
+          evening[0]!,
+          { ...evening[1]!, title: null },
+          evening[2]!,
+        ])}
+      />,
     );
+
+    expect(episodeRows(container)).toEqual([
+      ["14:05", "The Bear · S2E01"],
+      // No cached title: the episode code alone.
+      ["19:20", "S2E02"],
+      ["00:35", "The Bear · S2E03"],
+    ]);
+    const time = container.querySelector("[data-episode-row] > :first-child");
+    expect(time).toHaveClass("tabular-nums");
+    // After the axis: the overview first, then the detail.
+    const axis = container.querySelector("[data-point]")!;
+    const row = container.querySelector("[data-episode-row]")!;
+    expect(
+      axis.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("sets the recap's list in two columns from lg and the story's in one", () => {
+    const { container, unmount } = render(
+      <BigDayTimeline
+        soloTickTotal={120}
+        timeZone="UTC"
+        bigDay={bigDay(evening)}
+      />,
+    );
+    const list = () =>
+      container.querySelector("[data-episode-row]")!.parentElement;
+    expect(list()).toHaveClass("lg:columns-2");
+    unmount();
+
+    const story = render(
+      <BigDayTimeline
+        size="large"
+        soloTickTotal={120}
+        timeZone="UTC"
+        bigDay={bigDay(evening)}
+      />,
+    );
+    expect(
+      story.container.querySelector("[data-episode-row]")!.parentElement,
+    ).not.toHaveClass("lg:columns-2");
+  });
+
+  it("lists at most sixteen episodes and counts the rest", () => {
+    for (const size of ["default", "large"] as const) {
+      const { container, unmount } = render(
+        <BigDayTimeline
+          size={size}
+          soloTickTotal={120}
+          timeZone="UTC"
+          bigDay={bigDay(everyTenMinutes(20))}
+        />,
+      );
+
+      const rows = episodeRows(container);
+      expect(rows).toHaveLength(16);
+      expect(rows[15]).toEqual(["15:30", "The Bear · S2E16"]);
+      expect(screen.getByText("And four more.")).toBeInTheDocument();
+      // The axis still places every one.
+      expect(container.querySelectorAll("[data-point]")).toHaveLength(20);
+      unmount();
+    }
+  });
+
+  it("counts nothing more when every episode is listed", () => {
+    render(
+      <BigDayTimeline
+        soloTickTotal={120}
+        timeZone="UTC"
+        bigDay={bigDay(everyTenMinutes(16))}
+      />,
+    );
+
+    expect(screen.queryByText(/^And .* more\.$/)).not.toBeInTheDocument();
   });
 
   it("stacks points too close to sit side by side", () => {
@@ -187,8 +284,10 @@ describe("BigDayTimeline", () => {
       />,
     );
 
-    expect(screen.getByText("13:05 · The Bear S2E01")).toBeInTheDocument();
-    expect(screen.getByText("23:35 · S2E02")).toBeInTheDocument();
+    expect(episodeRows(container)).toEqual([
+      ["13:05", "The Bear · S2E01"],
+      ["23:35", "S2E02"],
+    ]);
     expect(container.querySelector("[data-point]")).toBeNull();
     expect(
       screen.getByText(

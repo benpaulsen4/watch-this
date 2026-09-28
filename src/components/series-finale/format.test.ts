@@ -45,6 +45,7 @@ import {
   streakLabel,
   streakLine,
   TIMELINE_TOO_FEW,
+  timelineEpisode,
   timelinePointLabel,
   timelineSummary,
   topShowStats,
@@ -656,6 +657,18 @@ describe("timelinePointLabel", () => {
         "UTC",
       ),
     ).toBe("13:05 · S2E03");
+  });
+});
+
+describe("timelineEpisode", () => {
+  it("names the show and the episode for a row of the day's list", () => {
+    expect(timelineEpisode({ title: "The Bear", episode: "S2E03" })).toBe(
+      "The Bear · S2E03",
+    );
+  });
+
+  it("gives the episode code alone when the show has no title", () => {
+    expect(timelineEpisode({ title: null, episode: "S2E03" })).toBe("S2E03");
   });
 });
 
