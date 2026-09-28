@@ -6,7 +6,15 @@ import { BigDayTimeline } from "./BigDayTimeline";
 const bigDay = (
   timeline: { at: string }[] | null,
   soloTickCount = timeline?.length ?? 0,
-) => ({ timeline, soloTickCount });
+) => ({
+  timeline:
+    timeline?.map((point, index) => ({
+      ...point,
+      title: "The Bear",
+      episode: `S2E${String(index + 1).padStart(2, "0")}`,
+    })) ?? null,
+  soloTickCount,
+});
 
 describe("BigDayTimeline", () => {
   it("places the solo ticks by elapsed time, with no clock times", () => {

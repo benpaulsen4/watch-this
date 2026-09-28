@@ -67,6 +67,7 @@ const payload = (): SeriesFinalePayload => ({
     start: "2025-01-01T00:00:00.000Z",
     end: "2026-01-01T00:00:00.000Z",
     label: "2025",
+    timezone: "UTC",
   },
   headline: {
     hours: 412,
@@ -113,6 +114,8 @@ const payload = (): SeriesFinalePayload => ({
     weekdayCounts: [1, 1, 1, 1, 1, 1, 6],
     topWeekday: 6,
     lateShare: 0.41,
+    hourCounts: null,
+    sharedListShare: null,
   },
   shame: { dropped: [], stillPlanning: [] },
   crew: [{ userId: "u-crew", username: "crewmate-quentin", episodes: 1041 }],

@@ -14,11 +14,13 @@ vi.mock("../db", () => {
   const queries: Array<{
     from: unknown;
     joins: Array<{ type: "left" | "inner"; table: unknown }>;
+    // Kept apart from `joins` so existing `{ type, table }` assertions hold.
+    joinConditions: unknown[];
     where: unknown;
   }> = [];
   const current = () => queries[queries.length - 1];
   const startQuery = () => {
-    queries.push({ from: undefined, joins: [], where: undefined });
+    queries.push({ from: undefined, joins: [], joinConditions: [], where: undefined });
     return chain;
   };
 
@@ -29,12 +31,14 @@ vi.mock("../db", () => {
       if (query) query.from = table;
       return chain;
     },
-    innerJoin: (table: unknown) => {
+    innerJoin: (table: unknown, on: unknown) => {
       current()?.joins.push({ type: "inner", table });
+      current()?.joinConditions.push(on);
       return chain;
     },
-    leftJoin: (table: unknown) => {
+    leftJoin: (table: unknown, on: unknown) => {
       current()?.joins.push({ type: "left", table });
+      current()?.joinConditions.push(on);
       return chain;
     },
     where: (condition: unknown) => {
@@ -89,7 +93,12 @@ vi.mock("../db", () => {
 });
 
 vi.mock("../db/schema", () => ({
-  episodeWatchStatus: {},
+  // Column sentinels, so the crew-ranking test can find the join by identity.
+  episodeWatchStatus: {
+    userId: { column: "episode_watch_status.user_id" },
+    watched: { column: "episode_watch_status.watched" },
+    watchedAt: { column: "episode_watch_status.watched_at" },
+  },
   userContentStatus: {},
   tmdbCache: {},
   // Column sentinels, so the consent tests can find the filter by identity.
@@ -129,10 +138,16 @@ vi.mock("../tmdb/client", () => ({
 }));
 
 import { db, tmdbSeasonFetch } from "../db";
-import { listCollaborators, lists, seriesFinale, users } from "../db/schema";
+import {
+  episodeWatchStatus,
+  listCollaborators,
+  lists,
+  seriesFinale,
+  users,
+} from "../db/schema";
 import { tmdbClient } from "../tmdb/client";
 import { buildPayload } from "./aggregate";
-import { calendarYearPeriod } from "./periods";
+import { calendarYearPeriod, localisePeriod } from "./periods";
 import {
   alsoTopForOf,
   buildCompare,
@@ -150,6 +165,7 @@ import {
   loadFirstActivity,
   loadGenreNames,
   loadUserRows,
+  mostActiveCollaborators,
   PERCENTILE_COHORT_MINIMUM,
   PERCENTILE_LENGTH_TOLERANCE,
   percentileOf,
@@ -168,6 +184,7 @@ const setResults = (rows: unknown[]) =>
 interface RecordedQuery {
   from: unknown;
   joins: Array<{ type: "left" | "inner"; table: unknown }>;
+  joinConditions: unknown[];
   where: unknown;
 }
 
@@ -497,17 +514,20 @@ describe("loadCollaboratorIds", () => {
     vi.clearAllMocks();
   });
 
-  it("sorts ids and caps them at CREW_LIMIT, excluding the viewer", async () => {
+  it("returns every consenting collaborator, sorted, deduplicated and without the viewer", async () => {
+    // More than CREW_LIMIT on purpose: the cap is applied by activity later
+    // (`mostActiveCollaborators`), so capping here would decide the crew by id.
     const ids = ["u9", "u3", "u10", "u1", "u7", "u5", "u2", "u8", "u6", "u4"];
     setResults([
       [{ listId: "l1" }],
       [{ userId: "viewer" }, ...ids.slice(0, 5).map((userId) => ({ userId }))],
-      ids.slice(5).map((userId) => ({ userId })),
+      [{ userId: "u9" }, ...ids.slice(5).map((userId) => ({ userId }))],
     ]);
 
     const result = await loadCollaboratorIds("viewer");
 
-    expect(result).toEqual([...ids].sort().slice(0, CREW_LIMIT));
+    expect(result).toEqual([...ids].sort());
+    expect(result.length).toBeGreaterThan(CREW_LIMIT);
     expect(result).not.toContain("viewer");
   });
 
@@ -523,6 +543,92 @@ describe("loadCollaboratorIds", () => {
       expect(query?.joins).toContainEqual({ type: "inner", table: users });
       expect(references(query?.where, users.shareStatsWithCollaborators)).toBe(true);
     }
+  });
+});
+
+describe("mostActiveCollaborators", () => {
+  const member = (id: string, username: string, episodes: number) => ({
+    id,
+    username,
+    episodes,
+  });
+
+  it("keeps the CREW_LIMIT most active, whatever their ids", () => {
+    // The e2e case: nine collaborators, and the one whose id sorts last is by
+    // far the busiest. An id cap leaves exactly that person out.
+    const candidates = [
+      member("u1", "ava", 40),
+      member("u2", "bo", 35),
+      member("u3", "cy", 3),
+      member("u4", "eli", 30),
+      member("u5", "fay", 25),
+      member("u6", "gus", 20),
+      member("u7", "hal", 15),
+      member("u8", "ivy", 10),
+      member("u9", "dee", 230),
+    ];
+
+    const kept = mostActiveCollaborators(candidates);
+
+    expect(kept).toHaveLength(CREW_LIMIT);
+    expect(kept.map((row) => row.username)).toEqual([
+      "dee",
+      "ava",
+      "bo",
+      "eli",
+      "fay",
+      "gus",
+      "hal",
+      "ivy",
+    ]);
+  });
+
+  it("breaks a tie at the cap by username, then by id, whatever the input order", () => {
+    // Nine people on equal episodes: the cap has to leave one out, and which
+    // one must not depend on the order the query returned them in. Usernames
+    // compare by code unit, so "Zed" sorts before "abe".
+    const tied = [
+      member("u9", "abe", 5),
+      member("u1", "zoe", 5),
+      member("u5", "Zed", 5),
+      member("u3", "kit", 5),
+      member("u4", "lou", 5),
+      member("u2", "max", 5),
+      member("u7", "ned", 5),
+      member("u6", "oli", 5),
+      member("u8", "pam", 5),
+    ];
+
+    const forwards = mostActiveCollaborators(tied);
+    const backwards = mostActiveCollaborators([...tied].reverse());
+
+    expect(forwards.map((row) => row.username)).toEqual([
+      "Zed",
+      "abe",
+      "kit",
+      "lou",
+      "max",
+      "ned",
+      "oli",
+      "pam",
+    ]);
+    expect(backwards).toEqual(forwards);
+
+    // Equal usernames cannot reach the database (the column is unique), but
+    // the rule still has to be total: the lower id wins.
+    const sameName = [member("u2", "sam", 5), member("u1", "sam", 5)];
+    expect(mostActiveCollaborators(sameName).map((row) => row.id)).toEqual([
+      "u1",
+      "u2",
+    ]);
+  });
+
+  it("does not mutate its input", () => {
+    const candidates = [member("u1", "ava", 1), member("u2", "bo", 2)];
+
+    mostActiveCollaborators(candidates);
+
+    expect(candidates.map((row) => row.id)).toEqual(["u1", "u2"]);
   });
 });
 
@@ -575,8 +681,8 @@ describe("loadCollaboratorSlices", () => {
       [{ listId: "l1" }],
       [{ userId: "u2" }],
       [{ userId: "u3" }],
-      // usernames: u3 withdrew between the id query and this one
-      [{ id: "u2", username: "ana" }],
+      // usernames and activity: u3 withdrew between the id query and this one
+      [{ id: "u2", username: "ana", episodes: 0 }],
       // u2: episodes, statuses (none, so no titles query)
       [],
       [],
@@ -594,12 +700,69 @@ describe("loadCollaboratorSlices", () => {
     expect(references(names?.where, users.shareStatsWithCollaborators)).toBe(true);
   });
 
+  it("counts every collaborator's period episodes in that same query, before any rows load", async () => {
+    // A localised window, so the test tells it apart from the canonical year.
+    const window = localisePeriod(period, "America/Los_Angeles");
+    setResults([
+      [{ listId: "l1" }],
+      [{ userId: "u2" }],
+      [],
+      [{ id: "u2", username: "ana", episodes: 0 }],
+    ]);
+
+    await loadCollaboratorSlices("viewer", window);
+
+    // A left join, so a consenting collaborator with no episodes this period
+    // still counts as a candidate on zero rather than vanishing -- and the
+    // join carries the same window and `watched` filter `loadUserRows` uses,
+    // so the count that ranks someone is the count their slice will hold.
+    const ranking = getQueries()[3];
+    expect(ranking?.from).toBe(users);
+    expect(ranking?.joins).toEqual([{ type: "left", table: episodeWatchStatus }]);
+    const on = ranking?.joinConditions[0];
+    expect(references(on, episodeWatchStatus.userId)).toBe(true);
+    expect(references(on, episodeWatchStatus.watched)).toBe(true);
+    expect(references(on, episodeWatchStatus.watchedAt)).toBe(true);
+    expect(containsInstant(on, window.start.toISOString())).toBe(true);
+    expect(containsInstant(on, window.end.toISOString())).toBe(true);
+    // Consent sits on the ranking query itself, not only on the id queries.
+    expect(references(ranking?.where, users.shareStatsWithCollaborators)).toBe(true);
+    // The ranking query and u2's two row queries -- nothing more.
+    expect(db.select).toHaveBeenCalledTimes(3);
+  });
+
+  it("loads full slices only for the CREW_LIMIT most active collaborators", async () => {
+    // The e2e case end to end: nine consenting collaborators whose ids sort
+    // u1..u9, and u9 -- the one an id cap drops -- is the busiest. The least
+    // active, u3, is the one left out, and nothing is loaded for them.
+    const ids = ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8", "u9"];
+    const activity: Record<string, number> = {
+      u1: 40, u2: 35, u3: 3, u4: 30, u5: 25, u6: 20, u7: 15, u8: 10, u9: 230,
+    };
+    setResults([
+      [{ listId: "l1" }],
+      ids.map((userId) => ({ userId })),
+      [],
+      ids.map((id) => ({ id, username: `user-${id}`, episodes: activity[id] })),
+      // Every slice query after this returns no rows (the mock's default), so
+      // each kept collaborator costs exactly two: episodes and statuses.
+    ]);
+
+    const { crew, peers } = await loadCollaboratorSlices("viewer", period);
+
+    const kept = ["u9", "u1", "u2", "u4", "u5", "u6", "u7", "u8"];
+    expect(crew.map((member) => member.userId).sort()).toEqual([...kept].sort());
+    expect(peers.map((peer) => peer.userId).sort()).toEqual([...kept].sort());
+    // One ranking query, then two row queries per kept collaborator.
+    expect(db.select).toHaveBeenCalledTimes(1 + 2 * CREW_LIMIT);
+  });
+
   it("scopes a peer's completed and dropped keys to the window but keeps planning unscoped", async () => {
     setResults([
       [{ listId: "l1" }],
       [{ userId: "u2" }],
       [],
-      [{ id: "u2", username: "ana" }],
+      [{ id: "u2", username: "ana", episodes: 0 }],
       [],
       [
         { tmdbId: 1, contentType: "tv", status: "completed", createdAt: new Date("2026-01-01T00:00:00Z"), updatedAt: new Date("2026-05-01T00:00:00Z") },
@@ -634,7 +797,7 @@ describe("loadCollaboratorSlices", () => {
       [{ listId: "l1" }],
       [{ userId: "u2" }],
       [],
-      [{ id: "u2", username: "ana" }],
+      [{ id: "u2", username: "ana", episodes: episodes.length }],
       episodes,
       [],
       // titles
@@ -654,20 +817,21 @@ describe("loadCollaboratorSlices", () => {
       [{ userId: "u2" }, { userId: "u3" }, { userId: "u4" }],
       [],
       [
-        { id: "u2", username: "zed" },
-        { id: "u3", username: "ana" },
-        { id: "u4", username: "bo" },
+        { id: "u2", username: "zed", episodes: 4 },
+        { id: "u3", username: "ana", episodes: 4 },
+        { id: "u4", username: "bo", episodes: 1 },
       ],
-      // u2 (zed): four 45-minute episodes
-      [episode(1, 1), episode(1, 2), episode(1, 3), episode(1, 4)],
-      [],
-      [],
-      [runtime(1, 1, 45), runtime(1, 2, 45), runtime(1, 3, 45), runtime(1, 4, 45)],
+      // Slices load in activity order, ties by username: ana, zed, bo.
       // u3 (ana): four episodes, runtimes unknown
       [episode(2, 1), episode(2, 2), episode(2, 3), episode(2, 4)],
       [],
       [],
       [],
+      // u2 (zed): four 45-minute episodes
+      [episode(1, 1), episode(1, 2), episode(1, 3), episode(1, 4)],
+      [],
+      [],
+      [runtime(1, 1, 45), runtime(1, 2, 45), runtime(1, 3, 45), runtime(1, 4, 45)],
       // u4 (bo): one episode
       [episode(3, 1)],
       [],
@@ -1028,13 +1192,13 @@ describe("snapshot generation", () => {
       ],
       // film runtimes
       [{ tmdbId: 9, runtime: 120 }],
-      // collaborators: list ids, owners, collaborators, usernames
+      // collaborators: list ids, owners, collaborators, usernames and activity
       [{ listId: "l1" }],
       [{ userId: "u2" }],
       [{ userId: "u3" }],
       [
-        { id: "u2", username: "ana" },
-        { id: "u3", username: "bo" },
+        { id: "u2", username: "ana", episodes: 1 },
+        { id: "u3", username: "bo", episodes: 1 },
       ],
       // u2: episodes, statuses, titles, runtimes
       [episode(1, 1)],
@@ -1098,6 +1262,9 @@ describe("snapshot generation", () => {
     expect(payload.headline.minutes).toBe(220);
     expect(payload.headline.unknownRuntimeEpisodes).toBe(0);
     expect(payload.headline.percentile).toBe(1);
+    // The zone every local figure was computed in, for renderers placing the
+    // big day's instants on a clock.
+    expect(payload.period.timezone).toBe("America/Los_Angeles");
 
     expect(db.insert).toHaveBeenCalledTimes(1);
     expect(getInserted()).toEqual([
@@ -1363,6 +1530,7 @@ describe("getOrGenerateSnapshot", () => {
       start: "2026-01-01T08:00:00.000Z",
       end: "2027-01-01T08:00:00.000Z",
       label: "2026",
+      timezone: "America/Los_Angeles",
     });
 
     expect(getInserted()).toEqual([

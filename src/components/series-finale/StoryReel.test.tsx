@@ -23,7 +23,7 @@ const viewer = { username: "ben", profilePictureUrl: "" };
 
 const payload = (overrides: Record<string, unknown> = {}) => ({
   schemaVersion: 2,
-  period: { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z", label: "2026" },
+  period: { start: "2026-01-01T00:00:00.000Z", end: "2027-01-01T00:00:00.000Z", label: "2026", timezone: "UTC" },
   headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 0, unknownRuntimeEpisodes: 0, percentile: 4 },
   episodes: { total: 1208, perDay: 3.3 },
   finished: { films: 31, shows: 16, total: 47 },
@@ -31,7 +31,7 @@ const payload = (overrides: Record<string, unknown> = {}) => ({
   months: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, episodes: 10 })),
   soloTickTotal: 0,
   bigDay: null,
-  rhythm: { archetype: null, weekdayCounts: [1, 1, 1, 1, 1, 1, 1], topWeekday: 0, lateShare: null },
+  rhythm: { archetype: null, weekdayCounts: [1, 1, 1, 1, 1, 1, 1], topWeekday: 0, lateShare: null, hourCounts: null, sharedListShare: null },
   shame: { dropped: [], stillPlanning: [] },
   crew: [], compare: [], thin: false,
   ...overrides,
@@ -44,7 +44,7 @@ const fullPayload = () =>
     niche: { tmdbId: 2, title: "Ich war zuhause, aber", posterPath: null, popularity: 2.1, medianPopularity: 68, mostPopular: null, filmPopularities: [2.1, 68] },
     genres: [{ name: "Drama", percent: 40 }],
     bigDay: { date: "2026-03-14", episodes: 11, minutes: 500, timeline: null, soloTickCount: 0, streak: null },
-    rhythm: { archetype: "completionist", weekdayCounts: [1, 1, 1, 1, 1, 1, 1], topWeekday: 0, lateShare: null },
+    rhythm: { archetype: "completionist", weekdayCounts: [1, 1, 1, 1, 1, 1, 1], topWeekday: 0, lateShare: null, hourCounts: null, sharedListShare: null },
     headline: { hours: 412, minutes: 24720, episodes: 1208, titlesCompleted: 47, titlesDropped: 1, unknownRuntimeEpisodes: 0, percentile: 4 },
     shame: { dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: null }], stillPlanning: [] },
     crew: [{ userId: "u2", username: "ana", episodes: 1041 }],

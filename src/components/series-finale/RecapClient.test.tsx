@@ -21,6 +21,7 @@ const payload = (overrides: Record<string, unknown> = {}) => ({
     start: "2026-01-01T00:00:00.000Z",
     end: "2027-01-01T00:00:00.000Z",
     label: "2026",
+    timezone: "UTC",
   },
   headline: {
     hours: 412,
@@ -44,6 +45,8 @@ const payload = (overrides: Record<string, unknown> = {}) => ({
     weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
     topWeekday: null,
     lateShare: null,
+    hourCounts: null,
+    sharedListShare: null,
   },
   shame: { dropped: [], stillPlanning: [] },
   crew: [],
@@ -211,6 +214,7 @@ describe("RecapClient", () => {
           start: "2025-12-31T11:00:00.000Z",
           end: "2026-12-31T11:00:00.000Z",
           label: "2026",
+          timezone: "Pacific/Auckland",
         },
       }),
     });
@@ -231,6 +235,8 @@ describe("RecapClient", () => {
           weekdayCounts: [1, 1, 1, 1, 1, 1, 6],
           topWeekday: 6,
           lateShare: 0.7,
+          hourCounts: null,
+          sharedListShare: null,
         },
       }),
     });
@@ -387,6 +393,8 @@ describe("RecapClient", () => {
           weekdayCounts: [10, 10, 10, 10, 10, 10, 60],
           topWeekday: 6,
           lateShare: 0.41,
+          hourCounts: null,
+          sharedListShare: null,
         },
       }),
     });
@@ -681,9 +689,9 @@ describe("RecapClient", () => {
           episodes: 11,
           minutes: 500,
           timeline: [
-            { at: "2026-03-14T10:00:00.000Z" },
-            { at: "2026-03-14T14:50:00.000Z" },
-            { at: "2026-03-14T19:40:00.000Z" },
+            { at: "2026-03-14T10:00:00.000Z", title: "The Bear", episode: "S2E01" },
+            { at: "2026-03-14T14:50:00.000Z", title: "The Bear", episode: "S2E02" },
+            { at: "2026-03-14T19:40:00.000Z", title: "The Bear", episode: "S2E03" },
           ],
           soloTickCount: 3,
           streak: null,
@@ -837,6 +845,8 @@ describe("RecapClient", () => {
           weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
           topWeekday: 0,
           lateShare: null,
+          hourCounts: null,
+          sharedListShare: null,
         },
       }),
     });

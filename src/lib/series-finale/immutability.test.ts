@@ -112,6 +112,7 @@ function basePayload(): SeriesFinalePayload {
       start: "2026-01-01T00:00:00.000Z",
       end: "2027-01-01T00:00:00.000Z",
       label: "2026",
+      timezone: "UTC",
     },
     headline: {
       hours: 412,
@@ -135,6 +136,8 @@ function basePayload(): SeriesFinalePayload {
       weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
       topWeekday: null,
       lateShare: null,
+      hourCounts: null,
+      sharedListShare: null,
     },
     shame: { dropped: [], stillPlanning: [] },
     crew: [],

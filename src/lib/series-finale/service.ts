@@ -1,5 +1,6 @@
 import {
   and,
+  count,
   desc,
   eq,
   gte,
@@ -219,21 +220,25 @@ export function clearGenreNameCache(): void {
  *
  * A user on many shared lists with many collaborators would otherwise fan out
  * into an unbounded number of per-peer queries at generation time. The mock
- * shows five; eight leaves room without letting it grow.
+ * shows five; eight leaves room without letting it grow. Who makes the cut is
+ * decided by activity (`mostActiveCollaborators`), and deciding it costs one
+ * grouped query however many collaborators there are.
  */
 export const CREW_LIMIT = 8;
 
 /**
  * Everyone who shares a list with this user and has not withdrawn from crew
- * comparisons, sorted and capped at `CREW_LIMIT`.
+ * comparisons, sorted, and NOT capped.
  *
  * The `share_stats_with_collaborators` filter is the consent boundary. It lives
  * in the query rather than a later filter so there is no path that loads a
  * withdrawn user's data at all. The first query yields list ids only, so it
  * needs no consent check; both queries that yield a person do.
  *
- * Sorted before capping so the same eight people are chosen on every
- * regeneration, rather than whichever eight the queries returned first.
+ * Uncapped on purpose (finding F3): capping here could only go by id, which
+ * left out whoever's id happened to sort last however much they watched.
+ * `loadCollaboratorSlices` caps by activity instead. Sorted so the list, and
+ * the query built from it, is the same on every regeneration.
  */
 export async function loadCollaboratorIds(userId: string): Promise<string[]> {
   const ownedOrJoined = await db
@@ -272,7 +277,40 @@ export async function loadCollaboratorIds(userId: string): Promise<string[]> {
     if (row.userId !== userId) ids.add(row.userId);
   }
 
-  return Array.from(ids).sort().slice(0, CREW_LIMIT);
+  return Array.from(ids).sort();
+}
+
+/** A crew candidate: who they are, and how many episodes they watched. */
+export interface CrewCandidate {
+  id: string;
+  username: string;
+  episodes: number;
+}
+
+/**
+ * The `CREW_LIMIT` candidates who watched the most episodes, most first.
+ *
+ * Ties break by username, compared by code unit rather than locale, then by
+ * id, so the same people are chosen on every regeneration whatever order the
+ * query returned them in. Usernames are unique, so the id step never decides
+ * anything in practice; it is there so the rule is total. The code-unit
+ * comparison matches the leaderboard's own ordering in
+ * `loadCollaboratorSlices`, and is done here rather than in SQL, where
+ * `ORDER BY username` would follow the database's collation instead.
+ */
+export function mostActiveCollaborators(
+  candidates: CrewCandidate[],
+): CrewCandidate[] {
+  const byCodeUnit = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+  return [...candidates]
+    .sort(
+      (a, b) =>
+        b.episodes - a.episodes ||
+        byCodeUnit(a.username, b.username) ||
+        byCodeUnit(a.id, b.id),
+    )
+    .slice(0, CREW_LIMIT);
 }
 
 /**
@@ -298,17 +336,25 @@ export function toStoredCrew(crew: CollaboratorTotals[]): CrewMemberTotals[] {
 }
 
 /**
- * Crew totals and compare keys for every consenting collaborator.
+ * Crew totals and compare keys for the `CREW_LIMIT` most active consenting
+ * collaborators.
  *
  * `window` must be the viewer's LOCALISED period (`localisePeriod` in
  * `./periods`) -- the same window the viewer's own rows were loaded with -- so
  * "the same period" means the same instants on both sides of the comparison.
  *
- * One fan-out: each collaborator's rows are loaded once and both slices are
- * derived from that load. Usernames come from a single query that re-applies
- * the consent filter at the point names are read; anyone it does not return
- * (withdrawn or deleted since their id was resolved) is skipped entirely, with
- * no rows loaded for them.
+ * Membership goes by activity (finding F3). One grouped query reads every
+ * consenting collaborator's username and period episode count together,
+ * re-applying the consent filter at the point names are read; anyone it does
+ * not return (withdrawn or deleted since their id was resolved) is skipped
+ * entirely. `mostActiveCollaborators` keeps the busiest, and only they are
+ * loaded in full -- so the fan-out stays bounded by `CREW_LIMIT` whatever the
+ * number of collaborators, at the cost of that one query. Its count carries
+ * `loadUserRows`' own episode filter (watched, inside `window`), so the number
+ * that ranks someone is the number their slice then holds.
+ *
+ * One fan-out: each kept collaborator's rows are loaded once and both slices
+ * are derived from that load.
  *
  * Hours come from the runtime cache only. This deliberately does not call
  * `ensureSeasonsCached`: that would be live TMDB fan-out on someone else's
@@ -321,28 +367,40 @@ export async function loadCollaboratorSlices(
   const collaboratorIds = await loadCollaboratorIds(userId);
   if (collaboratorIds.length === 0) return { crew: [], peers: [] };
 
-  const profiles = await db
-    .select({ id: users.id, username: users.username })
+  // A left join with the window in its ON clause, so a collaborator with no
+  // episodes this period is still a candidate, on zero.
+  const candidates = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      episodes: count(episodeWatchStatus.id),
+    })
     .from(users)
+    .leftJoin(
+      episodeWatchStatus,
+      and(
+        eq(episodeWatchStatus.userId, users.id),
+        eq(episodeWatchStatus.watched, true),
+        gte(episodeWatchStatus.watchedAt, window.start),
+        lt(episodeWatchStatus.watchedAt, window.end),
+      ),
+    )
     .where(
       and(
         inArray(users.id, collaboratorIds),
         eq(users.shareStatsWithCollaborators, true),
       ),
-    );
-  const usernames = new Map(
-    profiles.map((profile) => [profile.id, profile.username]),
-  );
+    )
+    .groupBy(users.id, users.username);
 
   const inWindow = (at: Date) => at >= window.start && at < window.end;
 
   const crew: CollaboratorTotals[] = [];
   const peers: ComparePeer[] = [];
 
-  for (const collaboratorId of collaboratorIds) {
-    const username = usernames.get(collaboratorId);
-    if (username === undefined) continue;
-
+  for (const { id: collaboratorId, username } of mostActiveCollaborators(
+    candidates,
+  )) {
     const rows = await loadUserRows(collaboratorId, window);
 
     const lookup = await loadEpisodeRuntimes(rows.episodes);

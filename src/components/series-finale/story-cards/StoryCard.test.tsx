@@ -27,6 +27,7 @@ const payload = (overrides: Partial<SeriesFinalePayload> = {}) =>
       start: "2026-01-01T00:00:00.000Z",
       end: "2027-01-01T00:00:00.000Z",
       label: "2026",
+      timezone: "UTC",
     },
     headline: {
       hours: 412,
@@ -53,6 +54,8 @@ const payload = (overrides: Partial<SeriesFinalePayload> = {}) =>
       weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
       topWeekday: 0,
       lateShare: null,
+      hourCounts: null,
+      sharedListShare: null,
     },
     shame: { dropped: [], stillPlanning: [] },
     crew: [],
@@ -311,6 +314,8 @@ describe("StoryCard", () => {
         weekdayCounts: [0, 20, 20, 20, 20, 20, 100],
         topWeekday: 6,
         lateShare: 0.41,
+        hourCounts: null,
+        sharedListShare: null,
       },
     });
     expect(screen.getByText("The Sunday Marathoner")).toBeInTheDocument();
@@ -482,6 +487,8 @@ describe("StoryCard", () => {
         weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
         topWeekday: 0,
         lateShare: null,
+        hourCounts: null,
+        sharedListShare: null,
       },
     });
     expect(screen.getByText(/412/)).toBeInTheDocument();
@@ -520,6 +527,8 @@ describe("StoryCard", () => {
         weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
         topWeekday: 0,
         lateShare: 0.4,
+        hourCounts: null,
+        sharedListShare: null,
       },
       shame: {
         dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }],

@@ -531,6 +531,7 @@ describe("buildBigDay", () => {
       [...batch("2026-03-14T12:00:00.000Z", 11), ...soloDay("2026-03-15", [20])],
       "UTC",
       new Map(),
+      new Map(),
     );
 
     expect(result?.date).toBe("2026-03-14");
@@ -538,7 +539,7 @@ describe("buildBigDay", () => {
   });
 
   it("returns a null timeline when solo ticks are below the floor", () => {
-    const result = buildBigDay(batch("2026-03-14T12:00:00.000Z", 11), "UTC", new Map());
+    const result = buildBigDay(batch("2026-03-14T12:00:00.000Z", 11), "UTC", new Map(), new Map());
 
     expect(result?.timeline).toBeNull();
     expect(result?.soloTickCount).toBe(0);
@@ -553,9 +554,53 @@ describe("buildBigDay", () => {
       ),
     );
 
-    const result = buildBigDay(solo, "UTC", new Map());
+    const result = buildBigDay(solo, "UTC", new Map(), new Map());
 
     expect(result?.timeline).not.toBeNull();
+  });
+
+  it("labels each timeline point with its show's title and episode code", () => {
+    // Fifty solo ticks through the year clear the floor; the big day holds
+    // three more, out of time order, from two shows -- one with no cached
+    // metadata. That point keeps its time and code with a null title, so the
+    // timeline still agrees with `soloTickCount`.
+    const background = soloTicksAtHours(Array.from({ length: 50 }, () => 12));
+    const bigDay: WatchedEpisodeRow[] = [
+      { tmdbId: 7, seasonNumber: 2, episodeNumber: 4, watchedAt: new Date("2026-11-20T14:10:00.000Z") },
+      { tmdbId: 7, seasonNumber: 2, episodeNumber: 3, watchedAt: new Date("2026-11-20T13:05:00.000Z") },
+      { tmdbId: 8, seasonNumber: 10, episodeNumber: 12, watchedAt: new Date("2026-11-20T23:35:00.000Z") },
+    ];
+
+    const result = buildBigDay(
+      [...background, ...bigDay],
+      "UTC",
+      new Map(),
+      titleMap([title({ tmdbId: 7, title: "The Bear" })]),
+    );
+
+    expect(result?.date).toBe("2026-11-20");
+    expect(result?.timeline).toEqual([
+      { at: "2026-11-20T13:05:00.000Z", title: "The Bear", episode: "S2E03" },
+      { at: "2026-11-20T14:10:00.000Z", title: "The Bear", episode: "S2E04" },
+      { at: "2026-11-20T23:35:00.000Z", title: null, episode: "S10E12" },
+    ]);
+    expect(result?.soloTickCount).toBe(3);
+  });
+
+  it("names a timeline point by the show's tv entry, never a film sharing its id", () => {
+    // TMDB numbers films and shows independently, so id 7 can be both. A
+    // timeline point is always an episode.
+    const background = soloTicksAtHours(Array.from({ length: 50 }, () => 12));
+    const bigDay = soloDay("2026-11-20", [13, 14]).map((row) => ({ ...row, tmdbId: 7 }));
+
+    const result = buildBigDay(
+      [...background, ...bigDay],
+      "UTC",
+      new Map(),
+      titleMap([title({ tmdbId: 7, contentType: "movie", title: "A Film" })]),
+    );
+
+    expect(result?.timeline?.map((point) => point.title)).toEqual([null, null]);
   });
 
   it("breaks a tie on the earlier date, whatever order the rows arrive in", () => {
@@ -564,16 +609,16 @@ describe("buildBigDay", () => {
     const march = soloDay("2026-03-03", [10, 11]);
     const september = soloDay("2026-09-09", [10, 11]);
 
-    expect(buildBigDay([...september, ...march], "UTC", new Map())?.date).toBe(
+    expect(buildBigDay([...september, ...march], "UTC", new Map(), new Map())?.date).toBe(
       "2026-03-03",
     );
-    expect(buildBigDay([...march, ...september], "UTC", new Map())?.date).toBe(
+    expect(buildBigDay([...march, ...september], "UTC", new Map(), new Map())?.date).toBe(
       "2026-03-03",
     );
   });
 
   it("returns null for no episodes", () => {
-    expect(buildBigDay([], "UTC", new Map())).toBeNull();
+    expect(buildBigDay([], "UTC", new Map(), new Map())).toBeNull();
   });
 });
 
@@ -622,6 +667,45 @@ describe("buildRhythm", () => {
 
     expect(result.weekdayCounts).toEqual([0, 0, 0, 0, 0, 0, 0]);
     expect(result.topWeekday).toBeNull();
+    expect(result.hourCounts).toBeNull();
+  });
+
+  it("counts solo ticks by local hour, summing to the solo ticks alone", () => {
+    // 30 ticks at 20:00 UTC and 25 at 10:00 UTC, read in Sydney (UTC+11 in
+    // summer, +10 in winter), plus a 100-episode batch that must not count.
+    const rows = [
+      ...soloTicksAtHours([
+        ...Array.from({ length: 30 }, () => 20),
+        ...Array.from({ length: 25 }, () => 10),
+      ]),
+      ...batch("2026-06-06T12:00:00.000Z", 100),
+    ];
+
+    const { hourCounts } = buildRhythm(rows, "Australia/Sydney");
+
+    expect(hourCounts).toHaveLength(24);
+    expect(hourCounts?.reduce((sum, count) => sum + count, 0)).toBe(55);
+    // January and February ticks are in daylight time: 20:00Z is 07:00 local
+    // the next morning, and 10:00Z is 21:00 local.
+    expect(hourCounts?.[7]).toBe(30);
+    expect(hourCounts?.[21]).toBe(25);
+    expect(hourCounts?.[20]).toBe(0);
+  });
+
+  it("returns null hour counts below the solo-tick floor, like lateShare", () => {
+    const noon = (count: number) =>
+      soloTicksAtHours(Array.from({ length: count }, () => 12));
+
+    expect(buildRhythm(noon(49), "UTC").hourCounts).toBeNull();
+    // A batch far above the floor does not lift solo ticks over it.
+    expect(
+      buildRhythm([...noon(49), ...batch("2026-06-06T12:00:00.000Z", 100)], "UTC")
+        .hourCounts,
+    ).toBeNull();
+
+    const atFloor = buildRhythm(noon(50), "UTC").hourCounts;
+    expect(atFloor?.[12]).toBe(50);
+    expect(atFloor?.reduce((sum, count) => sum + count, 0)).toBe(50);
   });
 });
 
@@ -934,6 +1018,49 @@ describe("buildPayload", () => {
     expect(payload.period.label).toBe("2026");
   });
 
+  it("records the zone the snapshot was generated in", () => {
+    expect(
+      buildPayload(input({ timeZone: "Australia/Sydney" }), NOW).period.timezone,
+    ).toBe("Australia/Sydney");
+  });
+
+  it("records the zone it actually used, not one the ICU database rejected", () => {
+    // Every local date in the payload was computed in UTC here, so a renderer
+    // reading the retired name back would place the timeline in a zone the
+    // numbers were never computed in -- or throw.
+    expect(
+      buildPayload(input({ timeZone: "Mars/Olympus" }), NOW).period.timezone,
+    ).toBe("UTC");
+  });
+
+  it("exposes the shared-list share the group-watcher archetype is classified on", () => {
+    // Five finished titles -- enough to escape the thin-year gate without an
+    // episode -- four of them on a shared list. Nothing else fires, so the
+    // archetype lands on group-watcher off 0.8, and the payload reports that
+    // same unrounded number.
+    const ids = [1, 2, 3, 4, 5];
+    const payload = buildPayload(
+      input({
+        statuses: ids.map((tmdbId) => status({ tmdbId })),
+        titles: titleMap(ids.map((tmdbId) => title({ tmdbId }))),
+        collaborativeCompletedKeys: new Set(["tv:1", "tv:2", "tv:3", "tv:4"]),
+      }),
+      NOW,
+    );
+
+    expect(payload.rhythm.archetype).toBe("group-watcher");
+    expect(payload.rhythm.sharedListShare).toBe(0.8);
+  });
+
+  it("reports a null shared-list share when nothing was finished", () => {
+    const payload = buildPayload(
+      input({ collaborativeCompletedKeys: new Set(["tv:1"]) }),
+      NOW,
+    );
+
+    expect(payload.rhythm.sharedListShare).toBeNull();
+  });
+
   it("degrades to UTC instead of throwing on a zone the ICU database no longer knows", () => {
     // `getTimezoneDateKey` hands its zone straight to `Intl.DateTimeFormat`,
     // which throws `RangeError` on an unknown zone -- so a profile holding a
@@ -969,6 +1096,11 @@ describe("buildPayload", () => {
 
     expect(payload.rhythm.archetype).toBe("nightly-ritualist");
     expect(payload.bigDay?.soloTickCount).toBe(1);
+    // The clock the ritualist is drawn with counts the period's ticks too.
+    expect(payload.rhythm.hourCounts?.[21]).toBe(60);
+    expect(
+      payload.rhythm.hourCounts?.reduce((sum, count) => sum + count, 0),
+    ).toBe(payload.soloTickTotal);
   });
 
   it("classifies one-genre-only from the share of titles, not of genre tags", () => {

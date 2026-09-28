@@ -29,6 +29,7 @@ const payload: SeriesFinalePayload = {
     start: "2026-01-01T00:00:00.000Z",
     end: "2027-01-01T00:00:00.000Z",
     label: "2026",
+    timezone: "UTC",
   },
   headline: {
     hours: 412,
@@ -68,6 +69,8 @@ const payload: SeriesFinalePayload = {
     weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
     topWeekday: 0,
     lateShare: null,
+    hourCounts: null,
+    sharedListShare: null,
   },
   shame: { dropped: [], stillPlanning: [] },
   crew: [{ userId: "u2", username: "ana_crew", episodes: 1041 }],

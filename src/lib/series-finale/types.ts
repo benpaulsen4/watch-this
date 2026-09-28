@@ -14,8 +14,11 @@
  *
  * 2: crew entries no longer carry a collaborator's hours or top show, and
  *    `shame.stillPlanning` leaves out films added after the period ended.
+ * 3: `period.timezone`, labelled `bigDay.timeline` points, `rhythm.hourCounts`
+ *    and `rhythm.sharedListShare`; the crew keeps the most active
+ *    collaborators rather than the lowest user ids.
  */
-export const SERIES_FINALE_SCHEMA_VERSION = 2;
+export const SERIES_FINALE_SCHEMA_VERSION = 3;
 
 /**
  * Minimum individually-ticked episodes before any intra-day statistic is
@@ -141,7 +144,14 @@ export interface AggregationInput {
 
 export interface SeriesFinalePayload {
   schemaVersion: number;
-  period: { start: string; end: string; label: string };
+  /**
+   * `timezone` is the IANA zone the snapshot was generated in -- the zone
+   * every local date, weekday and hour below was computed in. A renderer
+   * placing `bigDay.timeline` instants on a clock must use it rather than the
+   * browser's own zone, or a recap viewed abroad would move its big day's
+   * episodes to hours they were not watched at.
+   */
+  period: { start: string; end: string; label: string; timezone: string };
 
   headline: {
     hours: number;
@@ -206,8 +216,14 @@ export interface SeriesFinalePayload {
      * who ticks episodes individually all year but happened to bulk-mark their
      * biggest day. Renderers should check the length before drawing anything
      * that implies a session, rather than assuming non-null means chartable.
+     *
+     * Each point names the episode: `title` is the show's cached title, or
+     * null when the cache has none -- the point is kept, because its time is
+     * still true and dropping it would make the timeline disagree with
+     * `soloTickCount`. `episode` is a code in the same format as
+     * `shame.dropped[].lastEpisode` (`S2E03`).
      */
-    timeline: { at: string }[] | null;
+    timeline: { at: string; title: string | null; episode: string }[] | null;
     /**
      * Solo ticks on `date` only. Not the period-wide count that gates
      * `timeline` and feeds `ArchetypeInput.soloTickCount` -- same name, and
@@ -222,6 +238,19 @@ export interface SeriesFinalePayload {
     weekdayCounts: number[];
     topWeekday: number | null;
     lateShare: number | null;
+    /**
+     * Solo ticks by local hour in `period.timezone`, 24 entries from 00:00, or
+     * null below `SOLO_TICK_FLOOR` -- the same gate as `lateShare`, for the
+     * same reason. Sums to `soloTickTotal` when present.
+     */
+    hourCounts: number[] | null;
+    /**
+     * Share of the titles finished in the period that sit on a list shared
+     * with someone else, unrounded -- the value the group-watcher archetype is
+     * classified on. Null when nothing was finished, where the archetype reads
+     * 0 because it has nothing to divide by.
+     */
+    sharedListShare: number | null;
   };
 
   shame: {

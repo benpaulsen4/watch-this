@@ -169,6 +169,15 @@ export function buildMonths(
   return buckets;
 }
 
+/**
+ * An episode's display code, `S2E03`: season unpadded, episode padded to two.
+ * The one format for every episode the payload names -- shame's last episode
+ * and the big day's timeline points -- so the two cannot drift apart.
+ */
+export function episodeCode(seasonNumber: number, episodeNumber: number): string {
+  return `S${seasonNumber}E${String(episodeNumber).padStart(2, "0")}`;
+}
+
 /** Mean episodes per calendar day across the period. */
 export function episodesPerDay(
   total: number,
@@ -518,11 +527,19 @@ export function longestStreak(
  * ticks and is null below the floor -- a batch of eleven episodes shares one
  * timestamp, so charting it would draw a single spike and describe it as an
  * eight-hour session.
+ *
+ * Each timeline point names its episode from `titles`, looked up as a show:
+ * a point is always an episode, and TMDB numbers films and shows separately,
+ * so a film sharing the id must not lend it a name. A show with no cached
+ * metadata keeps its point with a null title -- the time is still true, and
+ * dropping the point would leave the timeline disagreeing with
+ * `soloTickCount`.
  */
 export function buildBigDay(
   episodes: WatchedEpisodeRow[],
   timeZone: string,
   episodeRuntimeLookup: RuntimeLookup,
+  titles: Map<string, TitleMeta>,
 ): SeriesFinalePayload["bigDay"] {
   if (episodes.length === 0) return null;
 
@@ -570,7 +587,11 @@ export function buildBigDay(
         ? soloOnBestDay
             .slice()
             .sort((a, b) => a.watchedAt.getTime() - b.watchedAt.getTime())
-            .map((row) => ({ at: row.watchedAt.toISOString() }))
+            .map((row) => ({
+              at: row.watchedAt.toISOString(),
+              title: titles.get(titleKey(row.tmdbId, "tv"))?.title ?? null,
+              episode: episodeCode(row.seasonNumber, row.episodeNumber),
+            }))
         : null,
     soloTickCount: soloOnBestDay.length,
     streak: longestStreak(Array.from(byDay.keys())),
@@ -579,20 +600,18 @@ export function buildBigDay(
 
 /**
  * Weekday distribution over every episode, plus the share of solo ticks from
- * 21:00 onwards -- the 21:00 hour itself counts, so a 21:30 episode is late.
+ * 21:00 onwards -- the 21:00 hour itself counts, so a 21:30 episode is late --
+ * and the solo ticks' 24-hour distribution.
  *
  * Weekday counts use all episodes: a batch write still lands on the right day.
- * `lateShare` uses solo ticks only and is null below the floor, because
- * time-of-day over batched rows is an artefact of when someone bulk-marked.
+ * `lateShare` and `hourCounts` use solo ticks only and are null below the
+ * floor, because time-of-day over batched rows is an artefact of when someone
+ * bulk-marked.
  */
 export function buildRhythm(
   episodes: WatchedEpisodeRow[],
   timeZone: string,
-): {
-  weekdayCounts: number[];
-  topWeekday: number | null;
-  lateShare: number | null;
-} {
+): Omit<SeriesFinalePayload["rhythm"], "archetype" | "sharedListShare"> {
   const weekdayCounts = Array.from({ length: 7 }, () => 0);
   for (const row of episodes) {
     const weekday = getTimezoneWeekday(row.watchedAt, timeZone);
@@ -607,13 +626,25 @@ export function buildRhythm(
     total === 0 ? null : weekdayCounts.indexOf(Math.max(...weekdayCounts));
 
   const { solo } = partitionSoloTicks(episodes);
-  const lateShare =
-    solo.length >= SOLO_TICK_FLOOR
-      ? solo.filter((row) => getTimezoneHour(row.watchedAt, timeZone) >= 21)
-          .length / solo.length
-      : null;
+  if (solo.length < SOLO_TICK_FLOOR) {
+    return { weekdayCounts, topWeekday, lateShare: null, hourCounts: null };
+  }
 
-  return { weekdayCounts, topWeekday, lateShare };
+  const hourCounts = Array.from({ length: 24 }, () => 0);
+  for (const row of solo) {
+    const hour = getTimezoneHour(row.watchedAt, timeZone);
+    // `?? 0` only for `noUncheckedIndexedAccess`: `getTimezoneHour` is 0-23.
+    hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
+  }
+
+  const late = hourCounts.slice(21).reduce((a, b) => a + b, 0);
+
+  return {
+    weekdayCounts,
+    topWeekday,
+    lateShare: late / solo.length,
+    hourCounts,
+  };
 }
 
 /**
@@ -694,7 +725,7 @@ export function buildShame(
         tmdbId: row.tmdbId,
         title: meta.title,
         lastEpisode: last
-          ? `S${last.seasonNumber}E${String(last.episodeNumber).padStart(2, "0")}`
+          ? episodeCode(last.seasonNumber, last.episodeNumber)
           : null,
       };
     })
@@ -793,6 +824,12 @@ export function buildPayload(
   const collaborativeCount = completedInPeriod.filter((row) =>
     input.collaborativeCompletedKeys.has(titleKey(row.tmdbId, row.contentType)),
   ).length;
+  // One value, read by both the archetype and the payload, so the group
+  // watcher's visual shows exactly the share it was classified on. Null with
+  // nothing finished: there is no share to show. The archetype reads that as
+  // 0, which is what it has always been handed in that case.
+  const sharedListShare =
+    finished.total === 0 ? null : collaborativeCount / finished.total;
 
   const archetype = classifyArchetype({
     completedTitles: finished.total,
@@ -814,8 +851,7 @@ export function buildPayload(
     // See `topGenreTitleShare`.
     topGenreShare: topGenreTitleShare(completedMetas),
     medianPopularity: median(completedMetas.map((meta) => meta.popularity)),
-    collaborativeCompletedShare:
-      finished.total === 0 ? 0 : collaborativeCount / finished.total,
+    collaborativeCompletedShare: sharedListShare ?? 0,
     totalEpisodes: episodes.length,
     totalTitles: finished.total,
   });
@@ -826,6 +862,9 @@ export function buildPayload(
       start: period.start.toISOString(),
       end: period.end.toISOString(),
       label: period.label,
+      // The resolved zone, not `input.timeZone`: it is the one every local
+      // date and hour here was actually computed in.
+      timezone: zone,
     },
     headline: {
       hours: Math.round(minutes / 60),
@@ -847,8 +886,8 @@ export function buildPayload(
     genres,
     months,
     soloTickTotal: solo.length,
-    bigDay: buildBigDay(episodes, zone, input.episodeRuntimeLookup),
-    rhythm: { archetype, ...rhythm },
+    bigDay: buildBigDay(episodes, zone, input.episodeRuntimeLookup, titles),
+    rhythm: { archetype, ...rhythm, sharedListShare },
     shame: buildShame(statuses, titles, episodes, period, now),
     crew: input.crew,
     // Assembled in plan 3, where the peer completed/planning sets are loaded.
