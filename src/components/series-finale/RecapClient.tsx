@@ -22,6 +22,7 @@ import type {
 } from "@/lib/series-finale/types";
 import { cn } from "@/lib/utils";
 
+import { ArchetypeVisual } from "./ArchetypeVisual";
 import { BigDayTimeline } from "./BigDayTimeline";
 import { ComparePeerPicker, useComparePeer } from "./ComparePeerPicker";
 import { CompareFacts, CompareSplit } from "./CompareSplit";
@@ -249,9 +250,9 @@ function RecapBody({
       <Container className="space-y-4 pb-14">
         <StatRow payload={payload} />
         <Band wide>
-          <MonthsPanel months={payload.months} />
+          <MonthsPanel months={payload.months} rhythm={payload.rhythm} />
           {archetype !== null ? (
-            <ArchetypePanel archetype={archetype} rhythm={payload.rhythm} />
+            <ArchetypePanel archetype={archetype} payload={payload} />
           ) : null}
         </Band>
         <Band>
@@ -461,8 +462,22 @@ function StatRow({ payload }: { payload: SeriesFinalePayload }) {
   );
 }
 
-function MonthsPanel({ months }: { months: SeriesFinalePayload["months"] }) {
+/**
+ * The months, and under them the weekdays for every type but the weekday
+ * marathoner, whose own card draws the weekday strip larger: one strip per
+ * page, never the same chart twice side by side.
+ */
+function MonthsPanel({
+  months,
+  rhythm,
+}: {
+  months: SeriesFinalePayload["months"];
+  rhythm: SeriesFinalePayload["rhythm"];
+}) {
   const peak = peakMonth(months);
+  const weekdays =
+    rhythm.archetype !== "weekday-marathoner" &&
+    rhythm.weekdayCounts.some((count) => count > 0);
 
   return (
     <Panel
@@ -474,17 +489,30 @@ function MonthsPanel({ months }: { months: SeriesFinalePayload["months"] }) {
       }
     >
       <MonthsChart months={months} axis />
+      {weekdays ? (
+        <div className="mt-6 border-t border-gray-800 pt-5">
+          <h3 className="mb-3 text-sm font-medium text-gray-300">
+            By day of the week
+          </h3>
+          {/* Indented past the months' axis, so the two plots line up. */}
+          <div className="pl-10">
+            <WeekdayStrip rhythm={rhythm} />
+          </div>
+        </div>
+      ) : null}
     </Panel>
   );
 }
 
+/** The type's name and copy, then its picture (see `ArchetypeVisual`). */
 function ArchetypePanel({
   archetype,
-  rhythm,
+  payload,
 }: {
   archetype: ArchetypeId;
-  rhythm: SeriesFinalePayload["rhythm"];
+  payload: SeriesFinalePayload;
 }) {
+  const { rhythm } = payload;
   const name = archetypeName({ archetype, topWeekday: rhythm.topWeekday });
   const description = archetypeDescription(archetype, rhythm);
 
@@ -496,9 +524,7 @@ function ArchetypePanel({
       <p className="mt-4 text-sm leading-relaxed text-pretty text-gray-300">
         {description}
       </p>
-      <div className="mt-auto pt-6">
-        <WeekdayStrip rhythm={rhythm} />
-      </div>
+      <ArchetypeVisual payload={payload} className="mt-auto pt-6" />
     </Panel>
   );
 }

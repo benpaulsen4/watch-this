@@ -3,6 +3,7 @@
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
 import { cn } from "@/lib/utils";
 
+import { ArchetypeVisual } from "../ArchetypeVisual";
 import { BigDayTimeline } from "../BigDayTimeline";
 import { CrewRanking } from "../CrewRanking";
 import {
@@ -30,12 +31,12 @@ import {
   unknownRuntimeNote,
 } from "../format";
 import { GenreBars } from "../GenreBars";
+import { PopularityStrip } from "../PopularityStrip";
 import { Poster } from "../Poster";
-import { MonthsChart, WeekdayStrip } from "../RhythmCharts";
+import { MonthsChart } from "../RhythmCharts";
 import type { StoryCardId } from "../StoryReel";
 import type { Viewer } from "../viewer";
 import { CompareCard } from "./CompareCard";
-import { PopularityStrip } from "./PopularityStrip";
 import { ShameCard } from "./ShameCard";
 import { Enter, Eyebrow, Headline, Shell } from "./StoryShell";
 import { SummaryCard } from "./SummaryCard";
@@ -256,7 +257,15 @@ export function StoryCard({
           >
             {nicheComparison(niche)}
           </Enter>
-          <PopularityStrip popularities={niche.filmPopularities} />
+          {/* The strip carries its own margin, so a card with too few films
+              to draw one keeps no gap where it would have been. */}
+          <Enter kind="fade" delay={340}>
+            <PopularityStrip
+              popularities={niche.filmPopularities}
+              size="large"
+              className="mt-8"
+            />
+          </Enter>
           {niche.mostPopular ? (
             <Enter
               kind="fade"
@@ -377,8 +386,8 @@ export function StoryCard({
           >
             {archetypeDescription(rhythm.archetype, rhythm)}
           </Enter>
-          <Enter kind="fade" delay={400} className="mt-9 w-full max-w-[290px]">
-            <WeekdayStrip rhythm={rhythm} />
+          <Enter kind="fade" delay={400} className="w-full max-w-[290px]">
+            <ArchetypeVisual payload={payload} size="large" className="mt-9" />
           </Enter>
         </Shell>
       );

@@ -666,6 +666,116 @@ describe("RecapClient", () => {
     expect(screen.queryByText("Your type")).not.toBeInTheDocument();
   });
 
+  it("draws the weekdays under the months for a type other than the marathoner", async () => {
+    mockFetch({
+      payload: payload({
+        rhythm: {
+          archetype: "group-watcher",
+          weekdayCounts: [10, 10, 10, 10, 30, 10, 10],
+          topWeekday: 4,
+          lateShare: null,
+          hourCounts: null,
+          sharedListShare: 0.625,
+        },
+      }),
+    });
+    renderRecap();
+
+    const heading = await screen.findByRole("heading", {
+      name: "By day of the week",
+    });
+    const months = screen
+      .getByRole("heading", { name: "Watched by month" })
+      .closest<HTMLElement>(".flex-col");
+    expect(months).toContainElement(heading);
+    expect(months).toContainElement(
+      screen.getByRole("img", { name: "Episodes by weekday. Peak Friday." }),
+    );
+
+    // The type's own picture is the shared-list share, not the weekdays.
+    const type = screen
+      .getByRole("heading", { name: "Your type" })
+      .closest<HTMLElement>(".flex-col");
+    expect(type).toContainElement(
+      screen.getByRole("img", {
+        name: "63% of what you finished was on a shared list.",
+      }),
+    );
+  });
+
+  it("draws the weekdays under the months with no archetype at all", async () => {
+    mockFetch({
+      payload: payload({
+        rhythm: {
+          archetype: null,
+          weekdayCounts: [1, 1, 1, 1, 1, 1, 6],
+          topWeekday: 6,
+          lateShare: null,
+          hourCounts: null,
+          sharedListShare: null,
+        },
+      }),
+    });
+    renderRecap();
+
+    expect(
+      await screen.findByRole("img", {
+        name: "Episodes by weekday. Peak Sunday.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Your type")).not.toBeInTheDocument();
+  });
+
+  it("draws the weekdays once, in the marathoner's own card", async () => {
+    mockFetch({
+      payload: payload({
+        rhythm: {
+          archetype: "weekday-marathoner",
+          weekdayCounts: [10, 10, 10, 10, 10, 10, 60],
+          topWeekday: 6,
+          lateShare: null,
+          hourCounts: null,
+          sharedListShare: null,
+        },
+      }),
+    });
+    renderRecap();
+
+    await screen.findByText("The Sunday Marathoner");
+    expect(
+      screen.queryByRole("heading", { name: "By day of the week" }),
+    ).not.toBeInTheDocument();
+    const strips = screen.getAllByRole("img", {
+      name: "Episodes by weekday. Peak Sunday.",
+    });
+    expect(strips).toHaveLength(1);
+    const type = screen
+      .getByRole("heading", { name: "Your type" })
+      .closest<HTMLElement>(".flex-col");
+    expect(type).toContainElement(strips[0] ?? null);
+  });
+
+  it("keeps the type's card without a picture when its data is missing", async () => {
+    mockFetch({
+      payload: payload({
+        rhythm: {
+          archetype: "nightly-ritualist",
+          weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
+          topWeekday: 0,
+          lateShare: null,
+          hourCounts: null,
+          sharedListShare: null,
+        },
+      }),
+    });
+    const { container } = renderRecap();
+
+    expect(
+      await screen.findByText("The Nightly Ritualist"),
+    ).toBeInTheDocument();
+    expect(container.querySelector("[data-archetype-visual]")).toBeNull();
+  });
+
   it("lists dropped shows with the episode that tipped it", async () => {
     mockFetch({
       payload: payload({

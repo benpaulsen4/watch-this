@@ -93,4 +93,15 @@ describe("BarChart", () => {
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("0")).toBeInTheDocument();
   });
+
+  it("draws the medium strip taller than the compact one, with flat bars", () => {
+    const { container } = render(
+      <BarChart bars={bars} ariaLabel="Episodes by weekday" size="medium" />,
+    );
+
+    const plot = screen.getByRole("img", { name: "Episodes by weekday" });
+    expect(plot.parentElement).toHaveClass("h-28");
+    const bar = container.querySelector<HTMLElement>("[data-bar]");
+    expect(bar).toHaveClass("rounded-sm");
+  });
 });

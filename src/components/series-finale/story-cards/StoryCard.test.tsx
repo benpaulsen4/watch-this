@@ -360,6 +360,54 @@ describe("StoryCard", () => {
     ).toBeInTheDocument();
   });
 
+  it("draws the type's own picture on the rhythm card, not the weekdays", () => {
+    const { container } = renderCard("rhythm", {
+      rhythm: {
+        archetype: "completionist",
+        weekdayCounts: [1, 1, 1, 1, 1, 1, 6],
+        topWeekday: 6,
+        lateShare: null,
+        hourCounts: null,
+        sharedListShare: null,
+      },
+    });
+    expect(screen.getByText("The Completionist")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Titles finished against titles dropped: 47 finished, 6 dropped. About eight finished for every one dropped.",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: /Episodes by weekday/ }),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector("[data-archetype-visual]")).toHaveClass(
+      "mt-9",
+    );
+  });
+
+  it("keeps the rhythm card when the type's picture has no data", () => {
+    const { container } = renderCard("rhythm", {
+      rhythm: {
+        archetype: "group-watcher",
+        weekdayCounts: [1, 1, 1, 1, 1, 1, 1],
+        topWeekday: 0,
+        lateShare: null,
+        hourCounts: null,
+        sharedListShare: null,
+      },
+    });
+    expect(screen.getByText("The Group Watcher")).toBeInTheDocument();
+    expect(container.querySelector("[data-archetype-visual]")).toBeNull();
+  });
+
+  it("leaves no gap on the niche card when too few films to line up", () => {
+    const { container } = renderCard("niche", {
+      niche: { ...niche, filmPopularities: [2.1, 50] },
+    });
+    expect(container.querySelector("[data-popularity]")).toBeNull();
+    expect(container.querySelector(".mt-8:empty")).toBeNull();
+  });
+
   it("lists the dropped shows and the longest-waiting film", () => {
     renderCard("shame", {
       ...droppedCount(2),

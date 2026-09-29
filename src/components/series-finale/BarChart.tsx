@@ -21,8 +21,11 @@ interface BarChartProps {
    * with the gridlines.
    */
   axis?: boolean;
-  /** "compact" is the short, flat-bar strip under the mock's archetype. */
-  size?: "default" | "compact";
+  /**
+   * "compact" is the short, flat-bar strip under the mock's archetype;
+   * "medium" the same strip drawn taller, where it is a card's one picture.
+   */
+  size?: "default" | "compact" | "medium";
 }
 
 const AXIS_INTERVALS = 4;
@@ -64,8 +67,10 @@ export function BarChart({
   const peak = Math.max(...bars.map((bar) => bar.value), 0);
   const ticks = axis ? axisTicks(peak) : [];
   const scaleTop = ticks[0] ?? peak;
-  const compact = size === "compact";
-  const plotHeight = compact ? "h-12" : "h-48";
+  const compact = size !== "default";
+  const plotHeight = { default: "h-48", compact: "h-12", medium: "h-28" }[
+    size
+  ];
   const gap = compact ? "gap-1.5" : "gap-2.5";
 
   return (

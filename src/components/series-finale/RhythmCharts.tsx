@@ -51,15 +51,20 @@ export function MonthsChart({
   );
 }
 
-/** Episodes by weekday, Monday first, the top weekday highlighted. */
+/**
+ * Episodes by weekday, Monday first, the top weekday highlighted. "medium" is
+ * the weekday marathoner's card, where the strip is the whole picture.
+ */
 export function WeekdayStrip({
   rhythm,
+  size = "compact",
 }: {
   rhythm: Pick<Payload["rhythm"], "weekdayCounts" | "topWeekday">;
+  size?: "compact" | "medium";
 }) {
   return (
     <BarChart
-      size="compact"
+      size={size}
       ariaLabel={
         rhythm.topWeekday === null
           ? "Episodes by weekday."

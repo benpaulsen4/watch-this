@@ -13,12 +13,17 @@ import {
   crewHeadline,
   dateKeyWeekday,
   episodesPerDayLine,
+  feastLine,
+  feastMonths,
+  finishedDroppedLine,
   finishedLine,
   formatCount,
   formatDateKey,
   formatDateRange,
   formatHoursMinutes,
   heroSentence,
+  hourClockLines,
+  hourLabel,
   hoursLine,
   isThinPeriod,
   monthInitial,
@@ -41,6 +46,7 @@ import {
   quietestMonth,
   shameIntro,
   shamePlanningLink,
+  sharedListLine,
   soloTickDisclosure,
   streakLabel,
   streakLine,
@@ -48,6 +54,7 @@ import {
   timelineEpisode,
   timelinePointLabel,
   timelineSummary,
+  topGenreLine,
   topShowStats,
   unknownRuntimeNote,
   weekdayInitial,
@@ -1039,5 +1046,129 @@ describe("finishedLine", () => {
 
   it("leaves the comparison out when nothing was dropped", () => {
     expect(finishedLine(47, 0)).toBe("things, all the way to the end.");
+  });
+});
+
+describe("hourLabel", () => {
+  it("pads the hour", () => {
+    expect(hourLabel(0)).toBe("00:00");
+    expect(hourLabel(22)).toBe("22:00");
+  });
+});
+
+describe("hourClockLines", () => {
+  const hours = (entries: Record<number, number>) =>
+    Array.from({ length: 24 }, (_, hour) => entries[hour] ?? 0);
+
+  it("says the share between 21:00 and 03:00 and the busiest hour", () => {
+    // 21-02 hold 30 + 10 + 5 = 45 of 60; 03:00 is outside the window.
+    const lines = hourClockLines(hours({ 22: 30, 1: 10, 2: 5, 3: 5, 12: 10 }));
+    expect(lines).toEqual({
+      caption:
+        "75% of the episodes you ticked one at a time came between 21:00 and 03:00.",
+      ariaLabel:
+        "Episodes ticked one at a time, by hour of the day. 75% between 21:00 and 03:00; busiest hour 22:00.",
+    });
+  });
+
+  it("takes the earlier hour on a tie", () => {
+    expect(hourClockLines(hours({ 9: 4, 23: 4 }))?.ariaLabel).toMatch(
+      /busiest hour 09:00\.$/,
+    );
+  });
+
+  it("is null with no ticks", () => {
+    expect(hourClockLines(hours({}))).toBeNull();
+  });
+});
+
+describe("topGenreLine", () => {
+  it("says the percent is of genre tags", () => {
+    expect(topGenreLine({ name: "Drama", percent: 38 })).toBe(
+      "Drama: 38% of the genre tags on what you finished",
+    );
+  });
+});
+
+describe("sharedListLine", () => {
+  it("rounds the unrounded share", () => {
+    expect(sharedListLine(0.625)).toBe(
+      "63% of what you finished was on a shared list",
+    );
+  });
+});
+
+describe("finishedDroppedLine", () => {
+  it("puts an exact whole ratio plainly", () => {
+    expect(finishedDroppedLine(42, 3)).toBe(
+      "Fourteen finished for every one dropped.",
+    );
+  });
+
+  it("uses a small fraction when the ratio is not whole", () => {
+    expect(finishedDroppedLine(12, 10)).toBe(
+      "Six finished for every five dropped.",
+    );
+  });
+
+  it("says About when the words round the ratio", () => {
+    // 47 / 6 = 7.83: eight for every one is within 5%.
+    expect(finishedDroppedLine(47, 6)).toBe(
+      "About eight finished for every one dropped.",
+    );
+  });
+
+  it("prefers a whole number within 10% to an exact-looking fraction", () => {
+    // 26 / 14 = 1.86: two for one is 8% out, nine for five 3%.
+    expect(finishedDroppedLine(26, 14)).toBe(
+      "About two finished for every one dropped.",
+    );
+  });
+
+  it("leads with dropped when more were dropped", () => {
+    expect(finishedDroppedLine(4, 6)).toBe(
+      "Three dropped for every two finished.",
+    );
+    expect(finishedDroppedLine(7, 10)).toBe(
+      "About three dropped for every two finished.",
+    );
+  });
+
+  it("says one for one on a tie", () => {
+    expect(finishedDroppedLine(5, 5)).toBe(
+      "One finished for every one dropped.",
+    );
+  });
+
+  it("handles one side empty, and is null with neither", () => {
+    expect(finishedDroppedLine(20, 0)).toBe("Nothing dropped.");
+    expect(finishedDroppedLine(0, 6)).toBe("Nothing finished.");
+    expect(finishedDroppedLine(0, 0)).toBeNull();
+  });
+});
+
+describe("feastMonths and feastLine", () => {
+  const months = (counts: number[]) =>
+    counts.map((episodes, index) => ({ month: index + 1, episodes }));
+
+  it("takes every month at half the busiest or more", () => {
+    const year = months([0, 0, 40, 0, 0, 0, 0, 20, 19, 0, 0, 1]);
+    expect(feastMonths(year).map((month) => month.month)).toEqual([3, 8]);
+    // 60 of 80.
+    expect(feastLine(year)).toBe(
+      "March and August: 75% of the year's episodes and films.",
+    );
+  });
+
+  it("names a lone peak", () => {
+    expect(feastLine(months([0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0]))).toBe(
+      "July: 100% of the year's episodes and films.",
+    );
+  });
+
+  it("is empty with nothing logged", () => {
+    const empty = months(Array.from({ length: 12 }, () => 0));
+    expect(feastMonths(empty)).toEqual([]);
+    expect(feastLine(empty)).toBeNull();
   });
 });

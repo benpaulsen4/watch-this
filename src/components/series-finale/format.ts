@@ -201,8 +201,8 @@ function percentOf(part: number, whole: number): number {
 }
 
 /**
- * What the weekday strip under the archetype shows, in words, saying exactly
- * what `rhythm` measures: weekday counts are episodes, and `lateShare` is the
+ * What the weekday strip shows (under the months, or the marathoner's own
+ * card), in words, saying exactly what `rhythm` measures: weekday counts are episodes, and `lateShare` is the
  * share of episodes ticked one at a time that came from 21:00 -- batch ticks
  * carry no real time of day, so they are not in it.
  */
@@ -248,6 +248,143 @@ export function archetypeDescription(
   const detail = archetypeDetail(rhythm);
   const { blurb } = ARCHETYPE_LABELS[archetype];
   return detail ? `${blurb} ${detail}` : blurb;
+}
+
+// ---------------------------------------------------------------------------
+// Archetype visuals -- the words on and behind each type's picture
+// ---------------------------------------------------------------------------
+
+/**
+ * The hours the nightly ritualist's clock highlights, 21:00 up to 03:00. Not
+ * `lateShare`'s window (21:00 to midnight): the clock shows the whole night,
+ * and says its own share rather than borrowing that one.
+ */
+export const NIGHT_HOURS = [21, 22, 23, 0, 1, 2] as const;
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+/** "22:00" for 22. */
+export function hourLabel(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+/**
+ * The clock's words: the share of solo ticks between 21:00 and 03:00, and the
+ * busiest hour (the earlier on a tie). Null when there is no tick to share.
+ */
+export function hourClockLines(
+  hourCounts: number[],
+): { caption: string; ariaLabel: string } | null {
+  const total = sum(hourCounts);
+  if (total === 0) return null;
+
+  const night = sum(NIGHT_HOURS.map((hour) => hourCounts[hour] ?? 0));
+  let busiest = 0;
+  hourCounts.forEach((count, hour) => {
+    if (count > (hourCounts[busiest] ?? 0)) busiest = hour;
+  });
+  const share = `${percentOf(night, total)}%`;
+
+  return {
+    caption: `${share} of the episodes you ticked one at a time came between 21:00 and 03:00.`,
+    ariaLabel: `Episodes ticked one at a time, by hour of the day. ${share} between 21:00 and 03:00; busiest hour ${hourLabel(busiest)}.`,
+  };
+}
+
+/**
+ * The one-genre bar's label. `genres[].percent` is a share of genre TAGS on
+ * the titles finished (a title carries two or three), so it says so: "of what
+ * you finished" alone would read as a share of titles, which it is not.
+ */
+export function topGenreLine(genre: Payload["genres"][number]): string {
+  return `${genre.name}: ${genre.percent}% of the genre tags on what you finished`;
+}
+
+/** The group watcher's bar: the share it was classified on, rounded. */
+export function sharedListLine(share: number): string {
+  return `${percentOf(share, 1)}% of what you finished was on a shared list`;
+}
+
+/** Largest denominator a finished-to-dropped ratio is put into words with. */
+const RATIO_MAX_DENOMINATOR = 5;
+
+/**
+ * `larger : smaller` in words-sized numbers: the exact ratio when a
+ * denominator up to five gives it, else the simplest fraction within 10% of
+ * it (a whole number where one will do: "about two" reads, "about nine for
+ * every five" does not), else the closest one there is. `exact` when it is
+ * the true ratio.
+ */
+function smallRatio(
+  larger: number,
+  smaller: number,
+): { p: number; q: number; exact: boolean } {
+  const ratio = larger / smaller;
+  const candidates = Array.from({ length: RATIO_MAX_DENOMINATOR }, (_, i) => {
+    const q = i + 1;
+    const p = Math.max(1, Math.round(ratio * q));
+    return { p, q, error: Math.abs(p / q - ratio) };
+  });
+
+  const exact = candidates.find(({ p, q }) => larger * q === p * smaller);
+  const close = candidates.find(({ error }) => error <= ratio * 0.1);
+  const closest = candidates.reduce((best, candidate) =>
+    candidate.error < best.error ? candidate : best,
+  );
+  const { p, q } = exact ?? close ?? closest;
+
+  return { p, q, exact: exact !== undefined };
+}
+
+/**
+ * The finished-against-dropped ratio in words: "Fourteen finished for every
+ * one dropped.", "About three dropped for every two finished." Null with
+ * neither.
+ */
+export function finishedDroppedLine(
+  completed: number,
+  dropped: number,
+): string | null {
+  if (completed <= 0 && dropped <= 0) return null;
+  if (dropped <= 0) return "Nothing dropped.";
+  if (completed <= 0) return "Nothing finished.";
+
+  const finishedLeads = completed >= dropped;
+  const { p, q, exact } = finishedLeads
+    ? smallRatio(completed, dropped)
+    : smallRatio(dropped, completed);
+  const [lead, trail] = finishedLeads
+    ? ["finished", "dropped"]
+    : ["dropped", "finished"];
+  const phrase = `${numberWords(p)} ${lead} for every ${numberWords(q)} ${trail}.`;
+  return exact ? capitalise(phrase) : `About ${phrase}`;
+}
+
+/**
+ * The feast months: every month at half the busiest one or more. Empty when
+ * nothing was logged.
+ */
+export function feastMonths(months: Payload["months"]): Payload["months"] {
+  const peak = peakMonth(months);
+  if (!peak) return [];
+  return months.filter((month) => month.episodes * 2 >= peak.episodes);
+}
+
+/**
+ * "March and August: 61% of the year's episodes and films." -- the feast
+ * months and their share of the months chart's total. Null when nothing was
+ * logged.
+ */
+export function feastLine(months: Payload["months"]): string | null {
+  const feast = feastMonths(months);
+  const total = sum(months.map((month) => month.episodes));
+  if (feast.length === 0 || total === 0) return null;
+
+  const names = joinWithAnd(feast.map((month) => monthName(month.month)));
+  const share = percentOf(sum(feast.map((month) => month.episodes)), total);
+  return `${names}: ${share}% of the year's episodes and films.`;
 }
 
 /** "16h 42m", "8h", "42m". */
