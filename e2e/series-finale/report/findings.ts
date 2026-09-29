@@ -13,9 +13,13 @@ import { PROJECTS } from "./load";
 export interface FindingDef {
   id: string;
   title: string;
+  /** Where the problem was, when the finding was made. */
   where: string;
+  /** What was wrong, as found (the run's evidence says whether it still is). */
   diagnosis: string;
-  /** A failing check (the run fails on it) or an informational note. */
+  /** How plan 6 fixed it, and what the checks now hold the app to. */
+  fix: string;
+  /** Checks that fail while the finding holds, or an informational note. */
   kind: "check" | "note";
   matches: (e: Evidence) => boolean;
 }
@@ -27,6 +31,7 @@ export const FINDINGS: FindingDef[] = [
     where: "src/components/series-finale/RecapClient.tsx:236-258 (Band)",
     diagnosis:
       "The wide band holding \"Watched by month\" and \"Your type\" has no column rule below lg, so its one implicit column grows to its widest item's min-content width: the page is 473 px wide in a 390 px viewport.",
+    fix: "Plan 6 Task 4: every Band is grid-cols-1 below lg (minmax columns from lg), and the months chart names each month by its initial below sm. Checked: every recap page is exactly as wide as the viewport.",
     kind: "check",
     matches: (e) => /^visual-.+-no-horizontal-scroll$/.test(e.id),
   },
@@ -36,16 +41,18 @@ export const FINDINGS: FindingDef[] = [
     where: "src/components/ui/PageHeader.tsx:24-26 (fixed h-16 bar)",
     diagnosis:
       "Beside \"Play as story\" and Share, \"Series Finale 2025\" wraps to three lines inside the fixed-height header; the title column has no min-w-0/truncate, so the text spills above and below the bar.",
+    fix: "Plan 6 Tasks 4-5: the title column is min-w-0 and the h1 truncates (with its full title on hover); below sm the header's actions fold to their icons. Checked: the title lies inside the bar and is whole, not truncated.",
     kind: "check",
     matches: (e) => /^visual-.+-header-title-fits$/.test(e.id),
   },
   {
     id: "F3",
     title: "Crew capped by user id, before activity is loaded",
-    where: "src/lib/series-finale/service.ts:238-275 (loadCollaboratorIds)",
+    where: "src/lib/series-finale/service.ts:238-275 (loadCollaboratorIds, before plan 6)",
     diagnosis:
-      "Consenting collaborators are sorted by user id and the first 8 kept before any activity is loaded, so who is left out depends on ids, not on how much they watched. Informational: the note compares the crew the app stored for e2e_jon (nine consenting collaborators) with the oracle's 8 most active, and is met once the cap goes by activity.",
-    kind: "note",
+      "Consenting collaborators were sorted by user id and the first 8 kept before any activity was loaded, so who was left out depended on ids, not on how much they watched.",
+    fix: "Plan 6 Task 1: every consenting collaborator is ranked by episodes in the period, then username, then id, and the 8 most active are kept (service.ts:301-314 mostActiveCollaborators). Checked: the crew the app stored for e2e_jon -- nine consenting collaborators, dee's id pinned to sort last -- is his 8 most active (crew-cap-rule).",
+    kind: "check",
     matches: (e) => e.id === "crew-cap-rule",
   },
   {
@@ -54,17 +61,19 @@ export const FINDINGS: FindingDef[] = [
     where: "src/components/series-finale/story-cards/SummaryCard.tsx:58-60",
     diagnosis:
       "The \"<username>'s year\" line has no break rule; underscores give no break opportunity, so flo's 725 px name runs out of the card (desktop) and scrolls the whole page sideways (phones). The share image wraps the same name.",
+    fix: "Plan 6 Task 4: the line (and the recap hero's name line, and a panel's title) wraps anywhere. Checked: every story card of flo's fits its column and the viewport.",
     kind: "check",
     matches: (e) => /^story-visual-.+-(fits-column|no-horizontal-scroll)$/.test(e.id),
   },
   {
     id: "F5",
     title: "Compare disc label clipped on phones (story and recap)",
-    where: "src/components/series-finale/CompareSplit.tsx:113-123 (line 117: the peer label's truncate, in both the default and the large variant)",
+    where: "src/components/series-finale/CompareSplit.tsx:113-123 (the peer label's truncate, before plan 6)",
     diagnosis:
-      "The peer's disc label is exactly as wide as its box and overflow-hidden, so at DPR 2 the last glyph's ink is cut: \"only e2e_bo\" reads \"only e2e_bc\" on the story card's large disc and on the recap panel's default one. DOM widths cannot see it; the verdict is a person's reading of the phone screenshots (Task 7 review, final review), recorded as a manual observation. Informational.",
-    kind: "note",
-    matches: (e) => e.id === "F5-compare-disc-label-clipped",
+      "The peer's disc label was exactly as wide as its box and overflow-hidden, so at DPR 2 the last glyph's ink was cut: \"only e2e_bo\" read \"only e2e_bc\" on the story card's large disc and on the recap panel's default one. It was a person's reading of the phone screenshots; the DOM widths fitted.",
+    fix: "Plan 6 Tasks 4-5: the Venn sets each label beneath the picture in its own third, wrapping anywhere, with nothing above it clipping. Checked on every project, for every peer swapped in, in both disc sizes (the story's large card, the recap's default panel): every label's content fits its box, with a screenshot of each.",
+    kind: "check",
+    matches: (e) => /^F5-compare-labels-whole-(story|recap)-/.test(e.id),
   },
   {
     id: "F6",
@@ -72,6 +81,7 @@ export const FINDINGS: FindingDef[] = [
     where: "src/components/ui/PageHeader.tsx:24-26 + src/components/series-finale/ShareButton.tsx:130-136",
     diagnosis:
       "The Share wrapper is a flex column holding the button and the failure line; in the fixed h-16 bar it grows to 84 px and is centred past both edges: the button's top is off-screen and the line spills below the header.",
+    fix: "Plan 6 Task 4: the recap shows the failure as a notice below the header, outside the bar, and the button no longer moves. Checked: with the failure shown, the Share button lies inside the bar and the line below it, visible.",
     kind: "check",
     matches: (e) => /^share-failure-layout(-boxes)?$/.test(e.id),
   },
@@ -79,33 +89,29 @@ export const FINDINGS: FindingDef[] = [
 
 export interface FindingStatus {
   def: FindingDef;
-  /** Evidence indexes that show the finding: failing checks, or unmet notes (never a manual observation). */
+  /** Evidence indexes that show the finding: failing checks, or unmet notes. */
   showing: number[];
   /** Every evidence index the finding covers, shown or not. */
   covered: number[];
-  /** Every covering line is a manual observation: this run cannot say whether the finding still holds. */
-  manualOnly: boolean;
   extra: string | null;
 }
 
 /** A finding's status in words, for the gallery and the report. */
 export function findingState(s: FindingStatus): string {
   if (s.covered.length === 0) return "no evidence this run";
-  if (s.manualOnly) return "manual observation; not re-verified by this run";
-  if (s.showing.length === 0) return "not reproduced this run";
-  return s.def.kind === "check" ? `reproduced: ${s.showing.length} failing check(s)` : "reproduced (note not met)";
+  if (s.showing.length > 0) return s.def.kind === "check" ? `REPRODUCED: ${s.showing.length} failing check(s)` : "REPRODUCED (note not met)";
+  return s.def.kind === "check" ? `FIXED: all ${s.covered.length} check(s) pass` : `FIXED (note met, ${s.covered.length} line(s))`;
 }
 
-/** F3's run-specific detail: who the id rule leaves out of e2e_jon's own 2025 crew. */
+/** F3's run-specific detail: who the activity rule leaves out of e2e_jon's and ava's 2025 crews. */
 function jonCrewDetail(oracle: Oracle | null): string | null {
   const jon = oracle?.e2e_jon?.["2025"];
   if (!jon || !oracle) return null;
-  const left = jon.crewCappedOut.map((u) => `${u} (${oracle[u]?.["2025"]?.episodes ?? "?"} episodes in 2025)`);
+  const left = (username: string) => `${username} (${oracle[username]?.["2025"]?.episodes ?? "?"} episodes in 2025)`;
   return (
-    `By the id rule, e2e_jon's 2025 crew leaves out ${left.join(", ") || "nobody"}; ava's leaves out ` +
-    `${oracle.e2e_ava?.["2025"]?.crewCappedOut.join(", ") || "nobody"}. The seeder pins dee's id to sort last among jon's ` +
-    "collaborators, so the rule leaves out a busy collaborator every run; the status compares the crew the app stored for " +
-    "jon with his 8 most active (crew-cap-rule)."
+    `By the activity rule, e2e_jon's 2025 crew leaves out ${jon.crewCappedOut.map(left).join(", ") || "nobody"}; ava's leaves out ` +
+    `${oracle.e2e_ava?.["2025"]?.crewCappedOut.map(left).join(", ") || "nobody"}. The seeder pins dee's id to sort last among jon's ` +
+    "collaborators, so the old id rule would leave her out every run; crew-cap-rule compares the crew the app stored for jon with his 8 most active."
   );
 }
 
@@ -115,8 +121,7 @@ export function findingStatuses(a: Pick<Artifacts, "evidence" | "oracle">): Find
     return {
       def,
       covered,
-      showing: covered.filter((i) => !a.evidence[i]!.pass && !a.evidence[i]!.manual),
-      manualOnly: covered.length > 0 && covered.every((i) => a.evidence[i]!.manual),
+      showing: covered.filter((i) => !a.evidence[i]!.pass),
       extra: def.id === "F3" ? jonCrewDetail(a.oracle) : null,
     };
   });
@@ -164,8 +169,7 @@ export const NOTES: NoteDef[] = [
 
 /**
  * What the suite does not check automatically (the final review's M8), so the
- * report's coverage story is honest. Each is visual, manual, or left to unit
- * tests.
+ * report's coverage story is honest. Each is visual or left to unit tests.
  */
 export const NOT_AUTOMATED: { title: string; text: string }[] = [
   {
@@ -181,8 +185,16 @@ export const NOT_AUTOMATED: { title: string; text: string }[] = [
     text: "Satori draws the card's text as paths, so its numbers (hours, episodes, titles, dropped, top show, niche), flo's long name wrapping and the QR code's target are checked by eye in the saved cards only. Its size, statuses, cache headers and privacy (byte identity across other people's changes, privacy-ava-card-unchanged) are automated.",
   },
   {
-    title: "F5, the clipped disc label",
-    text: "Only visible in the phone screenshots; recorded as a manual observation with the screenshot paths and DOM widths, never as reproduced or fixed by a run.",
+    title: "Archetype pictures no persona has",
+    text: "The cast's 2025s are a weekday marathoner (ava), one-genre-only (bo, bat) and a completionist (flo), and those pictures are checked against the oracle on the recap and the story. The nightly ritualist's clock, the deep cut hunter's popularity strip, feast or famine's months, the group watcher's shared-list bar and the serial abandoner's finished-against-dropped bar are left to the unit tests (ArchetypeVisual.test.tsx, format.test.ts); the oracle computes their numbers (hourCounts, busiestWindow, sharedListShare, months), and the payload's are checked against it for ava (api-payload-v4-fields).",
+  },
+  {
+    title: "The biggest day's edge cases",
+    text: "ava's big day (Brisbane, no daylight saving) has no two ticks close enough to stack, 14 points (no \"And N more.\"), and an axis within one day; stacking, the 16-row cap, half-hour zones and the few-points list are left to the unit tests (BigDayTimeline.test.tsx, format.test.ts).",
+  },
+  {
+    title: "Completion on desktop, and a failed completion",
+    text: "Every persona whose story a read-only spec walks is marked gone through by the seeder, so the summary card posts nothing there; the marking itself is exercised on a phone (85-story-completion). That a desktop marks completion too, and the summary card's \"Could not save your progress. Try again.\" after a failed POST, are left to the unit tests (StoryReel.test.tsx, SummaryCard.test.tsx).",
   },
   {
     title: "WebKit",
@@ -262,11 +274,14 @@ export function overallLine(a: Artifacts, statuses: FindingStatus[]): string {
   const explained = new Set(statuses.filter((s) => s.def.kind === "check").flatMap((s) => s.showing));
   const unexplained = failedChecks.filter((e) => !explained.has(a.evidence.indexOf(e)));
   const shown = statuses.filter((s) => s.def.kind === "check" && s.showing.length > 0).map((s) => s.def.id);
-  if (failedTests.length === 0 && failedChecks.length === 0) return "Every test and every check passed.";
+  const fixed = statuses.filter((s) => s.covered.length > 0 && s.showing.length === 0).map((s) => s.def.id);
+  if (failedTests.length === 0 && failedChecks.length === 0) {
+    return `Every test and every check passed${fixed.length ? `; findings ${fixed.join(", ")} read FIXED` : ""}.`;
+  }
   const head =
     `The run exits non-zero: ${failedTests.length} test(s) and ${failedChecks.length} check(s) fail` +
     (shown.length ? `, from app finding(s) ${shown.join(", ")}` : "");
   return unexplained.length === 0
-    ? `${head}. Every failing check is an app finding -- the expected, correct outcome; no harness bug is left.`
+    ? `${head}. Every failing check belongs to a known app finding, which plan 6 fixed -- so it has come back.`
     : `${head}. ${unexplained.length} failing check(s) belong to no known finding -- see "Failed checks".`;
 }

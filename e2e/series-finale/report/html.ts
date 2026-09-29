@@ -64,7 +64,7 @@ class Page {
   }
 
   chip(e: Evidence, anchor: string, times = 1): string {
-    const cls = e.informational ? (e.manual ? "note manual" : e.pass ? "note" : "note unmet") : e.pass ? "pass" : "fail";
+    const cls = e.informational ? (e.pass ? "note" : "note unmet") : e.pass ? "pass" : "fail";
     const title = `${e.description}\nexpected: ${clip(json(e.expected), 300)}\nactual: ${clip(json(e.actual), 300)}`;
     return `<a class="chip ${cls}" href="#${anchor}" title="${esc(title)}">${esc(e.id)}${times > 1 ? ` ×${times}` : ""}</a>`;
   }
@@ -157,8 +157,9 @@ class Page {
           .map((shot) => `<a href="${esc(shot.src)}"><img src="${esc(shot.src)}" loading="lazy" alt="${esc(`${shot.project}/${shot.name}`)}"></a>`)
           .join("");
         return (
-          `<article class="finding ${shown ? "shown" : "quiet"}"><h3><span class="fid">${s.def.id}</span> ${esc(s.def.title)} <span class="state">${esc(state)} · ${s.def.kind === "check" ? "failing check" : "informational"}</span></h3>` +
+          `<article class="finding ${shown ? "shown" : "quiet"}"><h3><span class="fid">${s.def.id}</span> ${esc(s.def.title)} <span class="state">${esc(state)} · ${s.def.kind === "check" ? "checked" : "informational"}</span></h3>` +
           `<p><b>Where:</b> <code>${esc(s.def.where)}</code></p><p>${esc(s.def.diagnosis)}</p>` +
+          `<p><b>Fix:</b> ${esc(s.def.fix)}</p>` +
           (s.extra ? `<p>${esc(s.extra)}</p>` : "") +
           `<p><b>Checks:</b> <span class="chips">${this.chips(evidenceIdx, this.a.evidence, "e") || "none"}</span></p>` +
           `<p><b>Screenshots:</b> ${shots || "none"}</p>${thumbs ? `<div class="thumbs">${thumbs}</div>` : ""}</article>`
@@ -494,7 +495,6 @@ ul.notes li{margin:6px 0}
 .chip.fail{color:#000;background:var(--bad);border-color:var(--bad)}
 .chip.note{color:var(--muted)}
 .chip.note.unmet{color:var(--warn);border-color:rgba(231,181,74,.5)}
-.chip.note.manual{color:var(--accent);border-style:dashed}
 .grid{margin:6px 0 16px}
 .cells{display:grid;gap:12px;align-items:start}
 .cells.head{position:sticky;top:0;z-index:1;background:var(--bg);padding:4px 0}

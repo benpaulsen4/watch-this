@@ -41,10 +41,17 @@ describe("relatedChecks", () => {
     ev("story-crew-rows", "phone"),
     ev("story-walk-12-progress", "phone"),
     ev("card-ava-2025-status", "desktop"),
-    ev("F5-compare-disc-label-clipped", "phone", false, {
+    ev("some-note", "phone", false, {
       informational: true,
       actual: { screenshot: "artifacts/screenshots/phone/story/ava-2025/13-a-shared-list.png" },
     }),
+    ev("F5-compare-labels-whole-story-e2e_bo", "phone"),
+    ev("F5-compare-labels-whole-recap-e2e_bo", "phone"),
+    ev("gate-phone-recap-to-story", "phone"),
+    ev("gate-cy-precondition", "phone"),
+    ev("gate-desktop-recap-shown", "desktop"),
+    ev("completion-posted", "desktop-mutating"),
+    ev("completion-recap-route-shows-recap", "desktop-mutating"),
   ];
   const cardAt = cardLookup(evidence);
 
@@ -74,8 +81,29 @@ describe("relatedChecks", () => {
   });
 
   it("links a shot to any evidence line that names it", () => {
-    expect(idsOf(relatedChecks(shot("phone", "story/ava-2025/13-a-shared-list"), evidence, cardAt), evidence)).toEqual([
-      "phone:F5-compare-disc-label-clipped",
+    expect(idsOf(relatedChecks(shot("phone", "story/ava-2025/13-a-shared-list"), evidence, cardAt), evidence)).toEqual(["phone:some-note"]);
+  });
+
+  it("links each F5 compare shot to its own surface's and peer's check", () => {
+    expect(idsOf(relatedChecks(shot("phone", "story/ava-2025-compare/e2e_bo"), evidence, cardAt), evidence)).toEqual([
+      "phone:F5-compare-labels-whole-story-e2e_bo",
+    ]);
+    expect(idsOf(relatedChecks(shot("phone", "recap/ava-2025-compare/e2e_bo"), evidence, cardAt), evidence)).toEqual([
+      "phone:F5-compare-labels-whole-recap-e2e_bo",
+    ]);
+  });
+
+  it("links the story gate's and the completion flow's shots to their checks", () => {
+    expect(idsOf(relatedChecks(shot("phone", "story/cy-2025-gate/handed-on"), evidence, cardAt), evidence)).toEqual([
+      "phone:gate-phone-recap-to-story",
+      "phone:gate-cy-precondition",
+    ]);
+    expect(idsOf(relatedChecks(shot("desktop", "recap/cy-2025-gate-desktop"), evidence, cardAt), evidence)).toEqual(["desktop:gate-desktop-recap-shown"]);
+    expect(idsOf(relatedChecks(shot("desktop-mutating", "story/cy-2025-completion/summary"), evidence, cardAt), evidence)).toEqual([
+      "desktop-mutating:completion-posted",
+    ]);
+    expect(idsOf(relatedChecks(shot("desktop-mutating", "recap/cy-2025-after-completion"), evidence, cardAt), evidence)).toEqual([
+      "desktop-mutating:completion-recap-route-shows-recap",
     ]);
   });
 });
@@ -171,7 +199,7 @@ describe("findingStatuses", () => {
         ev("visual-ava-2025-no-horizontal-scroll", "phone", false),
         ev("visual-ava-2025-no-horizontal-scroll", "desktop", true),
         ev("visual-ava-2025-header-title-fits", "phone", true),
-        ev("crew-cap-rule", "desktop", false, { informational: true }),
+        ev("crew-cap-rule", "desktop", false),
       ]),
     );
     const byId = new Map(statuses.map((s) => [s.def.id, s]));
@@ -182,21 +210,22 @@ describe("findingStatuses", () => {
     expect(byId.get("F6")?.covered).toEqual([]);
   });
 
-  it("reports a manual observation as such, never as reproduced or fixed", () => {
-    const manual = { informational: true, manual: true } as const;
-    const [f5] = findingStatuses({
-      oracle: null,
-      evidence: [ev("F5-compare-disc-label-clipped", "phone", false, manual), ev("F5-compare-disc-label-clipped", "desktop", false, manual)],
-    }).filter((s) => s.def.id === "F5");
-    expect(f5).toMatchObject({ covered: [0, 1], showing: [], manualOnly: true });
-    expect(findingState(f5!)).toBe("manual observation; not re-verified by this run");
+  it("reads FIXED while every one of a finding's checks passes, REPRODUCED once one fails", () => {
+    const f5 = (pass: boolean) =>
+      findingStatuses({
+        oracle: null,
+        evidence: [ev("F5-compare-labels-whole-story-e2e_bo", "phone"), ev("F5-compare-labels-whole-recap-e2e_bo", "small-phone", pass)],
+      }).find((s) => s.def.id === "F5")!;
+    expect(f5(true)).toMatchObject({ covered: [0, 1], showing: [] });
+    expect(findingState(f5(true))).toBe("FIXED: all 2 check(s) pass");
+    expect(findingState(f5(false))).toBe("REPRODUCED: 1 failing check(s)");
   });
 
-  it("derives F3 from its note: reproduced while unmet, not reproduced once met", () => {
-    const f3 = (pass: boolean) =>
-      findingStatuses({ oracle: null, evidence: [ev("crew-cap-rule", "desktop", pass, { informational: true })] }).find((s) => s.def.id === "F3")!;
-    expect(findingState(f3(false))).toBe("reproduced (note not met)");
-    expect(findingState(f3(true))).toBe("not reproduced this run");
+  it("derives F3 from its check, and says when a finding has no evidence", () => {
+    const f3 = (pass: boolean) => findingStatuses({ oracle: null, evidence: [ev("crew-cap-rule", "desktop", pass)] }).find((s) => s.def.id === "F3")!;
+    expect(findingState(f3(false))).toBe("REPRODUCED: 1 failing check(s)");
+    expect(findingState(f3(true))).toBe("FIXED: all 1 check(s) pass");
+    expect(findingState(findingStatuses({ oracle: null, evidence: [] })[0]!)).toBe("no evidence this run");
   });
 });
 
@@ -278,7 +307,9 @@ describe("renderHtml", () => {
 describe("renderMarkdown", () => {
   it("states the outcome and has per-project counts and the mutation section", () => {
     const md = renderMarkdown(artifacts([ev("visual-ava-2025-no-horizontal-scroll", "phone", false)]));
-    expect(md).toContain("The run exits non-zero: 1 test(s) and 1 check(s) fail, from app finding(s) F1. Every failing check is an app finding");
+    expect(md).toContain(
+      "The run exits non-zero: 1 test(s) and 1 check(s) fail, from app finding(s) F1. Every failing check belongs to a known app finding, which plan 6 fixed",
+    );
     expect(md).toContain("| phone | 0 | 1 | 0 | 0 | 1 | 0 | 0 |");
     expect(md).toContain("## Mutation check (I1)");
     expect(md).toContain("Not run: `artifacts/mutation-i1/` holds no evidence.");

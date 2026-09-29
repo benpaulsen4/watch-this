@@ -282,9 +282,9 @@ const RECAP_SECTION_CHECKS: Record<string, RegExp[]> = {
   shame: [/^recap-shame-/],
   months: [/^recap-months-/],
   rhythm: [/^recap-rhythm-/],
-  "big-day": [/^recap-big-day$/],
+  "big-day": [/^recap-big-day/],
   crew: [/^recap-crew-/, /^crew-cap-rule$/],
-  compare: [/^recap-compare-/],
+  compare: [/^recap-compare-/, /^F5-compare-labels-whole-recap-/],
   footer: [/^recap-footer-/],
 };
 
@@ -296,7 +296,9 @@ const STORY_CARD_CHECKS: Record<string, RegExp[]> = {
   topShow: [/^story-reach-topShow$/, /^story-parity-last-watched$/],
   shame: [/^story-reach-shame$/, /^story-small-shame-/],
   crew: [/^story-reach-crew$/, /^story-crew-/, /^story-small-crew-/],
-  compare: [/^story-compare-/, /^story-small-compare-/],
+  months: [/^story-reach-months$/, /^story-small-months-/],
+  bigDay: [/^story-reach-bigDay$/, /^story-big-day-/, /^story-small-bigDay-/],
+  compare: [/^story-compare-/, /^story-small-compare-/, /^F5-compare-labels-whole-story-/],
   summary: [/^story-reach-summary$/, /^story-right-at-end$/, /^story-share-/, /^story-parity-summary-/, /^story-small-summary-/],
 };
 
@@ -320,6 +322,11 @@ type Rule = [RegExp, (m: RegExpMatchArray, project: string, cardAt: CardAt) => R
 
 // First match wins. Shot names come from the specs' shot()/shotElement() calls.
 const RULES: Rule[] = [
+  [/^(recap|story)\/ava-2025-compare\/([\w-]+)$/, (m) => [re(`^F5-compare-labels-whole-${m[1]}-${m[2]}$`)]],
+  [/^story\/cy-2025-gate\//, () => [/^gate-phone-/, /^gate-cy-/]],
+  [/^recap\/cy-2025-gate-desktop$/, () => [/^gate-desktop-/]],
+  [/^story\/cy-2025-completion\//, () => [/^completion-(precondition|starts|summary|posted|stored|recap-link)/]],
+  [/^recap\/cy-2025-after-completion$/, () => [/^completion-(link-opens|recap-route|no-second|close)/]],
   [/^recap\/([a-z]+)-(\d{4})\/full$/, (m) => [
     re(`^visual-${m[1]}-${m[2]}-`),
     ...(m[1] === "ava" && m[2] === "2025" ? [/^recap-ava-rendered$/, /^recap-header-/] : []),
@@ -386,7 +393,7 @@ const RULES: Rule[] = [
 /**
  * Indexes into `evidence` of the checks `shot` illustrates: the rule for its
  * name (same project; any project for a share card), plus any evidence line
- * that names the shot itself (F5's note carries its screenshot path).
+ * that names the shot itself (in its description or its actual value).
  */
 export function relatedChecks(shot: Shot, evidence: Evidence[], cardAt: CardAt): number[] {
   const rule = RULES.map(([pattern, build]) => ({ m: pattern.exec(shot.name), build })).find((r) => r.m);

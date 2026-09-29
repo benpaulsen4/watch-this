@@ -81,9 +81,10 @@ export function renderMarkdown(a: Artifacts): string {
     const idx = shown ? s.showing : s.covered;
     const state = findingState(s);
     out.push(`### ${s.def.id}: ${s.def.title}`, "");
-    out.push(`- **Status:** ${state} (${s.def.kind === "check" ? "failing check" : "informational note"})`);
+    out.push(`- **Status:** ${state} (${s.def.kind === "check" ? "checked" : "informational note"})`);
     out.push(`- **Where:** \`${s.def.where}\``);
     out.push(`- **Diagnosis:** ${s.def.diagnosis}`);
+    out.push(`- **Fix:** ${s.def.fix}`);
     if (s.extra) out.push(`- **This run:** ${s.extra}`);
     const ev = idx.map((i) => {
       const e = a.evidence[i]!;

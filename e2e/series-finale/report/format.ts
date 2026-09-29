@@ -30,9 +30,8 @@ export function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[
   return out;
 }
 
-/** An evidence line's result in words: PASS/FAIL for a check, met/not met for a note, or a manual observation. */
+/** An evidence line's result in words: PASS/FAIL for a check, met/not met for a note. */
 export function resultLabel(e: Evidence): string {
   if (!e.informational) return e.pass ? "PASS" : "FAIL";
-  if (e.manual) return "manual observation";
   return e.pass ? "note met" : "note not met";
 }
