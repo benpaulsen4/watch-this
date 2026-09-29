@@ -73,8 +73,10 @@ const payload = (
       weekdayCounts: [10, 10, 10, 10, 10, 10, 60],
       topWeekday: 6,
       lateShare: 0.5,
-      hourCounts: hours({ 22: 30, 1: 10, 2: 5, 3: 5, 12: 10 }),
+      hourCounts: hours({ 21: 5, 22: 30, 23: 10, 1: 5, 12: 10 }),
       sharedListShare: 0.625,
+      topGenreName: "Drama",
+      topGenreShare: 0.64,
       ...rhythm,
     },
     shame: { dropped: [], stillPlanning: [] },
@@ -121,17 +123,17 @@ describe("ArchetypeVisual", () => {
   });
 
   describe("nightly ritualist", () => {
-    it("draws 24 hours with 21:00 to 03:00 highlighted", () => {
+    it("draws 24 hours with the busiest three highlighted", () => {
       const { container } = renderVisual(payload("nightly-ritualist"));
 
       expect(
         screen.getByRole("img", {
-          name: "Episodes ticked one at a time, by hour of the day. 75% between 21:00 and 03:00; busiest hour 22:00.",
+          name: "Episodes ticked one at a time, by hour of the day. Busiest three hours 21:00–00:00: 75% of them.",
         }),
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          "75% of the episodes you ticked one at a time came between 21:00 and 03:00.",
+          "21:00–00:00: 75% of the episodes you ticked one at a time",
         ),
       ).toBeInTheDocument();
 
@@ -140,9 +142,11 @@ describe("ArchetypeVisual", () => {
       );
       expect(bars).toHaveLength(24);
       const highlighted = bars
-        .filter((bar) => bar.dataset.night === "true")
+        .filter((bar) => bar.dataset.busiest === "true")
         .map((bar) => Number(bar.dataset.hour));
-      expect(highlighted).toEqual([0, 1, 2, 21, 22, 23]);
+      expect(highlighted).toEqual([21, 22, 23]);
+      expect(bars[21]?.className).toContain("from-red-600");
+      expect(bars[1]?.className).not.toContain("from-red-600");
       // The busiest hour is the full height.
       expect(bars[22]?.style.height).toBe("100%");
       expect(bars[12]?.style.height).toBe("33.3%");
@@ -171,25 +175,28 @@ describe("ArchetypeVisual", () => {
   });
 
   describe("one genre only", () => {
-    it("draws the top genre's share as one bar", () => {
+    it("draws the title share the type was classified on, not the tag share", () => {
       const { container } = renderVisual(payload("one-genre-only"));
 
+      // genres[0] is Drama at 38% of genre tags; the type is 64% of titles.
       expect(
         screen.getByRole("img", {
-          name: "Drama: 38% of the genre tags on what you finished.",
+          name: "Drama: 64% of what you finished.",
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByText("Drama: 38% of the genre tags on what you finished"),
+        screen.getByText("Drama: 64% of what you finished"),
       ).toBeInTheDocument();
       expect(
         container.querySelector<HTMLElement>("[data-share-fill]")?.style.width,
-      ).toBe("38%");
+      ).toBe("64%");
     });
 
-    it("draws nothing without genres", () => {
+    it("draws nothing without a top genre", () => {
       const { container } = renderVisual(
-        payload("one-genre-only", { genres: [] }),
+        payload("one-genre-only", {
+          rhythm: { topGenreName: null, topGenreShare: null },
+        }),
       );
       expect(container).toBeEmptyDOMElement();
     });

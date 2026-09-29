@@ -1126,6 +1126,70 @@ describe("buildPayload", () => {
     expect(payload.genres[0]?.percent).toBe(33);
   });
 
+  it("exposes the title share and genre the one-genre archetype is classified on", () => {
+    // Ten finished titles: all ten carry Drama (1), six carry Crime (2). The
+    // payload reports the classifier's unrounded title share for Drama -- 1,
+    // not the tag share of 63% the genres card shows.
+    const statuses = Array.from({ length: 10 }, (_, i) =>
+      status({ tmdbId: i + 1 }),
+    );
+    const titles = titleMap(
+      Array.from({ length: 10 }, (_, i) =>
+        title({ tmdbId: i + 1, genreIds: i < 6 ? [1, 2] : [1] }),
+      ),
+    );
+
+    const payload = buildPayload(
+      input({
+        statuses,
+        titles,
+        genreNames: new Map([
+          [1, "Drama"],
+          [2, "Crime"],
+        ]),
+      }),
+      NOW,
+    );
+
+    expect(payload.rhythm.archetype).toBe("one-genre-only");
+    expect(payload.rhythm.topGenreName).toBe("Drama");
+    expect(payload.rhythm.topGenreShare).toBe(1);
+    expect(payload.genres[0]).toEqual({ name: "Drama", percent: 63 });
+  });
+
+  it("names an unnamed top genre Unknown, and divides by titles with metadata", () => {
+    // Four of five finished titles have a cached row; three of those carry
+    // genre 9, which has no name. 3 / 4, not 3 / 5.
+    const statuses = [1, 2, 3, 4, 5].map((tmdbId) => status({ tmdbId }));
+    const titles = titleMap([
+      title({ tmdbId: 1, genreIds: [9] }),
+      title({ tmdbId: 2, genreIds: [9] }),
+      title({ tmdbId: 3, genreIds: [9] }),
+      title({ tmdbId: 4, genreIds: [4] }),
+    ]);
+
+    const payload = buildPayload(input({ statuses, titles }), NOW);
+
+    expect(payload.rhythm.topGenreName).toBe("Unknown");
+    expect(payload.rhythm.topGenreShare).toBe(0.75);
+  });
+
+  it("reports no top genre when nothing finished has a known genre", () => {
+    expect(buildPayload(input(), NOW).rhythm).toMatchObject({
+      topGenreName: null,
+      topGenreShare: null,
+    });
+
+    const statuses = [1, 2].map((tmdbId) => status({ tmdbId }));
+    const titles = titleMap([
+      title({ tmdbId: 1, genreIds: [] }),
+      title({ tmdbId: 2, genreIds: [] }),
+    ]);
+    expect(
+      buildPayload(input({ statuses, titles }), NOW).rhythm,
+    ).toMatchObject({ topGenreName: null, topGenreShare: null });
+  });
+
   it("routes each statistic to the field named for it", () => {
     // Every other test in this block leaves `statuses` empty, which makes
     // `titlesDropped`, `titlesCompleted` and `finished.total` all zero -- so

@@ -138,6 +138,8 @@ function basePayload(): SeriesFinalePayload {
       lateShare: null,
       hourCounts: null,
       sharedListShare: null,
+      topGenreName: null,
+      topGenreShare: null,
     },
     shame: { dropped: [], stillPlanning: [] },
     crew: [],

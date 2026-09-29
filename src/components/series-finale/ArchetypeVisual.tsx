@@ -13,7 +13,6 @@ import {
   hourClockLines,
   hourLabel,
   monthInitial,
-  NIGHT_HOURS,
   sharedListLine,
   topGenreLine,
 } from "./format";
@@ -108,9 +107,13 @@ function renderVisual(
     }
 
     case "one-genre-only": {
-      const top = payload.genres[0];
-      return top ? (
-        <ShareBar percent={top.percent} label={topGenreLine(top)} tone={tone} />
+      const { topGenreName, topGenreShare } = rhythm;
+      return topGenreName !== null && topGenreShare !== null ? (
+        <ShareBar
+          percent={Math.round(topGenreShare * 100)}
+          label={topGenreLine(topGenreName, topGenreShare)}
+          tone={tone}
+        />
       ) : null;
     }
 
@@ -159,9 +162,10 @@ function renderVisual(
 }
 
 /**
- * Solo ticks by local hour, midnight first, the night (21:00 to 03:00)
- * highlighted. Heights are a share of the busiest hour, so the habit reads as
- * a shape; a baseline keeps the empty hours visible as empty.
+ * Solo ticks by local hour, midnight first, the busiest three hours -- the
+ * window the archetype was classified on -- highlighted. Heights are a share
+ * of the busiest hour, so the habit reads as a shape; a baseline keeps the
+ * empty hours visible as empty.
  */
 function HourClock({
   hourCounts,
@@ -173,7 +177,7 @@ function HourClock({
   tone: Tone;
 }) {
   const peak = Math.max(...hourCounts);
-  const night = new Set<number>(NIGHT_HOURS);
+  const busiest = new Set(lines.hours);
 
   return (
     <div>
@@ -186,10 +190,10 @@ function HourClock({
           <div
             key={hour}
             data-hour={hour}
-            data-night={night.has(hour)}
+            data-busiest={busiest.has(hour)}
             className={cn(
               "min-w-0 flex-1 rounded-t-sm",
-              night.has(hour) ? HIGHLIGHT : tone.bar,
+              busiest.has(hour) ? HIGHLIGHT : tone.bar,
             )}
             style={{ height: `${Math.round((count / peak) * 1000) / 10}%` }}
           />

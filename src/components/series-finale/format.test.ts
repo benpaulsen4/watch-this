@@ -1060,21 +1060,28 @@ describe("hourClockLines", () => {
   const hours = (entries: Record<number, number>) =>
     Array.from({ length: 24 }, (_, hour) => entries[hour] ?? 0);
 
-  it("says the share between 21:00 and 03:00 and the busiest hour", () => {
-    // 21-02 hold 30 + 10 + 5 = 45 of 60; 03:00 is outside the window.
-    const lines = hourClockLines(hours({ 22: 30, 1: 10, 2: 5, 3: 5, 12: 10 }));
+  it("names the busiest three hours and their share of the solo ticks", () => {
+    // 21-23 hold 5 + 30 + 10 = 45 of 60; 22-00 only 40.
+    const lines = hourClockLines(
+      hours({ 21: 5, 22: 30, 23: 10, 1: 5, 12: 10 }),
+    );
     expect(lines).toEqual({
-      caption:
-        "75% of the episodes you ticked one at a time came between 21:00 and 03:00.",
+      hours: [21, 22, 23],
+      caption: "21:00–00:00: 75% of the episodes you ticked one at a time",
       ariaLabel:
-        "Episodes ticked one at a time, by hour of the day. 75% between 21:00 and 03:00; busiest hour 22:00.",
+        "Episodes ticked one at a time, by hour of the day. Busiest three hours 21:00–00:00: 75% of them.",
     });
   });
 
-  it("takes the earlier hour on a tie", () => {
-    expect(hourClockLines(hours({ 9: 4, 23: 4 }))?.ariaLabel).toMatch(
-      /busiest hour 09:00\.$/,
-    );
+  it("wraps its window across midnight", () => {
+    expect(hourClockLines(hours({ 23: 6, 0: 6, 1: 6, 14: 2 }))).toMatchObject({
+      hours: [23, 0, 1],
+      caption: "23:00–02:00: 90% of the episodes you ticked one at a time",
+    });
+  });
+
+  it("finds the window the classifier finds, the earliest on a tie", () => {
+    expect(hourClockLines(hours({ 9: 4, 23: 4 }))?.hours).toEqual([7, 8, 9]);
   });
 
   it("is null with no ticks", () => {
@@ -1083,10 +1090,8 @@ describe("hourClockLines", () => {
 });
 
 describe("topGenreLine", () => {
-  it("says the percent is of genre tags", () => {
-    expect(topGenreLine({ name: "Drama", percent: 38 })).toBe(
-      "Drama: 38% of the genre tags on what you finished",
-    );
+  it("gives the share of titles, rounded", () => {
+    expect(topGenreLine("Drama", 0.636)).toBe("Drama: 64% of what you finished");
   });
 });
 

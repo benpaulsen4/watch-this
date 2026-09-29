@@ -56,6 +56,8 @@ const payload = (overrides: Partial<SeriesFinalePayload> = {}) =>
       lateShare: null,
       hourCounts: null,
       sharedListShare: null,
+      topGenreName: null,
+      topGenreShare: null,
     },
     shame: { dropped: [], stillPlanning: [] },
     crew: [],
@@ -347,6 +349,8 @@ describe("StoryCard", () => {
         lateShare: 0.41,
         hourCounts: null,
         sharedListShare: null,
+        topGenreName: null,
+        topGenreShare: null,
       },
     });
     expect(screen.getByText("The Sunday Marathoner")).toBeInTheDocument();
@@ -360,6 +364,48 @@ describe("StoryCard", () => {
     ).toBeInTheDocument();
   });
 
+  it("draws the weekdays under the months for a type other than the marathoner", () => {
+    renderCard("months", {
+      rhythm: {
+        archetype: "completionist",
+        weekdayCounts: [1, 1, 1, 1, 6, 1, 1],
+        topWeekday: 4,
+        lateShare: null,
+        hourCounts: null,
+        sharedListShare: null,
+        topGenreName: null,
+        topGenreShare: null,
+      },
+    });
+    expect(
+      screen.getByRole("heading", { name: "By day of the week" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Episodes by weekday. Peak Friday." }),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the weekdays to the marathoner's own rhythm card", () => {
+    renderCard("months", {
+      rhythm: {
+        archetype: "weekday-marathoner",
+        weekdayCounts: [0, 20, 20, 20, 20, 20, 100],
+        topWeekday: 6,
+        lateShare: null,
+        hourCounts: null,
+        sharedListShare: null,
+        topGenreName: null,
+        topGenreShare: null,
+      },
+    });
+    expect(
+      screen.queryByRole("heading", { name: "By day of the week" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: /Episodes by weekday/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("draws the type's own picture on the rhythm card, not the weekdays", () => {
     const { container } = renderCard("rhythm", {
       rhythm: {
@@ -369,6 +415,8 @@ describe("StoryCard", () => {
         lateShare: null,
         hourCounts: null,
         sharedListShare: null,
+        topGenreName: null,
+        topGenreShare: null,
       },
     });
     expect(screen.getByText("The Completionist")).toBeInTheDocument();
@@ -394,6 +442,8 @@ describe("StoryCard", () => {
         lateShare: null,
         hourCounts: null,
         sharedListShare: null,
+        topGenreName: null,
+        topGenreShare: null,
       },
     });
     expect(screen.getByText("The Group Watcher")).toBeInTheDocument();
@@ -580,6 +630,8 @@ describe("StoryCard", () => {
         lateShare: null,
         hourCounts: null,
         sharedListShare: null,
+        topGenreName: null,
+        topGenreShare: null,
       },
     });
     expect(screen.getByText(/412/)).toBeInTheDocument();
@@ -620,6 +672,8 @@ describe("StoryCard", () => {
         lateShare: 0.4,
         hourCounts: null,
         sharedListShare: null,
+        topGenreName: null,
+        topGenreShare: null,
       },
       shame: {
         dropped: [{ tmdbId: 1, title: "Foundation", lastEpisode: "S2E03" }],

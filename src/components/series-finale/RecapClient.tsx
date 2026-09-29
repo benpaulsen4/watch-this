@@ -51,7 +51,11 @@ import {
 } from "./format";
 import { GenreBars } from "./GenreBars";
 import { Poster } from "./Poster";
-import { MonthsChart, WeekdayStrip } from "./RhythmCharts";
+import {
+  MonthsChart,
+  WeekdayStrip,
+  weekdaysUnderMonths,
+} from "./RhythmCharts";
 import {
   LoadFailedNotice,
   PROFILE_DATA_TAB,
@@ -475,9 +479,7 @@ function MonthsPanel({
   rhythm: SeriesFinalePayload["rhythm"];
 }) {
   const peak = peakMonth(months);
-  const weekdays =
-    rhythm.archetype !== "weekday-marathoner" &&
-    rhythm.weekdayCounts.some((count) => count > 0);
+  const weekdays = weekdaysUnderMonths(rhythm);
 
   return (
     <Panel

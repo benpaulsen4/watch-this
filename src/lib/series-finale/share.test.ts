@@ -51,6 +51,8 @@ const payload = (): SeriesFinalePayload => ({
     lateShare: 0.41,
     hourCounts: null,
     sharedListShare: null,
+    topGenreName: null,
+    topGenreShare: null,
   },
   shame: { dropped: [], stillPlanning: [] },
   crew: [{ userId: "u1", username: "ana", episodes: 1041 }],

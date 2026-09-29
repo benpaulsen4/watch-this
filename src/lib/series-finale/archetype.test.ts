@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   type ArchetypeInput,
+  busiestWindow,
   classifyArchetype,
   coefficientOfVariation,
   maxWindowShare,
+  RITUAL_WINDOW_HOURS,
 } from "./archetype";
 
 /** A deliberately unremarkable year that matches no rule. */
@@ -36,6 +38,45 @@ describe("coefficientOfVariation", () => {
 
   it("rises with spread", () => {
     expect(coefficientOfVariation([0, 0, 120])).toBeGreaterThan(1);
+  });
+});
+
+describe("busiestWindow", () => {
+  const counts = (entries: Record<number, number>) =>
+    Array.from({ length: 24 }, (_, hour) => entries[hour] ?? 0);
+
+  it("finds the busiest run and where it starts", () => {
+    expect(busiestWindow(counts({ 12: 2, 21: 3, 22: 4, 23: 1 }), 3)).toEqual({
+      start: 21,
+      count: 8,
+    });
+  });
+
+  it("wraps across midnight", () => {
+    expect(busiestWindow(counts({ 23: 5, 0: 5, 1: 5, 6: 9 }), 3)).toEqual({
+      start: 23,
+      count: 15,
+    });
+  });
+
+  it("takes the earliest start on a tie", () => {
+    expect(busiestWindow(counts({ 2: 4, 14: 4 }), 3).start).toBe(0);
+  });
+
+  it("is an empty window at midnight with no counts", () => {
+    expect(busiestWindow(counts({}), 3)).toEqual({ start: 0, count: 0 });
+  });
+
+  it("is the window the nightly-ritualist rule measures", () => {
+    // The clock highlights busiestWindow over the payload's hourCounts; the
+    // rule reads maxWindowShare over the same ticks as hours. They must agree.
+    const hours = [22, 22, 23, 0, 0, 1, 9, 13, 13, 18, 21, 23];
+    const hourCounts = counts({});
+    for (const hour of hours) hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
+
+    expect(
+      busiestWindow(hourCounts, RITUAL_WINDOW_HOURS).count / hours.length,
+    ).toBe(maxWindowShare(hours, RITUAL_WINDOW_HOURS));
   });
 });
 

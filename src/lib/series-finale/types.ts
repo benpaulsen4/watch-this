@@ -17,8 +17,10 @@
  * 3: `period.timezone`, labelled `bigDay.timeline` points, `rhythm.hourCounts`
  *    and `rhythm.sharedListShare`; the crew keeps the most active
  *    collaborators rather than the lowest user ids.
+ * 4: `rhythm.topGenreName` and `rhythm.topGenreShare`, the title share the
+ *    one-genre-only archetype is classified on.
  */
-export const SERIES_FINALE_SCHEMA_VERSION = 3;
+export const SERIES_FINALE_SCHEMA_VERSION = 4;
 
 /**
  * Minimum individually-ticked episodes before any intra-day statistic is
@@ -251,6 +253,18 @@ export interface SeriesFinalePayload {
      * 0 because it has nothing to divide by.
      */
     sharedListShare: number | null;
+    /**
+     * The genre carried by the most titles finished in the period, and the
+     * share of those titles carrying it, unrounded -- the value the
+     * one-genre-only archetype is classified on. Not `genres[0]`: that ranks
+     * genre TAGS (a title carries two or three), so both its percent and, on
+     * a near tie, its genre can differ. The denominator is finished titles
+     * with cached metadata. Both null together, when no finished title has a
+     * known genre; the archetype then reads 0. The name is "Unknown" for a
+     * genre id with no name, as in `genres`.
+     */
+    topGenreName: string | null;
+    topGenreShare: number | null;
   };
 
   shame: {

@@ -33,7 +33,11 @@ import {
 import { GenreBars } from "../GenreBars";
 import { PopularityStrip } from "../PopularityStrip";
 import { Poster } from "../Poster";
-import { MonthsChart } from "../RhythmCharts";
+import {
+  MonthsChart,
+  WeekdayStrip,
+  weekdaysUnderMonths,
+} from "../RhythmCharts";
 import type { StoryCardId } from "../StoryReel";
 import type { Viewer } from "../viewer";
 import { CompareCard } from "./CompareCard";
@@ -320,6 +324,16 @@ export function StoryCard({
                   in {monthName(quietest.month)}
                 </span>
               ) : null}
+            </Enter>
+          ) : null}
+          {weekdaysUnderMonths(payload.rhythm) ? (
+            // The rhythm card quotes weekday figures; for every type but the
+            // marathoner (whose rhythm card is the strip) they are drawn here.
+            <Enter kind="fade" delay={1000} className="mt-8">
+              <h3 className="mb-3 text-[13px] font-medium text-white/50">
+                By day of the week
+              </h3>
+              <WeekdayStrip rhythm={payload.rhythm} />
             </Enter>
           ) : null}
         </Shell>

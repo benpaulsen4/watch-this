@@ -8,6 +8,10 @@
  */
 
 import {
+  busiestWindow,
+  RITUAL_WINDOW_HOURS,
+} from "@/lib/series-finale/archetype";
+import {
   type ArchetypeId,
   type SeriesFinalePayload,
   THIN_YEAR_EPISODES,
@@ -254,13 +258,6 @@ export function archetypeDescription(
 // Archetype visuals -- the words on and behind each type's picture
 // ---------------------------------------------------------------------------
 
-/**
- * The hours the nightly ritualist's clock highlights, 21:00 up to 03:00. Not
- * `lateShare`'s window (21:00 to midnight): the clock shows the whole night,
- * and says its own share rather than borrowing that one.
- */
-export const NIGHT_HOURS = [21, 22, 23, 0, 1, 2] as const;
-
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
@@ -271,35 +268,39 @@ export function hourLabel(hour: number): string {
 }
 
 /**
- * The clock's words: the share of solo ticks between 21:00 and 03:00, and the
- * busiest hour (the earlier on a tie). Null when there is no tick to share.
+ * The nightly ritualist's clock: its busiest run of hours -- the window the
+ * archetype was classified on, found by the classifier's own `busiestWindow`
+ * -- and that window's share of the solo ticks, named by its span so it never
+ * reads as `lateShare`'s "after 21:00". Null when there is no tick.
  */
 export function hourClockLines(
   hourCounts: number[],
-): { caption: string; ariaLabel: string } | null {
+): { hours: number[]; caption: string; ariaLabel: string } | null {
   const total = sum(hourCounts);
   if (total === 0) return null;
 
-  const night = sum(NIGHT_HOURS.map((hour) => hourCounts[hour] ?? 0));
-  let busiest = 0;
-  hourCounts.forEach((count, hour) => {
-    if (count > (hourCounts[busiest] ?? 0)) busiest = hour;
-  });
-  const share = `${percentOf(night, total)}%`;
+  const window = busiestWindow(hourCounts, RITUAL_WINDOW_HOURS);
+  const hours = Array.from(
+    { length: RITUAL_WINDOW_HOURS },
+    (_, offset) => (window.start + offset) % 24,
+  );
+  const span = `${hourLabel(window.start)}–${hourLabel((window.start + RITUAL_WINDOW_HOURS) % 24)}`;
+  const share = `${percentOf(window.count, total)}%`;
 
   return {
-    caption: `${share} of the episodes you ticked one at a time came between 21:00 and 03:00.`,
-    ariaLabel: `Episodes ticked one at a time, by hour of the day. ${share} between 21:00 and 03:00; busiest hour ${hourLabel(busiest)}.`,
+    hours,
+    caption: `${span}: ${share} of the episodes you ticked one at a time`,
+    ariaLabel: `Episodes ticked one at a time, by hour of the day. Busiest three hours ${span}: ${share} of them.`,
   };
 }
 
 /**
- * The one-genre bar's label. `genres[].percent` is a share of genre TAGS on
- * the titles finished (a title carries two or three), so it says so: "of what
- * you finished" alone would read as a share of titles, which it is not.
+ * The one-genre bar's label, from `rhythm.topGenreName/topGenreShare`: the
+ * share of finished titles carrying the genre, which is what the archetype is
+ * classified on -- not `genres[0].percent`, a share of genre tags.
  */
-export function topGenreLine(genre: Payload["genres"][number]): string {
-  return `${genre.name}: ${genre.percent}% of the genre tags on what you finished`;
+export function topGenreLine(name: string, share: number): string {
+  return `${name}: ${percentOf(share, 1)}% of what you finished`;
 }
 
 /** The group watcher's bar: the share it was classified on, rounded. */

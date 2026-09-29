@@ -108,6 +108,8 @@ const payload: SeriesFinalePayload = {
     lateShare: null,
     hourCounts: null,
     sharedListShare: null,
+    topGenreName: null,
+    topGenreShare: null,
   },
   shame: { dropped: [], stillPlanning: [] },
   crew: [{ userId: "u2", username: "ana_crew", episodes: 1041 }],

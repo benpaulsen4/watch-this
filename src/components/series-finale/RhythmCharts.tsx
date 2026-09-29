@@ -78,3 +78,19 @@ export function WeekdayStrip({
     />
   );
 }
+
+/**
+ * Whether the weekday strip sits under the months chart: for every type but
+ * the weekday marathoner, whose own type visual is the strip (drawn larger),
+ * and only with an episode to spread over the week. The recap's months panel
+ * and the story's months card both read this, so the strip shows exactly
+ * once wherever the year is told.
+ */
+export function weekdaysUnderMonths(
+  rhythm: Pick<Payload["rhythm"], "archetype" | "weekdayCounts">,
+): boolean {
+  return (
+    rhythm.archetype !== "weekday-marathoner" &&
+    rhythm.weekdayCounts.some((count) => count > 0)
+  );
+}

@@ -369,7 +369,7 @@ export function buildNiche(
  * geometry from the shares themselves.
  *
  * Deliberately NOT the number the `one-genre-only` archetype reads: that one is
- * `topGenreTitleShare` below, over a different denominator. Do not collapse the
+ * `topGenreByTitles` below, over a different denominator. Do not collapse the
  * two -- see its comment for why they answer different questions.
  */
 export function buildGenres(
@@ -436,8 +436,10 @@ export function buildGenres(
  * threshold reading a display percent moves whenever the rounding does -- 0.395
  * would classify, 0.404 might not.
  */
-function topGenreTitleShare(completed: TitleMeta[]): number {
-  if (completed.length === 0) return 0;
+function topGenreByTitles(
+  completed: TitleMeta[],
+): { genreId: number; share: number } | null {
+  if (completed.length === 0) return null;
 
   const titlesPerGenre = new Map<number, number>();
   for (const meta of completed) {
@@ -448,13 +450,18 @@ function topGenreTitleShare(completed: TitleMeta[]): number {
     }
   }
 
-  const best = Math.max(0, ...titlesPerGenre.values());
+  // The first genre seen wins a tie, so the pick is stable for one input.
+  let best: { genreId: number; titles: number } | null = null;
+  for (const [genreId, titles] of titlesPerGenre) {
+    if (!best || titles > best.titles) best = { genreId, titles };
+  }
+  if (!best) return null;
 
   // Divided by the titles whose genres are actually known -- the caller passes
   // only resolvable metadata. A title with no cached row has unknown genres,
   // not zero genres, so counting it in the denominator would read as evidence
   // against the archetype when it is really absence of evidence.
-  return best / completed.length;
+  return { genreId: best.genreId, share: best.titles / completed.length };
 }
 
 function groupByDateKey(
@@ -611,7 +618,10 @@ export function buildBigDay(
 export function buildRhythm(
   episodes: WatchedEpisodeRow[],
   timeZone: string,
-): Omit<SeriesFinalePayload["rhythm"], "archetype" | "sharedListShare"> {
+): Omit<
+  SeriesFinalePayload["rhythm"],
+  "archetype" | "sharedListShare" | "topGenreName" | "topGenreShare"
+> {
   const weekdayCounts = Array.from({ length: 7 }, () => 0);
   for (const row of episodes) {
     const weekday = getTimezoneWeekday(row.watchedAt, timeZone);
@@ -831,6 +841,10 @@ export function buildPayload(
   const sharedListShare =
     finished.total === 0 ? null : collaborativeCount / finished.total;
 
+  // One value, read by both the archetype and the payload, so the one-genre
+  // visual shows exactly the share it was classified on.
+  const topGenre = topGenreByTitles(completedMetas);
+
   const archetype = classifyArchetype({
     completedTitles: finished.total,
     droppedShows: titlesDropped,
@@ -848,8 +862,8 @@ export function buildPayload(
     soloTickCount: solo.length,
     // Not `genres[0].percent / 100`: that is a share of genre TAGS, rounded
     // for display, and both of those are wrong for a classification threshold.
-    // See `topGenreTitleShare`.
-    topGenreShare: topGenreTitleShare(completedMetas),
+    // See `topGenreByTitles`. No genre known reads as 0, as it always has.
+    topGenreShare: topGenre?.share ?? 0,
     medianPopularity: median(completedMetas.map((meta) => meta.popularity)),
     collaborativeCompletedShare: sharedListShare ?? 0,
     totalEpisodes: episodes.length,
@@ -887,7 +901,15 @@ export function buildPayload(
     months,
     soloTickTotal: solo.length,
     bigDay: buildBigDay(episodes, zone, input.episodeRuntimeLookup, titles),
-    rhythm: { archetype, ...rhythm, sharedListShare },
+    rhythm: {
+      archetype,
+      ...rhythm,
+      sharedListShare,
+      topGenreName: topGenre
+        ? (input.genreNames.get(topGenre.genreId) ?? "Unknown")
+        : null,
+      topGenreShare: topGenre?.share ?? null,
+    },
     shame: buildShame(statuses, titles, episodes, period, now),
     crew: input.crew,
     // Assembled in plan 3, where the peer completed/planning sets are loaded.

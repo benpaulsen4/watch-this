@@ -54,6 +54,8 @@ const payload = (overrides: Record<string, unknown> = {}) => ({
     lateShare: null,
     hourCounts: null,
     sharedListShare: null,
+    topGenreName: null,
+    topGenreShare: null,
   },
   shame: { dropped: [], stillPlanning: [] },
   crew: [],
@@ -440,6 +442,8 @@ describe("RecapClient", () => {
           lateShare: 0.7,
           hourCounts: null,
           sharedListShare: null,
+          topGenreName: null,
+          topGenreShare: null,
         },
       }),
     });
@@ -639,6 +643,8 @@ describe("RecapClient", () => {
           lateShare: 0.41,
           hourCounts: null,
           sharedListShare: null,
+          topGenreName: null,
+          topGenreShare: null,
         },
       }),
     });
@@ -676,6 +682,8 @@ describe("RecapClient", () => {
           lateShare: null,
           hourCounts: null,
           sharedListShare: 0.625,
+          topGenreName: null,
+          topGenreShare: null,
         },
       }),
     });
@@ -713,6 +721,8 @@ describe("RecapClient", () => {
           lateShare: null,
           hourCounts: null,
           sharedListShare: null,
+          topGenreName: null,
+          topGenreShare: null,
         },
       }),
     });
@@ -736,6 +746,8 @@ describe("RecapClient", () => {
           lateShare: null,
           hourCounts: null,
           sharedListShare: null,
+          topGenreName: null,
+          topGenreShare: null,
         },
       }),
     });
@@ -765,6 +777,8 @@ describe("RecapClient", () => {
           lateShare: null,
           hourCounts: null,
           sharedListShare: null,
+          topGenreName: null,
+          topGenreShare: null,
         },
       }),
     });
@@ -1310,6 +1324,8 @@ describe("RecapClient", () => {
           lateShare: null,
           hourCounts: null,
           sharedListShare: null,
+          topGenreName: null,
+          topGenreShare: null,
         },
       }),
     });

@@ -59,6 +59,36 @@ export function coefficientOfVariation(values: number[]): number {
 }
 
 /**
+ * The nightly ritualist's window: this many consecutive hours, wrapping across
+ * midnight. The classifier tests it and the recap's clock draws it, so both
+ * read this one constant.
+ */
+export const RITUAL_WINDOW_HOURS = 3;
+
+/**
+ * The busiest run of `windowSize` consecutive hours in 24 hourly counts,
+ * wrapping across midnight: where it starts (the earliest start on a tie) and
+ * how many it holds. The one implementation behind both the nightly-ritualist
+ * rule (`maxWindowShare`) and the clock the ritualist is drawn with, so the
+ * window the picture highlights is always the window that was classified.
+ * Pure and dependency-free, so a client component may import it.
+ */
+export function busiestWindow(
+  hourCounts: number[],
+  windowSize: number,
+): { start: number; count: number } {
+  let best = { start: 0, count: 0 };
+  for (let start = 0; start < 24; start += 1) {
+    let inWindow = 0;
+    for (let offset = 0; offset < windowSize; offset += 1) {
+      inWindow += hourCounts[(start + offset) % 24] ?? 0;
+    }
+    if (inWindow > best.count) best = { start, count: inWindow };
+  }
+  return best;
+}
+
+/**
  * Largest share of `hours` falling inside any window of `windowSize` hours.
  * Windows wrap across midnight, because a 22:00-01:00 habit is exactly the
  * pattern this is looking for.
@@ -77,16 +107,7 @@ export function maxWindowShare(hours: number[], windowSize: number): number {
     counts[hour] = (counts[hour] ?? 0) + 1;
   }
 
-  let best = 0;
-  for (let start = 0; start < 24; start += 1) {
-    let inWindow = 0;
-    for (let offset = 0; offset < windowSize; offset += 1) {
-      inWindow += counts[(start + offset) % 24] ?? 0;
-    }
-    best = Math.max(best, inWindow);
-  }
-
-  return best / hours.length;
+  return busiestWindow(counts, windowSize).count / hours.length;
 }
 
 /**
@@ -148,7 +169,7 @@ export function classifyArchetype(input: ArchetypeInput): ArchetypeId | null {
     const distinctWeekdays = new Set(input.soloTickWeekdays).size;
     if (
       distinctWeekdays >= 5 &&
-      maxWindowShare(input.soloTickHours, 3) >= 0.6
+      maxWindowShare(input.soloTickHours, RITUAL_WINDOW_HOURS) >= 0.6
     ) {
       return "nightly-ritualist";
     }
