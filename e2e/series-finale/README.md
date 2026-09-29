@@ -50,8 +50,9 @@ npm run e2e:all   # about 5-10 minutes; nothing may be listening on :3100 when i
                   # migrate, build, start the app, register, seed, oracle, the two Playwright
                   # runs as e2e:test, the gallery and report (built even when tests fail), secret
                   # scan. Stops the app it started; leaves the database up -- after the mutating
-                  # specs it holds bo renamed and cy opted out, so `npm run e2e:seed` alone cannot
-                  # restore it (reset first, or rename bo back); npm run e2e:db:down removes it.
+                  # specs it holds bo renamed, cy opted out and her 2025 story gone through, so
+                  # `npm run e2e:seed` alone cannot restore it (reset first, or rename bo back);
+                  # npm run e2e:db:down removes it.
 ```
 
 Individual Playwright invocations work too, e.g.:
@@ -136,10 +137,7 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   own element shots drift down the page.
 - `support/evidence.ts` -- `check()`: a soft assertion that also appends a
   line to `artifacts/evidence.jsonl`; `note()`: an informational line
-  (timings) that never fails the test; `manualObservation()`: a finding only
-  a person can see in the screenshots (F5), recorded with this run's paths
-  and measurements and reported as a manual observation, never as
-  reproduced or fixed. Each line records its spec file.
+  (timings) that never fails the test. Each line records its spec file.
 - `report/` -- `npm run e2e:gallery` (and the end of `e2e:all`).
   `load.ts` reads evidence.jsonl, both invocations' results JSON (a
   truncated file is named, not stack-traced), oracle.json, the screenshots
@@ -148,7 +146,8 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   notes, the "not automated" list and the counts; `html.ts` and
   `markdown.ts` render; `gallery.ts` writes
   - `artifacts/index.html`: a dark, script-free page with relative image
-    paths -- findings F1-F6 with their failing checks and screenshots,
+    paths -- findings F1-F6 with their status (FIXED while every check a
+    finding covers passes, REPRODUCED when one fails), checks and screenshots,
     counts per invocation and project, failed checks (expected vs actual),
     the I1 mutation check, notes, then every screenshot by surface (share
     cards, banner, recap, story, profile, states, consent and rename before
@@ -159,9 +158,10 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
     seeded cast, ava's 2025 oracle block, timings, skips, what is not
     automated, and every screenshot no check links to.
 
-  The findings' diagnoses are written in `FINDINGS`; whether each one
-  reproduced, and its evidence, comes from the run. A failing check no
-  finding explains is listed as unclassified.
+  The findings' diagnoses and plan 6's fixes are written in `FINDINGS`;
+  whether each one holds, and its evidence, comes from the run. All six
+  were fixed in plan 6, so a failing check of one is a regression. A failing
+  check no finding explains is listed as unclassified.
 - `support/oracle.ts` -- `oracleYear(username, year)` and
   `oracleAvailableYears(username)`, read from `artifacts/oracle.json`.
 - `support/pages.ts` -- shared page helpers: `listResponse` (the page's
@@ -181,6 +181,17 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   recap's crew panel or the story's crew card), `readCompare` (CompareSplit's
   discs and CompareFacts' facts, in the recap panel or the story card) and
   `textOf`.
+- `support/big-day.ts` -- the biggest day's clock (BigDayTimeline, in the
+  recap panel or the story card): `readBigDay` (the hour labels on screen,
+  each dot's accessible name, the summary line, the listed rows and "And N
+  more.") and `expectedBigDay(oracle, surface)` (the same from the oracle's
+  `bigDayTimeline`, with the labels each surface shows: every hour on the
+  recap from lg, fewer below lg and on the story's card).
+- `support/archetype.ts` -- the type's picture (`[data-archetype-visual]`
+  and its `role="img"`): `readArchetypeVisual`, `expectedArchetypeLabel`
+  (its aria-label from the oracle's numbers, in the app's wording) and
+  `SEEDED_ARCHETYPES` (each persona's 2025 type in this cast: ava a weekday
+  marathoner, bo and bat one genre only, flo a completionist).
 - `support/profile.ts` -- the profile page: `openProfileTab` (by URL
   fragment) and `clickProfileTab` (no page load), the Data Management tab's
   Series Finale card (`finaleCard`, `finaleRows`, `readFinaleRows`), the
@@ -212,21 +223,26 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   username and year). `seed/generate.test.ts` checks the generator and pins
   the cast's designed statistics with the engine's own pure functions.
 - `seed/seed.ts` -- the seeder: users (signing-in ones looked up, the rest
-  inserted; `e2e_jon` gets the all-f id so the id-ordered crew cap always
-  drops him from ava's crew, and `e2e_dee` the next id down so it always
-  drops her from jon's -- finding F3), history, the shared list, then TMDB metadata via the app's
-  `addToCache`, runtimes via `ensureSeasonsCached` and the backfill's film
-  loop, three nulled runtimes, and the 2025 snapshots of everyone but ava
-  (pops first, pop12 last of them). Re-runnable: it clears the cast's rows
-  first.
+  inserted; `e2e_jon` gets the all-f id and `e2e_dee` the next id down, so
+  the old id-ordered crew cap would drop dee from jon's crew every run -- the
+  activity rule keeps her, finding F3 fixed), history, the shared list, then
+  TMDB metadata via the app's `addToCache`, runtimes via
+  `ensureSeasonsCached` and the backfill's film loop, three nulled runtimes,
+  the 2025 snapshots of everyone but ava (pops first, pop12 last of them),
+  and the story completions phones need (see "Story first on phones").
+  Re-runnable: it clears the cast's rows first.
 - `seed/oracle.ts` -- independent of the app's engine: plain SQL plus the
   spec's rules, each open rule cited to the line of `aggregate.ts` /
   `service.ts` it matches. Writes `artifacts/oracle.json`
   (`Record<username, Record<year, OracleYear>>`): counts, minutes, local
-  months, weekdays and the after-21:00 share (`AT TIME ZONE`), the crew and
-  compare, `episodesIfUtcWindow` (the zone-edge precondition) and
-  `crewTopByActivity` (what F3 compares). The percentile is `null` by
-  design; specs test its presence.
+  months, weekdays and the after-21:00 share (`AT TIME ZONE`), the crew
+  (the 8 most active consenting collaborators) and compare,
+  `episodesIfUtcWindow` (the zone-edge precondition), `crewTopByActivity`
+  (what F3 compares), and payload v4's figures: `bigDayTimeline` (the big
+  day's solo ticks as local `HH:MM`, title and `S2E03` code), `hourCounts`
+  and `busiestWindow`, `topGenre` (by title share, names from a static TMDB
+  genre table) and `sharedListShare`. The percentile is `null` by design;
+  specs test its presence.
 - `specs/` -- Playwright spec files, numbered so alphabetical order is also
   run order within a project: `00`-`79` are read-only, `80`-`99` (or any
   `*.mutating.e2e.ts`) mutate shared state and run last, in the
@@ -236,21 +252,30 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   - `20-api-and-card` (desktop only) -- the list and payload routes, the
     card's status matrix, card PNGs saved to `artifacts/cards/`, the
     first-generation time (`note`), the payload's local buckets (months,
-    weekdays, late share) against the oracle, and ava's card saved for the
-    privacy check in 80.
-  - `30-banner` -- the dashboard banner: who sees it, its text, its link.
+    weekdays, late share) and v4 fields (zone, big-day timeline, hour counts,
+    top genre, shared-list share) against the oracle, ava's story completion
+    kept through her first generation (and listed per period), and ava's card
+    saved for the privacy check in 80.
+  - `30-banner` -- the dashboard banner: who sees it, its text (no "A card
+    at a time on your year."), its actions' layout (side by side from md,
+    stacked full width on a phone), and its CTA, which opens the recap.
   - `31-banner.mutating` -- "Not now": optimistic hide, persistence, and a
     forced failure that leaves bo undismissed.
   - `40-recap` -- ava's 2025 recap, section by section, against the oracle
-    (hero, tiles and the zone-edge precondition, months, type, top show,
-    niche, shame, big day, crew, compare, header, footer); the crew-cap rule
-    (F3) is a note comparing jon's stored crew with his most active.
+    (hero, tiles and the zone-edge precondition, months, type and its
+    picture, top show, niche, shame, the big day's date and clock -- hour
+    ticks, labelled points, listed episodes -- crew, compare for every peer
+    swapped in, header, footer); the crew-cap rule (F3, fixed) checks that
+    jon's stored crew is his 8 most active.
   - `41-recap-visual` (desktop, phone; webkit-phone skips where WebKit does
     not launch) -- full-page and per-section screenshots,
     `recap/<user>-<year>/<section>`, for ava 2025/2024/2023, bo, bat and flo
     2025 and flo 2024; which sections render is checked against the oracle,
-    plus no sideways scroll, a header title that fits, and each type panel's
-    after-21:00 share (ava's shown, bat's absent) against the oracle.
+    plus no sideways scroll (F1), a header title that fits whole (F2), each
+    type panel's after-21:00 share (ava's shown, bat's absent), the
+    archetype's picture and the weekday strip under the months against the
+    oracle, and (desktop) the top-titles card's natural height within 40 px
+    of the Genres card's.
   - `42-recap-states` -- loading, load failure then Retry, and unavailable,
     each forced with `page.route` on the period's GET.
   - `50-story` (desktop, phone, small-phone) -- ava's 2025 story: the walk
@@ -258,16 +283,26 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
     sideways scroll), ArrowLeft and both ends, taps on the right and left
     thirds (touch on phones), Close and Escape, the crew card's top five
     with ranks and "And N more.", the compare card's discs and facts for
-    every peer (the closest, then each swapped in), the summary card's Share (with
-    `navigator.share` stubbed) leaving the reel where it is, the small
-    phone's tall cards scrolled to their bottom (TMDB attribution, swap
-    controls) with the scroll reset on the next card, and wording that
-    matches the recap.
+    every peer (the closest, then each swapped in, the shown chip pressed),
+    the big-day card's clock against the oracle, F5 (every compare label
+    whole, for every peer, on the story card and the recap panel, with a
+    screenshot of each), the summary card's Share (with `navigator.share`
+    stubbed) leaving the reel where it is, the small phone's tall cards
+    (months, big day, shame, crew, compare) scrolled to their bottom with the
+    scroll reset on the next card, and wording that matches the recap.
   - `51-story-visual` (desktop, phone, small-phone; webkit-phone skips
     where WebKit does not launch) -- one full-page shot per card,
     `story/<user>-2025/<nn>-<heading-slug>` (the card id where a card has
     no h2), for ava, bat and flo, and tia's thin story; which cards appear
-    is checked against the oracle.
+    is checked against the oracle, as are the rhythm card's archetype
+    picture and the months card's weekday strip; on the small phone every
+    card's last line must be reachable by scrolling.
+  - `52-story-gate` (desktop, phone, small-phone) -- the story-first gate on
+    cy's 2025, the one story the seeder leaves not gone through: on a phone
+    the recap route hands on to the story without showing the recap, Close
+    and Escape go to the dashboard, and the banner's CTA lands on the story;
+    on desktop the recap shows and Close goes to it. Read-only: it never
+    reaches the summary card, and checks cy's row is still unmarked.
   - `60-profile` (desktop, phone) -- ava's Data Management tab: the archive
     rows against the oracle (newest first and highlighted, each opening its
     recap, the thin 2023 listed), a forced list failure, the crew switch on
@@ -277,13 +312,20 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
     `cards/ava-2025-downloaded.png`); on the phone `navigator.share`
     (stubbed with `addInitScript`) handed exactly one PNG file, a cancel
     that is not a failure, and the story summary's Share; on both a forced
-    card failure and its line.
+    card failure and its line, set below the header bar with the button
+    still in it (F6).
   - `80-consent-and-rename` (desktop-mutating) -- cy opts out of crew
     comparisons; ava's recap withholds her on read while the stored
     snapshot still names her; bo renames himself `e2e_bo_renamed`, and
     ava's recap and story, and bo's own card, show the new name; ava's own
     card stays byte-identical throughout (privacy). Leaves bo renamed and cy
     opted out: re-seeding afterwards needs a database reset.
+  - `85-story-completion` (desktop-mutating, emulating the phone project's
+    Pixel 7) -- cy's story gone through on a phone: reaching the summary
+    card posts one completion (and `story_completed_at` is then set, read
+    through `db.sh psql`), "See the full recap" opens the recap, and
+    afterwards the phone's recap route shows the recap, Close goes to it and
+    nothing is posted again. Leaves cy's 2025 marked.
   - `90-account-switch` (desktop-mutating) -- the same-tab account switch
     (ava out, bat in, one document): bat's recap and card are his own, and a
     MutationObserver sees none of ava's crew after her Logout; plus the
@@ -304,6 +346,28 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   I1 mutation check (ruling E9: 90-account-switch against a build with
   AuthProvider's cache clear reverted, in a scratch worktree); `e2e:all`
   keeps it and the gallery reports it.
+
+## Story first on phones
+
+On a phone (below 768 px) `/series-finale/<year>` hands a story not yet gone
+through on to the story, and the recap opens once the story's summary card
+has been reached -- which marks `series_finale.story_completed_at` on the
+account, on any device. So:
+
+- The seeder marks the story gone through for every non-thin recap a
+  read-only phone spec opens as a recap: ava 2025 and 2024, bo, bat and flo
+  2025 (`STORY_COMPLETED` in `seed/seed.ts`; thin years are never gated).
+  Walking those stories to their summary card then posts nothing, which
+  keeps the read-only projects read-only. ava's snapshots are generated in
+  the browser (her first generation is timed), so hers are stored on
+  placeholder rows (schema version 0, an empty payload) that the app
+  regenerates on first read -- keeping the completion, which
+  `api-payload-story-completion-kept` checks.
+- `e2e_cy`'s 2025 is left unmarked: non-thin, signing in, and screenshotted
+  nowhere else. `52-story-gate` sees it gated (read-only), and
+  `85-story-completion` marks it, last, in `desktop-mutating` with a phone
+  emulated -- rather than a phone-mutating project, so `run.ts`'s two
+  invocations and the report's project list are unchanged.
 
 ## Projects
 
