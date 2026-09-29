@@ -61,16 +61,48 @@ export interface OracleYear {
   lateSoloTicks: number;
   /** lateSoloTicks / soloTicks; null below SOLO_TICK_FLOOR (types.ts:24) solo ticks, when the app shows no share. */
   lateShare: number | null;
+  /** The user's zone: every local bucket here, and the payload's period.timezone. */
+  timezone: string;
+  /**
+   * The biggest day's solo ticks in time order, each as its local "HH:MM",
+   * the show's cached title (null when uncached) and its episode code
+   * ("S2E03"); null below SOLO_TICK_FLOOR solo ticks in the period
+   * (aggregate.ts:545-615 buildBigDay; :177-179 episodeCode).
+   */
+  bigDayTimeline: { time: string; title: string | null; episode: string }[] | null;
+  /** Solo ticks per local hour, midnight first; null below SOLO_TICK_FLOOR (aggregate.ts:618-661 buildRhythm). */
+  hourCounts: number[] | null;
+  /**
+   * The busiest three consecutive hours of hourCounts, wrapping midnight, the
+   * earliest start on a tie (archetype.ts:66-89 busiestWindow, RITUAL_WINDOW_HOURS):
+   * the nightly ritualist's clock. Null with no hourCounts.
+   */
+  busiestWindow: { start: number; count: number } | null;
+  /**
+   * The genre on most finished titles, by TITLE share: titles completed in the
+   * period with cached metadata carrying the genre, over those titles
+   * (aggregate.ts:439-465 topGenreByTitles). `names` holds every genre tied at
+   * the top -- the engine keeps the first it meets, which is query order --
+   * named as TMDB names them (GENRE_NAMES). Null with no such title.
+   */
+  topGenre: { names: string[]; share: number } | null;
+  /**
+   * Titles completed in the period that sit on a shared list (a list with a
+   * collaborator besides its owner, the user owning or collaborating on it),
+   * over titles completed; null with none completed (aggregate.ts:829-837,
+   * service.ts:670-691 loadCollaborativeTitleKeys).
+   */
+  sharedListShare: number | null;
   /** Consenting collaborators kept by the cap, plus the viewer, as CrewRanking orders and ranks them. Empty without collaborators. */
   crew: { username: string; episodes: number; rank: number }[];
   /** How the crew was capped, and who the cap left out. */
   crewCapRule: string;
   crewCappedOut: string[];
   /**
-   * The consenting collaborators a cap by activity would keep: the 8 with most
-   * episodes in the viewer's window, a tie to the username by code unit. Not
-   * the app's rule (that is the id cap above); finding F3 compares the crew
-   * the app stored with this.
+   * The consenting collaborators the cap keeps, most active first: the 8 with
+   * most episodes in the viewer's window, a tie to the username by code unit,
+   * then the id (service.ts mostActiveCollaborators). Finding F3 (fixed)
+   * compares the crew the app stored for e2e_jon with this.
    */
   crewTopByActivity: string[];
   /** Per crew member, keys in the order the compare rows render. */
@@ -97,13 +129,70 @@ const THIN_YEAR_TITLES = 5;
 // types.ts:24 -- below this many solo ticks the late share is null.
 const SOLO_TICK_FLOOR = 50;
 
-// service.ts:224 and :275 -- ids sorted as strings, the first 8 kept, before
-// any activity is loaded.
+// service.ts:227 CREW_LIMIT; :301-314 mostActiveCollaborators -- every
+// consenting collaborator ranked by episodes in the viewer's window (the
+// grouped left join at :363-394), then username by code unit, then id; the
+// first 8 kept (finding F3, fixed: the cap once went by user id).
 const CREW_LIMIT = 8;
 const CREW_CAP_RULE =
-  "service.ts loadCollaboratorIds: consenting collaborators (list owners and list collaborators, minus the viewer) " +
-  `sorted by user id as strings, first ${CREW_LIMIT} kept, BEFORE activity is loaded -- so the cap drops by id, ` +
-  "not by how much anyone watched (e2e_jon has the all-f id and is always the one left out of ava's crew)";
+  "service.ts mostActiveCollaborators: consenting collaborators (list owners and list collaborators, minus the viewer) " +
+  `ranked by episodes in the viewer's window, then username by code unit, then id; the first ${CREW_LIMIT} kept -- ` +
+  "so the cap leaves out the least active, whatever their ids (e2e_jon, with nothing in 2025, is the one left out of ava's crew)";
+
+// archetype.ts:66 RITUAL_WINDOW_HOURS.
+const RITUAL_WINDOW_HOURS = 3;
+
+/**
+ * TMDB's genre names by id, the movie list then the TV list (service.ts
+ * loadGenreNames merges them in that order; the ids they share have the same
+ * name in both). Static here so the oracle needs no TMDB call; an id missing
+ * from it reads "Unknown", as the app's does.
+ */
+const GENRE_NAMES: Record<number, string> = {
+  28: "Action",
+  12: "Adventure",
+  16: "Animation",
+  35: "Comedy",
+  80: "Crime",
+  99: "Documentary",
+  18: "Drama",
+  10751: "Family",
+  14: "Fantasy",
+  36: "History",
+  27: "Horror",
+  10402: "Music",
+  9648: "Mystery",
+  10749: "Romance",
+  878: "Science Fiction",
+  10770: "TV Movie",
+  53: "Thriller",
+  10752: "War",
+  37: "Western",
+  10759: "Action & Adventure",
+  10762: "Kids",
+  10763: "News",
+  10764: "Reality",
+  10765: "Sci-Fi & Fantasy",
+  10766: "Soap",
+  10767: "Talk",
+  10768: "War & Politics",
+};
+
+/** archetype.ts busiestWindow: the busiest `size` consecutive hours, wrapping midnight, the earliest start on a tie. */
+function busiestWindowOf(hourCounts: number[], size: number): { start: number; count: number } {
+  let best = { start: 0, count: 0 };
+  for (let start = 0; start < 24; start += 1) {
+    let count = 0;
+    for (let offset = 0; offset < size; offset += 1) count += hourCounts[(start + offset) % 24] ?? 0;
+    if (count > best.count) best = { start, count };
+  }
+  return best;
+}
+
+/** aggregate.ts:177-179 episodeCode: "S2E03", the season unpadded and the episode to two digits. */
+function episodeCodeOf(season: number, episode: number): string {
+  return `S${season}E${String(episode).padStart(2, "0")}`;
+}
 
 // Connected in `main`, after the DATABASE_URL guard.
 let sql: postgres.Sql;
@@ -152,7 +241,7 @@ async function statusKeys(userId: string, status: string, w: Window | null): Pro
   return rows.map((row) => row.key);
 }
 
-/** The first key, in sorted order, that has a tmdb_cache row, as its title (service.ts:439-448). */
+/** The first key, in sorted order, that has a tmdb_cache row, as its title (service.ts:496-505 buildCompare firstTitle). */
 async function firstCachedTitle(keys: string[]): Promise<string | null> {
   for (const key of Array.from(new Set(keys)).sort()) {
     const [type, id] = key.split(":");
@@ -318,9 +407,76 @@ async function oracleYear(user: { id: string; username: string; timezone: string
       group by watched_at having count(*) = 1
     ) solo`;
 
+  // Solo ticks by local hour, the busiest three hours of them, and the
+  // biggest day's solo ticks in time order -- all null below the floor.
+  const hourRows = await sql<{ h: number; n: number }[]>`
+    select extract(hour from watched_at at time zone ${w.zone})::int as h, count(*)::int as n from (
+      select watched_at from episode_watch_status
+      where user_id = ${u} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
+      group by watched_at having count(*) = 1
+    ) solo group by h`;
+  const hourCounts =
+    ticks!.solo >= SOLO_TICK_FLOOR ? Array.from({ length: 24 }, (_, h) => hourRows.find((row) => row.h === h)?.n ?? 0) : null;
+  let bigDayTimeline: OracleYear["bigDayTimeline"] = null;
+  if (bigDay && ticks!.solo >= SOLO_TICK_FLOOR) {
+    const points = await sql<{ time: string; title: string | null; season: number; episode: number }[]>`
+      with solo as (
+        select watched_at from episode_watch_status
+        where user_id = ${u} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
+        group by watched_at having count(*) = 1
+      )
+      select to_char(e.watched_at at time zone ${w.zone}, 'HH24:MI') as time, c.title,
+             e.season_number as season, e.episode_number as episode
+      from episode_watch_status e
+      join solo on solo.watched_at = e.watched_at
+      left join tmdb_cache c on c.tmdb_id = e.tmdb_id and c.content_type = 'tv'
+      where e.user_id = ${u} and e.watched and e.watched_at >= ${w.start} and e.watched_at < ${w.end}
+        and to_char(e.watched_at at time zone ${w.zone}, 'YYYY-MM-DD') = ${bigDay.date}
+      order by e.watched_at`;
+    bigDayTimeline = points.map((p) => ({ time: p.time, title: p.title, episode: episodeCodeOf(p.season, p.episode) }));
+  }
+
+  // The top genre by titles: completed titles of the period with cached
+  // metadata, each genre counted once per title, over those titles.
+  const genreRows = await sql<{ titles: number; genre: number | null; n: number }[]>`
+    with done as (
+      select distinct c.tmdb_id, c.content_type, c.genre_ids from user_content_status s
+      join tmdb_cache c on c.tmdb_id = s.tmdb_id and c.content_type = s.content_type
+      where s.user_id = ${u} and s.status = 'completed' and s.updated_at >= ${w.start} and s.updated_at < ${w.end}
+    )
+    select (select count(*)::int from done) as titles, g.genre, count(distinct (done.tmdb_id, done.content_type))::int as n
+    from done left join lateral unnest(done.genre_ids) as g(genre) on true
+    group by g.genre`;
+  const known = genreRows[0]?.titles ?? 0;
+  const perGenre = genreRows.filter((row) => row.genre !== null);
+  const topCount = Math.max(0, ...perGenre.map((row) => row.n));
+  const topGenre =
+    known === 0 || topCount === 0
+      ? null
+      : {
+          names: perGenre
+            .filter((row) => row.n === topCount)
+            .map((row) => GENRE_NAMES[row.genre!] ?? "Unknown")
+            .sort(),
+          share: topCount / known,
+        };
+
+  // Titles completed in the period that are on a shared list.
+  const [shared] = await sql<{ n: number }[]>`
+    select count(*)::int as n from user_content_status s
+    where s.user_id = ${u} and s.status = 'completed' and s.updated_at >= ${w.start} and s.updated_at < ${w.end}
+      and exists (
+        select 1 from list_items li
+        join lists l on l.id = li.list_id
+        join list_collaborators lc on lc.list_id = l.id
+        where li.tmdb_id = s.tmdb_id and li.content_type = s.content_type
+          and (l.owner_id = ${u} or lc.user_id = ${u}) and lc.user_id <> l.owner_id
+      )`;
+
   // --- Crew and compare --------------------------------------------------
-  // service.ts:238-276: every list the viewer owns or joined; their owners and
-  // collaborators who consent, minus the viewer; sorted by id; first 8.
+  // service.ts:243-281 loadCollaboratorIds: every list the viewer owns or
+  // joined; their owners and collaborators who consent, minus the viewer --
+  // uncapped; the cap by activity follows (service.ts:363-401).
   const people = await sql<{ id: string }[]>`
     with mine as (
       select l.id from lists l left join list_collaborators lc on lc.list_id = l.id
@@ -333,20 +489,22 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     ) p join users on users.id = p.id
     where users.share_stats_with_collaborators and p.id <> ${u}`;
   const sortedIds = people.map((row) => row.id).sort();
-  const keptIds = sortedIds.slice(0, CREW_LIMIT);
   const usernameOf = async (id: string) => {
     const [row] = await sql<{ username: string }[]>`select username from users where id = ${id}`;
     return row!.username;
   };
-  const crewCappedOut = await Promise.all(sortedIds.slice(CREW_LIMIT).map(usernameOf));
-  const everyone = [];
-  for (const id of sortedIds) everyone.push({ username: await usernameOf(id), episodes: await episodeCount(id, w) });
-  const crewTopByActivity = everyone
-    .sort((a, b) => b.episodes - a.episodes || byCodeUnit(a.username, b.username))
-    .slice(0, CREW_LIMIT)
-    .map((person) => person.username);
+  // Every candidate with their episodes in the viewer's window, ranked as
+  // mostActiveCollaborators ranks them (service.ts:301-314).
+  const everyone: { id: string; username: string; episodes: number }[] = [];
+  for (const id of sortedIds) everyone.push({ id, username: await usernameOf(id), episodes: await episodeCount(id, w) });
+  const ranked = everyone.sort(
+    (a, b) => b.episodes - a.episodes || byCodeUnit(a.username, b.username) || byCodeUnit(a.id, b.id),
+  );
+  const keptIds = ranked.slice(0, CREW_LIMIT).map((person) => person.id);
+  const crewCappedOut = ranked.slice(CREW_LIMIT).map((person) => person.username);
+  const crewTopByActivity = ranked.slice(0, CREW_LIMIT).map((person) => person.username);
 
-  // Each kept collaborator counted in the VIEWER's window (service.ts:303-306, :346).
+  // Each kept collaborator counted in the VIEWER's window (service.ts:363-433 loadCollaboratorSlices).
   const collaborators = [];
   for (const id of keptIds) {
     collaborators.push({
@@ -356,7 +514,7 @@ async function oracleYear(user: { id: string; username: string; timezone: string
       topShowId: await topShowId(id, w),
     });
   }
-  // Episodes descending, username by code unit (service.ts:380-384).
+  // Episodes descending, username by code unit (service.ts:436-442).
   collaborators.sort((a, b) => b.episodes - a.episodes || byCodeUnit(a.username, b.username));
 
   // The viewer joins the ranking only when there is a crew (RecapClient.tsx:194);
@@ -374,11 +532,11 @@ async function oracleYear(user: { id: string; username: string; timezone: string
   }));
 
   // alsoTopFor: kept collaborators, in crew order, whose most-watched show is
-  // the viewer's -- nobody when the viewer has no top show card (service.ts:590-599, :824-826).
+  // the viewer's -- nobody when the viewer has no top show card (service.ts:648-657 alsoTopForOf, :883).
   const alsoTopFor = topShow === null ? [] : collaborators.filter((c) => c.topShowId === topId).map((c) => c.username);
 
   // Compare: completed and dropped scoped to the viewer's window on both
-  // sides, planning unscoped (service.ts:359-375, :426-437, :450-467).
+  // sides, planning unscoped (service.ts:417-432, :477-529 buildCompare).
   const myCompleted = new Set(await statusKeys(u, "completed", w));
   const myDropped = new Set(await statusKeys(u, "dropped", w));
   const myPlanning = new Set(await statusKeys(u, "planning", null));
@@ -398,7 +556,7 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     });
   }
   // Keys in the service's row order: most in common first, then username by
-  // code unit (service.ts:472-476).
+  // code unit (service.ts:530-537).
   compareRows.sort((a, b) => b.both - a.both || byCodeUnit(a.username, b.username));
   const compare: OracleYear["compare"] = Object.fromEntries(compareRows.map(({ username, ...row }) => [username, row]));
 
@@ -428,6 +586,12 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     soloTicks: ticks!.solo,
     lateSoloTicks: ticks!.late,
     lateShare: ticks!.solo >= SOLO_TICK_FLOOR ? ticks!.late / ticks!.solo : null,
+    timezone: w.zone,
+    bigDayTimeline,
+    hourCounts,
+    busiestWindow: hourCounts ? busiestWindowOf(hourCounts, RITUAL_WINDOW_HOURS) : null,
+    topGenre,
+    sharedListShare: counts!.completed === 0 ? null : shared!.n / counts!.completed,
     crew,
     crewCapRule: CREW_CAP_RULE,
     crewCappedOut,

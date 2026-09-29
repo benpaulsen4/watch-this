@@ -20,15 +20,16 @@ import { generate } from "./generate";
 import { PERSONAS, type PersonaSpec, UNKNOWN_RUNTIME_EPISODES } from "./personas";
 
 /**
- * Inserted (non-signing) users get default random ids, except two: the crew
- * is capped at 8 collaborators by sorted user id before anyone's activity is
- * loaded (service.ts `loadCollaboratorIds`), and ava's list has 9.
- * - jon's all-f id sorts last, so he is always the one left out of ava's crew
- *   (ruling E5).
- * - dee's sorts last among jon's nine collaborators, so jon's own crew always
- *   leaves out dee -- one of the most active -- and finding F3 (the cap
- *   ignores activity) reproduces every run instead of depending on random
- *   registration ids.
+ * Inserted (non-signing) users get default random ids, except two, pinned to
+ * sort last by id: the crew keeps a user's 8 most active consenting
+ * collaborators (service.ts `mostActiveCollaborators`), and ava's list has 9.
+ * The rule no longer looks at ids (finding F3, fixed), and these two pins are
+ * what make that observable every run rather than by luck of registration:
+ * - jon's all-f id sorts last, and he watched nothing in 2025, so he is the
+ *   one left out of ava's crew under either rule (ruling E5).
+ * - dee's sorts last among jon's nine collaborators, so the old id rule left
+ *   dee -- one of the most active -- out of jon's crew; the activity rule
+ *   keeps her, and 40-recap's `crew-cap-rule` checks that it does.
  */
 const FIXED_IDS: Record<string, string> = {
   e2e_jon: "ffffffff-ffff-4fff-bfff-ffffffffffff",
@@ -58,6 +59,33 @@ const PREGENERATE_ORDER = [
   "e2e_tia",
 ];
 const NOT_PREGENERATED = new Set(["e2e_ava", "e2e_neo"]);
+
+/**
+ * The recaps whose story is marked gone through before any browser opens, so
+ * a phone opens them as recaps rather than handing on to the story (Task 3's
+ * gate): every non-thin year a read-only phone spec opens as a recap (thin
+ * years are never gated). Walking these stories to their summary card then
+ * posts nothing, so the read-only projects stay read-only -- the summary
+ * card marks completion on any device. e2e_cy is deliberately left out: her
+ * 2025 is the one the gate is tested on (52-story-gate, read-only: the phone
+ * recap hands on to the story, Close goes to the dashboard) and the one the
+ * marking flow completes (85-story-completion, mutating, last).
+ *
+ * ava's two have no snapshot yet (her first generation is the browser's), so
+ * for her the seeder stores the completion on a placeholder row at schema
+ * version 0 with an empty payload: the app regenerates any row below its
+ * current version on first read (service.ts getOrGenerateSnapshot), and the
+ * regeneration's upsert leaves `story_completed_at` alone -- which
+ * 20-api-and-card checks. The placeholder is never served: only rows at the
+ * current version are read back, or counted in anyone's percentile cohort.
+ */
+const STORY_COMPLETED: { username: string; year: number; placeholder: boolean }[] = [
+  { username: "e2e_ava", year: 2025, placeholder: true },
+  { username: "e2e_ava", year: 2024, placeholder: true },
+  { username: "e2e_bo", year: 2025, placeholder: false },
+  { username: "e2e_bat", year: 2025, placeholder: false },
+  { username: "e2e_flo_watches_only_films_and_has_a_long_name", year: 2025, placeholder: false },
+];
 
 /** TMDB pacing, as `tools/backfill-runtimes.ts` and the catalogue resolver use. */
 const REQUEST_GAP_MS = 250;
@@ -372,7 +400,33 @@ async function main(): Promise<void> {
     log("snapshot", `${username} 2025: thin=${payload.thin} minutes=${minutes} (${hours} h) percentile=${percentile ?? "null"}`);
   }
 
-  // 9. Summary.
+  // 9. Story completion, for the recaps a read-only phone spec opens (STORY_COMPLETED).
+  for (const { username, year, placeholder } of STORY_COMPLETED) {
+    const userId = ids.get(username)!;
+    const yearPeriod = calendarYearPeriod(year);
+    const completedAt = new Date();
+    if (placeholder) {
+      await db.insert(seriesFinale).values({
+        userId,
+        periodStart: yearPeriod.start,
+        periodEnd: yearPeriod.end,
+        periodLabel: yearPeriod.label,
+        payload: {},
+        schemaVersion: 0,
+        storyCompletedAt: completedAt,
+      });
+    } else {
+      const updated = await db
+        .update(seriesFinale)
+        .set({ storyCompletedAt: completedAt })
+        .where(and(eq(seriesFinale.userId, userId), eq(seriesFinale.periodStart, yearPeriod.start), eq(seriesFinale.periodEnd, yearPeriod.end)))
+        .returning({ id: seriesFinale.id });
+      if (updated.length !== 1) throw new Error(`${username} ${year}: no snapshot to mark story-completed`);
+    }
+    log("story", `${username} ${year}: story completed${placeholder ? " (on a placeholder row the app regenerates on first read)" : ""}`);
+  }
+
+  // 10. Summary.
   const snapshotCount = await db.select({ count: sql<number>`count(*)::int` }).from(seriesFinale).where(inArray(seriesFinale.userId, seededIds));
   console.log("");
   console.log("[seed] summary");
@@ -394,7 +448,7 @@ async function main(): Promise<void> {
   });
   const widths = header.map((title, i) => Math.max(title.length, ...table.map((row) => row[i]!.length)));
   for (const row of [header, ...table]) console.log(`  ${row.map((cell, i) => cell.padEnd(widths[i]!)).join("  ")}`);
-  console.log(`  ${snapshotCount[0]?.count ?? 0} snapshots stored (ava's are generated in the browser)`);
+  console.log(`  ${snapshotCount[0]?.count ?? 0} snapshots stored (ava's are generated in the browser; her two placeholders included)`);
 }
 
 if (process.argv[1]?.endsWith("seed.ts")) {
