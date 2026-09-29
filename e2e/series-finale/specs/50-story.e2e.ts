@@ -1,10 +1,12 @@
 import { type Locator, type Page, test } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
+import { expectedBigDay, readBigDay } from "../support/big-day";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { becomesVisible, dayMonth, pluralise, words, wordValue } from "../support/pages";
 import { crewRows, openRecap, readCompare, recapSection, textOf, tileValue } from "../support/recap";
+import { shotElement } from "../support/shots";
 import {
   type CardState,
   cardState,
@@ -27,7 +29,12 @@ import {
 // ava's 2025 story (desktop, phone, small-phone; read-only): walking the
 // reel by key and by tap, its progress bars and headings, closing it, the
 // crew card's cap, the summary card's Share, the small phone's tall cards,
-// and wording that must read as the recap does. Every fact goes through
+// and wording that must read as the recap does. On the phones ava's recap is
+// open to her (the seeder marked her story gone through, seed.ts
+// STORY_COMPLETED), so Close goes to it as on desktop, and reaching the
+// summary card posts no completion: this spec stays read-only. The gate
+// itself, for a story not yet gone through, is 52-story-gate's; marking it
+// is 85-story-completion's. Every fact goes through
 // check() -- soft -- so it reaches the evidence log whether it holds or not;
 // a test stops early only when the reel never rendered, after logging that.
 
@@ -183,7 +190,7 @@ test("taps: the right two-thirds advance, the left third goes back", async ({ pa
   check("story-tap-url-unchanged", "tapping through the reel stays on the story page", `${RECAP_PATH}/story`, new URL(page.url()).pathname);
 });
 
-test("closing: the 'Close story' button, and Escape, return to the recap", async ({ page, hasTouch }) => {
+test("closing: the 'Close story' button, and Escape, return to the recap (on a phone too: ava's story is gone through)", async ({ page, hasTouch }) => {
   const total = await openAvaStory(page);
   await pressTo(page, "ArrowRight", 2, total);
 
@@ -251,19 +258,28 @@ test("the compare card: every peer's split and named facts, the closest first, t
   const card = storyCard(page);
   const peers = Object.keys(oracle.compare);
 
+  // "Swap in" lists every peer, the one shown pressed (ComparePeerPicker).
+  const chips = card.getByText("Swap in", { exact: true }).locator("xpath=..").getByRole("button");
+  const pressedChips = () =>
+    chips.evaluateAll((buttons) => buttons.filter((button) => button.getAttribute("aria-pressed") === "true").map((button) => button.textContent?.trim() ?? ""));
   for (const [index, peer] of peers.entries()) {
     const expected = oracle.compare[peer]!;
     if (index > 0) {
-      // "Swap in" lists every peer but the one shown.
       const swap = card.getByText("Swap in", { exact: true }).locator("xpath=..").getByRole("button", { name: peer, exact: true });
       const tapped = await tapCentre(page, swap, hasTouch);
-      check(`story-compare-${peer}-swapped`, `tapping '${peer}' in the swap row shows 'You & ${peer}', still on the compare card`, { tapped: true, eyebrow: true, card: "compare" }, {
+      check(`story-compare-${peer}-swapped`, `tapping '${peer}' in the swap row shows 'You & ${peer}', still on the compare card, with only its chip pressed`, { tapped: true, eyebrow: true, card: "compare", pressed: [peer] }, {
         tapped,
         eyebrow: await becomesVisible(card.getByText(`You & ${peer}`, { exact: true }), 5_000),
         card: (await cardState(page)).id,
+        pressed: await pressedChips(),
       });
     } else {
-      check("story-compare-first-peer", "the card opens on the oracle's closest peer", true, await becomesVisible(card.getByText(`You & ${peer}`, { exact: true }), 5_000));
+      check(
+        "story-compare-first-peer",
+        "the card opens on the oracle's closest peer, whose chip is the pressed one",
+        { eyebrow: true, pressed: [peer] },
+        { eyebrow: await becomesVisible(card.getByText(`You & ${peer}`, { exact: true }), 5_000), pressed: await pressedChips() },
+      );
     }
     const shown = await readCompare(card, peer);
     check(
@@ -278,6 +294,80 @@ test("the compare card: every peer's split and named facts, the closest first, t
       { theyFinishedYouDropped: expected.theyFinishedYouDropped, bothPlanning: expected.bothPlanning },
       { theyFinishedYouDropped: shown.theyFinishedYouDropped, bothPlanning: shown.bothPlanning },
     );
+  }
+});
+
+test("the biggest day card: its clock's hour ticks, labelled points and listed episodes", async ({ page }) => {
+  const oracle = oracleYear(AVA, YEAR);
+  await openAvaStory(page);
+  await reachCard(page, "bigDay");
+  check(
+    "story-big-day-clock",
+    `the big-day card's hour ticks (the narrow set), each point's label, the summary line and the listed rows are the oracle's timeline in ${oracle.timezone}`,
+    expectedBigDay(oracle, "story"),
+    await readBigDay(storyCard(page)),
+  );
+});
+
+/**
+ * Each of CompareSplit's three labels ("only you", "both", "only <peer>")
+ * under `container`, and whether it is whole: its content no wider or taller
+ * than its box (F5: the peer's label was cut to its box, its last glyph lost).
+ */
+function compareLabels(container: Locator) {
+  return container.locator("[data-region]").evaluateAll((regions) =>
+    regions.map((region) => {
+      const label = region.lastElementChild as HTMLElement | null;
+      return {
+        label: label?.textContent?.trim() ?? null,
+        whole: !!label && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight,
+      };
+    }),
+  );
+}
+
+const wholeLabels = (peer: string) => ["only you", "both", `only ${peer}`].map((label) => ({ label, whole: true }));
+
+test("F5: every compare label is whole, in the story card's large discs and the recap panel's default ones, for every peer", async ({ page, hasTouch }) => {
+  const oracle = oracleYear(AVA, YEAR);
+  const peers = Object.keys(oracle.compare);
+
+  // The story card (CompareSplit size "large").
+  await openAvaStory(page);
+  await reachCard(page, "compare");
+  const card = storyCard(page);
+  for (const [index, peer] of peers.entries()) {
+    if (index > 0) {
+      await tapCentre(page, card.getByText("Swap in", { exact: true }).locator("xpath=..").getByRole("button", { name: peer, exact: true }), hasTouch);
+      await becomesVisible(card.getByText(`You & ${peer}`, { exact: true }), 5_000);
+    }
+    check(
+      `F5-compare-labels-whole-story-${peer}`,
+      `APP FINDING F5, fixed: on the story's compare card with ${peer} swapped in, every disc label is whole (scrollWidth <= clientWidth); see story/ava-2025-compare/${peer}`,
+      wholeLabels(peer),
+      await compareLabels(card),
+    );
+    await shotElement(card, `story/ava-2025-compare/${peer}`);
+  }
+
+  // The recap panel (CompareSplit size "default").
+  const rendered = await openRecap(page, YEAR);
+  check("F5-recap-rendered", "ava's 2025 recap renders", true, rendered);
+  const chips = recapSection(page, "compare").getByText("Swap in", { exact: true }).locator("xpath=..").getByRole("button");
+  for (const [index, peer] of peers.entries()) {
+    if (index > 0) {
+      const chip = chips.filter({ hasText: new RegExp(`^${peer}$`) });
+      await (hasTouch ? chip.tap() : chip.click()).catch(() => undefined);
+      await becomesVisible(page.getByRole("heading", { level: 2, name: `You & ${peer}`, exact: true }), 5_000);
+    }
+    const panel = recapSection(page, "compare");
+    check(
+      `F5-compare-labels-whole-recap-${peer}`,
+      `APP FINDING F5, fixed: on the recap's compare panel with ${peer} swapped in, every disc label is whole (scrollWidth <= clientWidth); see recap/ava-2025-compare/${peer}`,
+      wholeLabels(peer),
+      await compareLabels(panel),
+    );
+    await shotElement(panel, `recap/ava-2025-compare/${peer}`);
   }
 });
 
@@ -347,7 +437,7 @@ test("small phone: the tallest cards scroll to their bottom, and each next card 
   test.skip(testInfo.project.name !== "small-phone", "the 360×640 small-phone project only");
   const oracle = oracleYear(AVA, YEAR);
   const total = await openAvaStory(page);
-  await reachCard(page, "shame");
+  await reachCard(page, "months");
 
   const tmdbLogo = storyCard(page).getByRole("img", { name: "TMDB" });
   const tmdbDisclaimer = storyCard(page).getByText(/not endorsed or certified by TMDB/);
@@ -365,7 +455,22 @@ test("small phone: the tallest cards scroll to their bottom, and each next card 
     return reach === null ? null : reach.inViewport;
   };
 
-  const tallest: StoryCardId[] = ["shame", "crew", "compare"];
+  // The months card (a little taller with the weekday strip, which ava's
+  // marathoner card leaves out) and the biggest day (its axis plus the listed
+  // episodes: about 220 px past a 640 px screen) joined the tall cards in
+  // plan 6; shame, crew and compare were already.
+  const tallest: StoryCardId[] = ["months", "bigDay", "shame", "crew", "compare"];
+  /** Whether the card's lowest content -- its last line, whatever it is -- is on screen. */
+  const bottomOnScreen = () =>
+    storyCard(page).evaluate((group) => {
+      // Content only: the Shell's aria-hidden wash fills the card (inset-0)
+      // and ends a sub-pixel below the screen.
+      const leaves = Array.from(group.querySelectorAll("[data-card] *")).filter(
+        (node) => node.children.length === 0 && node.getBoundingClientRect().height > 0 && !node.closest('[aria-hidden="true"]'),
+      );
+      const lowest = Math.max(...leaves.map((node) => node.getBoundingClientRect().bottom));
+      return lowest <= window.innerHeight + 0.5;
+    });
   for (const [index, id] of tallest.entries()) {
     if (index > 0) {
       const moved = await goToCard(page, id);
@@ -376,13 +481,30 @@ test("small phone: the tallest cards scroll to their bottom, and each next card 
     }
 
     const heights = await scrollToBottom();
+    // ava's months card has no weekday strip (hers is the marathoner's rhythm
+    // card), so it may just fit; the non-marathoners' months cards scroll a
+    // little (51-story-visual checks each card's bottom is reachable).
+    const mayFit = id === "months";
     note(
       `story-small-${id}-height`,
       `the ${id} card's page height against the 640 px screen`,
-      "taller than the screen",
+      mayFit ? "at most a little taller than the screen" : "taller than the screen",
       heights,
-      heights.scrollHeight > heights.clientHeight,
+      mayFit || heights.scrollHeight > heights.clientHeight,
     );
+
+    if (id === "months" || id === "bigDay") {
+      check(`story-small-${id}-bottom`, `scrolled to the bottom, the ${id} card's last line is on screen`, true, await bottomOnScreen());
+      if (id === "bigDay") {
+        check(
+          "story-small-bigDay-last-row",
+          "scrolled to the bottom, the biggest day's last listed episode is on screen",
+          true,
+          await inViewport(storyCard(page).locator("[data-episode-row]").last()),
+        );
+      }
+      continue;
+    }
 
     if (id === "crew") {
       // The crew card shows no TMDB metadata, so it carries no attribution: its bottom is the count of the rest.
@@ -398,38 +520,16 @@ test("small phone: the tallest cards scroll to their bottom, and each next card 
       const swaps = storyCard(page).getByText("Swap in", { exact: true }).locator("xpath=..").getByRole("button");
       check(
         "story-small-compare-swap-peers",
-        "the compare card offers every other peer the oracle compares, closest first",
-        peers.slice(1),
-        (await swaps.allTextContents()).map((text) => text.trim()),
+        "the compare card's 'Swap in' row offers every peer the oracle compares, closest first, the shown one pressed",
+        peers.map((peer, index) => ({ name: peer, pressed: String(index === 0) })),
+        await swaps.evaluateAll((buttons) => buttons.map((button) => ({ name: button.textContent?.trim() ?? "", pressed: button.getAttribute("aria-pressed") ?? "" }))),
       );
       const reach = await Promise.all((await swaps.all()).map((swap) => onScreenAndReachable(swap)));
       check(
         "story-small-compare-swaps-reachable",
         "scrolled to the bottom, every 'Swap in' button is on screen and is what a tap at its centre hits",
-        peers.slice(1).map(() => ({ inViewport: true, hitAtCentre: true })),
+        peers.map(() => ({ inViewport: true, hitAtCentre: true })),
         reach,
-      );
-
-      // The peer's disc label ("only e2e_bo") truncates by design (CompareSplit's
-      // max-w-[5rem]). Its DOM widths are recorded here; they cannot see the
-      // clipped last glyph the phone screenshots show -- that is finding F5,
-      // noted by 51-story-visual.
-      const peerLabel = await storyCard(page)
-        .getByText(`only ${peers[0] ?? ""}`, { exact: true })
-        .evaluate((element) => {
-          // Fractional widths: scrollWidth and clientWidth round to whole pixels.
-          const range = document.createRange();
-          range.selectNodeContents(element);
-          const round = (value: number) => Math.round(value * 100) / 100;
-          return { textWidth: round(range.getBoundingClientRect().width), boxWidth: round(element.getBoundingClientRect().width) };
-        }, undefined, { timeout: 2_000 })
-        .catch(() => null);
-      note(
-        "story-small-compare-peer-label-fits",
-        `the compare disc's 'only ${peers[0] ?? ""}' label's text is no wider than its box (DOM only; see F5 for what the screenshots show)`,
-        "textWidth <= boxWidth",
-        peerLabel,
-        !!peerLabel && peerLabel.textWidth <= peerLabel.boxWidth,
       );
 
       const swapTo = peers[1];

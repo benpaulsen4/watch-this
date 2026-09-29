@@ -16,7 +16,9 @@ import { oracleAvailableYears, oracleYear } from "../support/oracle";
 //
 // Order matters within the file: the payload test runs first, so ava's 2025
 // may still be ungenerated and its timing is a first generation (the list
-// route generates every missing year).
+// route generates every missing year). "Ungenerated" includes the seeder's
+// placeholder row (schema version 0, empty payload), which only carries her
+// story completion into the regeneration.
 
 const AVA = "e2e_ava";
 const BO = "e2e_bo";
@@ -32,6 +34,7 @@ interface ListItem {
   label: string;
   generatedAt: string;
   dismissedAt: string | null;
+  storyCompletedAt: string | null;
   headline: { episodes: number; titlesCompleted: number };
 }
 
@@ -42,7 +45,18 @@ interface Payload {
   compare: { username: string }[];
   thin: boolean;
   months: { month: number; episodes: number }[];
-  rhythm: { weekdayCounts: number[]; topWeekday: number | null; lateShare: number | null };
+  rhythm: {
+    weekdayCounts: number[];
+    topWeekday: number | null;
+    lateShare: number | null;
+    archetype: string | null;
+    hourCounts: number[] | null;
+    sharedListShare: number | null;
+    topGenreName: string | null;
+    topGenreShare: number | null;
+  };
+  period: { timezone: string };
+  bigDay: { timeline: { at: string; title: string | null; episode: string }[] | null } | null;
 }
 
 test.beforeEach(() => {
@@ -64,15 +78,36 @@ async function requestAs(browser: Browser, username: string | null): Promise<API
   return context.request;
 }
 
-/** Whether `username` already has a stored snapshot for `label`. */
+/**
+ * Whether `username` already has a generated snapshot for `label`: a row with
+ * a payload. The seeder's placeholder rows (schema version 0, `{}`) carry only
+ * a story completion and are regenerated on first read, so they do not count.
+ */
 function snapshotStored(username: string, label: string): boolean {
   return (
     psql(
       `select count(*) from series_finale s join users u on u.id = s.user_id
-       where u.username = :'u' and s.period_label = :'p';`,
+       where u.username = :'u' and s.period_label = :'p' and s.payload ? 'headline';`,
       { u: username, p: label },
     ) !== "0"
   );
+}
+
+/** A stored row's schema version and whether its story is marked completed; null without a row. */
+function storedRow(username: string, label: string): { schemaVersion: number; storyCompleted: boolean } | null {
+  const raw = psql(
+    `select s.schema_version || ',' || (s.story_completed_at is not null) from series_finale s join users u on u.id = s.user_id
+     where u.username = :'u' and s.period_label = :'p';`,
+    { u: username, p: label },
+  );
+  if (raw === "") return null;
+  const [version, completed] = raw.split(",");
+  return { schemaVersion: Number(version), storyCompleted: completed === "true" };
+}
+
+/** The schema version the app writes today, read off a row the seeder generated through it (bo's 2025). */
+function currentSchemaVersion(): number | null {
+  return storedRow(BO, "2025")?.schemaVersion ?? null;
 }
 
 test("GET /api/series-finale/2025 as ava: the payload, its crew, and the first generation's time", async ({ browser }) => {
@@ -80,10 +115,11 @@ test("GET /api/series-finale/2025 as ava: the payload, its crew, and the first g
   const oracle = oracleYear(AVA, "2025");
 
   const storedBefore = snapshotStored(AVA, "2025");
+  const rowBefore = storedRow(AVA, "2025");
   const started = performance.now();
   const response = await ava.get("/api/series-finale/2025");
   const ms = Math.round(performance.now() - started);
-  const body = (await response.json()) as { payload?: Payload };
+  const body = (await response.json()) as { payload?: Payload; storyCompletedAt?: string | null };
 
   check("api-payload-status", "ava's 2025 payload answers 200", 200, response.status());
   check("api-payload-cache-control", "the payload response is private, no-store", NO_STORE, response.headers()["cache-control"]);
@@ -125,9 +161,49 @@ test("GET /api/series-finale/2025 as ava: the payload, its crew, and the first g
       lateShare: sixPlaces(body.payload?.rhythm.lateShare),
     },
   );
+  // The seeder stored ava's story completion on a placeholder row (schema
+  // version 0) so a phone opens her 2025 as a recap; generating over it must
+  // keep the completion (the upsert sets payload, version and generated_at
+  // only), or every phone spec on her recap would land on the story instead.
+  const rowAfter = storedRow(AVA, "2025");
+  check(
+    "api-payload-story-completion-kept",
+    "generating ava's 2025 over the seeder's placeholder row brings it to the current schema version and keeps its story completion, which the payload route returns beside the payload",
+    { before: { schemaVersion: 0, storyCompleted: true }, after: { schemaVersion: currentSchemaVersion(), storyCompleted: true }, returned: true },
+    { before: rowBefore, after: rowAfter, returned: typeof body.storyCompletedAt === "string" },
+  );
+
+  // Payload v4's new fields, against the oracle: the snapshot's zone, the
+  // biggest day's timeline (local times, titles, episode codes), the solo
+  // ticks by hour, the top genre's title share and the shared-list share.
+  const timeline = body.payload?.bigDay?.timeline ?? null;
+  const localClock = (at: string) =>
+    new Date(at).toLocaleTimeString("en-GB", { timeZone: oracle.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const topGenre = oracle.topGenre;
+  check(
+    "api-payload-v4-fields",
+    "the payload's period.timezone, bigDay.timeline (local HH:MM, title, episode code), rhythm.hourCounts, top genre (name among the oracle's tied top, share by titles) and sharedListShare are the oracle's",
+    {
+      timezone: oracle.timezone,
+      timeline: oracle.bigDayTimeline,
+      hourCounts: oracle.hourCounts,
+      topGenre: topGenre && { nameIsTop: true, share: sixPlaces(topGenre.share) },
+      sharedListShare: sixPlaces(oracle.sharedListShare),
+    },
+    {
+      timezone: body.payload?.period.timezone,
+      timeline: timeline && timeline.map((point) => ({ time: localClock(point.at), title: point.title, episode: point.episode })),
+      hourCounts: body.payload?.rhythm.hourCounts,
+      topGenre: body.payload?.rhythm.topGenreName == null
+        ? null
+        : { nameIsTop: !!topGenre?.names.includes(body.payload.rhythm.topGenreName), share: sixPlaces(body.payload.rhythm.topGenreShare) },
+      sharedListShare: sixPlaces(body.payload?.rhythm.sharedListShare),
+    },
+  );
+
   note(
     "gen-time",
-    "time for GET /api/series-finale/2025 as ava; generated = no snapshot was stored before the call",
+    "time for GET /api/series-finale/2025 as ava; generated = no generated snapshot was stored before the call (the seeder's placeholder row does not count)",
     `< ${GEN_BUDGET_MS} ms`,
     { generated: !storedBefore, ms },
     ms < GEN_BUDGET_MS,
@@ -158,6 +234,16 @@ test("GET /api/series-finale as ava: every available year, newest first, headlin
       titlesCompleted: oracleYear(AVA, p.label).titlesCompleted,
     })),
     periods.map((p) => ({ label: p.label, episodes: p.headline.episodes, titlesCompleted: p.headline.titlesCompleted })),
+  );
+  check(
+    "api-list-story-completed",
+    "the list carries each period's storyCompletedAt: set for 2025 and 2024 (the seeder marked them, and generation kept it), null for the thin 2023",
+    [
+      { label: "2025", storyCompleted: true },
+      { label: "2024", storyCompleted: true },
+      { label: "2023", storyCompleted: false },
+    ],
+    periods.map((p) => ({ label: p.label, storyCompleted: typeof p.storyCompletedAt === "string" })),
   );
 });
 

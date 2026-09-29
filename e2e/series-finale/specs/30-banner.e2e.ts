@@ -4,6 +4,7 @@ import { storageStatePath } from "../support/auth";
 import { check } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { banner, BANNER_READY, becomesVisible, openDashboard, pluralise } from "../support/pages";
+import { recapHeroRange } from "../support/recap";
 import { shot, shotElement } from "../support/shots";
 
 // The dashboard banner, read-only (desktop + phone): who sees it, what it
@@ -59,27 +60,71 @@ test.describe("ava: a completed 2025 with plenty in it", () => {
       await bannerHeadline(page),
     );
 
+    check(
+      "banner-ava-no-card-at-a-time",
+      "the banner no longer says 'A card at a time on your year.'",
+      0,
+      await banner(page).getByText(/A card at a time/).count(),
+    );
+
+    // The CTA and "Not now" are one group: side by side from md, right of
+    // the headline and centred on each other; stacked full width on a phone.
+    const layout = await banner(page)
+      .first()
+      .evaluate((card) => {
+        const cta = Array.from(card.querySelectorAll("a")).find((a) => a.textContent?.trim() === "See your Series Finale");
+        const notNow = Array.from(card.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Not now");
+        const headline = card.querySelector("p");
+        if (!cta || !notNow || !headline) return null;
+        const [c, n, h, k] = [cta, notNow, headline, card].map((node) => node.getBoundingClientRect());
+        return {
+          sameCentre: Math.abs(c!.top + c!.height / 2 - (n!.top + n!.height / 2)) <= 1,
+          ctaFirst: c!.left < n!.left || c!.top < n!.top,
+          rightOfHeadline: c!.left >= h!.right,
+          fullWidth: Math.abs(c!.width - n!.width) <= 1 && c!.width >= k!.width * 0.8,
+        };
+      }, undefined, { timeout: 2_000 })
+      .catch(() => null);
+    const desktop = test.info().project.name === "desktop";
+    check(
+      "banner-ava-actions-layout",
+      desktop
+        ? "on desktop the CTA and 'Not now' sit side by side, vertically centred on each other, right of the headline"
+        : "on a phone the CTA and 'Not now' are stacked, each the full width of the card's content",
+      desktop ? { sameCentre: true, ctaFirst: true, rightOfHeadline: true } : { ctaFirst: true, fullWidth: true },
+      layout && (desktop ? { sameCentre: layout.sameCentre, ctaFirst: layout.ctaFirst, rightOfHeadline: layout.rightOfHeadline } : { ctaFirst: layout.ctaFirst, fullWidth: layout.fullWidth }),
+    );
+
     await shot(page, "dashboard/ava-banner");
     if (await banner(page).isVisible()) await shotElement(banner(page), "dashboard/ava-banner-card");
   });
 
-  test("See your Series Finale opens the 2025 story", async ({ page }) => {
+  // The CTA opens the recap route everywhere. On a phone the recap hands a
+  // story not yet gone through on to the story (52-story-gate checks that
+  // with cy); ava's is gone through (seed.ts STORY_COMPLETED), so she lands
+  // on her recap on either device.
+  test("See your Series Finale opens the 2025 recap", async ({ page }) => {
     await openDashboard(page);
     const link = banner(page).getByRole("link", { name: "See your Series Finale" });
     const shown = await becomesVisible(link, FIRST_GENERATION_MS);
     check("banner-ava-link-shown", "the banner offers 'See your Series Finale'", true, shown);
     check(
       "banner-ava-link-href",
-      "the banner's link points at the 2025 story",
-      "/series-finale/2025/story",
+      "the banner's link points at the 2025 recap",
+      "/series-finale/2025",
       shown ? await link.getAttribute("href") : null,
     );
 
     if (shown) {
       await link.click();
-      await page.waitForURL("**/series-finale/2025/story").catch(() => undefined);
+      await page.waitForURL((url) => url.pathname === "/series-finale/2025").catch(() => undefined);
     }
-    check("banner-ava-link-lands", "following it lands on /series-finale/2025/story", "/series-finale/2025/story", new URL(page.url()).pathname);
+    check(
+      "banner-ava-link-lands",
+      "following it lands on /series-finale/2025 and shows the recap",
+      { path: "/series-finale/2025", recap: true },
+      { path: new URL(page.url()).pathname, recap: await becomesVisible(recapHeroRange(page, "2025"), FIRST_GENERATION_MS) },
+    );
   });
 });
 

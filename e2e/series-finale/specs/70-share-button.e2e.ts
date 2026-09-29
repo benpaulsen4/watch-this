@@ -245,21 +245,30 @@ test("a card that cannot be made shows the failure line", async ({ page, hasTouc
       downloads,
       shareCalls: (await shareCalls(page)).length,
     });
-    // The line sits under the button, in the header's fixed-height bar: both
-    // must still lie inside the bar, or the button is pushed off its top.
+    // APP FINDING F6, fixed: the line used to sit under the button inside the
+    // header's fixed-height bar, pushing the button off its top. Now the
+    // button stays in the bar and the line is set below the bar, outside it
+    // (RecapClient's ShareFailureNotice), where it is visible.
     const span = async (element: Locator) => {
       const box = await element.boundingBox({ timeout: 2_000 }).catch(() => null);
       return box && { top: Math.round(box.y), bottom: Math.round(box.y + box.height) };
     };
     const [bar, button, line] = await Promise.all([span(page.getByRole("banner")), span(headerShare(page)), span(page.getByText(FAILURE_LINE))]);
     const inside = (box: { top: number; bottom: number } | null) => !!bar && !!box && box.top >= bar.top && box.bottom <= bar.bottom;
+    const below = !!bar && !!line && line.top >= bar.bottom;
     check(
       "share-failure-layout",
-      "with the failure line shown, the Share button and the line both lie inside the header bar",
-      { button: true, line: true },
-      { button: inside(button), line: inside(line) },
+      "with the failure line shown, the Share button lies inside the header bar and the line sits below the bar, visible",
+      { buttonInsideBar: true, lineBelowBar: true, lineVisible: true },
+      { buttonInsideBar: inside(button), lineBelowBar: below, lineVisible: await page.getByText(FAILURE_LINE).isVisible() },
     );
-    note("share-failure-layout-boxes", "vertical extents (CSS px) of the header bar, the Share button and the failure line", "button and line within the bar", { bar, button, line }, inside(button) && inside(line));
+    note(
+      "share-failure-layout-boxes",
+      "vertical extents (CSS px) of the header bar, the Share button and the failure line",
+      "button within the bar, line below it",
+      { bar, button, line },
+      inside(button) && below,
+    );
     await shot(page, "share/failure-line");
   } finally {
     await page.unroute(isCard);

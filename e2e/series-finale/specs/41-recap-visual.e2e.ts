@@ -1,11 +1,12 @@
 import { test } from "@playwright/test";
 
 import type { OracleYear } from "../seed/oracle";
+import { expectedArchetypeLabel, readArchetypeVisual, SEEDED_ARCHETYPES } from "../support/archetype";
 import { storageStatePath } from "../support/auth";
 import { check } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
-import { becomesVisible, percent } from "../support/pages";
-import { loadAllImages, openRecap, RECAP_SECTIONS, type RecapSection, recapSection, textOf, thinYearHeading } from "../support/recap";
+import { becomesVisible, percent, weekdayName } from "../support/pages";
+import { loadAllImages, openRecap, RECAP_SECTIONS, recapPanel, type RecapSection, recapSection, textOf, thinYearHeading } from "../support/recap";
 import { shot, shotElement } from "../support/shots";
 
 // The recap's screenshot set (desktop, phone; webkit-phone where WebKit
@@ -15,6 +16,12 @@ import { shot, shotElement } from "../support/shots";
 // personas cover a full year (ava 2025, bo 2025), a quieter one (ava 2024),
 // thin years (ava 2023, flo 2024), a year with no solo ticks and one show
 // (bat 2025) and a films-only year (flo 2025). Read-only; saved storage state.
+// On the phone every non-thin one of these opens as a recap because the
+// seeder marked its story gone through (seed.ts STORY_COMPLETED); thin years
+// are never handed on to the story.
+
+/** The top-titles row's height gap the poster change (plan 6 Task 4) must keep within, at 1440 px. */
+const POSTER_ROW_GAP_PX = 40;
 
 const FLO = "e2e_flo_watches_only_films_and_has_a_long_name";
 
@@ -71,14 +78,17 @@ for (const { user, slug, year } of RECAPS) {
       if (!rendered) return;
 
       // Layout: nothing may push the page sideways, and the header's title
-      // must sit inside the header bar rather than spill out of it.
+      // must sit inside the header bar rather than spill out of it -- whole,
+      // not cut to an ellipsis (PageHeader truncates a title that cannot fit).
       const layout = await page.evaluate(() => {
         const header = document.querySelector("header")?.getBoundingClientRect();
-        const title = document.querySelector("header h1")?.getBoundingClientRect();
+        const h1 = document.querySelector("header h1");
+        const title = h1?.getBoundingClientRect();
         return {
           viewportWidth: document.documentElement.clientWidth,
           pageWidth: document.documentElement.scrollWidth,
           titleInsideHeader: !!header && !!title && title.top >= header.top && title.bottom <= header.bottom,
+          titleWhole: !!h1 && h1.scrollWidth <= h1.clientWidth,
         };
       });
       check(
@@ -87,7 +97,12 @@ for (const { user, slug, year } of RECAPS) {
         layout.viewportWidth,
         layout.pageWidth,
       );
-      check(`visual-${name}-header-title-fits`, "the header's 'Series Finale <year>' title fits inside the header bar", true, layout.titleInsideHeader);
+      check(
+        `visual-${name}-header-title-fits`,
+        "the header's 'Series Finale <year>' title fits inside the header bar, whole (not truncated)",
+        { insideHeader: true, whole: true },
+        { insideHeader: layout.titleInsideHeader, whole: layout.titleWhole },
+      );
 
       const shown: Record<string, boolean> = {};
       for (const section of RECAP_SECTIONS) {
@@ -119,6 +134,57 @@ for (const { user, slug, year } of RECAPS) {
           `${slug}'s ${year} type panel gives the oracle's after-21:00 share of solo ticks (${oracle.lateSoloTicks} of ${oracle.soloTicks}), or none below the floor`,
           oracle.lateShare === null ? null : `${percent(oracle.lateShare, 1)}% of the episodes you ticked one at a time came after 21:00.`,
           /\d+% of the episodes you ticked one at a time came after 21:00\./.exec(late ?? "")?.[0] ?? late,
+        );
+      }
+
+      // The type's picture, for the personas whose 2025 archetype the cast is
+      // known to produce, labelled with the oracle's numbers; and the weekday
+      // strip under the months for every type but the marathoner (whose
+      // picture it is), when there is a weekday to draw.
+      const archetype = year === "2025" ? SEEDED_ARCHETYPES[user] : undefined;
+      if (archetype && !oracle.thin) {
+        check(
+          `visual-${name}-archetype`,
+          `${slug}'s ${year} type panel draws the ${archetype}'s picture, labelled with the oracle's numbers`,
+          { archetype, label: expectedArchetypeLabel(archetype, oracle) },
+          await readArchetypeVisual(recapSection(page, "rhythm")),
+        );
+        const weekdayRow = archetype !== "weekday-marathoner" && oracle.weekdayCounts.some((count) => count > 0);
+        check(
+          `visual-${name}-weekday-row`,
+          `${slug}'s months panel ${weekdayRow ? "has" : "has no"} a 'By day of the week' strip (${archetype}; ${oracle.episodes} episodes)`,
+          weekdayRow ? { row: 1, label: oracle.topWeekday === null ? "Episodes by weekday." : `Episodes by weekday. Peak ${weekdayName(oracle.topWeekday)}.` } : { row: 0, label: null },
+          {
+            row: await recapSection(page, "months").getByRole("heading", { name: "By day of the week" }).count(),
+            label: await recapSection(page, "months")
+              .getByRole("img", { name: /^Episodes by weekday\./ })
+              .getAttribute("aria-label", { timeout: 1_000 })
+              .catch(() => null),
+          },
+        );
+      }
+
+      // The posters in "Most watched, and least known" were shrunk so that
+      // row closes up with the Genres card beside it at desktop widths: their
+      // natural heights (the bottom of the last child plus the padding, as
+      // the grid stretches both to the taller) may differ by 40 px at most.
+      if (test.info().project.name === "desktop" && (shown["top-show"] || shown.niche) && shown.genres) {
+        const natural = (locator: ReturnType<typeof recapPanel>) =>
+          locator.first().evaluate((card) => {
+            const top = card.getBoundingClientRect().top;
+            const bottom = Math.max(...Array.from(card.children).map((child) => child.getBoundingClientRect().bottom));
+            return Math.round(bottom + Number.parseFloat(getComputedStyle(card).paddingBottom) - top);
+          }, undefined, { timeout: 2_000 }).catch(() => null);
+        const heights = {
+          topTitles: await natural(recapPanel(page, /^(Most watched|Least known)/)),
+          genres: await natural(recapPanel(page, "Genres")),
+        };
+        const gap = heights.topTitles === null || heights.genres === null ? null : Math.abs(heights.topTitles - heights.genres);
+        check(
+          `visual-${name}-poster-row-gap`,
+          `at 1440 px the top-titles card and the Genres card beside it differ in natural height by at most ${POSTER_ROW_GAP_PX} px (${JSON.stringify(heights)})`,
+          true,
+          gap !== null && gap <= POSTER_ROW_GAP_PX,
         );
       }
 

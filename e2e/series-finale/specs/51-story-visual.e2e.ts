@@ -1,8 +1,8 @@
-import { type Page, test } from "@playwright/test";
+import { test } from "@playwright/test";
 
-import type { OracleYear } from "../seed/oracle";
+import { expectedArchetypeLabel, readArchetypeVisual, SEEDED_ARCHETYPES } from "../support/archetype";
 import { storageStatePath } from "../support/auth";
-import { check, manualObservation } from "../support/evidence";
+import { check } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { shot } from "../support/shots";
 import {
@@ -25,8 +25,12 @@ import {
 // (flo 2025, whose long username tests the summary card); and the thin
 // story (tia 2025). A card with no h2 is named by its card id instead.
 // Which cards appear is checked against the oracle, and every card's width
-// against its column and the viewport.
-// Read-only; saved storage state.
+// against its column and the viewport. The rhythm card's archetype picture
+// and the months card's weekday strip are checked against the oracle, and on
+// the small phone every card's last line must be reachable by scrolling.
+// Read-only; saved storage state. ava, bat and flo have their story marked
+// gone through by the seeder (seed.ts STORY_COMPLETED), so reaching the
+// summary card posts nothing.
 
 const FLO = "e2e_flo_watches_only_films_and_has_a_long_name";
 const YEAR = "2025";
@@ -36,51 +40,6 @@ const STORIES: { user: string; slug: string }[] = [
   { user: "e2e_bat", slug: "bat" },
   { user: FLO, slug: "flo" },
 ];
-
-/**
- * APP FINDING F5, a manual visual observation: on the phones (DPR 2) the
- * compare disc's "only <peer>" label loses the last glyph's right edge --
- * "only e2e_bo" reads "e2e_bc" -- in both CompareSplit variants: the story
- * card's large disc and the recap panel's default one. Desktop (DPR 1) draws
- * both whole. The label is `truncate` (overflow hidden) and its text is
- * exactly as wide as its box, so the final glyph's ink is cut with no room for
- * an ellipsis. Only a person looking at the screenshots can see it (the DOM
- * widths fit), so this run records the screenshot paths and the widths it
- * measured, and the report shows the verdict as a manual observation (Task 7
- * review, story; final review, recap) rather than as reproduced or fixed.
- */
-async function observeCompareDiscLabel(page: Page, oracle: OracleYear, shotName: string): Promise<void> {
-  const peer = Object.keys(oracle.compare)[0] ?? "";
-  const project = test.info().project.name;
-  const widths = await storyCard(page)
-    .getByText(`only ${peer}`, { exact: true })
-    .evaluate(
-      (element) => {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        const round = (value: number) => Math.round(value * 100) / 100;
-        return { textWidth: round(range.getBoundingClientRect().width), boxWidth: round(element.getBoundingClientRect().width) };
-      },
-      undefined,
-      { timeout: 2_000 },
-    )
-    .catch(() => null);
-  manualObservation(
-    "F5-compare-disc-label-clipped",
-    `APP FINDING F5 (manual visual observation, not re-verified by this run): on phone and small-phone the compare disc's 'only ${peer}' label ` +
-      `reads 'only ${peer.slice(0, -1)}c' -- its last glyph is cut -- in the story card's large disc and the recap panel's default one; ` +
-      "desktop draws both whole. Look at: artifacts/screenshots/phone/story/ava-2025/13-a-shared-list-and-some-shared-taste.png, " +
-      "artifacts/screenshots/small-phone/story/ava-2025/13-a-shared-list-and-some-shared-taste.png, " +
-      "artifacts/screenshots/phone/recap/ava-2025/compare.png; whole: the desktop counterparts.",
-    `'only ${peer}' fully visible in both disc variants`,
-    {
-      storyScreenshot: `artifacts/screenshots/${project}/${shotName}.png`,
-      recapScreenshot: `artifacts/screenshots/${project}/recap/ava-2025/compare.png`,
-      devicePixelRatio: await page.evaluate(() => window.devicePixelRatio),
-      storyLabelDom: widths,
-    },
-  );
-}
 
 // WebKit cannot launch on this host (Task 1: missing system libraries), so the
 // webkit-phone project skips rather than failing at browser launch.
@@ -134,11 +93,52 @@ for (const story of STORIES) {
           layout.pageWidth,
         );
 
-        const label = (state.heading && slug(state.heading)) || state.id || "card";
-        const shotName = `story/${name}/${nn}-${label}`;
-        await shot(page, shotName, { fullPage: true });
+        const archetype = SEEDED_ARCHETYPES[story.user];
+        if (state.id === "rhythm" && archetype) {
+          check(
+            `story-visual-${name}-${nn}-archetype`,
+            `the rhythm card draws the ${archetype}'s picture, labelled with the oracle's numbers`,
+            { archetype, label: expectedArchetypeLabel(archetype, oracle) },
+            await readArchetypeVisual(storyCard(page)),
+          );
+        }
+        if (state.id === "months" && archetype) {
+          const weekdayRow = archetype !== "weekday-marathoner" && oracle.weekdayCounts.some((count) => count > 0);
+          check(
+            `story-visual-${name}-${nn}-weekday-row`,
+            `the months card ${weekdayRow ? "has" : "has no"} a 'By day of the week' strip (${archetype})`,
+            weekdayRow ? 1 : 0,
+            await storyCard(page).getByRole("heading", { name: "By day of the week" }).count(),
+          );
+        }
 
-        if (story.slug === "ava" && state.id === "compare") await observeCompareDiscLabel(page, oracle, shotName);
+        if (test.info().project.name === "small-phone") {
+          // A card taller than the 640 px screen scrolls; its last line must
+          // be reachable (the Shell grows with its content).
+          await page.waitForTimeout(1_200); // the latest Enter (fades in at 1000 ms) has landed
+          const bottom = await storyCard(page).evaluate((group) => {
+            const root = document.scrollingElement ?? document.documentElement;
+            root.scrollTop = root.scrollHeight;
+            // Content only: the Shell's aria-hidden wash fills the card
+            // (inset-0) and ends a sub-pixel below the screen.
+            const leaves = Array.from(group.querySelectorAll("[data-card] *")).filter(
+              (node) => node.children.length === 0 && node.getBoundingClientRect().height > 0 && !node.closest('[aria-hidden="true"]'),
+            );
+            const lowest = Math.max(...leaves.map((node) => node.getBoundingClientRect().bottom));
+            const result = { scrolled: root.scrollTop, lowestOnScreen: lowest <= window.innerHeight + 0.5 };
+            root.scrollTop = 0;
+            return result;
+          });
+          check(
+            `story-visual-${name}-${nn}-bottom-reachable`,
+            `card ${position} (${state.id}): scrolled to the bottom (${bottom.scrolled} px), its last line is on screen`,
+            true,
+            bottom.lowestOnScreen,
+          );
+        }
+
+        const label = (state.heading && slug(state.heading)) || state.id || "card";
+        await shot(page, `story/${name}/${nn}-${label}`, { fullPage: true });
       }
 
       check(

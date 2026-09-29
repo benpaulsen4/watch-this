@@ -54,11 +54,19 @@ const WORDS = [
   "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
 ];
 
-/** 5 -> "five", for counts below twenty (throws beyond, where the table stops). */
+const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+
+/**
+ * The app's numberWords() (format.ts): 5 -> "five", 42 -> "forty-two",
+ * 230 -> "two hundred and thirty"; throws from a thousand, where the app
+ * falls back to digits and no sentence here reaches.
+ */
 export function words(value: number): string {
-  const word = WORDS[value];
-  if (word === undefined) throw new Error(`no word for ${value} in this spec's table`);
-  return word;
+  if (!Number.isInteger(value) || value < 0 || value >= 1000) throw new Error(`no words for ${value} in this spec's table`);
+  const belowHundred = (n: number) => WORDS[n] ?? (n % 10 === 0 ? TENS[Math.floor(n / 10)]! : `${TENS[Math.floor(n / 10)]!}-${WORDS[n % 10]!}`);
+  if (value < 100) return belowHundred(value);
+  const hundreds = `${WORDS[Math.floor(value / 100)]!} hundred`;
+  return value % 100 === 0 ? hundreds : `${hundreds} and ${belowHundred(value % 100)}`;
 }
 
 /** "five" (any case) -> 5; null for a word outside the table. */

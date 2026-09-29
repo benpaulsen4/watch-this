@@ -292,11 +292,11 @@ test("ava's recap and story show bo under his new name", async ({ page }) => {
   const swaps = storyCard(page).getByText("Swap in", { exact: true }).locator("xpath=..").getByRole("button");
   check(
     "rename-story-compare",
-    "the compare card is 'You & e2e_bo_renamed', and the swap row offers the other peers (no cy)",
-    { eyebrow: true, swaps: expected.peers.slice(1) },
+    "the compare card is 'You & e2e_bo_renamed', and the swap row offers every peer (no cy), e2e_bo_renamed pressed",
+    { eyebrow: true, swaps: expected.peers.map((peer, index) => ({ name: peer, pressed: String(index === 0) })) },
     {
       eyebrow: await storyCard(page).getByText(`You & ${BO_RENAMED}`, { exact: true }).isVisible(),
-      swaps: (await swaps.allTextContents()).map((text) => text.trim()),
+      swaps: await swaps.evaluateAll((buttons) => buttons.map((button) => ({ name: button.textContent?.trim() ?? "", pressed: button.getAttribute("aria-pressed") ?? "" }))),
     },
   );
   check("rename-story-compare-card", "still on the compare card", "compare", (await cardState(page)).id);

@@ -1,6 +1,8 @@
 import { type Locator, type Page, test } from "@playwright/test";
 
+import { expectedArchetypeLabel, readArchetypeVisual, SEEDED_ARCHETYPES } from "../support/archetype";
 import { storageStatePath } from "../support/auth";
+import { expectedBigDay, readBigDay } from "../support/big-day";
 import { psql } from "../support/db";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
@@ -8,7 +10,9 @@ import { alsoTopForLine, becomesVisible, capitalise, dayMonth, monthName, percen
 import { crewRows, openRecap, readCompare, recapSection, textOf, tileValue } from "../support/recap";
 
 // ava's 2025 recap, section by section, against the SQL oracle (desktop +
-// phone; read-only). Each test opens the page from ava's saved storage state.
+// phone; read-only). Each test opens the page from ava's saved storage state;
+// on the phone that shows the recap because the seeder marked her story gone
+// through (seed.ts STORY_COMPLETED) -- else the phone hands on to the story.
 // Every fact goes through check() -- soft -- so it reaches the evidence log
 // whether it holds or not; a test stops early only when the recap never
 // rendered, after logging that.
@@ -161,6 +165,22 @@ test("your type: the top weekday's share and the after-21:00 share", async ({ pa
     top === null ? "Episodes by weekday." : `Episodes by weekday. Peak ${weekdayName(top)}.`,
     await panel.getByRole("img").getAttribute("aria-label", { timeout: 1_000 }).catch(() => null),
   );
+  // ava is the weekday marathoner: her type's picture is the weekday strip
+  // (the larger one, in this card), so the months panel carries no second
+  // "By day of the week" strip.
+  const archetype = SEEDED_ARCHETYPES[AVA]!;
+  check(
+    "recap-rhythm-archetype-visual",
+    `the type panel draws the ${archetype}'s picture, labelled with the oracle's numbers`,
+    { archetype, label: expectedArchetypeLabel(archetype, oracle) },
+    await readArchetypeVisual(panel),
+  );
+  check(
+    "recap-months-no-weekday-row",
+    "the months panel has no 'By day of the week' row for the marathoner (her card is the strip)",
+    0,
+    await recapSection(page, "months").getByRole("heading", { name: "By day of the week" }).count(),
+  );
   // The positive side of bat's "no share" (41-recap-visual): ava ticks enough
   // episodes one at a time, so hers is shown, and must be the oracle's.
   check(
@@ -237,16 +257,29 @@ test("the shame panel: dropped count and names, 'And one more.', still planning"
   );
 });
 
-test("the biggest day", async ({ page }) => {
+test("the biggest day: its date, and its clock of hour ticks, labelled points and listed episodes", async ({ page }) => {
   const oracle = oracleYear(AVA, YEAR);
   await openAvaRecap(page);
-  const intro = await textOf(recapSection(page, "big-day").locator("p").first());
+  const panel = recapSection(page, "big-day");
+  const intro = await textOf(panel.locator("p").first());
   const bigDay = oracle.bigDay;
   check(
     "recap-big-day",
     "the biggest day's date and episode count are the oracle's",
     bigDay === null ? null : `${weekdayOf(bigDay.date)} ${dayMonth(bigDay.date)} · ${pluralise(bigDay.episodes, "episode")}`,
     intro?.split(" · ").slice(0, 2).join(" · ") ?? null,
+  );
+
+  // The clock: an hour axis in ava's zone from the first tick's hour to the
+  // hour after the last, labelled every hour from lg (the desktop panel) and
+  // more sparsely below it; a dot per solo tick named "HH:MM · Show S1E03";
+  // and the episodes listed by time. All from the oracle's timeline.
+  const wide = (page.viewportSize()?.width ?? 0) >= 1024;
+  check(
+    "recap-big-day-clock",
+    `the biggest day's hour ticks (${wide ? "every hour, lg and up" : "the narrow set, below lg"}), each point's label, the summary line and the listed rows are the oracle's timeline in ${oracle.timezone}`,
+    expectedBigDay(oracle, wide ? "recap-lg" : "recap-below-lg"),
+    await readBigDay(panel),
   );
 });
 
@@ -300,14 +333,14 @@ test("the crew: eight collaborators and ava, ranked as the oracle", async ({ pag
     false,
   );
 
-  // APP FINDING F3 (E5), informational: CREW_LIMIT keeps the first 8
-  // consenting collaborators by user id, before any activity is loaded. In
-  // ava's 2025 the rule drops e2e_jon (seeded with the all-f id), who also
-  // watched nothing, so her crew cannot show it. e2e_jon's own 2025 can: he
-  // has nine consenting collaborators, and the seeder generated his snapshot
-  // through the app. The note compares the crew the app stored for him with
-  // the 8 most active (the oracle's crewTopByActivity): met once the app caps
-  // by activity.
+  // APP FINDING F3 (E5), now fixed: CREW_LIMIT once kept the first 8
+  // consenting collaborators by user id, before any activity was loaded; it
+  // now keeps the 8 most active. In ava's 2025 either rule drops e2e_jon
+  // (all-f id, nothing watched), so her crew cannot tell them apart. e2e_jon's
+  // own 2025 can: he has nine consenting collaborators, dee's id sorts last
+  // among them though she is one of the busiest, and the seeder generated his
+  // snapshot through the app. The check compares the crew the app stored for
+  // him with his 8 most active (the oracle's crewTopByActivity).
   const jon = oracleYear("e2e_jon", YEAR);
   const jonStored = psql(
     `select coalesce(json_agg(c->>'username'), '[]'::json) from series_finale s join users u on u.id = s.user_id,
@@ -318,24 +351,50 @@ test("the crew: eight collaborators and ava, ranked as the oracle", async ({ pag
   const stored = (JSON.parse(jonStored || "[]") as string[]).sort();
   const byActivity = [...jon.crewTopByActivity].sort();
   const episodesOf = (username: string) => `${username} (${pluralise(oracleYear(username, YEAR).episodes, "episode")})`;
-  note(
+  check(
     "crew-cap-rule",
-    `APP FINDING F3 (E5): which 8 collaborators the crew keeps, in e2e_jon's 2025 (nine consent). ${oracle.crewCapRule}`,
-    { storedCrew: byActivity },
+    `APP FINDING F3 (E5), fixed: the crew keeps the 8 most active, in e2e_jon's 2025 (nine consent; dee's id sorts last, so the old id cap left her out). ${oracle.crewCapRule}`,
+    { storedCrew: byActivity, moreActiveButLeftOut: [] },
     { storedCrew: stored, moreActiveButLeftOut: byActivity.filter((username) => !stored.includes(username)).map(episodesOf) },
-    stored.length > 0 && JSON.stringify(stored) === JSON.stringify(byActivity),
   );
 });
 
-test("compare: the split and the named facts for the peer shown", async ({ page }) => {
+test("compare: the closest peer first, then every peer swapped in, each with the oracle's split and named facts", async ({ page, hasTouch }) => {
   const oracle = oracleYear(AVA, YEAR);
   await openAvaRecap(page);
   const headings = await page.getByRole("heading", { level: 2, name: /^You & / }).allTextContents();
-  const peers = headings.map((heading) => heading.replace(/^You & /, "").trim());
-  // The recap shows one peer: the one with most titles in common (compare[0]).
-  check("recap-compare-peer", "the recap compares ava with the oracle's closest peer", Object.keys(oracle.compare).slice(0, 1), peers);
+  const shownFirst = headings.map((heading) => heading.replace(/^You & /, "").trim());
+  // The recap opens on one peer: the one with most titles in common (compare[0]).
+  check("recap-compare-peer", "the recap compares ava with the oracle's closest peer", Object.keys(oracle.compare).slice(0, 1), shownFirst);
 
-  for (const peer of peers) {
+  // "Swap in" lists every peer, the one shown pressed (ComparePeerPicker);
+  // choosing one redraws the title, the Venn and the facts for them. Every
+  // peer is visited in the oracle's order -- e2e_fay among them.
+  const peers = Object.keys(oracle.compare);
+  const chips = recapSection(page, "compare").getByText("Swap in", { exact: true }).locator("xpath=..").getByRole("button");
+  check(
+    "recap-compare-swap-row",
+    "the compare panel's 'Swap in' row offers every peer the oracle compares, closest first, the shown one pressed",
+    peers.map((peer, index) => ({ name: peer, pressed: String(index === 0) })),
+    await chips.evaluateAll((buttons) => buttons.map((button) => ({ name: button.textContent?.trim() ?? "", pressed: button.getAttribute("aria-pressed") ?? "" }))),
+  );
+
+  for (const [index, peer] of peers.entries()) {
+    if (index > 0) {
+      const chip = chips.filter({ hasText: new RegExp(`^${peer}$`) });
+      await (hasTouch ? chip.tap() : chip.click()).catch(() => undefined);
+      check(
+        `recap-compare-${peer}-swapped`,
+        `choosing '${peer}' makes the panel 'You & ${peer}', with only its chip pressed`,
+        { heading: true, pressed: [peer] },
+        {
+          heading: await becomesVisible(page.getByRole("heading", { level: 2, name: `You & ${peer}`, exact: true }), 5_000),
+          pressed: await chips.evaluateAll((buttons) =>
+            buttons.filter((button) => button.getAttribute("aria-pressed") === "true").map((button) => button.textContent?.trim() ?? ""),
+          ),
+        },
+      );
+    }
     const expected = oracle.compare[peer];
     const shown = await readCompare(recapSection(page, "compare").filter({ hasText: `You & ${peer}` }), peer);
     check(
