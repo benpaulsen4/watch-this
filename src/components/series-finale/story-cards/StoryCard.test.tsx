@@ -431,6 +431,30 @@ describe("StoryCard", () => {
     );
   });
 
+  it("draws no second popularity strip on a deep cut hunter's rhythm card", () => {
+    const rhythm = {
+      archetype: "deep-cut-hunter" as const,
+      weekdayCounts: [1, 1, 1, 1, 1, 1, 6],
+      topWeekday: 6,
+      lateShare: null,
+      hourCounts: null,
+      sharedListShare: null,
+      topGenreName: null,
+      topGenreShare: null,
+    };
+    const { container, unmount } = renderCard("rhythm", { rhythm, niche });
+    expect(screen.getByText("The Deep Cut Hunter")).toBeInTheDocument();
+    // The niche card draws that strip already.
+    expect(container.querySelector("[data-archetype-visual]")).toBeNull();
+    expect(container.querySelector("[data-popularity]")).toBeNull();
+    unmount();
+
+    const nicheCard = renderCard("niche", { rhythm, niche });
+    expect(
+      nicheCard.container.querySelector("[data-popularity]"),
+    ).not.toBeNull();
+  });
+
   it("keeps the rhythm card when the type's picture has no data", () => {
     const { container } = renderCard("rhythm", {
       rhythm: {

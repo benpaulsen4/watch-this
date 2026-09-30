@@ -400,9 +400,17 @@ export function StoryCard({
           >
             {archetypeDescription(rhythm.archetype, rhythm)}
           </Enter>
-          <Enter kind="fade" delay={400} className="w-full max-w-[290px]">
-            <ArchetypeVisual payload={payload} size="large" className="mt-9" />
-          </Enter>
+          {/* A deep cut hunter's picture is the popularity strip the niche
+              card has just drawn: shown once, there. */}
+          {rhythm.archetype === "deep-cut-hunter" ? null : (
+            <Enter kind="fade" delay={400} className="w-full max-w-[290px]">
+              <ArchetypeVisual
+                payload={payload}
+                size="large"
+                className="mt-9"
+              />
+            </Enter>
+          )}
         </Shell>
       );
     }
