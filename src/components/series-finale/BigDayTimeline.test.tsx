@@ -107,8 +107,8 @@ describe("BigDayTimeline", () => {
     ).toBeInTheDocument();
   });
 
-  it("names each point by its time, show and episode, spoken and on hover", () => {
-    render(
+  it("titles each point by its time, show and episode for hover, and hides the dots from screen readers", () => {
+    const { container } = render(
       <BigDayTimeline
         soloTickTotal={120}
         timeZone="UTC"
@@ -120,14 +120,21 @@ describe("BigDayTimeline", () => {
       />,
     );
 
-    const first = screen.getByRole("img", { name: "13:05 · The Bear S2E01" });
-    expect(first).toHaveAttribute("title", "13:05 · The Bear S2E01");
+    const titles = Array.from(
+      container.querySelectorAll("[data-point] [title]"),
+    ).map((dot) => dot.getAttribute("title"));
     // No cached title: the time and episode alone, never "Unknown".
-    expect(screen.getByRole("img", { name: "18:20 · S2E02" })).toHaveAttribute(
-      "title",
+    expect(titles).toEqual([
+      "13:05 · The Bear S2E01",
       "18:20 · S2E02",
-    );
-    expect(screen.getAllByRole("img")).toHaveLength(3);
+      "23:35 · The Bear S2E03",
+    ]);
+    // The list under the axis says the same, so the dots are not announced
+    // a second time.
+    expect(
+      container.querySelector("[data-point]")!.closest("ol"),
+    ).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
   });
 
   it("lists the day's episodes under the axis, each by its local time", () => {
@@ -253,6 +260,43 @@ describe("BigDayTimeline", () => {
     ).toHaveLength(6);
     expect(labels[0]).not.toHaveClass("hidden");
     expect(labels[1]).toHaveClass("hidden", "lg:block");
+  });
+
+  it("labels every narrow step below lg on a long day, not only the steps both widths share", () => {
+    // Fourteen hours, 13:00 to 03:00: every second hour from lg, every
+    // third below it -- five labels, where intersecting the two gave three.
+    const { container } = render(
+      <BigDayTimeline
+        soloTickTotal={120}
+        timeZone="UTC"
+        bigDay={bigDay([
+          { at: "2026-03-14T13:05:00.000Z" },
+          { at: "2026-03-14T20:00:00.000Z" },
+          { at: "2026-03-15T02:35:00.000Z" },
+        ])}
+      />,
+    );
+
+    const labels = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-tick-label]"),
+    );
+    const belowLg = labels
+      .filter((label) => !label.classList.contains("hidden"))
+      .map((label) => label.textContent);
+    const fromLg = labels
+      .filter((label) => !label.classList.contains("lg:hidden"))
+      .map((label) => label.textContent);
+    expect(belowLg).toEqual(["13:00", "16:00", "19:00", "22:00", "01:00"]);
+    expect(fromLg).toEqual([
+      "13:00",
+      "15:00",
+      "17:00",
+      "19:00",
+      "21:00",
+      "23:00",
+      "01:00",
+      "03:00",
+    ]);
   });
 
   it("gives the story's card only the labels its width holds", () => {

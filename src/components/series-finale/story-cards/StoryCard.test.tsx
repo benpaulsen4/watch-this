@@ -327,12 +327,10 @@ describe("StoryCard", () => {
       },
     });
 
-    expect(
-      screen.getByRole("img", { name: "13:05 · The Bear S2E01" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("img", { name: "18:20 · S2E02" }),
-    ).toBeInTheDocument();
+    // Each dot is titled for hover; the list says the same out loud.
+    expect(screen.getByTitle("13:05 · The Bear S2E01")).toBeInTheDocument();
+    expect(screen.getByTitle("18:20 · S2E02")).toBeInTheDocument();
+    expect(screen.getByText("The Bear · S2E01")).toBeInTheDocument();
     expect(
       screen.getByText(
         "First at 13:05, last at 23:35 · 3 episodes ticked one at a time",

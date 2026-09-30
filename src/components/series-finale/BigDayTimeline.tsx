@@ -88,7 +88,7 @@ function localHourStart(time: number, clock: string): number {
 interface Placed {
   time: number;
   clock: string;
-  /** "13:05 · The Bear S2E03", the dot's accessible name and hover title. */
+  /** "13:05 · The Bear S2E03", the dot's hover title. */
   label: string;
   /** "The Bear · S2E03", the list row beside the time. */
   episode: string;
@@ -191,8 +191,11 @@ export function BigDayTimeline({
     <>
       {/* Inset, so an hour label centred on either end stays inside. */}
       <div className="mx-4">
-        {/* Over the axis, which a first-row dot straddles, so hover finds it. */}
+        {/* Over the axis, which a first-row dot straddles, so hover finds it.
+            Hidden from screen readers: the list under the axis names every
+            episode and its time, so the dots would only say it twice. */}
         <ol
+          aria-hidden="true"
           className="relative z-10"
           style={{ height: (rows - 1) * ROW_PX + DOT_PX / 2 + 4 }}
         >
@@ -208,8 +211,6 @@ export function BigDayTimeline({
               }}
             >
               <span
-                role="img"
-                aria-label={dot.label}
                 title={dot.label}
                 className={cn(
                   "block h-2.5 w-2.5 rounded-full bg-red-500 ring-2",
@@ -222,8 +223,18 @@ export function BigDayTimeline({
         <div aria-hidden="true" className="relative h-6">
           <div className={cn("absolute inset-x-0 top-0 h-px", styles.track)} />
           {ticks.map((tick, index) => {
-            // The story's card is always narrow; a panel is wide from `lg`.
-            const labelled = large ? tick.narrow : tick.wide;
+            // The story's card is always narrow, so it takes the narrow
+            // steps. A panel is narrow below `lg` and wide from it, and each
+            // width gets its own full set: a label on only one of the two
+            // steps shows at that width alone.
+            const labelled = large ? tick.narrow : tick.narrow || tick.wide;
+            const onlyAt = large
+              ? null
+              : !tick.wide
+                ? "lg:hidden"
+                : !tick.narrow
+                  ? "hidden lg:block"
+                  : null;
             return (
               <div key={index}>
                 <span
@@ -236,7 +247,7 @@ export function BigDayTimeline({
                     className={cn(
                       "absolute top-2 -translate-x-1/2 leading-none tabular-nums",
                       styles.tickLabel,
-                      !tick.narrow && "hidden lg:block",
+                      onlyAt,
                     )}
                     style={{ left: `${tick.left}%` }}
                   >

@@ -790,8 +790,8 @@ type TimelinePoint = NonNullable<
 >[number];
 
 /**
- * "13:05 · The Bear S2E03": one solo tick, as its point's accessible name and
- * hover title. A show with no cached title is its episode code alone
+ * "13:05 · The Bear S2E03": one solo tick, as its point's hover title. A
+ * show with no cached title is its episode code alone
  * ("13:05 · S2E03"), never a made-up name. Null when `at` does not parse.
  */
 export function timelinePointLabel(
