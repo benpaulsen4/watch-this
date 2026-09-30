@@ -151,9 +151,10 @@ describe("archetypeName", () => {
 });
 
 describe("archetypeDetail", () => {
-  it("states the top weekday's share and the solo-tick late share", () => {
+  it("states the weekday marathoner's top-day share", () => {
     expect(
       archetypeDetail(
+        "weekday-marathoner",
         rhythm({
           weekdayCounts: [0, 20, 16, 23, 18, 30, 37],
           topWeekday: 6,
@@ -161,21 +162,73 @@ describe("archetypeDetail", () => {
         }),
       ),
     ).toBe(
-      "26% of your episodes landed on a Sunday. 41% of the episodes you ticked one at a time came after 21:00. Mondays had no episodes.",
+      "26% of your episodes landed on a Sunday. Mondays had no episodes.",
     );
   });
 
-  it("drops the late clause when there are too few solo ticks to say", () => {
+  it("never mentions the nightly ritualist's late share for a weekday marathoner", () => {
     expect(
       archetypeDetail(
-        rhythm({ weekdayCounts: [1, 1, 1, 1, 1, 1, 4], lateShare: null }),
+        "weekday-marathoner",
+        rhythm({
+          weekdayCounts: [1, 1, 1, 1, 1, 1, 4],
+          topWeekday: 6,
+          lateShare: 0.9,
+        }),
       ),
     ).toBe("40% of your episodes landed on a Sunday.");
   });
 
-  it("states the late share alone when there is no top weekday", () => {
+  it("names every weekday with no episodes on it", () => {
     expect(
       archetypeDetail(
+        "weekday-marathoner",
+        rhythm({ weekdayCounts: [0, 0, 5, 5, 5, 5, 10], lateShare: null }),
+      ),
+    ).toBe(
+      "33% of your episodes landed on a Sunday. Mondays and Tuesdays had no episodes.",
+    );
+  });
+
+  it("is null for a weekday marathoner with no top weekday and nothing empty to name", () => {
+    expect(
+      archetypeDetail(
+        "weekday-marathoner",
+        rhythm({
+          weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
+          topWeekday: null,
+          lateShare: null,
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("states the nightly ritualist's after-21:00 share", () => {
+    expect(
+      archetypeDetail(
+        "nightly-ritualist",
+        rhythm({
+          weekdayCounts: [0, 20, 16, 23, 18, 30, 37],
+          topWeekday: 6,
+          lateShare: 0.6,
+        }),
+      ),
+    ).toBe("60% of the episodes you ticked one at a time came after 21:00.");
+  });
+
+  it("is null for a nightly ritualist with no late share", () => {
+    expect(
+      archetypeDetail(
+        "nightly-ritualist",
+        rhythm({ weekdayCounts: [0, 20, 16, 23, 18, 30, 37], lateShare: null }),
+      ),
+    ).toBeNull();
+  });
+
+  it("never mentions the weekday marathoner's stats for a nightly ritualist", () => {
+    expect(
+      archetypeDetail(
+        "nightly-ritualist",
         rhythm({
           weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
           topWeekday: null,
@@ -185,26 +238,22 @@ describe("archetypeDetail", () => {
     ).toBe("60% of the episodes you ticked one at a time came after 21:00.");
   });
 
-  it("names every weekday with no episodes on it", () => {
-    expect(
-      archetypeDetail(
-        rhythm({ weekdayCounts: [0, 0, 5, 5, 5, 5, 10], lateShare: null }),
-      ),
-    ).toBe(
-      "33% of your episodes landed on a Sunday. Mondays and Tuesdays had no episodes.",
-    );
-  });
-
-  it("returns null when there is nothing to say", () => {
-    expect(
-      archetypeDetail(
-        rhythm({
-          weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
-          topWeekday: null,
-          lateShare: null,
-        }),
-      ),
-    ).toBeNull();
+  it("is null for every other archetype, whatever the rhythm carries", () => {
+    const busyRhythm = rhythm({
+      weekdayCounts: [0, 20, 16, 23, 18, 30, 37],
+      topWeekday: 6,
+      lateShare: 0.41,
+    });
+    for (const archetype of [
+      "serial-abandoner",
+      "completionist",
+      "feast-or-famine",
+      "one-genre-only",
+      "deep-cut-hunter",
+      "group-watcher",
+    ] as const) {
+      expect(archetypeDetail(archetype, busyRhythm)).toBeNull();
+    }
   });
 });
 
@@ -220,6 +269,19 @@ describe("archetypeDescription", () => {
     );
   });
 
+  it("leads with the blurb, then the after-21:00 share, for a nightly ritualist", () => {
+    expect(
+      archetypeDescription(
+        "nightly-ritualist",
+        rhythm({
+          weekdayCounts: [0, 20, 16, 23, 18, 30, 37],
+          topWeekday: 6,
+          lateShare: 0.6,
+        }),
+      ),
+    ).toMatch(/60% of the episodes you ticked one at a time came after 21:00\.$/);
+  });
+
   it("is the blurb alone when rhythm has nothing to add", () => {
     expect(
       archetypeDescription(
@@ -228,6 +290,19 @@ describe("archetypeDescription", () => {
           weekdayCounts: [0, 0, 0, 0, 0, 0, 0],
           topWeekday: null,
           lateShare: null,
+        }),
+      ),
+    ).toBe("Once you start something you see it through, whatever it costs.");
+  });
+
+  it("is the blurb alone for a non-weekday, non-nightly type, even with weekday and late-share data", () => {
+    expect(
+      archetypeDescription(
+        "completionist",
+        rhythm({
+          weekdayCounts: [0, 20, 16, 23, 18, 30, 37],
+          topWeekday: 6,
+          lateShare: 0.41,
         }),
       ),
     ).toBe("Once you start something you see it through, whatever it costs.");
@@ -1156,8 +1231,9 @@ describe("feastMonths and feastLine", () => {
   const months = (counts: number[]) =>
     counts.map((episodes, index) => ({ month: index + 1, episodes }));
 
-  it("takes every month at half the busiest or more", () => {
+  it("keeps only the months at least one standard deviation above the mean", () => {
     const year = months([0, 0, 40, 0, 0, 0, 0, 20, 19, 0, 0, 1]);
+    // mean 6.67, sd 12.34, threshold 19.01: 40 and 20 clear it, 19 does not.
     expect(feastMonths(year).map((month) => month.month)).toEqual([3, 8]);
     // 60 of 80.
     expect(feastLine(year)).toBe(
@@ -1168,6 +1244,41 @@ describe("feastMonths and feastLine", () => {
   it("names a lone peak", () => {
     expect(feastLine(months([0, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0]))).toBe(
       "July: 100% of the year's episodes and films.",
+    );
+  });
+
+  it("highlights only the top month in a fairly even year, when none clears the bar", () => {
+    // Nine months close together (19-24), three quiet -- the shape of the
+    // real bug report. mean 15.83, sd 9.25, threshold 25.09: nothing clears
+    // it, so only the busiest month (November, 24) is a spike.
+    const year = months([20, 22, 19, 0, 0, 21, 23, 20, 19, 22, 24, 0]);
+    expect(feastMonths(year).map((month) => month.month)).toEqual([11]);
+    // 24 of 190.
+    expect(feastLine(year)).toBe(
+      "November: 13% of the year's episodes and films.",
+    );
+  });
+
+  it("keeps up to three spikes, ranked by count", () => {
+    // mean 9, sd 11.39, threshold 20.39: March (28), July (26) and October
+    // (24) clear it.
+    const year = months([1, 1, 28, 1, 1, 1, 26, 1, 1, 24, 22, 1]);
+    expect(feastMonths(year).map((month) => month.month)).toEqual([3, 7, 10]);
+    // 78 of 108.
+    expect(feastLine(year)).toBe(
+      "March, July and October: 72% of the year's episodes and films.",
+    );
+  });
+
+  it("caps a tie at three, keeping the earliest months", () => {
+    // Four months tied at 30 (Feb, Apr, Jun, Aug) all clear the threshold
+    // (mean 11.33, sd 13.2, threshold 24.53); the cap keeps the first three
+    // in chronological order and drops August.
+    const year = months([2, 30, 2, 30, 2, 30, 2, 30, 2, 2, 2, 2]);
+    expect(feastMonths(year).map((month) => month.month)).toEqual([2, 4, 6]);
+    // 90 of 136.
+    expect(feastLine(year)).toBe(
+      "February, April and June: 66% of the year's episodes and films.",
     );
   });
 

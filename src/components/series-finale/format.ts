@@ -205,51 +205,64 @@ function percentOf(part: number, whole: number): number {
 }
 
 /**
- * What the weekday strip shows (under the months, or the marathoner's own
- * card), in words, saying exactly what `rhythm` measures: weekday counts are episodes, and `lateShare` is the
- * share of episodes ticked one at a time that came from 21:00 -- batch ticks
- * carry no real time of day, so they are not in it.
+ * The archetype's own statistic, in words, so a type's blurb is followed only
+ * by the figure it was actually classified on:
+ *
+ * - The weekday marathoner keeps the weekday sentences -- the share on its
+ *   top day, and which weekdays (if any) had no episodes.
+ * - The nightly ritualist keeps the after-21:00 sentence -- `lateShare` is
+ *   the share of episodes ticked one at a time that came from 21:00; batch
+ *   ticks carry no real time of day, so they are not in it.
+ * - Every other archetype has nothing to add here: `null`.
  */
 export function archetypeDetail(
+  archetype: ArchetypeId,
   rhythm: Pick<Payload["rhythm"], "weekdayCounts" | "topWeekday" | "lateShare">,
 ): string | null {
-  const total = rhythm.weekdayCounts.reduce((sum, count) => sum + count, 0);
   const sentences: string[] = [];
 
-  const topCount =
-    rhythm.topWeekday === null
-      ? undefined
-      : rhythm.weekdayCounts[rhythm.topWeekday];
-  if (rhythm.topWeekday !== null && topCount !== undefined && total > 0) {
-    sentences.push(
-      `${percentOf(topCount, total)}% of your episodes landed on a ${weekdayName(rhythm.topWeekday)}.`,
-    );
+  if (archetype === "weekday-marathoner") {
+    const total = rhythm.weekdayCounts.reduce((sum, count) => sum + count, 0);
+    const topCount =
+      rhythm.topWeekday === null
+        ? undefined
+        : rhythm.weekdayCounts[rhythm.topWeekday];
+    if (rhythm.topWeekday !== null && topCount !== undefined && total > 0) {
+      sentences.push(
+        `${percentOf(topCount, total)}% of your episodes landed on a ${weekdayName(rhythm.topWeekday)}.`,
+      );
+    }
+
+    if (total > 0) {
+      const empty = rhythm.weekdayCounts.flatMap((count, index) =>
+        count === 0 ? [`${weekdayName(index)}s`] : [],
+      );
+      if (empty.length > 0) {
+        sentences.push(`${joinWithAnd(empty)} had no episodes.`);
+      }
+    }
   }
 
-  if (rhythm.lateShare !== null) {
+  if (archetype === "nightly-ritualist" && rhythm.lateShare !== null) {
     sentences.push(
       `${percentOf(rhythm.lateShare, 1)}% of the episodes you ticked one at a time came after 21:00.`,
     );
   }
 
-  if (total > 0) {
-    const empty = rhythm.weekdayCounts.flatMap((count, index) =>
-      count === 0 ? [`${weekdayName(index)}s`] : [],
-    );
-    if (empty.length > 0) {
-      sentences.push(`${joinWithAnd(empty)} had no episodes.`);
-    }
-  }
-
   return sentences.length > 0 ? sentences.join(" ") : null;
 }
 
-/** The archetype's blurb, then what the weekday strip shows. */
+/**
+ * The archetype's blurb, then its own statistic (`archetypeDetail`) -- never
+ * another archetype's, so a completionist's description does not also quote
+ * the weekday marathoner's Sunday share or the nightly ritualist's late-tick
+ * share.
+ */
 export function archetypeDescription(
   archetype: ArchetypeId,
   rhythm: Pick<Payload["rhythm"], "weekdayCounts" | "topWeekday" | "lateShare">,
 ): string {
-  const detail = archetypeDetail(rhythm);
+  const detail = archetypeDetail(archetype, rhythm);
   const { blurb } = ARCHETYPE_LABELS[archetype];
   return detail ? `${blurb} ${detail}` : blurb;
 }
@@ -363,20 +376,43 @@ export function finishedDroppedLine(
   return exact ? capitalise(phrase) : `About ${phrase}`;
 }
 
+/** Spikes are ranked by count and capped at this many. */
+const FEAST_SPIKE_LIMIT = 3;
+
 /**
- * The feast months: every month at half the busiest one or more. Empty when
- * nothing was logged.
+ * The feast months: the spikes in the monthly series, ranked by count and
+ * capped at three. A spike is a month whose count is at least one standard
+ * deviation above the mean of the same series `coefficientOfVariation`
+ * classifies the archetype on. When no month clears that bar -- a fairly
+ * even year -- only the single busiest month is a spike, the earlier on a
+ * tie. Empty when nothing was logged.
  */
 export function feastMonths(months: Payload["months"]): Payload["months"] {
+  const counts = months.map((month) => month.episodes);
+  const total = sum(counts);
+  if (total === 0) return [];
+
+  const mean = total / counts.length;
+  const variance =
+    counts.reduce((total, count) => total + (count - mean) ** 2, 0) /
+    counts.length;
+  const threshold = mean + Math.sqrt(variance);
+
+  const spikes = months
+    .filter((month) => month.episodes >= threshold)
+    // Stable, so months tied at the cap keep their chronological order and
+    // the earliest of them survives the slice below.
+    .sort((a, b) => b.episodes - a.episodes);
+  if (spikes.length > 0) return spikes.slice(0, FEAST_SPIKE_LIMIT);
+
   const peak = peakMonth(months);
-  if (!peak) return [];
-  return months.filter((month) => month.episodes * 2 >= peak.episodes);
+  return peak ? [peak] : [];
 }
 
 /**
- * "March and August: 61% of the year's episodes and films." -- the feast
- * months and their share of the months chart's total. Null when nothing was
- * logged.
+ * "July, March and October: 58% of the year's episodes and films." -- the
+ * feast months, ranked by count, and their share of the months chart's
+ * total. Null when nothing was logged.
  */
 export function feastLine(months: Payload["months"]): string | null {
   const feast = feastMonths(months);

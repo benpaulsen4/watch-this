@@ -145,7 +145,7 @@ test("watched by month: every local month's bar, and the peak", async ({ page })
   );
 });
 
-test("your type: the top weekday's share and the after-21:00 share", async ({ page }) => {
+test("your type: the top weekday's share, and no other archetype's stat", async ({ page }) => {
   const oracle = oracleYear(AVA, YEAR);
   await openAvaRecap(page);
   const panel = recapSection(page, "rhythm");
@@ -181,12 +181,13 @@ test("your type: the top weekday's share and the after-21:00 share", async ({ pa
     0,
     await recapSection(page, "months").getByRole("heading", { name: "By day of the week" }).count(),
   );
-  // The positive side of bat's "no share" (41-recap-visual): ava ticks enough
-  // episodes one at a time, so hers is shown, and must be the oracle's.
+  // ava is the weekday marathoner (G8): her type panel quotes only the
+  // weekday stat above, never the nightly ritualist's after-21:00 share,
+  // whatever her own late-tick share happens to be.
   check(
     "recap-rhythm-late-share",
-    `the type panel gives the oracle's after-21:00 share of solo ticks (${oracle.lateSoloTicks} of ${oracle.soloTicks}, local time)`,
-    oracle.lateShare === null ? null : `${percent(oracle.lateShare, 1)}% of the episodes you ticked one at a time came after 21:00.`,
+    `the type panel never shows the after-21:00 share for a weekday marathoner, even though the oracle has one (${oracle.lateSoloTicks} of ${oracle.soloTicks}, local time)`,
+    null,
     /\d+% of the episodes you ticked one at a time came after 21:00\./.exec(text)?.[0] ?? null,
   );
 });

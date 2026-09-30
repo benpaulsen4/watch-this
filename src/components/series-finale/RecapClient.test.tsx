@@ -655,7 +655,7 @@ describe("RecapClient", () => {
     );
     expect(
       screen.getByText(
-        "One day a week does most of the work. 50% of your episodes landed on a Sunday. 41% of the episodes you ticked one at a time came after 21:00.",
+        "One day a week does most of the work. 50% of your episodes landed on a Sunday.",
       ),
     ).toBeInTheDocument();
     expect(

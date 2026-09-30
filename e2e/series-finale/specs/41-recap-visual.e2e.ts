@@ -134,24 +134,29 @@ for (const { user, slug, year } of RECAPS) {
         await shotElement(thinCard.locator("xpath=.."), `recap/${name}/thin-card`);
       }
 
-      // The type panel's after-21:00 share: the oracle's, or none below the
-      // solo-tick floor. ava's year shows one (the positive control); bat's
-      // has no episode ticked alone, so it must show none.
-      if (shown.rhythm) {
-        const late = await textOf(recapSection(page, "rhythm").getByText(/after 21:00/));
-        check(
-          `visual-${name}-late-share`,
-          `${slug}'s ${year} type panel gives the oracle's after-21:00 share of solo ticks (${oracle.lateSoloTicks} of ${oracle.soloTicks}), or none below the floor`,
-          oracle.lateShare === null ? null : `${percent(oracle.lateShare, 1)}% of the episodes you ticked one at a time came after 21:00.`,
-          /\d+% of the episodes you ticked one at a time came after 21:00\./.exec(late ?? "")?.[0] ?? late,
-        );
-      }
-
       // The type's picture, for the personas whose 2025 archetype the cast is
       // known to produce, labelled with the oracle's numbers; and the weekday
       // strip under the months for every type but the marathoner (whose
       // picture it is), when there is a weekday to draw.
       const archetype = year === "2025" ? SEEDED_ARCHETYPES[user] : undefined;
+
+      // The type panel's after-21:00 share only ever belongs to the nightly
+      // ritualist (G8: every other archetype's description quotes its own
+      // statistic, never this one). None of the seeded 2025 archetypes is a
+      // nightly ritualist, so the sentence must be absent for all of them,
+      // whatever the oracle's own late-tick share happens to be.
+      if (shown.rhythm && archetype) {
+        const late = await textOf(recapSection(page, "rhythm").getByText(/after 21:00/));
+        check(
+          `visual-${name}-late-share`,
+          `${slug}'s ${year} type panel (a ${archetype}) gives the after-21:00 share only if it were the nightly ritualist (oracle late share: ${oracle.lateShare === null ? "none" : `${oracle.lateSoloTicks} of ${oracle.soloTicks}`})`,
+          archetype === "nightly-ritualist" && oracle.lateShare !== null
+            ? `${percent(oracle.lateShare, 1)}% of the episodes you ticked one at a time came after 21:00.`
+            : null,
+          /\d+% of the episodes you ticked one at a time came after 21:00\./.exec(late ?? "")?.[0] ?? late,
+        );
+      }
+
       if (archetype && !oracle.thin) {
         check(
           `visual-${name}-archetype`,

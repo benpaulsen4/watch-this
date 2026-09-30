@@ -32,7 +32,14 @@ const TONES = {
     baseline: "border-gray-700",
     caption: "text-sm leading-relaxed text-gray-400",
     label: "text-xs text-gray-500",
-    figure: "text-5xl text-gray-50",
+    // Larger than "large" (below): the recap's share-bar picture (one genre
+    // only, group watcher) is the shortest of the type pictures, so a small
+    // figure here left "Your type" visibly shorter than "Watched by month"
+    // beside it (G5/I1's top-band-gap check) once G8 stopped padding every
+    // archetype's blurb with two sentences that were never its own. Making
+    // the figure itself large (I1's own fix for this) closes most of the
+    // gap without adding back any text.
+    figure: "text-8xl text-gray-50",
   },
   large: {
     track: "bg-white/10",
