@@ -183,10 +183,12 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   `textOf`.
 - `support/big-day.ts` -- the biggest day's clock (BigDayTimeline, in the
   recap panel or the story card): `readBigDay` (the hour labels on screen,
-  each dot's accessible name, the summary line, the listed rows and "And N
-  more.") and `expectedBigDay(oracle, surface)` (the same from the oracle's
-  `bigDayTimeline`, with the labels each surface shows: every hour on the
-  recap from lg, fewer below lg and on the story's card).
+  each dot's hover title and how many dots a screen reader would still meet
+  -- none, the list says the same -- the summary line, the listed rows and
+  "And N more.") and `expectedBigDay(oracle, surface)` (the same from the
+  oracle's `bigDayTimeline`, with the labels each surface shows: the wide
+  steps on the recap from lg, the narrow steps below lg and on the story's
+  card).
 - `support/archetype.ts` -- the type's picture (`[data-archetype-visual]`
   and its `role="img"`): `readArchetypeVisual`, `expectedArchetypeLabel`
   (its aria-label from the oracle's numbers, in the app's wording) and
@@ -264,7 +266,7 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   - `40-recap` -- ava's 2025 recap, section by section, against the oracle
     (hero, tiles and the zone-edge precondition, months, type and its
     picture, top show, niche, shame, the big day's date and clock -- hour
-    ticks, labelled points, listed episodes -- crew, compare for every peer
+    ticks, titled points, listed episodes -- crew, compare for every peer
     swapped in, header, footer); the crew-cap rule (F3, fixed) checks that
     jon's stored crew is his 8 most active.
   - `41-recap-visual` (desktop, phone; webkit-phone skips where WebKit does
@@ -275,7 +277,9 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
     type panel's after-21:00 share (ava's shown, bat's absent), the
     archetype's picture and the weekday strip under the months against the
     oracle, and (desktop) the top-titles card's natural height within 40 px
-    of the Genres card's.
+    of the Genres card's, and, for ava 2025/2024, bo, bat and flo 2025, the
+    content of "Watched by month" and "Your type" ending within 60 px of
+    each other (no empty block in the top band).
   - `42-recap-states` -- loading, load failure then Retry, and unavailable,
     each forced with `page.route` on the period's GET.
   - `50-story` (desktop, phone, small-phone) -- ava's 2025 story: the walk

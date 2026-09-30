@@ -303,7 +303,7 @@ test("the biggest day card: its clock's hour ticks, labelled points and listed e
   await reachCard(page, "bigDay");
   check(
     "story-big-day-clock",
-    `the big-day card's hour ticks (the narrow set), each point's label, the summary line and the listed rows are the oracle's timeline in ${oracle.timezone}`,
+    `the big-day card's hour ticks (the narrow set), each point's hover title (no dot announced), the summary line and the listed rows are the oracle's timeline in ${oracle.timezone}`,
     expectedBigDay(oracle, "story"),
     await readBigDay(storyCard(page)),
   );

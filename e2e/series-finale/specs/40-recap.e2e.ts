@@ -272,12 +272,13 @@ test("the biggest day: its date, and its clock of hour ticks, labelled points an
 
   // The clock: an hour axis in ava's zone from the first tick's hour to the
   // hour after the last, labelled every hour from lg (the desktop panel) and
-  // more sparsely below it; a dot per solo tick named "HH:MM · Show S1E03";
+  // every narrow step below it; a dot per solo tick titled "HH:MM · Show
+  // S1E03" for hover and hidden from screen readers (the list says it);
   // and the episodes listed by time. All from the oracle's timeline.
   const wide = (page.viewportSize()?.width ?? 0) >= 1024;
   check(
     "recap-big-day-clock",
-    `the biggest day's hour ticks (${wide ? "every hour, lg and up" : "the narrow set, below lg"}), each point's label, the summary line and the listed rows are the oracle's timeline in ${oracle.timezone}`,
+    `the biggest day's hour ticks (${wide ? "every hour, lg and up" : "the narrow set, below lg"}), each point's hover title (no dot announced), the summary line and the listed rows are the oracle's timeline in ${oracle.timezone}`,
     expectedBigDay(oracle, wide ? "recap-lg" : "recap-below-lg"),
     await readBigDay(panel),
   );

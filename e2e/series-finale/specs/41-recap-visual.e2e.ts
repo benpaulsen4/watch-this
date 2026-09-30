@@ -23,6 +23,16 @@ import { shot, shotElement } from "../support/shots";
 /** The top-titles row's height gap the poster change (plan 6 Task 4) must keep within, at 1440 px. */
 const POSTER_ROW_GAP_PX = 40;
 
+/**
+ * How far apart the content of "Watched by month" and "Your type" may end, at
+ * 1440 px (plan 6 final review I1): the grid stretches both cards to the
+ * taller, so a larger gap is an empty block under the shorter one's content.
+ */
+const TOP_BAND_GAP_PX = 60;
+
+/** The recaps whose top band is checked: every seeded type, and ava's 2024. */
+const TOP_BAND = new Set(["ava-2025", "ava-2024", "bo-2025", "bat-2025", "flo-2025"]);
+
 const FLO = "e2e_flo_watches_only_films_and_has_a_long_name";
 
 const RECAPS: { user: string; slug: string; year: string }[] = [
@@ -185,6 +195,34 @@ for (const { user, slug, year } of RECAPS) {
           `at 1440 px the top-titles card and the Genres card beside it differ in natural height by at most ${POSTER_ROW_GAP_PX} px (${JSON.stringify(heights)})`,
           true,
           gap !== null && gap <= POSTER_ROW_GAP_PX,
+        );
+      }
+
+      // The top band: the months chart fills its card beside a taller type
+      // card, and a type's picture is centred in a taller months card's
+      // spare height, so neither card's content stops far short of the other.
+      // Content bottom: the lowest of the card's children (a centred
+      // picture's margins are outside its box).
+      if (test.info().project.name === "desktop" && TOP_BAND.has(name)) {
+        const contentBottom = (locator: ReturnType<typeof recapPanel>) =>
+          locator.first().evaluate((card) => {
+            const box = card.getBoundingClientRect();
+            const bottom = Math.max(...Array.from(card.children).map((child) => child.getBoundingClientRect().bottom));
+            return {
+              cardBottom: Math.round(box.bottom - Number.parseFloat(getComputedStyle(card).paddingBottom)),
+              contentBottom: Math.round(bottom),
+            };
+          }, undefined, { timeout: 2_000 }).catch(() => null);
+        const band = {
+          months: await contentBottom(recapPanel(page, "Watched by month")),
+          type: await contentBottom(recapPanel(page, "Your type")),
+        };
+        const gap = band.months === null || band.type === null ? null : Math.abs(band.months.contentBottom - band.type.contentBottom);
+        check(
+          `visual-${name}-top-band-gap`,
+          `at 1440 px the content of 'Watched by month' and 'Your type' ends within ${TOP_BAND_GAP_PX} px of each other, leaving no empty block under either (${JSON.stringify({ ...band, gap })})`,
+          true,
+          gap !== null && gap <= TOP_BAND_GAP_PX,
         );
       }
 

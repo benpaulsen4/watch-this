@@ -2,8 +2,8 @@
 // story's card) read back, and what it must show for an oracle year: an hour
 // axis in the snapshot's zone from the first point's hour to the hour after
 // the last, labelled every `step` hours (fewer labels where the axis is
-// narrow), one labelled dot per solo tick, and the day's episodes listed
-// underneath.
+// narrow), one dot per solo tick titled for hover (hidden from screen
+// readers, which read the list), and the day's episodes listed underneath.
 import type { Locator } from "@playwright/test";
 
 import type { OracleYear } from "../seed/oracle";
@@ -26,7 +26,7 @@ const hourClock = (hour: number) => `${String(hour % 24).padStart(2, "0")}:00`;
 export interface BigDayShown {
   /** The hour labels on screen (display:none ones left out), left to right. */
   ticks: string[];
-  /** Every dot's accessible name, in DOM (time) order: "13:05 · The Bear S2E03". */
+  /** Every dot's hover title, in DOM (time) order: "13:05 · The Bear S2E03". */
   points: string[];
   /** The listed rows as "13:05 The Bear · S2E03". */
   rows: string[];
@@ -34,6 +34,8 @@ export interface BigDayShown {
   more: string | null;
   /** "First at 13:05, last at 23:35 · 14 episodes ticked one at a time", or null. */
   summary: string | null;
+  /** Dots a screen reader would still meet: 0, since the list says the same. */
+  pointsAnnounced: number;
 }
 
 /** Reads the clock inside `container` (the recap's big-day panel or the story's big-day card). */
@@ -46,7 +48,12 @@ export async function readBigDay(container: Locator): Promise<BigDayShown> {
     const summary = Array.from(root.querySelectorAll("p")).find((p) => /ticked one at a time$/.test(text(p) ?? ""));
     return {
       ticks: Array.from(root.querySelectorAll("[data-tick-label]")).filter(shown).map((node) => text(node) ?? ""),
-      points: Array.from(root.querySelectorAll('[data-point] [role="img"]')).map((node) => node.getAttribute("aria-label") ?? ""),
+      points: Array.from(root.querySelectorAll("[data-point] [title]")).map((node) => node.getAttribute("title") ?? ""),
+      // The dots are aria-hidden (the list names the same episodes), so none
+      // may still be announced as an image.
+      pointsAnnounced: Array.from(root.querySelectorAll("[data-point]")).filter(
+        (node) => !node.closest('[aria-hidden="true"]') || node.querySelector('[role="img"]'),
+      ).length,
       rows: Array.from(root.querySelectorAll("[data-episode-row]")).map((node) =>
         Array.from(node.children)
           .map((child) => text(child) ?? "")
@@ -60,8 +67,8 @@ export async function readBigDay(container: Locator): Promise<BigDayShown> {
 
 /**
  * Where the clock is drawn, which decides its hour labels: the recap's panel
- * labels every wide step from lg (1024 px) up and, below lg, only the wide
- * steps that are also narrow ones; the story's card labels the narrow steps.
+ * labels every wide step from lg (1024 px) up and every narrow step below lg;
+ * the story's card labels the narrow steps.
  */
 export type BigDaySurface = "recap-lg" | "recap-below-lg" | "story";
 
@@ -76,7 +83,7 @@ export function expectedBigDay(oracle: OracleYear, surface: BigDaySurface): BigD
   const row = (point: (typeof timeline)[number]) => `${point.time} ${point.title ? `${point.title} · ${point.episode}` : point.episode}`;
   const rows = timeline.slice(0, LISTED).map(row);
   const more = timeline.length > LISTED ? `And ${words(timeline.length - LISTED)} more.` : null;
-  if (timeline.length < AXIS_MIN_POINTS) return { ticks: [], points: [], rows, more, summary: null };
+  if (timeline.length < AXIS_MIN_POINTS) return { ticks: [], points: [], rows, more, summary: null, pointsAnnounced: 0 };
 
   const first = timeline[0]!.time;
   const last = timeline[timeline.length - 1]!.time;
@@ -85,9 +92,7 @@ export function expectedBigDay(oracle: OracleYear, surface: BigDaySurface): BigD
   const narrow = labelStep(hours, NARROW_LABELS);
   const wideStep = labelStep(hours, WIDE_LABELS);
   const ticks = Array.from({ length: hours + 1 }, (_, index) => index)
-    .filter((index) =>
-      surface === "story" ? index % narrow === 0 : index % wideStep === 0 && (surface === "recap-lg" || index % narrow === 0),
-    )
+    .filter((index) => (surface === "recap-lg" ? index % wideStep === 0 : index % narrow === 0))
     .map((index) => hourClock(start + index));
   const when = first === last ? `All at ${first}` : `First at ${first}, last at ${last}`;
   return {
@@ -96,5 +101,6 @@ export function expectedBigDay(oracle: OracleYear, surface: BigDaySurface): BigD
     rows,
     more,
     summary: `${when} · ${pluralise(timeline.length, "episode")} ticked one at a time`,
+    pointsAnnounced: 0,
   };
 }
