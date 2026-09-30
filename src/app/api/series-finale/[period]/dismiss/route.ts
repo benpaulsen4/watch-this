@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import {
   AuthenticatedRequest,
@@ -11,7 +11,7 @@ import { seriesFinale } from "@/lib/db/schema";
 import { parsePeriodLabel } from "@/lib/series-finale/periods";
 
 // POST /api/series-finale/[period]/dismiss - hide the dashboard banner
-export const POST = withAuth(async (request: AuthenticatedRequest) => {
+const handler = withAuth(async (request: AuthenticatedRequest) => {
   try {
     const segments = new URL(request.url).pathname.split("/");
     const label = segments.at(-2) ?? "";
@@ -37,3 +37,11 @@ export const POST = withAuth(async (request: AuthenticatedRequest) => {
     return handleApiError(error, "Series Finale dismiss");
   }
 });
+
+// Every response is per-user at a URL shared by every user, so no shared
+// cache may keep it -- 401s and errors included (as story-complete does).
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const response = await handler(request);
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
+}

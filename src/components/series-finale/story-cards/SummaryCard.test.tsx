@@ -245,8 +245,9 @@ describe("SummaryCard", () => {
       { wrapper },
     );
 
+    // The button says "Try again"; the message does not repeat it.
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Could not save your progress. Try again.",
+      /^Could not save your progress\.$/,
     );
     expect(
       screen.queryByRole("link", { name: "See the full recap" }),

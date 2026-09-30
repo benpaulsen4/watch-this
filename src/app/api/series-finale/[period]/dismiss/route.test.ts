@@ -61,6 +61,19 @@ describe("POST /api/series-finale/[period]/dismiss", () => {
       error: "Invalid period",
     });
     expect(whereSpy).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+
+  it("keeps a signed-out 401 out of shared caches too", async () => {
+    const response = await POST(
+      new NextRequest("http://localhost/api/series-finale/2025/dismiss", {
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(whereSpy).not.toHaveBeenCalled();
   });
 
   it("marks the recap dismissed for the current user and period", async () => {
@@ -70,6 +83,7 @@ describe("POST /api/series-finale/[period]/dismiss", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
 
     expect(whereSpy).toHaveBeenCalledTimes(1);
     const condition = whereSpy.mock.calls[0]?.[0] as { parts: unknown[] };

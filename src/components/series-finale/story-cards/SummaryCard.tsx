@@ -133,7 +133,7 @@ export function SummaryCard({
         {unsaved ? (
           <>
             <p role="alert" className="text-xs text-red-400">
-              Could not save your progress. Try again.
+              Could not save your progress.
             </p>
             <Button
               variant="ghost"

@@ -42,7 +42,8 @@ const SIZES = {
 /**
  * "Swap in" and a chip per peer, the one shown pressed: the comparison's
  * choice of whom it compares with, shared by the recap's panel and the
- * story's card. Nothing with a single peer.
+ * story's card. The chips are a group named "Compare with", so a screen
+ * reader gives each its context. Nothing with a single peer.
  */
 export function ComparePeerPicker({
   peers,
@@ -63,6 +64,8 @@ export function ComparePeerPicker({
 
   return (
     <div
+      role="group"
+      aria-label="Compare with"
       className={cn(
         "flex flex-wrap items-center justify-center gap-2",
         styles.row,

@@ -23,6 +23,10 @@ describe("ComparePeerPicker", () => {
     );
 
     expect(screen.getByText("Swap in")).toBeInTheDocument();
+    // Named as a group, so a chip reads "Compare with, ana, pressed".
+    expect(
+      screen.getByRole("group", { name: "Compare with" }),
+    ).toContainElement(screen.getByRole("button", { name: "ana" }));
     expect(screen.getByRole("button", { name: "ana" })).toHaveAttribute(
       "aria-pressed",
       "true",
