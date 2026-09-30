@@ -1101,9 +1101,15 @@ describe("RecapClient", () => {
     expect(screen.getByText("35%")).toBeInTheDocument();
     // Says what its percent measures, so it is not read as the type
     // card's share of titles.
-    expect(
-      screen.getByText("Share of genre tags across what you finished"),
-    ).toBeInTheDocument();
+    const caption = screen.getByText(
+      "Share of genre tags across what you finished",
+    );
+    // In the title row, which wraps: on a phone the caption drops under
+    // "Genres" rather than squeezing it into "Genr / es".
+    expect(caption.parentElement).toContainElement(
+      screen.getByRole("heading", { name: "Genres" }),
+    );
+    expect(caption.parentElement).toHaveClass("flex-wrap");
   });
 
   it("describes the biggest day, and why there is no timeline", async () => {

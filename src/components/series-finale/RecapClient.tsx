@@ -378,7 +378,10 @@ function Panel({
   return (
     <Card className={cn("flex flex-col", className)}>
       <div className="mb-5">
-        <div className="flex items-baseline justify-between gap-4">
+        {/* Wraps, so an aside too long to share the line (the Genres
+            caption on a phone) drops under the title instead of breaking
+            it mid-word. */}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 className="min-w-0 text-lg leading-tight font-semibold [overflow-wrap:anywhere] text-gray-100">
             {title}
           </h2>
