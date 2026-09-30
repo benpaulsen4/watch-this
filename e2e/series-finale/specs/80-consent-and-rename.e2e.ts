@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { type Page, test } from "@playwright/test";
 
 import { signInAs } from "../support/auth";
-import { CARD_SIZE, CARDS_DIR, pngSize } from "../support/cards";
+import { CARD_SIZE, CARDS_DIR, compareCardPngsOutsidePosterBox, pngSize } from "../support/cards";
 import { psql, userExists } from "../support/db";
 import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
@@ -306,8 +306,12 @@ test("ava's recap and story show bo under his new name", async ({ page }) => {
 test("privacy: ava's card is unchanged by cy's opt-out and bo's rename", async ({ page }) => {
   // The share card must carry no collaborator data at all (spec privacy rule
   // 2), so nothing another person does may change ava's card. Its text is
-  // drawn as paths, so this compares the whole image: byte-identical to the
-  // one 20-api-and-card saved before any mutation.
+  // drawn as paths, so this compares the whole image against the one
+  // 20-api-and-card saved before any mutation -- except the top-show
+  // poster's box (POSTER_BOX), which `route.tsx`'s `posterDataUrl` fetches
+  // live from TMDB's CDN on every render and is not guaranteed byte-stable
+  // between two fetches (ruling G6). Everything outside that box must still
+  // match exactly.
   await signInAs(page, AVA);
   const card = await page.request.get(`/api/series-finale/${YEAR}/card`);
   const bytes = await card.body();
@@ -316,11 +320,23 @@ test("privacy: ava's card is unchanged by cy's opt-out and bo's rename", async (
     note("privacy-ava-card-unchanged", `no cards/ava-${YEAR}.png from before the mutations (20-api-and-card did not run); nothing to compare`, "a card from before", null, false);
     return;
   }
+  const beforeBytes = readFileSync(before);
+  const identicalBytes = bytes.equals(beforeBytes);
+  const comparison = identicalBytes
+    ? { sameSize: true, outsideIdentical: true, posterBoxIdentical: true }
+    : await compareCardPngsOutsidePosterBox(page, bytes, beforeBytes);
   check(
     "privacy-ava-card-unchanged",
-    `after e2e_cy opted out and e2e_bo renamed himself, ava's 2025 card is byte-identical to cards/ava-${YEAR}.png from before`,
-    { status: 200, identical: true },
-    { status: card.status(), identical: bytes.equals(readFileSync(before)) },
+    `after e2e_cy opted out and e2e_bo renamed himself, ava's 2025 card matches cards/ava-${YEAR}.png from before everywhere outside the live poster's box`,
+    { status: 200, sameSize: true, outsideIdentical: true },
+    { status: card.status(), sameSize: comparison.sameSize, outsideIdentical: comparison.outsideIdentical },
   );
-  if (!bytes.equals(readFileSync(before))) writeFileSync(join(CARDS_DIR, `ava-${YEAR}-after-mutations.png`), bytes);
+  note(
+    "privacy-ava-card-poster-box-changed",
+    "informational only: whether the live TMDB poster itself differed between the two fetches (expected to, sometimes)",
+    "either",
+    comparison.posterBoxIdentical ? "unchanged" : "changed",
+    true,
+  );
+  if (!identicalBytes) writeFileSync(join(CARDS_DIR, `ava-${YEAR}-after-mutations.png`), bytes);
 });
