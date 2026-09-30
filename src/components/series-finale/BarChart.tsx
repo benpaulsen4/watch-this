@@ -26,6 +26,12 @@ interface BarChartProps {
    * "medium" the same strip drawn taller, where it is a card's one picture.
    */
   size?: "default" | "compact" | "medium";
+  /**
+   * The plot grows to fill the height its flex-column parent gives it, from
+   * the default size's 12rem: the recap's months chart, beside a taller card
+   * in the same row, fills its own card instead of leaving a gap under it.
+   */
+  fill?: boolean;
 }
 
 const AXIS_INTERVALS = 4;
@@ -63,19 +69,22 @@ export function BarChart({
   ariaLabel,
   axis = false,
   size = "default",
+  fill = false,
 }: BarChartProps) {
   const peak = Math.max(...bars.map((bar) => bar.value), 0);
   const ticks = axis ? axisTicks(peak) : [];
   const scaleTop = ticks[0] ?? peak;
   const compact = size !== "default";
-  const plotHeight = { default: "h-48", compact: "h-12", medium: "h-28" }[
-    size
-  ];
+  // Filling, the row takes the parent's free height and the plot and axis
+  // stretch to it, the plot never below 12rem.
+  const plotHeight = fill
+    ? null
+    : { default: "h-48", compact: "h-12", medium: "h-28" }[size];
   const gap = compact ? "gap-1.5" : "gap-2.5";
 
   return (
-    <div>
-      <div className="flex gap-3">
+    <div className={cn(fill && "flex flex-1 flex-col")}>
+      <div className={cn("flex gap-3", fill && "flex-1")}>
         {axis ? (
           <div
             aria-hidden="true"
@@ -89,7 +98,10 @@ export function BarChart({
             ))}
           </div>
         ) : null}
-        <div className={cn("relative flex-1", plotHeight)}>
+        <div
+          data-plot=""
+          className={cn("relative flex-1", plotHeight ?? "min-h-48")}
+        >
           {axis ? (
             <div
               aria-hidden="true"
@@ -106,10 +118,17 @@ export function BarChart({
               ))}
             </div>
           ) : null}
+          {/* Filling, the plot's height may be a stretch rather than a set
+              height, which a percentage cannot resolve against; an inset
+              box always can. */}
           <div
             aria-label={ariaLabel}
             role="img"
-            className={cn("relative flex h-full items-end", gap)}
+            className={cn(
+              "flex items-end",
+              fill ? "absolute inset-0" : "relative h-full",
+              gap,
+            )}
           >
             {bars.map((bar, index) => (
               // Keyed by position: labels repeat (the weekday initials T and S).

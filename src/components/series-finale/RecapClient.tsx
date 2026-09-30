@@ -264,7 +264,12 @@ function RecapBody({
             <TopTitlesPanel topShow={topShow} niche={niche} />
           ) : null}
           {payload.genres.length > 0 ? (
-            <Panel title="Genres">
+            // What the percents measure, set over their column in the
+            // title row: the type card's genre figure is a share of titles.
+            <Panel
+              title="Genres"
+              aside="Share of genre tags across what you finished"
+            >
               <GenreBars genres={payload.genres} />
             </Panel>
           ) : null}
@@ -469,7 +474,9 @@ function StatRow({ payload }: { payload: SeriesFinalePayload }) {
 /**
  * The months, and under them the weekdays for every type but the weekday
  * marathoner, whose own card draws the weekday strip larger: one strip per
- * page, never the same chart twice side by side.
+ * page, never the same chart twice side by side. The months chart fills
+ * whatever height the row gives the panel, so a taller type card beside it
+ * leaves no empty block under the chart.
  */
 function MonthsPanel({
   months,
@@ -490,7 +497,7 @@ function MonthsPanel({
           : undefined
       }
     >
-      <MonthsChart months={months} axis />
+      <MonthsChart months={months} axis fill />
       {weekdays ? (
         <div className="mt-6 border-t border-gray-800 pt-5">
           <h3 className="mb-3 text-sm font-medium text-gray-300">
@@ -506,7 +513,10 @@ function MonthsPanel({
   );
 }
 
-/** The type's name and copy, then its picture (see `ArchetypeVisual`). */
+/**
+ * The type's name and copy, then its picture (see `ArchetypeVisual`), centred
+ * in whatever height the months panel beside it leaves over.
+ */
 function ArchetypePanel({
   archetype,
   payload,
@@ -526,7 +536,7 @@ function ArchetypePanel({
       <p className="mt-4 text-sm leading-relaxed text-pretty text-gray-300">
         {description}
       </p>
-      <ArchetypeVisual payload={payload} className="mt-auto pt-6" />
+      <ArchetypeVisual payload={payload} className="my-auto pt-6" />
     </Panel>
   );
 }

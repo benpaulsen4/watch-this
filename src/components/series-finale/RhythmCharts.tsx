@@ -16,22 +16,26 @@ type Payload = SeriesFinalePayload;
 /**
  * Episodes and films by month, the peak highlighted and named in the label.
  * The recap draws it with an axis and three-letter months (1e), initials
- * below `sm`; the story bare, with initials (1c).
+ * below `sm`; the story bare, with initials (1c). `fill` grows the plot to
+ * the height its card is given (see `BarChart`).
  */
 export function MonthsChart({
   months,
   axis = false,
   labels = "short",
+  fill = false,
 }: {
   months: Payload["months"];
   axis?: boolean;
   labels?: "short" | "initial";
+  fill?: boolean;
 }) {
   const peak = peakMonth(months);
 
   return (
     <BarChart
       axis={axis}
+      fill={fill}
       ariaLabel={
         peak
           ? `Episodes and films by month. Peak ${monthName(peak.month)}, ${formatCount(peak.episodes)}.`

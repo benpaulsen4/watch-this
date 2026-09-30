@@ -32,6 +32,7 @@ const TONES = {
     baseline: "border-gray-700",
     caption: "text-sm leading-relaxed text-gray-400",
     label: "text-xs text-gray-500",
+    figure: "text-5xl text-gray-50",
   },
   large: {
     track: "bg-white/10",
@@ -39,6 +40,7 @@ const TONES = {
     baseline: "border-white/15",
     caption: "text-[15px] leading-relaxed text-white/70",
     label: "text-xs text-white/45",
+    figure: "text-5xl text-white",
   },
 } as const;
 
@@ -218,7 +220,11 @@ function HourClock({
   );
 }
 
-/** One share as one bar, labelled with the sentence it stands for. */
+/**
+ * One share as a figure over one bar, labelled with the sentence it stands
+ * for: the number the type is about leads, large, where it gives the card
+ * its weight.
+ */
 function ShareBar({
   percent,
   label,
@@ -230,6 +236,15 @@ function ShareBar({
 }) {
   return (
     <div role="img" aria-label={`${label}.`}>
+      <p
+        data-share-figure=""
+        className={cn(
+          "mb-4 leading-none font-bold tracking-tight tabular-nums",
+          tone.figure,
+        )}
+      >
+        {`${percent}%`}
+      </p>
       <div className={cn("h-2.5 rounded-full", tone.track)}>
         <div
           data-share-fill=""

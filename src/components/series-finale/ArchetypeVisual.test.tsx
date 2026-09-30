@@ -190,6 +190,10 @@ describe("ArchetypeVisual", () => {
       expect(
         container.querySelector<HTMLElement>("[data-share-fill]")?.style.width,
       ).toBe("64%");
+      // The share leads, large, above its bar.
+      expect(container.querySelector("[data-share-figure]")).toHaveTextContent(
+        /^64%$/,
+      );
     });
 
     it("draws nothing without a top genre", () => {
@@ -345,6 +349,9 @@ describe("ArchetypeVisual", () => {
       expect(
         container.querySelector<HTMLElement>("[data-share-fill]")?.style.width,
       ).toBe("63%");
+      expect(container.querySelector("[data-share-figure]")).toHaveTextContent(
+        /^63%$/,
+      );
     });
 
     it("draws nothing when nothing was finished", () => {

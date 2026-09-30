@@ -767,6 +767,63 @@ describe("RecapClient", () => {
     expect(type).toContainElement(strips[0] ?? null);
   });
 
+  it("fills the months panel with its chart, so a taller type card leaves no gap under it", async () => {
+    mockFetch({
+      payload: payload({
+        rhythm: {
+          archetype: "weekday-marathoner",
+          weekdayCounts: [10, 10, 10, 10, 10, 10, 60],
+          topWeekday: 6,
+          lateShare: null,
+          hourCounts: null,
+          sharedListShare: null,
+          topGenreName: null,
+          topGenreShare: null,
+        },
+      }),
+    });
+    renderRecap();
+
+    const chart = await screen.findByRole("img", {
+      name: /^Episodes and films by month\./,
+    });
+    // The plot grows with the row, from the chart's usual 12rem.
+    const plot = chart.closest("[data-plot]");
+    expect(plot).toHaveClass("flex-1", "min-h-48");
+    expect(plot).not.toHaveClass("h-48");
+    // The weekday strip in the type card keeps its own fixed height.
+    const strip = screen.getByRole("img", {
+      name: "Episodes by weekday. Peak Sunday.",
+    });
+    expect(strip.closest("[data-plot]")).toHaveClass("h-28");
+  });
+
+  it("centres the type's picture in the card's free height", async () => {
+    mockFetch({
+      payload: payload({
+        rhythm: {
+          archetype: "one-genre-only",
+          weekdayCounts: [1, 1, 1, 1, 1, 1, 6],
+          topGenreName: "Drama",
+          topGenreShare: 0.86,
+          topWeekday: 6,
+          lateShare: null,
+          hourCounts: null,
+          sharedListShare: null,
+        },
+      }),
+    });
+    const { container } = renderRecap();
+
+    await screen.findByText("One Genre Only");
+    expect(container.querySelector("[data-archetype-visual]")).toHaveClass(
+      "my-auto",
+    );
+    expect(container.querySelector("[data-share-figure]")).toHaveTextContent(
+      /^86%$/,
+    );
+  });
+
   it("keeps the type's card without a picture when its data is missing", async () => {
     mockFetch({
       payload: payload({
@@ -1042,6 +1099,11 @@ describe("RecapClient", () => {
     await waitFor(() => expect(screen.getByText("Genres")).toBeInTheDocument());
     expect(screen.getByText("Drama")).toBeInTheDocument();
     expect(screen.getByText("35%")).toBeInTheDocument();
+    // Says what its percent measures, so it is not read as the type
+    // card's share of titles.
+    expect(
+      screen.getByText("Share of genre tags across what you finished"),
+    ).toBeInTheDocument();
   });
 
   it("describes the biggest day, and why there is no timeline", async () => {
@@ -1098,9 +1160,7 @@ describe("RecapClient", () => {
         ),
       ).toBeInTheDocument(),
     );
-    expect(
-      screen.getByRole("img", { name: "14:50 · The Bear S2E02" }),
-    ).toHaveAttribute("title", "14:50 · The Bear S2E02");
+    expect(screen.getByTitle("14:50 · The Bear S2E02")).toBeInTheDocument();
     expect(
       screen.queryByText(/too few to put on a clock/),
     ).not.toBeInTheDocument();
