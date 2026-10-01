@@ -42,6 +42,13 @@ describe("getTimezoneDateKey", () => {
       "2026-01-02",
     );
   });
+
+  it("falls back to UTC for an unknown zone rather than throwing", () => {
+    // 22:00Z on the 20th: the UTC day, not Auckland's 21st.
+    expect(
+      getTimezoneDateKey(new Date("2026-07-20T22:00:00Z"), "Mars/Olympus"),
+    ).toBe("2026-07-20");
+  });
 });
 
 describe("getTimezoneWeekday", () => {

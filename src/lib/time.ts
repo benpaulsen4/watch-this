@@ -76,17 +76,17 @@ export function resolveTimeZone(timeZone: string | null | undefined): string {
 /**
  * "YYYY-MM-DD" for `date` as observed in `timeZone`.
  *
- * Unlike the two below, this does NOT resolve the zone first: it throws
- * `RangeError` for one `Intl` does not know. Callers that must degrade rather
- * than fail resolve before calling -- `buildPayload` does.
+ * Resolves the zone first, like the two below, so a stale or renamed profile
+ * zone yields the UTC day rather than a `RangeError`.
  */
 export function getTimezoneDateKey(date: Date, timeZone: string): string {
+  const zone = resolveTimeZone(timeZone);
   return cached(
     dateKeyFormatters,
-    timeZone,
+    zone,
     () =>
       new Intl.DateTimeFormat("en-CA", {
-        timeZone,
+        timeZone: zone,
         year: "numeric",
         month: "2-digit",
         day: "2-digit",

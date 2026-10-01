@@ -803,15 +803,10 @@ export function buildPayload(
   const { period, episodes, statuses, titles } = input;
 
   // Resolved once, here at the boundary, and it is the resolved value that
-  // every builder below receives. `getTimezoneWeekday` and `getTimezoneHour`
-  // resolve internally, but `getTimezoneDateKey` does not -- it hands the zone
-  // straight to `Intl.DateTimeFormat`, which throws `RangeError` for a zone no
-  // longer in the ICU database. A profile holding a renamed or retired IANA
-  // name would therefore fail a whole recap, contradicting this module's own
-  // promise that one thin slice of data cannot. Resolving here rather than
-  // inside `getTimezoneDateKey` keeps that helper's app-wide behaviour where
-  // its own callers decide it, and costs one validation rather than one per
-  // formatter call.
+  // every builder below receives -- and that the payload records as
+  // `period.timezone`. The time helpers also resolve internally, so a renamed
+  // or retired IANA name cannot fail a recap either way; resolving here keeps
+  // the recorded zone the one the dates were actually computed in.
   const zone = resolveTimeZone(input.timeZone);
 
   const finished = countFinished(statuses, period);
