@@ -217,6 +217,42 @@ describe("classifyArchetype", () => {
     ).not.toBe("weekday-marathoner");
   });
 
+  // The label names the top weekday (archetypeName reads rhythm.topWeekday),
+  // so the rule is judged on that day: a marathon on a lesser day must not
+  // ship as "The <top day> Marathoner" -- the share card freezes the name.
+  it("judges weekday-marathoner on the top weekday only", () => {
+    // Saturday leads (30%) but is casual; Sunday (25%) has the marathons.
+    expect(
+      classifyArchetype({
+        ...base(),
+        weekdayCounts: [9, 9, 9, 9, 9, 30, 25],
+        medianEpisodesPerActiveDayByWeekday: [1, 1, 1, 1, 1, 2, 5],
+      }),
+    ).not.toBe("weekday-marathoner");
+  });
+
+  it("matches weekday-marathoner on the top weekday with another day also over 22%", () => {
+    expect(
+      classifyArchetype({
+        ...base(),
+        weekdayCounts: [9, 9, 9, 9, 9, 25, 30],
+        medianEpisodesPerActiveDayByWeekday: [1, 1, 1, 1, 1, 2, 5],
+      }),
+    ).toBe("weekday-marathoner");
+  });
+
+  it("takes the first of tied top weekdays, as buildRhythm's topWeekday does", () => {
+    // Friday and Sunday tie on 30; topWeekday is Friday (index 4), so Sunday's
+    // deeper days do not make a "Friday Marathoner".
+    expect(
+      classifyArchetype({
+        ...base(),
+        weekdayCounts: [5, 5, 5, 5, 30, 5, 30],
+        medianEpisodesPerActiveDayByWeekday: [1, 1, 1, 1, 2, 1, 5],
+      }),
+    ).not.toBe("weekday-marathoner");
+  });
+
   it("matches feast-or-famine", () => {
     expect(
       classifyArchetype({

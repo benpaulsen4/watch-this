@@ -209,22 +209,6 @@ export function median(values: number[]): number | null {
 }
 
 /**
- * The show with the most episodes watched in the period.
- *
- * `finishedAt` comes from the latest `watchedAt` rather than a status column,
- * because that is a real event with a real timestamp -- unlike film completion,
- * which has to be inferred.
- *
- * When the top show has no cached metadata the whole statistic returns null
- * rather than falling through to the runner-up. That is deliberate, and it is
- * why this differs from `buildNiche` and `buildGenres`, which drop an
- * unresolvable row and carry on: those two describe a population, so one
- * missing title makes them slightly less complete, while this one names a
- * single show. Silently promoting second place would tell the user their most
- * watched show of the year was something it was not, and nothing in the
- * rendering would reveal the substitution.
- */
-/**
  * The show with the most episodes in `episodeCounts` (tmdbId to count), or
  * null when there are none.
  *
@@ -260,6 +244,22 @@ export function mostWatchedShowId(
   return topId;
 }
 
+/**
+ * The show with the most episodes watched in the period.
+ *
+ * `finishedAt` comes from the latest `watchedAt` rather than a status column,
+ * because that is a real event with a real timestamp -- unlike film completion,
+ * which has to be inferred.
+ *
+ * When the top show has no cached metadata the whole statistic returns null
+ * rather than falling through to the runner-up. That is deliberate, and it is
+ * why this differs from `buildNiche` and `buildGenres`, which drop an
+ * unresolvable row and carry on: those two describe a population, so one
+ * missing title makes them slightly less complete, while this one names a
+ * single show. Silently promoting second place would tell the user their most
+ * watched show of the year was something it was not, and nothing in the
+ * rendering would reveal the substitution.
+ */
 export function buildTopShow(
   episodes: WatchedEpisodeRow[],
   titles: Map<string, TitleMeta>,

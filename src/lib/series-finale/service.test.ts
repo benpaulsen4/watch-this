@@ -159,6 +159,7 @@ import {
   LIST_GENERATION_BUDGET_MS,
   listAvailableSnapshots,
   listSnapshots,
+  LIVE_SEASON_FETCH_LIMIT,
   loadCohortMinutes,
   loadCollaborativeTitleKeys,
   loadCollaboratorIds,
@@ -171,6 +172,7 @@ import {
   PERCENTILE_COHORT_MINIMUM,
   PERCENTILE_LENGTH_TOLERANCE,
   percentileOf,
+  seasonsMissingFrom,
 } from "./service";
 import {
   type ComparePeer,
@@ -1926,6 +1928,35 @@ describe("listAvailableSnapshots", () => {
       expect(a.map((row) => row.label)).toEqual(["2026"]);
     });
 
+    it("lists what it has when one year fails to generate, and goes on to the next", async () => {
+      // 2026 fails at its write, after reading everything it needed (so no
+      // phantom read from the insert chain); 2025 and 2024 still generate,
+      // and the listing still answers rather than failing the whole request.
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(db.insert).mockImplementationOnce(() => {
+        throw new Error("write failed");
+      });
+      setResults([
+        ...threeMissing(),
+        [], [], [], [], [], // 2026's reads; its write throws
+        ...generation(),
+        ...generation(),
+        listing,
+      ]);
+
+      const result = await listAvailableSnapshots("viewer", later, () => 0);
+
+      expect(getInserted().map((row) => (row as { periodLabel: string }).periodLabel)).toEqual([
+        "2025",
+        "2024",
+      ]);
+      expect(result.map((row) => row.label)).toEqual(["2026"]);
+      expect(errors).toHaveBeenCalledWith(
+        "Series Finale: generating 2026 failed; listing the rest",
+        expect.any(Error),
+      );
+    });
+
     it("does not hand a failed run to the next call", async () => {
       vi.mocked(db.select).mockImplementationOnce(() => {
         throw new Error("db down");
@@ -1999,3 +2030,37 @@ describe("listAvailableSnapshots", () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 });
+
+describe("seasonsMissingFrom", () => {
+  const watched = (tmdbId: number, seasonNumber: number, episodeNumber: number) => ({
+    tmdbId,
+    seasonNumber,
+    episodeNumber,
+    watchedAt: new Date("2026-03-01T20:00:00Z"),
+  });
+
+  it("names each season with a never-asked episode once, and skips answered ones", () => {
+    const lookup = new Map<string, number | null>([
+      ["1:1:1", 50],
+      ["1:1:2", null], // asked, TMDB does not know: not missing
+    ]);
+    expect(
+      seasonsMissingFrom([watched(1, 1, 1), watched(1, 1, 2), watched(1, 2, 1), watched(1, 2, 2)], lookup),
+    ).toEqual([{ tmdbId: 1, seasonNumber: 2 }]);
+  });
+
+  it(`asks about at most ${LIVE_SEASON_FETCH_LIMIT} seasons, those holding the most watched episodes first`, () => {
+    // Show 1..25, season 1 each; show n has n watched episodes.
+    const episodes = Array.from({ length: 25 }, (_, i) =>
+      Array.from({ length: i + 1 }, (_, e) => watched(i + 1, 1, e + 1)),
+    ).flat();
+
+    const seasons = seasonsMissingFrom(episodes, new Map());
+
+    expect(LIVE_SEASON_FETCH_LIMIT).toBe(20);
+    expect(seasons).toHaveLength(20);
+    expect(seasons[0]).toEqual({ tmdbId: 25, seasonNumber: 1 });
+    expect(seasons.map((season) => season.tmdbId)).not.toContain(5);
+  });
+});
+

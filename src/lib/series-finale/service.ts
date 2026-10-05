@@ -761,25 +761,45 @@ async function loadRecapStart(
 }
 
 /**
- * The distinct (show, season) pairs holding at least one episode with NO entry
- * in `lookup`. An entry whose runtime is null is not missing: it means TMDB
- * was asked and does not know, and asking again will not change that (see
- * `RuntimeLookup`).
+ * The most seasons one generation asks TMDB about. Each is a request plus a
+ * 250 ms pacing gap inside a user's page load, and a heavy year the runtime
+ * backfill never saw could hold hundreds. Past this, the rest count as
+ * unknown runtimes (the recap footnotes them) and the backfill fills them in.
  */
-function seasonsMissingFrom(
+export const LIVE_SEASON_FETCH_LIMIT = 20;
+
+/**
+ * The (show, season) pairs to ask TMDB about: those holding at least one
+ * episode with NO entry in `lookup`, the ones with the most such episodes
+ * first, at most `LIVE_SEASON_FETCH_LIMIT` -- so a capped generation still
+ * gets the runtimes that move the hours most. An entry whose runtime is null
+ * is not missing: TMDB was asked and does not know, and asking again will not
+ * change that (see `RuntimeLookup`).
+ */
+export function seasonsMissingFrom(
   episodes: WatchedEpisodeRow[],
   lookup: RuntimeLookup,
 ): SeasonKey[] {
-  const missing = new Map<string, SeasonKey>();
+  const missing = new Map<string, SeasonKey & { episodes: number }>();
   for (const episode of episodes) {
     if (lookup.has(episodeKeyOf(episode))) continue;
-    missing.set(`${episode.tmdbId}:${episode.seasonNumber}`, {
-      tmdbId: episode.tmdbId,
-      seasonNumber: episode.seasonNumber,
-    });
+    const key = `${episode.tmdbId}:${episode.seasonNumber}`;
+    const season = missing.get(key);
+    if (season) {
+      season.episodes += 1;
+    } else {
+      missing.set(key, {
+        tmdbId: episode.tmdbId,
+        seasonNumber: episode.seasonNumber,
+        episodes: 1,
+      });
+    }
   }
 
-  return Array.from(missing.values());
+  return Array.from(missing.values())
+    .sort((a, b) => b.episodes - a.episodes)
+    .slice(0, LIVE_SEASON_FETCH_LIMIT)
+    .map(({ tmdbId, seasonNumber }) => ({ tmdbId, seasonNumber }));
 }
 
 /**
@@ -815,11 +835,13 @@ async function generateInZone(
   const rows = await loadUserRows(userId, window);
 
   // Only seasons with a watched episode the cache has never heard of are
-  // handed to TMDB. A cached season is never refetched here, however old its
-  // fetch record: the spec says generation does not block on live fetches for
-  // seasons already recorded, and a heavy user's year spans hundreds of
-  // seasons at 250 ms apiece. Keeping cached seasons fresh is the backfill's
-  // job, not a user-facing request's.
+  // handed to TMDB, at most LIVE_SEASON_FETCH_LIMIT of them: a heavy user's
+  // year spans hundreds of seasons at 250 ms apiece, and the spec says
+  // generation does not block on live fetches. A season whose episodes all
+  // have entries is never asked about here, however old its fetch record;
+  // one with an episode that has no entry may be (`ensureSeasonsCached`
+  // refetches a record over 30 days old for such an episode). Keeping the
+  // cache fresh at large is the backfill's job, not a user-facing request's.
   let episodeRuntimeLookup = await loadEpisodeRuntimes(rows.episodes);
   const uncachedSeasons = seasonsMissingFrom(rows.episodes, episodeRuntimeLookup);
   if (uncachedSeasons.length > 0) {
@@ -1158,7 +1180,19 @@ async function generateAndList(
       break;
     }
 
-    await generateInZone(userId, period, zone, now);
+    // One year failing (a timeout mid-fetch, data nothing anticipated) must
+    // not fail the listing: that would hide the banner and empty the
+    // profile archive of every year already stored, on every dashboard
+    // load. It is logged and left missing, and the next listing tries it
+    // again. The attempt still counts against the budget.
+    try {
+      await generateInZone(userId, period, zone, now);
+    } catch (error) {
+      console.error(
+        `Series Finale: generating ${period.label} failed; listing the rest`,
+        error,
+      );
+    }
     generated += 1;
   }
 

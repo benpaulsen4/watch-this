@@ -487,9 +487,9 @@ export function formatDateRange(startKey: string, endKey: string): string {
 
 /**
  * "1 January – 31 December 2026". Every period is a calendar year, so the
- * range comes from the label. The payload's bounds are instants localised to
- * whatever zone the user had when the snapshot froze, and nothing records that
- * zone -- reading them in today's zone could shift either end by a day.
+ * range comes from the label rather than from the payload's bounds: those are
+ * instants localised to the zone the snapshot froze in, and reading them in
+ * any other zone (today's browser, say) could shift either end by a day.
  */
 export function periodRange(label: string): string {
   return /^\d{4}$/.test(label) ? `1 January – 31 December ${label}` : "";

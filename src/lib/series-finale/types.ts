@@ -19,8 +19,10 @@
  *    collaborators rather than the lowest user ids.
  * 4: `rhythm.topGenreName` and `rhythm.topGenreShare`, the title share the
  *    one-genre-only archetype is classified on.
+ * 5: the weekday-marathoner rule is judged on the top weekday only, the day
+ *    its label names.
  */
-export const SERIES_FINALE_SCHEMA_VERSION = 4;
+export const SERIES_FINALE_SCHEMA_VERSION = 5;
 
 /**
  * Minimum individually-ticked episodes before any intra-day statistic is

@@ -147,15 +147,20 @@ export function classifyArchetype(input: ArchetypeInput): ArchetypeId | null {
     return "completionist";
   }
 
-  // 3 - Weekday Marathoner
+  // 3 - Weekday Marathoner, judged on the top weekday alone. The label is
+  // "The <top weekday> Marathoner" (`archetypeName` reads
+  // `rhythm.topWeekday`), so a lesser day clearing both thresholds would name
+  // a day that did not earn it -- on a share card, frozen. The first of tied
+  // top days, as `buildRhythm` picks it.
   const totalWeekdayEpisodes = input.weekdayCounts.reduce((a, b) => a + b, 0);
   if (totalWeekdayEpisodes > 0) {
-    for (let weekday = 0; weekday < input.weekdayCounts.length; weekday += 1) {
-      const share = (input.weekdayCounts[weekday] ?? 0) / totalWeekdayEpisodes;
-      const median = input.medianEpisodesPerActiveDayByWeekday[weekday] ?? 0;
-      if (share >= 0.22 && median >= 4) {
-        return "weekday-marathoner";
-      }
+    const topWeekday = input.weekdayCounts.indexOf(
+      Math.max(...input.weekdayCounts),
+    );
+    const share = (input.weekdayCounts[topWeekday] ?? 0) / totalWeekdayEpisodes;
+    const median = input.medianEpisodesPerActiveDayByWeekday[topWeekday] ?? 0;
+    if (share >= 0.22 && median >= 4) {
+      return "weekday-marathoner";
     }
   }
 
