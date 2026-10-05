@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { Mock } from "vitest";
 import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TMDBContent } from "@/lib/content-status/types";
@@ -38,7 +39,7 @@ function renderWithQuery(ui: React.ReactElement, client?: QueryClient) {
 }
 
 describe("ContentCard", () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
+  let fetchMock: Mock<typeof fetch>;
 
   beforeEach(() => {
     fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
