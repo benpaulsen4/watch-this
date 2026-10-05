@@ -165,6 +165,41 @@ describe("useDismissSeriesFinale", () => {
   });
 });
 
+describe("posting a dismissal or a completion", () => {
+  // An unread body leaves the request open in Chromium, so the page never
+  // goes network-idle; the recap's foot sends a dismissal on every visit.
+  it.each([
+    ["useDismissSeriesFinale", useDismissSeriesFinale],
+    ["useCompleteStory", useCompleteStory],
+  ] as const)("%s reads the response to its end", async (_name, useHook) => {
+    const json = vi.fn().mockResolvedValue({ success: true });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json }));
+
+    const { result } = renderHook(() => useHook(), { wrapper });
+    result.current.mutate("2026");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(json).toHaveBeenCalledTimes(1);
+  });
+
+  it("still fails on an error whose body is not JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: vi.fn().mockRejectedValue(new SyntaxError("not JSON")),
+      }),
+    );
+
+    const { result } = renderHook(() => useDismissSeriesFinale(), { wrapper });
+    result.current.mutate("2026");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe("Dismiss failed");
+  });
+});
+
 describe("useCompleteStory", () => {
   it("posts to the story-complete endpoint and invalidates both caches on success", async () => {
     const fetchMock = vi.fn().mockResolvedValue({

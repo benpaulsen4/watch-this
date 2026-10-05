@@ -23,9 +23,9 @@ Series Finale covers each year from when you started using WatchThis. A year wit
 
 This includes history you **imported** from another app. Imported episodes are often dated by when they aired rather than when you watched them, so years before you joined WatchThis don't get a Series Finale, even if your import has entries dated then.
 
-## You Dismissed the Banner
+## The Banner Has Gone
 
-Selecting **Not now** hides the dashboard banner, but the Series Finale is still there. Find it under **Profile → Data Management → Series Finale**. Read: [Find Past Years](/help/series-finale/find-past-years).
+The dashboard banner goes away once you've been through your Series Finale (to the last card of the story, or to the bottom of the full recap), or when you select **Not now**. The Series Finale itself is still there. Find it under **Profile → Data Management → Series Finale**. Read: [Find Past Years](/help/series-finale/find-past-years).
 
 ## It's an Older Year That Hasn't Appeared Yet
 

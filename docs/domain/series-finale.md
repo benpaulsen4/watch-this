@@ -75,7 +75,7 @@ A year is available when **both** of these hold:
    - **all** status rows, all-time, because some cards need history before the period;
    - `tmdb_cache` metadata for every referenced title;
    - TMDB genre names, memoised per process.
-3. Resolves episode runtimes from `tmdb_episode_runtime`. Only seasons the cache has **never** recorded are fetched live (`ensureSeasonsCached`). A cached season is never refetched during a user request, because keeping the cache fresh is the backfill's job.
+3. Resolves episode runtimes from `tmdb_episode_runtime`. Only seasons holding a watched episode that has no entry in the cache are fetched live (`ensureSeasonsCached`), and at most `LIVE_SEASON_FETCH_LIMIT` (20) of them per generation, the ones with the most such episodes first. Any beyond that count as unknown runtimes, which the recap footnotes. A season whose episodes all have entries is never refetched during a user request, however old its fetch record: keeping the cache fresh is the backfill's job.
 4. Resolves film runtimes from `tmdb_cache.runtime`.
 5. Loads crew and compare data (`loadCollaboratorSlices`). See [Crew and Compare](#crew-and-compare).
 6. Loads list-shared title keys for the group-watcher archetype.
@@ -92,6 +92,8 @@ The row is keyed by the **canonical** UTC calendar year, which is also the URL l
 
 Concurrent calls for the same user in one process share a single run (`inFlightListings`). Across processes, duplicate work is possible but harmless, because the upsert makes the last write win.
 
+A year whose generation throws is logged and left out of that listing, and the next listing tries it again. One bad year never fails the request, so the banner and the archive of years already stored still show.
+
 ### Frozen, except for privacy
 
 A stored payload is never recomputed on read. TMDB popularity drifts and users keep editing statuses, so a live recompute would make an archived year disagree with a share image someone already posted.
@@ -105,7 +107,7 @@ It only ever removes or relabels other people's data. The viewer's own figures a
 
 ### Schema versioning
 
-`SERIES_FINALE_SCHEMA_VERSION` (currently **4**) is stored on each row. A row below the current version is regenerated on its next read, or by the next listing. Bump it whenever a stored payload would read differently if generated today. The version history is in the comment above the constant in [types.ts](../../src/lib/series-finale/types.ts).
+`SERIES_FINALE_SCHEMA_VERSION` (currently **5**) is stored on each row. A row below the current version is regenerated on its next read, or by the next listing. Bump it whenever a stored payload would read differently if generated today. The version history is in the comment above the constant in [types.ts](../../src/lib/series-finale/types.ts).
 
 A regeneration replaces `payload`, `schema_version` and `generated_at`. It leaves `dismissed_at` and `story_completed_at` alone, so a user does not see the banner again or have to replay the story because the payload shape changed.
 
@@ -173,14 +175,14 @@ A thin year still gets a row; the profile archive lists it. Its recap and story 
 | --- | --- | --- |
 | 1 | `serial-abandoner` | At least 5 dropped, and dropped / (dropped + completed) ≥ 0.35 |
 | 2 | `completionist` | At least 15 titles in completed + dropped + paused, and completed share ≥ 0.9 |
-| 3 | `weekday-marathoner` | Some weekday holds at least 22% of episodes **and** a median of 4 or more episodes on the days it was active |
+| 3 | `weekday-marathoner` | The top weekday (the one the label names) holds at least 22% of episodes **and** has a median of 4 or more episodes on the days it was active |
 | 4 | `feast-or-famine` | The coefficient of variation of monthly counts is at least 0.75 |
 | 5 | `nightly-ritualist` | At least 50 solo ticks on 5 or more distinct weekdays, with 60% or more inside one 3-hour window (wrapping past midnight) |
 | 6 | `one-genre-only` | At least 40% of completed **titles** carry one genre (a share of titles, not of tags) |
 | 7 | `deep-cut-hunter` | Median popularity of completed titles is 25 or less |
 | 8 | `group-watcher` | At least 50% of completed titles are on a list shared with someone else |
 
-The display name and per-type copy live in [format.ts](../../src/components/series-finale/format.ts) and [ARCHETYPE_LABELS.ts](../../src/components/series-finale/ARCHETYPE_LABELS.ts). The weekday marathoner's name includes the day ("The Sunday Marathoner"). Each type has its own visual in [ArchetypeVisual.tsx](../../src/components/series-finale/ArchetypeVisual.tsx). Each visual reads the same payload field the rule was classified on, so the picture always matches the decision. `busiestWindow` and `RITUAL_WINDOW_HOURS` are shared by the classifier and the ritualist's clock for this reason.
+The display name and per-type copy live in [format.ts](../../src/components/series-finale/format.ts) and [ARCHETYPE_LABELS.ts](../../src/components/series-finale/ARCHETYPE_LABELS.ts). The weekday marathoner's name includes the day ("The Sunday Marathoner"). Each type has its own visual in [ArchetypeVisual.tsx](../../src/components/series-finale/ArchetypeVisual.tsx). Each visual reads the same payload field the rule was classified on, so the picture matches the decision. `busiestWindow` and `RITUAL_WINDOW_HOURS` are shared by the classifier and the ritualist's clock for this reason. The one exception is the deep-cut hunter: it is classified on the median popularity of every completed title, shows included, but its picture draws the completed films' popularity strip (`niche.filmPopularities`).
 
 > The user guide deliberately does **not** list the archetypes, so users discover them in their own recap. Keep it that way when editing [content/help/series-finale](../../content/help/series-finale/).
 
@@ -240,7 +242,7 @@ It is reported only once the cohort holds at least `PERCENTILE_COHORT_MINIMUM` (
 
 | Surface | Component | Behaviour |
 | --- | --- | --- |
-| Dashboard banner | `SeriesFinaleBanner` | Promotes only the newest period, and never a thin one. "Not now" sets `dismissed_at`, updating the list cache optimistically. |
+| Dashboard banner | `SeriesFinaleBanner` | Promotes only the newest period, and never a thin one. It goes away once the year has been seen or put aside: "Not now" (sets `dismissed_at`, updating the list cache optimistically), reaching the story's summary card (`story_completed_at`), or scrolling the recap page to its foot (`RecapEnd` sets `dismissed_at` when the footer is scrolled into view). Opening the recap alone does not clear it, even when a short year's footer is in view from the start, so a misclick keeps the banner. |
 | Profile → Data Management | `ProfileFinaleRows`, `CrewComparisonToggle` | The permanent archive, thin years included, newest highlighted. The consent toggle sits under it. |
 | Recap page | `RecapClient` | Desktop default: hero, stat row, then bands of panels. Panels with nothing to say are omitted, and a lone panel takes the full width. The header has "Play as story" and "Share". |
 | Story | `StoryReel`, `story-cards/*` | `REEL_ORDER` holds 14 cards; cards with no content are removed (`hasContent`). Tap the right two-thirds or press ArrowRight to advance; tap the left third or press ArrowLeft to go back. Escape or × closes. |
@@ -270,7 +272,7 @@ All routes require a session (`withAuth`). Every response, including 401s and er
 | --- | --- | --- |
 | `GET /api/series-finale` | List available periods, generating missing or stale ones within the budget | `200 { periods: [{ label, generatedAt, dismissedAt, storyCompletedAt, headline }] }`, newest first |
 | `GET /api/series-finale/{period}` | The frozen payload, generated if absent | `200 { payload, storyCompletedAt }`; `400` for a bad label; `404` if not available |
-| `POST /api/series-finale/{period}/dismiss` | Hide the dashboard banner for this period | `200 { success: true }`; `400` |
+| `POST /api/series-finale/{period}/dismiss` | Hide the dashboard banner for this period ("Not now", or the recap's foot reached). The first dismissal is kept | `200 { success: true }`; `400` |
 | `POST /api/series-finale/{period}/story-complete` | Record that the story was finished (idempotent) | `200 { success: true }`; `400`; `404` if no row |
 | `GET /api/series-finale/{period}/card` | 1080×1350 PNG share image (Node runtime) | `200 image/png`; `404` if not available **or thin** |
 
@@ -299,6 +301,7 @@ These are accepted approximations. The spec gives the full reasoning.
 - **`watched_at` is a logging time.** Ticking last night's episode this morning makes it a morning watch.
 - **Niche popularity is today's TMDB value,** not the value at watch time.
 - **Only first watches count;** there is no rewatch tracking.
+- **The join year can include imported history from before the account existed.** The recap start floors whole years at `created_at`, but within the year an account was created, rows dated before that day (for example, imported air dates) still count.
 - **The percentile reflects the cohort at generation time.**
 - **`shame.dropped[].lastEpisode` only sees the period's episodes.** A show dropped this year but last watched in an earlier year shows no episode code.
 

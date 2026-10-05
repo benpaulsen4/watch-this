@@ -28,7 +28,7 @@ When it's ready, a banner appears at the top of your dashboard. Select **See you
 
 ![The Series Finale banner on the dashboard](/help/series-finale/dashboard-banner.webp)
 
-Not in the mood? Select **Not now** to hide the banner. Your Series Finale doesn't go anywhere; you can open it from your profile at any time. Read [Find Past Years](/help/series-finale/find-past-years).
+The banner goes away by itself once you've been through your Series Finale, either to the last card of the story or to the bottom of the full recap. Not in the mood yet? Select **Not now** to hide it. Either way, your Series Finale doesn't go anywhere; you can open it from your profile at any time. Read [Find Past Years](/help/series-finale/find-past-years).
 
 The first time you open a year, it can take a few seconds to put together.
 

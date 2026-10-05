@@ -10,10 +10,12 @@ vi.mock("@/lib/auth/webauthn", () => ({
 }));
 
 const whereSpy = vi.fn();
+const setSpy = vi.fn();
 vi.mock("@/lib/db", () => ({
   db: {
     update: () => ({
-      set: () => ({
+      set: (values: unknown) => ({
+        ...setSpy(values),
         where: (condition: unknown) => {
           whereSpy(condition);
           return Promise.resolve();
@@ -28,12 +30,18 @@ vi.mock("@/lib/db/schema", () => ({
     userId: "seriesFinale.userId",
     periodStart: "seriesFinale.periodStart",
     periodEnd: "seriesFinale.periodEnd",
+    dismissedAt: "seriesFinale.dismissedAt",
   },
 }));
 
 vi.mock("drizzle-orm", () => ({
   and: (...parts: unknown[]) => ({ op: "and", parts }),
   eq: (column: unknown, value: unknown) => ({ op: "eq", column, value }),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+    op: "sql",
+    text: strings.join("?"),
+    values,
+  }),
 }));
 
 const { POST } = await import("./route");
@@ -91,6 +99,20 @@ describe("POST /api/series-finale/[period]/dismiss", () => {
       op: "eq",
       column: "seriesFinale.userId",
       value: "user-1",
+    });
+  });
+
+  it("keeps the first dismissal rather than moving it to the latest", async () => {
+    // The recap's foot dismisses on every visit that reaches it; a repeat
+    // must not rewrite when the banner was first put away.
+    await POST(authedRequest("http://localhost/api/series-finale/2025/dismiss"));
+
+    expect(setSpy).toHaveBeenCalledWith({
+      dismissedAt: {
+        op: "sql",
+        text: "coalesce(?, now())",
+        values: ["seriesFinale.dismissedAt"],
+      },
     });
   });
 });

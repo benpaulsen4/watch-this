@@ -3,7 +3,14 @@
 import { Play } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Children, type ReactNode, useEffect, useState } from "react";
+import {
+  Children,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +20,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { usePhoneViewport } from "@/hooks/usePhoneViewport";
 import {
   SeriesFinaleUnavailableError,
+  useDismissSeriesFinale,
   useSeriesFinale,
   useStoryCompletedAt,
 } from "@/hooks/useSeriesFinale";
@@ -306,7 +314,7 @@ function RecapBody({
             <ComparePanel compare={payload.compare} />
           ) : null}
         </Band>
-        <Footer />
+        <RecapEnd period={period} />
       </Container>
     </>
   );
@@ -693,9 +701,56 @@ function ComparePanel({
   );
 }
 
-function Footer() {
+/**
+ * The foot of a recap with something to read. Reaching it is going through
+ * the recap, as the story's summary card is going through the story, so it
+ * puts the dashboard banner away (`dismissedAt`, as "Not now" sets). A thin
+ * year renders the plain `Footer`: it never has a banner.
+ */
+function RecapEnd({ period }: { period: string }) {
+  const { mutate: dismiss } = useDismissSeriesFinale();
+  const reached = useCallback(() => dismiss(period), [dismiss, period]);
+  return <Footer onReached={reached} />;
+}
+
+/**
+ * The TMDB attribution, closing every recap. `onReached` is called the first
+ * time the footer is scrolled into view, once per page: a visit that opens
+ * the recap and leaves without scrolling down never calls it.
+ *
+ * Scrolled into view, not merely in view: the observer reports the footer's
+ * state as soon as it starts watching, and on a tall screen a short year's
+ * footer is in view on opening -- that is the page loading, not the recap
+ * being read, and counting it would let a misclick put the banner away. So
+ * the footer has to have been out of view first.
+ */
+function Footer({ onReached }: { onReached?: () => void }) {
+  const ref = useRef<HTMLElement>(null);
+  const done = useRef(false);
+  const beenOutOfView = useRef(false);
+
+  useEffect(() => {
+    const footer = ref.current;
+    if (!onReached || !footer || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (done.current) return;
+      if (!entries.some((entry) => entry.isIntersecting)) {
+        beenOutOfView.current = true;
+        return;
+      }
+      if (!beenOutOfView.current) return;
+      done.current = true;
+      observer.disconnect();
+      onReached();
+    });
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, [onReached]);
+
   return (
-    <footer className="mt-8 border-t border-gray-800 pt-6">
+    <footer ref={ref} className="mt-8 border-t border-gray-800 pt-6">
       <TmdbAttribution />
     </footer>
   );

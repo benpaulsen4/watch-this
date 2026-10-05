@@ -103,6 +103,62 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/**
+ * A stand-in IntersectionObserver (jsdom has none), recording what each one
+ * watches so a test can say when it comes into view.
+ */
+const observed: { callback: IntersectionObserverCallback; targets: Element[] }[] =
+  [];
+
+const mockIntersectionObserver = () => {
+  observed.length = 0;
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      private record: (typeof observed)[number];
+      constructor(callback: IntersectionObserverCallback) {
+        this.record = { callback, targets: [] };
+        observed.push(this.record);
+      }
+      observe(target: Element) {
+        this.record.targets.push(target);
+      }
+      disconnect() {
+        this.record.targets = [];
+      }
+      unobserve() {}
+      takeRecords() {
+        return [];
+      }
+    },
+  );
+};
+
+/** Everything being watched comes into view (or not). */
+const intersect = (isIntersecting: boolean) =>
+  act(() => {
+    for (const { callback, targets } of observed) {
+      if (targets.length === 0) continue;
+      callback(
+        targets.map(
+          (target) => ({ isIntersecting, target }) as IntersectionObserverEntry,
+        ),
+        {} as IntersectionObserver,
+      );
+    }
+  });
+
+/** Lets a mutation started by an intersection reach `fetch` (it is async). */
+const settle = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+
+const dismissPosts = () =>
+  vi
+    .mocked(fetch)
+    .mock.calls.filter(([url]) => String(url) === "/api/series-finale/2026/dismiss");
+
 describe("RecapClient on a phone", () => {
   it("sends a story not yet gone through to the story, recap unseen", async () => {
     mockViewport(true);
@@ -356,6 +412,65 @@ describe("RecapClient", () => {
 
     await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
     expect(screen.queryByText(/Top \d+%/)).not.toBeInTheDocument();
+  });
+
+  it("puts the dashboard banner away once the recap's foot is reached, and only then", async () => {
+    mockIntersectionObserver();
+    mockFetch({ payload: payload() });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    // Watching the foot: the footer holding the TMDB attribution.
+    expect(observed.flatMap((o) => o.targets)).toEqual([
+      screen.getByText(/not endorsed or certified by TMDB/).closest("footer"),
+    ]);
+
+    // Opened but not read to the end: nothing posted.
+    intersect(false);
+    await settle();
+    expect(dismissPosts()).toHaveLength(0);
+
+    intersect(true);
+    await waitFor(() => expect(dismissPosts()).toHaveLength(1));
+    expect(dismissPosts()[0]?.[1]).toEqual({ method: "POST" });
+
+    // Scrolling back down again posts nothing more.
+    intersect(false);
+    intersect(true);
+    await settle();
+    expect(dismissPosts()).toHaveLength(1);
+  });
+
+  it("keeps the banner when the foot is already in view on opening, until it is scrolled back to", async () => {
+    // A tall screen, a short year: the observer's first report is "in view".
+    // That is the page opening, not the recap being read.
+    mockIntersectionObserver();
+    mockFetch({ payload: payload() });
+    renderRecap();
+
+    await waitFor(() => expect(screen.getByText("412")).toBeInTheDocument());
+    intersect(true);
+    await settle();
+    expect(dismissPosts()).toHaveLength(0);
+
+    // Scrolled up past it and back down: now it has been read to the end.
+    intersect(false);
+    intersect(true);
+    await waitFor(() => expect(dismissPosts()).toHaveLength(1));
+  });
+
+  it("leaves a thin year's banner alone, having none to put away", async () => {
+    mockIntersectionObserver();
+    mockFetch({ payload: payload({ thin: true }) });
+    renderRecap();
+
+    await waitFor(() =>
+      expect(screen.getByText(/Not much of a 2026/)).toBeInTheDocument(),
+    );
+    intersect(true);
+    await settle();
+    expect(observed.flatMap((o) => o.targets)).toEqual([]);
+    expect(dismissPosts()).toHaveLength(0);
   });
 
   it("shows TMDB attribution", async () => {

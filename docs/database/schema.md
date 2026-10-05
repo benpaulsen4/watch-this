@@ -275,7 +275,7 @@ One frozen Series Finale recap per user per period. It is written at generation 
   - `payload` (jsonb, required): the `SeriesFinalePayload` ([types.ts](../../src/lib/series-finale/types.ts))
   - `schema_version` (int, required): a row below `SERIES_FINALE_SCHEMA_VERSION` is regenerated on its next read
   - `generated_at` (timestamptz, required)
-  - `dismissed_at` (timestamptz, optional): "Not now" on the dashboard banner
+  - `dismissed_at` (timestamptz, optional): when the dashboard banner was put away, by "Not now" or by scrolling the recap page to its foot. The first time is kept.
   - `story_completed_at` (timestamptz, optional): when the story was finished; it unlocks the recap on a phone
 - Constraints:
   - Unique: (`user_id`, `period_start`, `period_end`). Generation upserts on this.

@@ -17,7 +17,7 @@ Every Series Finale you've had is kept in your profile, so you can go back to an
 
 Years are listed newest first, with each year's episode and title counts. The newest is highlighted.
 
-The archive is also where to find a Series Finale after selecting **Not now** on the dashboard banner. The banner only promotes your newest year, and only until you dismiss it.
+The archive is also where to find a Series Finale once the dashboard banner has gone. The banner only promotes your newest year, and only until you've been through it or selected **Not now**.
 
 ## Which Years Are Listed
 

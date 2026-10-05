@@ -740,7 +740,7 @@ components:
       type: object
       description: |
         The frozen recap. The authoritative contract, with per-field notes, is
-        `SeriesFinalePayload` in src/lib/series-finale/types.ts (schemaVersion 4).
+        `SeriesFinalePayload` in src/lib/series-finale/types.ts (schemaVersion 5).
         Every field is present; optional cards are null rather than absent.
         Weekday arrays are Monday-first.
       required: [schemaVersion, period, headline, episodes, finished, topShow, niche, genres, months, soloTickTotal, bigDay, rhythm, shame, crew, compare, thin]
@@ -3438,6 +3438,10 @@ paths:
     post:
       tags: [SeriesFinale]
       summary: Hide the dashboard banner for a period
+      description: |
+        Sent by "Not now", and by the recap page when its foot is scrolled into view.
+        The first dismissal is kept (repeat calls do not move it). The banner
+        also hides once the period's story has been completed.
       parameters:
         - in: path
           name: period

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -27,6 +27,21 @@ const item = (overrides: Record<string, unknown> = {}) => ({
   headline: { episodes: 1208, titlesCompleted: 47, hours: 412 },
   ...overrides,
 });
+
+/**
+ * Renders the banner and resolves once its list has landed, so an empty
+ * render means "decided to show nothing" rather than "still loading" -- the
+ * banner renders null while it waits, so an assertion made before then can
+ * never fail.
+ */
+async function renderSettled() {
+  const view = render(<SeriesFinaleBanner />, { wrapper });
+  await waitFor(() => expect(fetch).toHaveBeenCalled());
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  return view;
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -80,16 +95,23 @@ describe("SeriesFinaleBanner", () => {
 
   it("renders nothing when the period is dismissed", async () => {
     listResponse([item({ dismissedAt: "2027-01-02T00:00:00.000Z" })]);
-    const { container } = render(<SeriesFinaleBanner />, { wrapper });
+    const { container } = await renderSettled();
 
-    await waitFor(() => expect(container.textContent).toBe(""));
+    expect(container.textContent).toBe("");
+  });
+
+  it("renders nothing once the period's story has been gone through", async () => {
+    listResponse([item({ storyCompletedAt: "2027-01-02T00:00:00.000Z" })]);
+    const { container } = await renderSettled();
+
+    expect(container.textContent).toBe("");
   });
 
   it("renders nothing when no periods exist", async () => {
     listResponse([]);
-    const { container } = render(<SeriesFinaleBanner />, { wrapper });
+    const { container } = await renderSettled();
 
-    await waitFor(() => expect(container.textContent).toBe(""));
+    expect(container.textContent).toBe("");
   });
 
   it("hides the banner as soon as Not now is pressed, and posts the dismissal", async () => {
@@ -173,17 +195,17 @@ describe("SeriesFinaleBanner", () => {
       item({ dismissedAt: "2027-01-02T00:00:00.000Z" }),
       item({ label: "2025", dismissedAt: null }),
     ]);
-    const { container } = render(<SeriesFinaleBanner />, { wrapper });
+    const { container } = await renderSettled();
 
-    await waitFor(() => expect(container.textContent).toBe(""));
+    expect(container.textContent).toBe("");
   });
 
   it("renders nothing when the newest period is thin", async () => {
     listResponse([
       item({ headline: { episodes: 4, titlesCompleted: 2, hours: 1 } }),
     ]);
-    const { container } = render(<SeriesFinaleBanner />, { wrapper });
+    const { container } = await renderSettled();
 
-    await waitFor(() => expect(container.textContent).toBe(""));
+    expect(container.textContent).toBe("");
   });
 });

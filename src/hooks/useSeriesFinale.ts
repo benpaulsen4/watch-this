@@ -40,6 +40,20 @@ async function getJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * POST to `url`, resolving once the response has been read to its end, and
+ * throwing `failure` on a non-2xx. Nothing uses the body (`{ success: true }`),
+ * but it is read anyway: an unread fetch body leaves the request open in the
+ * browser, so a page that has posted never goes network-idle -- and the recap
+ * posts a dismissal whenever its foot is reached. A body that is not JSON (a
+ * proxy's error page) is read all the same and ignored.
+ */
+async function post(url: string, failure: string): Promise<void> {
+  const response = await fetch(url, { method: "POST" });
+  await response.json().catch(() => undefined);
+  if (!response.ok) throw new Error(failure);
+}
+
 const LIST_KEY = ["series-finale", "list"] as const;
 
 export function useSeriesFinaleList() {
@@ -112,12 +126,8 @@ export function useDismissSeriesFinale() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (period: string) => {
-      const response = await fetch(`/api/series-finale/${period}/dismiss`, {
-        method: "POST",
-      });
-      if (!response.ok) throw new Error("Dismiss failed");
-    },
+    mutationFn: (period: string) =>
+      post(`/api/series-finale/${period}/dismiss`, "Dismiss failed"),
     onMutate: async (period: string) => {
       // An in-flight list fetch would land after this and overwrite it.
       await queryClient.cancelQueries({ queryKey: LIST_KEY });
@@ -159,13 +169,11 @@ export function useCompleteStory() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (period: string) => {
-      const response = await fetch(
+    mutationFn: (period: string) =>
+      post(
         `/api/series-finale/${period}/story-complete`,
-        { method: "POST" },
-      );
-      if (!response.ok) throw new Error("Story completion failed");
-    },
+        "Story completion failed",
+      ),
     onMutate: async (period: string) => {
       const queryKey = periodQueryKey(period);
       // In-flight fetches for either cache would otherwise land after this

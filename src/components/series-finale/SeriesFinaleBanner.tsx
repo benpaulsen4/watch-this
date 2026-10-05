@@ -26,6 +26,13 @@ import { isThinPeriod, pluralise } from "./format";
  * see `useDismissSeriesFinale`). If the dismissal fails the banner comes
  * back, with a line saying so.
  *
+ * Seeing the year hides it too, so nobody is asked again to open what they
+ * have already opened. Seen means got to the end: the story's summary card
+ * (`storyCompletedAt`), or the recap page's foot, which dismisses the period
+ * the way "Not now" does (`RecapClient`). Opening the recap is not enough on
+ * its own -- a click that lands there by mistake and comes straight back
+ * keeps its banner.
+ *
  * Renders nothing rather than an empty shell when there is no eligible
  * period -- for most of the year that is the correct state, not an error.
  *
@@ -43,6 +50,7 @@ export function SeriesFinaleBanner() {
 
   const [newest] = periods ?? [];
   if (!newest || newest.dismissedAt !== null) return null;
+  if (newest.storyCompletedAt !== null) return null;
   if (isThinPeriod(newest.headline)) return null;
 
   const { label, headline } = newest;
