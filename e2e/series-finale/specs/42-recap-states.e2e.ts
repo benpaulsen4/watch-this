@@ -1,10 +1,11 @@
-import { type Page, type Route, test } from "@playwright/test";
+import { type Page, type Route } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
 import { check } from "../support/evidence";
 import { becomesVisible } from "../support/pages";
 import { recapHeroRange } from "../support/recap";
 import { shot } from "../support/shots";
+import { test } from "../support/test";
 
 // The recap's states other than a loaded year (desktop + phone; read-only):
 // loading, a failed load and its retry, and an unavailable period. Each is

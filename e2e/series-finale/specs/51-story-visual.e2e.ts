@@ -1,4 +1,3 @@
-import { test } from "@playwright/test";
 
 import { expectedArchetypeLabel, readArchetypeVisual, SEEDED_ARCHETYPES } from "../support/archetype";
 import { storageStatePath } from "../support/auth";
@@ -17,6 +16,7 @@ import {
   storyCard,
   type StoryCardId,
 } from "../support/story";
+import { test } from "../support/test";
 
 // The story's screenshot set (desktop, phone, small-phone; webkit-phone
 // where WebKit runs): one full-page shot per card,

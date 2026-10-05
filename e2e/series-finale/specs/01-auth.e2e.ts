@@ -1,7 +1,5 @@
 import { rmSync } from "node:fs";
 
-import { expect, test } from "@playwright/test";
-
 import {
   credentialPath,
   enableVirtualAuthenticator,
@@ -13,6 +11,7 @@ import {
 import { deleteUser, userExists } from "../support/db";
 import { check } from "../support/evidence";
 import { shot } from "../support/shots";
+import { expect, test } from "../support/test";
 
 // The passkey round trip every later spec relies on: register through /auth
 // with a virtual authenticator, sign out through the profile, sign back in with

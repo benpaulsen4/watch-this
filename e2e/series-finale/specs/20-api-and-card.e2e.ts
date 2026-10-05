@@ -1,13 +1,14 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type APIRequestContext, type Browser, type BrowserContext, test } from "@playwright/test";
+import { type APIRequestContext, type Browser, type BrowserContext } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
 import { CARDS_DIR, pngSize } from "../support/cards";
 import { psql } from "../support/db";
 import { check, note } from "../support/evidence";
 import { oracleAvailableYears, oracleYear } from "../support/oracle";
+import { test } from "../support/test";
 
 // The Series Finale API as a client sees it: the list, the payload, the share
 // card's status matrix and image, and what the card must not carry. Desktop

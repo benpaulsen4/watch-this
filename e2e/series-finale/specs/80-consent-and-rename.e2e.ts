@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
 import { signInAs } from "../support/auth";
 import { CARD_SIZE, CARDS_DIR, compareCardPngsOutsidePosterBox, pngSize } from "../support/cards";
@@ -13,6 +13,7 @@ import { crewSwitch, openProfileTab, sessionPut, toggleCrewSwitch } from "../sup
 import { crewRows, openRecap, recapSection, textOf } from "../support/recap";
 import { shot, shotElement } from "../support/shots";
 import { cardState, goToCard, openStory, storyCard } from "../support/story";
+import { test } from "../support/test";
 
 // Consent withdrawn, and a username changed, as other people's recaps see
 // them (desktop-mutating only; the steps run in order and build on each

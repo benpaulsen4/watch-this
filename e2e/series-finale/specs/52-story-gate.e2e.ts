@@ -1,4 +1,4 @@
-import { type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
 import { psql } from "../support/db";
@@ -7,6 +7,7 @@ import { banner, becomesVisible, openDashboard } from "../support/pages";
 import { recapHeroRange } from "../support/recap";
 import { shot } from "../support/shots";
 import { storyCard } from "../support/story";
+import { test } from "../support/test";
 
 // The story-first gate (plan 6, Ben's decision 3), read-only, on a story not
 // yet gone through: e2e_cy's 2025, the one recap the seeder leaves unmarked
@@ -16,7 +17,9 @@ import { storyCard } from "../support/story";
 // the recap route, therefore lands on the story too. On desktop the recap is
 // the default and never hands on, and Close goes to it. Nothing here reaches
 // the summary card, which is what marks completion (85-story-completion does
-// that, last): the last test confirms cy's row is still unmarked.
+// that, last): the last test confirms cy's row is still unmarked. Nothing here
+// scrolls cy's recap to its foot either, which would put her banner away --
+// 30-banner reads that banner -- so the last test confirms it is still up.
 
 const CY = "e2e_cy";
 const YEAR = "2025";
@@ -28,14 +31,16 @@ test.use({ storageState: storageStatePath(CY) });
 const phoneOnly = () => test.skip(test.info().project.name === "desktop", "the phone gate: phone and small-phone only");
 const desktopOnly = () => test.skip(test.info().project.name !== "desktop", "the desktop default: desktop only");
 
-/** cy's 2025 row as stored: whether it exists and whether its story is marked gone through. */
-function cyRow(): { stored: boolean; storyCompleted: boolean } {
+/** cy's 2025 row as stored: whether it exists, and whether its story is gone through and its banner put away. */
+function cyRow(): { stored: boolean; storyCompleted: boolean; dismissed: boolean } {
   const raw = psql(
-    `select (s.story_completed_at is not null)::text from series_finale s join users u on u.id = s.user_id
+    `select (s.story_completed_at is not null)::text || ',' || (s.dismissed_at is not null)::text
+     from series_finale s join users u on u.id = s.user_id
      where u.username = :'u' and s.period_label = :'p';`,
     { u: CY, p: YEAR },
   );
-  return { stored: raw !== "", storyCompleted: raw === "true" };
+  const [storyCompleted, dismissed] = raw.split(",");
+  return { stored: raw !== "", storyCompleted: storyCompleted === "true", dismissed: dismissed === "true" };
 }
 
 /**
@@ -57,7 +62,12 @@ async function watchForRecap(page: Page): Promise<void> {
 const recapSeen = (page: Page) => page.evaluate(() => (window as unknown as { __e2eRecapSeen?: boolean }).__e2eRecapSeen ?? null);
 
 test("precondition: cy's 2025 is stored and its story not gone through", async () => {
-  check("gate-cy-precondition", "cy's 2025 snapshot is stored (the seeder generated it) with no story_completed_at", { stored: true, storyCompleted: false }, cyRow());
+  check(
+    "gate-cy-precondition",
+    "cy's 2025 snapshot is stored (the seeder generated it) with no story_completed_at or dismissed_at",
+    { stored: true, storyCompleted: false, dismissed: false },
+    cyRow(),
+  );
 });
 
 test("phone: the recap route hands a story not gone through on to the story, showing none of the recap", async ({ page }) => {
@@ -116,7 +126,9 @@ test("desktop: the recap is the default, shown without the story gone through, a
     { recap: true, path: RECAP_PATH },
     { recap, path: new URL(page.url()).pathname },
   );
-  await shot(page, "recap/cy-2025-gate-desktop", { fullPage: true });
+  // The viewport only: a full-page capture lays the whole recap out at once,
+  // its foot included, and reaching the foot puts cy's banner away.
+  await shot(page, "recap/cy-2025-gate-desktop");
 
   await page.goto(STORY_PATH);
   const close = page.getByRole("button", { name: "Close story" });
@@ -126,6 +138,11 @@ test("desktop: the recap is the default, shown without the story gone through, a
   check("gate-desktop-close-to-recap", "on desktop 'Close story' goes to the recap", RECAP_PATH, new URL(page.url()).pathname);
 });
 
-test("still read-only: cy's story is not marked gone through", async () => {
-  check("gate-cy-still-not-completed", "after this spec, cy's 2025 still has no story_completed_at", { stored: true, storyCompleted: false }, cyRow());
+test("still read-only: cy's story is not marked gone through, nor her banner put away", async () => {
+  check(
+    "gate-cy-still-not-completed",
+    "after this spec, cy's 2025 still has no story_completed_at or dismissed_at",
+    { stored: true, storyCompleted: false, dismissed: false },
+    cyRow(),
+  );
 });

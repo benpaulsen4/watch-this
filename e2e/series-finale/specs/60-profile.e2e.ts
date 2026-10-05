@@ -1,4 +1,4 @@
-import { type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
 import { psql } from "../support/db";
@@ -20,6 +20,7 @@ import {
   toggleCrewSwitch,
 } from "../support/profile";
 import { shot, shotElement } from "../support/shots";
+import { test } from "../support/test";
 
 // ava's profile, Data Management tab (desktop + phone; read-only): the Series
 // Finale archive rows against the oracle, the list's failure line, and the

@@ -358,9 +358,10 @@ const RULES: Rule[] = [
     }
     return patterns;
   }],
-  [/^dashboard\/ava-banner(-card)?$/, () => [/^banner-ava-/]],
-  [/^dashboard\/flo-banner$/, () => [/^banner-flo-/]],
+  [/^dashboard\/cy-banner(-card)?$/, () => [/^banner-cy-/]],
   [/^dashboard\/ava-after-dismiss$/, () => [/^dismiss-(?!failed)/]],
+  [/^dashboard\/ava-after-recap-foot$/, () => [/^banner-recap-foot-/]],
+  [/^dashboard\/ava-after-story$/, () => [/^banner-story-end-/]],
   [/^dashboard\/bo-dismiss-failed$/, () => [/^dismiss-failed-/]],
   [/^profile\/ava-rows$/, () => [/^profile-rows(?!-error)/]],
   [/^profile\/rows-error$/, () => [/^profile-rows-error-/]],

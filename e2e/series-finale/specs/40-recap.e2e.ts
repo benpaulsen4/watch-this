@@ -1,4 +1,4 @@
-import { type Locator, type Page, test } from "@playwright/test";
+import { type Locator, type Page } from "@playwright/test";
 
 import { expectedArchetypeLabel, readArchetypeVisual, SEEDED_ARCHETYPES } from "../support/archetype";
 import { storageStatePath } from "../support/auth";
@@ -8,6 +8,7 @@ import { check, note } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { alsoTopForLine, becomesVisible, capitalise, dayMonth, monthName, percent, pluralise, weekdayName, words } from "../support/pages";
 import { crewRows, openRecap, readCompare, recapSection, textOf, tileValue } from "../support/recap";
+import { test } from "../support/test";
 
 // ava's 2025 recap, section by section, against the SQL oracle (desktop +
 // phone; read-only). Each test opens the page from ava's saved storage state;

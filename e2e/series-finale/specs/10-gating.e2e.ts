@@ -1,10 +1,11 @@
-import { type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
 import { check } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { BANNER_READY, becomesVisible, listResponse, pluralise } from "../support/pages";
 import { shot } from "../support/shots";
+import { test } from "../support/test";
 
 // Who gets a Series Finale, and what everyone else sees instead: a user with
 // no completed year, a year that is not over, a malformed period, a thin year,

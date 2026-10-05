@@ -1,4 +1,4 @@
-import { type Locator, type Page, test } from "@playwright/test";
+import { type Locator, type Page } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
 import { expectedBigDay, readBigDay } from "../support/big-day";
@@ -25,6 +25,7 @@ import {
   type StoryCardId,
   tapCentre,
 } from "../support/story";
+import { test } from "../support/test";
 
 // ava's 2025 story (desktop, phone, small-phone; read-only): walking the
 // reel by key and by tap, its progress bars and headings, closing it, the

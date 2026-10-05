@@ -1,4 +1,4 @@
-import { devices, type Page, test } from "@playwright/test";
+import { devices, type Page } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
 import { psql } from "../support/db";
@@ -7,6 +7,7 @@ import { becomesVisible } from "../support/pages";
 import { recapHeroRange } from "../support/recap";
 import { shot } from "../support/shots";
 import { goToCard, storyCard } from "../support/story";
+import { test } from "../support/test";
 
 // Going through the story on a phone (mutating: runs in desktop-mutating,
 // after every read-only project). Reaching the summary card marks the story

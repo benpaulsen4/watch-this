@@ -130,6 +130,12 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   `{ navigate: false }` it signs in on the /auth page already showing, with
   no page load, so an account switch stays in one document), `signOut`
   (through the profile page's Logout), `storageStatePath`.
+- `support/test.ts` -- the `test` every spec imports: Playwright's, plus an
+  automatic fixture that, in every project but `desktop-mutating`, answers
+  `POST /api/series-finale/<year>/dismiss` in the browser. A recap posts one
+  when its footer comes into view, and read-only specs scroll recaps to the
+  bottom constantly; this keeps those projects read-only.
+  `41-recap-visual` ends by checking no row it scrolled was dismissed.
 - `support/shots.ts` -- `shot` / `shotElement` write
   `artifacts/screenshots/<project>/<name>.png`. `shotElement` crops the
   element out of a full-page capture by its document box: on a phone page

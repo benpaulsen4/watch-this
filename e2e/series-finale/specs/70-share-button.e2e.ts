@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type Locator, type Page, type Request, test } from "@playwright/test";
+import { type Locator, type Page, type Request } from "@playwright/test";
 
 import { storageStatePath } from "../support/auth";
 import { CARD_SIZE, CARDS_DIR, pngSize } from "../support/cards";
@@ -10,6 +10,7 @@ import { becomesVisible } from "../support/pages";
 import { openRecap } from "../support/recap";
 import { shot } from "../support/shots";
 import { goToCard, openStory, storyCard } from "../support/story";
+import { test } from "../support/test";
 
 // The Share button (read-only; desktop + phone). The recap header's Share
 // prefetches the card when it mounts, then:

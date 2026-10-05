@@ -146,11 +146,6 @@ export const NOTES: NoteDef[] = [
     text: "Switch renders its error or its helper text, never both, so after \"Could not save that. Reverted.\" the consent disclosure is gone until the next toggle.",
   },
   {
-    title: "flo's banner reads \"0 episodes. 28 titles.\"",
-    ids: ["banner-flo-headline"],
-    text: "A films-only, non-thin year leads with a zero. It matches the oracle (so the check passes); it is a copy candidate for the visual review.",
-  },
-  {
     title: "Generation timing is not representative",
     ids: ["gen-time"],
     text: "The seeder pre-warms every TMDB cache, so first generation here never waits on TMDB.",

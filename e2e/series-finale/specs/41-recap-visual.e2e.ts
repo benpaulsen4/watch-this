@@ -1,13 +1,14 @@
-import { test } from "@playwright/test";
 
 import type { OracleYear } from "../seed/oracle";
 import { expectedArchetypeLabel, readArchetypeVisual, SEEDED_ARCHETYPES } from "../support/archetype";
 import { storageStatePath } from "../support/auth";
+import { psql } from "../support/db";
 import { check } from "../support/evidence";
 import { oracleYear } from "../support/oracle";
 import { becomesVisible, percent, weekdayName } from "../support/pages";
 import { loadAllImages, openRecap, RECAP_SECTIONS, recapPanel, type RecapSection, recapSection, textOf, thinYearHeading } from "../support/recap";
 import { shot, shotElement } from "../support/shots";
+import { test } from "../support/test";
 
 // The recap's screenshot set (desktop, phone; webkit-phone where WebKit
 // runs): for each persona-year, the full page and one shot per section --
@@ -18,7 +19,9 @@ import { shot, shotElement } from "../support/shots";
 // (bat 2025) and a films-only year (flo 2025). Read-only; saved storage state.
 // On the phone every non-thin one of these opens as a recap because the
 // seeder marked its story gone through (seed.ts STORY_COMPLETED); thin years
-// are never handed on to the story.
+// are never handed on to the story. Scrolling a recap to its footer posts a
+// dismissal; in a read-only project support/test.ts answers it in the
+// browser, and the last test here confirms none reached the database.
 
 /** The top-titles row's height gap the poster change (plan 6 Task 4) must keep within, at 1440 px. */
 const POSTER_ROW_GAP_PX = 40;
@@ -244,3 +247,17 @@ for (const { user, slug, year } of RECAPS) {
     });
   });
 }
+
+test("still read-only: no recap scrolled here was dismissed in the database", async () => {
+  const dismissed = psql(
+    `select u.username || ' ' || s.period_label from series_finale s join users u on u.id = s.user_id
+     where u.username in (:'ava', :'bo', :'bat', :'flo') and s.dismissed_at is not null order by 1;`,
+    { ava: "e2e_ava", bo: "e2e_bo", bat: "e2e_bat", flo: FLO },
+  );
+  check(
+    "visual-read-only-no-dismissals",
+    "after scrolling every recap to its footer, none of their rows has dismissed_at set",
+    [],
+    dismissed === "" ? [] : dismissed.split("\n"),
+  );
+});

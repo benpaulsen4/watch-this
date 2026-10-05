@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
 import { signInAs } from "../support/auth";
 import { CARD_SIZE, CARDS_DIR, pngSize } from "../support/cards";
@@ -10,6 +10,7 @@ import { becomesVisible } from "../support/pages";
 import { clickProfileTab, finaleRows, logoutButton, openProfileTab, type ProfileTab } from "../support/profile";
 import { recapHeroRange, recapSection, textOf } from "../support/recap";
 import { shot } from "../support/shots";
+import { test } from "../support/test";
 
 // Switching accounts in one tab (desktop-mutating only) -- the regression
 // test for the cross-account cache leak (I1): the app keeps one query cache,

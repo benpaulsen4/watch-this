@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../support/test";
+
 
 // Confirms the harness itself works: the app serves the auth page and the
 // API refuses unauthenticated requests without letting a shared cache keep
