@@ -6,8 +6,16 @@ import { countTests, findingState, findingStatuses, I1_SENSITIVE, mutationVerdic
 import { clip, groupBy, json, resultLabel, seconds, specOf } from "./format";
 import { type Artifacts, cardLookup, relatedChecks } from "./load";
 
-function cell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+/**
+ * Text made safe for one Markdown table cell. Backslashes are escaped first:
+ * otherwise a backslash already before a pipe would swallow that pipe's
+ * escape and the pipe would split the cell.
+ */
+export function cell(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ");
 }
 
 function codeCell(value: unknown, max = 400): string {
