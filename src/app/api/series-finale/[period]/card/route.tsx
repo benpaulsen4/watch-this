@@ -18,8 +18,8 @@ import {
 import { getImageUrl } from "@/lib/tmdb/client";
 
 // NOT edge. This route reads the database, and postgres-js opens raw TCP
-// sockets the edge runtime does not provide -- unlike src/app/opengraph-image.tsx,
-// which reads nothing and can afford `runtime = "edge"`.
+// sockets the edge runtime does not provide. (Next 16 deprecates the edge
+// runtime anyway; nodejs is the default, so this export is belt-and-braces.)
 export const runtime = "nodejs";
 
 const POSTER_TIMEOUT_MS = 3000;

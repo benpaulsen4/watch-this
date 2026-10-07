@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createInMemoryLimiter } from "./middleware";
+import { createInMemoryLimiter } from "./proxy";
 
 describe("in-memory rate limiter (AUTH-05)", () => {
   beforeEach(() => {
@@ -41,8 +41,8 @@ describe("in-memory rate limiter (AUTH-05)", () => {
   });
 });
 
-describe("middleware rate-limit keying (AUTH-05 bypass regression)", () => {
-  // The middleware holds a module-level limiter, so give each test a fresh one.
+describe("proxy rate-limit keying (AUTH-05 bypass regression)", () => {
+  // The proxy holds a module-level limiter, so give each test a fresh one.
   beforeEach(() => {
     vi.resetModules();
   });
@@ -55,7 +55,7 @@ describe("middleware rate-limit keying (AUTH-05 bypass regression)", () => {
   }
 
   it("cannot be bypassed by rotating the client-controlled X-Forwarded-For", async () => {
-    const { middleware } = await import("./middleware");
+    const { proxy } = await import("./proxy");
     const limit = 20; // the "/api/auth/" rule
 
     // One real client (fixed x-real-ip, which Vercel sets at its edge and the
@@ -64,7 +64,7 @@ describe("middleware rate-limit keying (AUTH-05 bypass regression)", () => {
     // fresh bucket and the limiter never tripped. The key must ignore XFF.
     let lastStatus = 0;
     for (let i = 0; i <= limit; i++) {
-      lastStatus = middleware(
+      lastStatus = proxy(
         authRequest({
           "x-forwarded-for": `1.2.3.${i}, 10.0.0.1`,
           "x-real-ip": "203.0.113.7",
@@ -76,20 +76,20 @@ describe("middleware rate-limit keying (AUTH-05 bypass regression)", () => {
   });
 
   it("keys buckets off the trusted platform IP, not the forwarded chain", async () => {
-    const { middleware } = await import("./middleware");
+    const { proxy } = await import("./proxy");
     const limit = 20;
 
     // Exhaust the bucket for one trusted IP...
     for (let i = 0; i <= limit; i++) {
-      middleware(authRequest({ "x-real-ip": "203.0.113.7" }));
+      proxy(authRequest({ "x-real-ip": "203.0.113.7" }));
     }
     expect(
-      middleware(authRequest({ "x-real-ip": "203.0.113.7" })).status,
+      proxy(authRequest({ "x-real-ip": "203.0.113.7" })).status,
     ).toBe(429);
 
     // ...a genuinely different client is unaffected.
     expect(
-      middleware(authRequest({ "x-real-ip": "203.0.113.8" })).status,
+      proxy(authRequest({ "x-real-ip": "203.0.113.8" })).status,
     ).not.toBe(429);
   });
 });

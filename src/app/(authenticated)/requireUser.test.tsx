@@ -163,7 +163,7 @@ describe("authenticated pages with no session", () => {
   });
 
   // Deleting the client-gated group layout removed the only group-wide gate:
-  // `src/middleware.ts` rate-limits /api/auth and /api/admin and does not touch
+  // `src/proxy.ts` rate-limits /api/auth and /api/admin and does not touch
   // page routes, so every page in this group is now individually responsible for
   // calling requireUser. The `cases` list above is hand-written, so an eighth
   // page would ship unguarded and nothing above would fail.
