@@ -2,7 +2,7 @@
 title: "Watch Your Story"
 description: Go through your Series Finale one card at a time, the way it's meant to be seen on a phone.
 order: 2
-lastUpdated: 2026-10-01
+lastUpdated: 2026-10-07
 ---
 
 The story is your Series Finale told one card at a time: your hours, your top show, your most obscure film, your genres, your busiest month, your biggest day, your watching type, the shows you walked out on, your crew, and how you compare with a friend.
@@ -41,5 +41,5 @@ If you close the story on your phone before reaching the end, you're taken back 
 
 ## Tips
 
-- **Some cards depend on how you tick episodes.** The biggest-day timeline and anything about the time of day you watch need episodes you marked one at a time. Marking a whole season watched at once gives every episode the same timestamp, so those episodes can't say when you watched. With fewer than 50 episodes ticked one at a time in the year, the biggest-day card shows the date and episode count without the times.
+- **Some cards depend on how you tick episodes.** The biggest-day timeline and anything about the time of day you watch need episodes you marked one at a time. Marking a whole season watched at once, or ticking several episodes of one show within a couple of minutes, records when you ticked them rather than when you watched them, so those episodes can't say when you watched. Ticking one episode each of a few different shows together still counts each one. With fewer than 50 episodes ticked one at a time in the year, the biggest-day card shows the date and episode count without the times.
 - **Times are shown in your profile's timezone,** not the timezone of wherever you happen to be viewing from.

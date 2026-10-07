@@ -21,8 +21,11 @@
  *    one-genre-only archetype is classified on.
  * 5: the weekday-marathoner rule is judged on the top weekday only, the day
  *    its label names.
+ * 6: a batch is also any run of one show's ticks within `BATCH_GAP_MS` of
+ *    each other, not just rows sharing one timestamp, so seasons marked before
+ *    July 2026 stop counting as solo ticks.
  */
-export const SERIES_FINALE_SCHEMA_VERSION = 5;
+export const SERIES_FINALE_SCHEMA_VERSION = 6;
 
 /**
  * Minimum individually-ticked episodes before any intra-day statistic is

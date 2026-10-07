@@ -107,7 +107,7 @@ It only ever removes or relabels other people's data. The viewer's own figures a
 
 ### Schema versioning
 
-`SERIES_FINALE_SCHEMA_VERSION` (currently **5**) is stored on each row. A row below the current version is regenerated on its next read, or by the next listing. Bump it whenever a stored payload would read differently if generated today. The version history is in the comment above the constant in [types.ts](../../src/lib/series-finale/types.ts).
+`SERIES_FINALE_SCHEMA_VERSION` (currently **6**) is stored on each row. A row below the current version is regenerated on its next read, or by the next listing. Bump it whenever a stored payload would read differently if generated today. The version history is in the comment above the constant in [types.ts](../../src/lib/series-finale/types.ts).
 
 A regeneration replaces `payload`, `schema_version` and `generated_at`. It leaves `dismissed_at` and `story_completed_at` alone, so a user does not see the banner again or have to replay the story because the payload shape changed.
 
@@ -121,7 +121,16 @@ Renderers that place instants on a clock must use `period.timezone`, **not the b
 
 ## Solo Ticks
 
-Batch writes (for example, marking a whole season watched) stamp every episode with one `new Date()`. `partitionSoloTicks` calls an episode a **solo tick** when no other episode in the period shares its `watched_at` to the millisecond.
+`partitionSoloTicks` calls an episode a **solo tick** when no other episode **of the same show** in the period has a `watched_at` within `BATCH_GAP_MS` (2 minutes) of it. A show's ticks closer than that are chained into one batch, however long the whole run lasts.
+
+The gap is per show because every write path saves one show at a time, and because ticking the two or three shows on today's schedule in one go, before or after watching, is a common routine. Those are separate viewings and stay solo ticks. The one cross-show case is rows sharing a timestamp to the millisecond: separate taps never do, but an import can (the SeriesGuide converter stamps episodes with their air dates), so those are a batch whatever their show.
+
+It is a gap, not an exact match, because batch writes have taken two shapes:
+
+- **Since July 2026,** a batch write (for example, marking a whole season watched) stamps every episode with one `new Date()`, so the rows share a timestamp to the millisecond.
+- **Before that,** the batch endpoint wrote the episodes one after another, each with its own `new Date()`. A season marked in 2025 is a run of rows milliseconds to seconds apart.
+
+Ticking a few episodes of one show by hand in quick succession, after the fact, also falls inside the gap. That is the same artefact: the times say when the boxes were ticked, not when the episodes were watched.
 
 | Uses only solo ticks | Uses every episode |
 | --- | --- |
@@ -299,6 +308,7 @@ These are accepted approximations. The spec gives the full reasoning.
 
 - **Films are dated by `user_content_status.updated_at`.** Re-marking a film moves it to the later year.
 - **`watched_at` is a logging time.** Ticking last night's episode this morning makes it a morning watch.
+- **Two genuine viewings of one show ticked within 2 minutes of each other count as a batch.** No episode is that short in practice, so this only loses ticks that were catch-up clicks anyway.
 - **Niche popularity is today's TMDB value,** not the value at watch time.
 - **Only first watches count;** there is no rewatch tracking.
 - **The join year can include imported history from before the account existed.** The recap start floors whole years at `created_at`, but within the year an account was created, rows dated before that day (for example, imported air dates) still count.

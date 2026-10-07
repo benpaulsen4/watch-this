@@ -740,7 +740,7 @@ components:
       type: object
       description: |
         The frozen recap. The authoritative contract, with per-field notes, is
-        `SeriesFinalePayload` in src/lib/series-finale/types.ts (schemaVersion 5).
+        `SeriesFinalePayload` in src/lib/series-finale/types.ts (schemaVersion 6).
         Every field is present; optional cards are null rather than absent.
         Weekday arrays are Monday-first.
       required: [schemaVersion, period, headline, episodes, finished, topShow, niche, genres, months, soloTickTotal, bigDay, rhythm, shame, crew, compare, thin]
