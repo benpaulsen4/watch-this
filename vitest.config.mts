@@ -19,7 +19,21 @@ export default defineConfig({
     // test files would otherwise be collected here and resolve "@/" against
     // the alias below - i.e. this repo's src, not their own - so they fail
     // against a source tree they were never written for.
-    exclude: [...configDefaults.exclude, ".claude/**"],
+    //
+    // e2e/series-finale/specs holds Playwright specs (*.e2e.ts) that need a
+    // running server and the throwaway e2e database -- Vitest must never try
+    // to run them. Its artifacts/.auth dirs are generated output. Excluding
+    // is scoped to those, not all of e2e/**, because Vitest's `exclude`
+    // wins over `include` -- a blanket "e2e/**" exclude would also swallow
+    // the harness's own unit tests (e2e/**/*.test.ts, e.g. the safety-guard
+    // test for buildE2eEnv), which `include` already picks up by default.
+    exclude: [
+      ...configDefaults.exclude,
+      ".claude/**",
+      "e2e/series-finale/specs/**",
+      "e2e/series-finale/artifacts/**",
+      "e2e/series-finale/.auth/**",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text-summary", "html", "lcov"],

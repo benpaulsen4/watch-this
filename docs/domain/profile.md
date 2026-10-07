@@ -60,6 +60,8 @@ The Profile page is a server component that renders a single client “island”
     - Passkey devices: [PasskeyDevicesViewer](../../src/components/profile/PasskeyDevicesViewer.tsx)
   - “Data Management” tab
     - Import/export: [DataExportImport](../../src/components/profile/DataExportImport.tsx)
+    - Series Finale archive: [ProfileFinaleRows](../../src/components/series-finale/ProfileFinaleRows.tsx)
+    - Crew-comparison consent: [CrewComparisonToggle](../../src/components/series-finale/CrewComparisonToggle.tsx) (see [series-finale.md](./series-finale.md#crew-and-compare))
   - “Streaming” tab
     - Country/region + providers: [StreamingPreferences](../../src/components/profile/StreamingPreferences.tsx)
 
@@ -72,14 +74,15 @@ All profile APIs are authenticated. Profile uses `withAuth` middleware to guaran
 Profile settings update the current user via the session endpoint:
 
 - `GET /api/auth/session`
-  - Response: `{ user: { id, username, profilePictureUrl, timezone, createdAt } }`
+  - Response: `{ user: { id, username, profilePictureUrl, timezone, createdAt, shareStatsWithCollaborators } }`
   - Implementation: [session/route.ts](../../src/app/api/auth/session/route.ts)
 - `PUT /api/auth/session`
-  - Request JSON (any subset): `{ username?, profilePictureUrl?, timezone? }`
+  - Request JSON (any subset): `{ username?, profilePictureUrl?, timezone?, shareStatsWithCollaborators? }`
   - Validation:
     - `username`: `/^[a-zA-Z0-9_-]{3,50}$/`, must be unique (409 if taken)
     - `profilePictureUrl`: `null` or URL string; max 500 chars; parsed with `new URL(...)`
     - `timezone`: validated via `Intl.DateTimeFormat(..., { timeZone })`
+    - `shareStatsWithCollaborators`: must be a boolean
   - Response: `{ success: true, user: { ...same fields... } }`
   - Implementation: [session/route.ts](../../src/app/api/auth/session/route.ts)
 

@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { type ReactElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getCurrentSession } from "@/lib/auth/client";
@@ -19,11 +20,24 @@ const signedIn = {
   },
 };
 
+const signedInAs = (id: string, username: string) => ({
+  user: { ...signedIn.user, id, username },
+});
+
+/** As the root layout nests them: the auth provider inside the query client. */
+function render(ui: ReactElement, client = new QueryClient()) {
+  return rtlRender(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
+}
+
 function StreamingProbe() {
   const { streamingPreferences, streamingError } = useStreamingPreferences();
   return (
     <div>
-      <span data-testid="country">{streamingPreferences?.country ?? "none"}</span>
+      <span data-testid="country">
+        {streamingPreferences?.country ?? "none"}
+      </span>
       <span data-testid="streaming-error">{streamingError ?? ""}</span>
     </div>
   );
@@ -92,9 +106,11 @@ describe("AuthProvider", () => {
   });
 
   it("surfaces the failure instead of looking like empty preferences", async () => {
-    vi.spyOn(global, "fetch").mockImplementation(
-      (async () => ({ ok: false, status: 503, json: async () => ({}) })) as any,
-    );
+    vi.spyOn(global, "fetch").mockImplementation((async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+    })) as any);
 
     render(
       <AuthProvider>
@@ -108,13 +124,11 @@ describe("AuthProvider", () => {
   });
 
   it("keeps the context value stable across renders that do not change auth state", async () => {
-    vi.spyOn(global, "fetch").mockImplementation(
-      (async () => ({
-        ok: true,
-        status: 200,
-        json: async () => ({ country: "GB", providers: [] }),
-      })) as any,
-    );
+    vi.spyOn(global, "fetch").mockImplementation((async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ country: "GB", providers: [] }),
+    })) as any);
 
     const seen: unknown[] = [];
 
@@ -149,5 +163,107 @@ describe("AuthProvider", () => {
     // UI-13: the provider re-renders, but nothing about auth changed, so every
     // consumer must get the same context object back.
     expect(seen.at(-1)).toBe(before);
+  });
+
+  describe("query cache across sign-ins", () => {
+    // Something cached for whoever was signed in: a stand-in for the recap
+    // payload or the share card, both of which are keyed without a user.
+    const SEEDED = ["cached-for-the-previous-user"];
+
+    function SessionProbe() {
+      const { user, loading, refreshSession, clearAuth } = useAuth();
+      return (
+        <div>
+          <span data-testid="who">
+            {loading ? "loading" : (user?.username ?? "signed-out")}
+          </span>
+          <button onClick={() => void refreshSession()}>refresh</button>
+          <button onClick={clearAuth}>sign out</button>
+        </div>
+      );
+    }
+
+    const who = () => screen.getByTestId("who").textContent;
+
+    const renderSession = (client: QueryClient) =>
+      render(
+        <AuthProvider>
+          <SessionProbe />
+        </AuthProvider>,
+        client,
+      );
+
+    beforeEach(() => {
+      vi.spyOn(global, "fetch").mockImplementation((async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ country: "GB", providers: [] }),
+      })) as any);
+    });
+
+    it("keeps the cache when the first session resolves", async () => {
+      const client = new QueryClient();
+      client.setQueryData(SEEDED, "first page's data");
+
+      renderSession(client);
+      await waitFor(() => expect(who()).toBe("alice"));
+
+      expect(client.getQueryData(SEEDED)).toBe("first page's data");
+    });
+
+    it("clears the cache when a different user signs in", async () => {
+      const client = new QueryClient();
+      renderSession(client);
+      await waitFor(() => expect(who()).toBe("alice"));
+      client.setQueryData(SEEDED, "alice's card");
+
+      (getCurrentSession as any).mockResolvedValue(signedInAs("u2", "bob"));
+      await userEvent.click(screen.getByRole("button", { name: "refresh" }));
+      await waitFor(() => expect(who()).toBe("bob"));
+
+      expect(client.getQueryData(SEEDED)).toBeUndefined();
+    });
+
+    it("clears the cache on sign-out", async () => {
+      const client = new QueryClient();
+      renderSession(client);
+      await waitFor(() => expect(who()).toBe("alice"));
+      client.setQueryData(SEEDED, "alice's card");
+
+      await userEvent.click(screen.getByRole("button", { name: "sign out" }));
+      await waitFor(() => expect(who()).toBe("signed-out"));
+
+      expect(client.getQueryData(SEEDED)).toBeUndefined();
+    });
+
+    it("clears the cache when someone signs in after a signed-out start", async () => {
+      (getCurrentSession as any).mockResolvedValue(null);
+      const client = new QueryClient();
+      renderSession(client);
+      await waitFor(() => expect(who()).toBe("signed-out"));
+      client.setQueryData(SEEDED, "cached while signed out");
+
+      (getCurrentSession as any).mockResolvedValue(signedIn);
+      await userEvent.click(screen.getByRole("button", { name: "refresh" }));
+      await waitFor(() => expect(who()).toBe("alice"));
+
+      expect(client.getQueryData(SEEDED)).toBeUndefined();
+    });
+
+    // A rename or a picture change refreshes the session for the same user.
+    it("keeps the cache when a refresh returns the same user", async () => {
+      const client = new QueryClient();
+      renderSession(client);
+      await waitFor(() => expect(who()).toBe("alice"));
+      client.setQueryData(SEEDED, "alice's card");
+
+      (getCurrentSession as any).mockResolvedValue(
+        signedInAs("u1", "alice-renamed"),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "refresh" }));
+      await waitFor(() => expect(who()).toBe("alice-renamed"));
+
+      expect(client.getQueryData(SEEDED)).toBe("alice's card");
+    });
   });
 });

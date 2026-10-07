@@ -1,7 +1,7 @@
 ﻿---
 title: "Profile & Data"
 description: Update your profile, manage passkeys, and export or import your data.
-order: 6
+order: 7
 lastUpdated: 2026-02-04
 ---
 

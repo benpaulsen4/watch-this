@@ -39,6 +39,15 @@ lastUpdated: 2026-02-04
 - [Mark the Next Episode Watched](/help/tracking/mark-the-next-episode-watched)
 - [Weekly TV Schedule: Plan What to Watch](/help/tracking/weekly-tv-schedule)
 
+## Series Finale
+
+- [What Is Series Finale?](/help/series-finale/what-is-series-finale)
+- [Watch Your Story](/help/series-finale/watch-your-story)
+- [Explore Your Full Recap](/help/series-finale/explore-your-recap)
+- [Friends in Your Series Finale](/help/series-finale/friends-in-your-series-finale)
+- [Share Your Card](/help/series-finale/share-your-card)
+- [Find Past Years](/help/series-finale/find-past-years)
+
 ## Profile & Data
 
 - [Edit Your Profile: Name, Photo, and Timezone](/help/profile/edit-your-profile)
@@ -53,4 +62,6 @@ lastUpdated: 2026-02-04
 - [Troubleshooting: Region/Provider Results Look Wrong](/help/faq/region-provider-results-look-wrong)
 - [Why did a Show Dissapear from My Schedule?](/help/faq/why-did-a-show-dissapear-from-my-schedule)
 - [How are Recommendations Generated?](/help/faq/how-are-recommendations-generated)
+- [Why Don't I Have a Series Finale?](/help/faq/why-dont-i-have-a-series-finale)
+- [Why Do My Series Finale Numbers Look Off?](/help/faq/why-do-my-series-finale-numbers-look-off)
 

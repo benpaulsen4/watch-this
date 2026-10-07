@@ -1,0 +1,731 @@
+{
+  "_notes": [
+    "Real TMDB titles for the Series Finale e2e cast. Resolved by resolveCatalogue() (exact title or original title, same first-air/release year); TV seasons hold aired episodes only, season 0 excluded.",
+    "jeanne-dielman: the brief listed \"Jeanne Dielman, 23 quai du Commerce, 1080 Bruxelles\" (1975). TMDB (44012) titles it with a comma after \"23\" and dates its release 1976-01-21, so the lock uses TMDB's title and year. Same film, not a substitution.",
+    "past-lives: TMDB has two exact \"Past Lives\" (2023) results; the resolver takes the one with the most votes (666277, the Celine Song feature).",
+    "Additions beyond the brief's list: parasite, portrait, moonlight, lady-bird, roma, worst-person, banshees, godzilla-minus-one, florida-project, minari, nomadland. A user holds one status per title, and e2e_ava alone needs 36 distinct films (22 completed + 4 planning in 2025, 8 in 2024, 2 in 2023) against the 29 listed. Minari and Nomadland carry TMDB's release year (2021), not their 2020 premieres.",
+    "station-eleven: added (fix round 1, ruling E6). Films cannot be dropped in the app, so ava's uncached dropped title is a show that nobody else watches; the seeder deletes its tmdb_cache row after warming."
+  ],
+  "entries": [
+    {
+      "key": "bear",
+      "title": "The Bear",
+      "year": 2022,
+      "type": "tv",
+      "tmdbId": 136315,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 8
+        },
+        {
+          "season": 2,
+          "episodes": 10
+        },
+        {
+          "season": 3,
+          "episodes": 10
+        },
+        {
+          "season": 4,
+          "episodes": 10
+        },
+        {
+          "season": 5,
+          "episodes": 8
+        }
+      ]
+    },
+    {
+      "key": "severance",
+      "title": "Severance",
+      "year": 2022,
+      "type": "tv",
+      "tmdbId": 95396,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 9
+        },
+        {
+          "season": 2,
+          "episodes": 10
+        }
+      ]
+    },
+    {
+      "key": "slow-horses",
+      "title": "Slow Horses",
+      "year": 2022,
+      "type": "tv",
+      "tmdbId": 95480,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 6
+        },
+        {
+          "season": 2,
+          "episodes": 6
+        },
+        {
+          "season": 3,
+          "episodes": 6
+        },
+        {
+          "season": 4,
+          "episodes": 6
+        },
+        {
+          "season": 5,
+          "episodes": 6
+        },
+        {
+          "season": 6,
+          "episodes": 2
+        }
+      ]
+    },
+    {
+      "key": "shogun",
+      "title": "Shōgun",
+      "year": 2024,
+      "type": "tv",
+      "tmdbId": 126308,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 10
+        }
+      ]
+    },
+    {
+      "key": "last-of-us",
+      "title": "The Last of Us",
+      "year": 2023,
+      "type": "tv",
+      "tmdbId": 100088,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 9
+        },
+        {
+          "season": 2,
+          "episodes": 7
+        }
+      ]
+    },
+    {
+      "key": "andor",
+      "title": "Andor",
+      "year": 2022,
+      "type": "tv",
+      "tmdbId": 83867,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 12
+        },
+        {
+          "season": 2,
+          "episodes": 12
+        }
+      ]
+    },
+    {
+      "key": "fleabag",
+      "title": "Fleabag",
+      "year": 2016,
+      "type": "tv",
+      "tmdbId": 67070,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 6
+        },
+        {
+          "season": 2,
+          "episodes": 6
+        }
+      ]
+    },
+    {
+      "key": "office",
+      "title": "The Office",
+      "year": 2005,
+      "type": "tv",
+      "tmdbId": 2316,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 6
+        },
+        {
+          "season": 2,
+          "episodes": 22
+        },
+        {
+          "season": 3,
+          "episodes": 23
+        },
+        {
+          "season": 4,
+          "episodes": 14
+        },
+        {
+          "season": 5,
+          "episodes": 26
+        },
+        {
+          "season": 6,
+          "episodes": 24
+        },
+        {
+          "season": 7,
+          "episodes": 24
+        },
+        {
+          "season": 8,
+          "episodes": 24
+        },
+        {
+          "season": 9,
+          "episodes": 23
+        }
+      ]
+    },
+    {
+      "key": "succession",
+      "title": "Succession",
+      "year": 2018,
+      "type": "tv",
+      "tmdbId": 76331,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 10
+        },
+        {
+          "season": 2,
+          "episodes": 10
+        },
+        {
+          "season": 3,
+          "episodes": 9
+        },
+        {
+          "season": 4,
+          "episodes": 10
+        }
+      ]
+    },
+    {
+      "key": "taskmaster",
+      "title": "Taskmaster",
+      "year": 2015,
+      "type": "tv",
+      "tmdbId": 63404,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 6
+        },
+        {
+          "season": 2,
+          "episodes": 5
+        },
+        {
+          "season": 3,
+          "episodes": 5
+        },
+        {
+          "season": 4,
+          "episodes": 8
+        },
+        {
+          "season": 5,
+          "episodes": 8
+        },
+        {
+          "season": 6,
+          "episodes": 10
+        },
+        {
+          "season": 7,
+          "episodes": 10
+        },
+        {
+          "season": 8,
+          "episodes": 10
+        },
+        {
+          "season": 9,
+          "episodes": 10
+        },
+        {
+          "season": 10,
+          "episodes": 10
+        },
+        {
+          "season": 11,
+          "episodes": 10
+        },
+        {
+          "season": 12,
+          "episodes": 10
+        },
+        {
+          "season": 13,
+          "episodes": 10
+        },
+        {
+          "season": 14,
+          "episodes": 10
+        },
+        {
+          "season": 15,
+          "episodes": 10
+        },
+        {
+          "season": 16,
+          "episodes": 10
+        },
+        {
+          "season": 17,
+          "episodes": 10
+        },
+        {
+          "season": 18,
+          "episodes": 10
+        },
+        {
+          "season": 19,
+          "episodes": 10
+        },
+        {
+          "season": 20,
+          "episodes": 10
+        },
+        {
+          "season": 21,
+          "episodes": 10
+        },
+        {
+          "season": 22,
+          "episodes": 4
+        }
+      ]
+    },
+    {
+      "key": "rehearsal",
+      "title": "The Rehearsal",
+      "year": 2022,
+      "type": "tv",
+      "tmdbId": 204284,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 6
+        },
+        {
+          "season": 2,
+          "episodes": 6
+        }
+      ]
+    },
+    {
+      "key": "res-dogs",
+      "title": "Reservation Dogs",
+      "year": 2021,
+      "type": "tv",
+      "tmdbId": 95215,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 8
+        },
+        {
+          "season": 2,
+          "episodes": 10
+        },
+        {
+          "season": 3,
+          "episodes": 10
+        }
+      ]
+    },
+    {
+      "key": "hacks",
+      "title": "Hacks",
+      "year": 2021,
+      "type": "tv",
+      "tmdbId": 124101,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 10
+        },
+        {
+          "season": 2,
+          "episodes": 8
+        },
+        {
+          "season": 3,
+          "episodes": 9
+        },
+        {
+          "season": 4,
+          "episodes": 10
+        },
+        {
+          "season": 5,
+          "episodes": 10
+        }
+      ]
+    },
+    {
+      "key": "ted-lasso",
+      "title": "Ted Lasso",
+      "year": 2020,
+      "type": "tv",
+      "tmdbId": 97546,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 10
+        },
+        {
+          "season": 2,
+          "episodes": 12
+        },
+        {
+          "season": 3,
+          "episodes": 12
+        },
+        {
+          "season": 4,
+          "episodes": 8
+        }
+      ]
+    },
+    {
+      "key": "mr-robot",
+      "title": "Mr. Robot",
+      "year": 2015,
+      "type": "tv",
+      "tmdbId": 62560,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 10
+        },
+        {
+          "season": 2,
+          "episodes": 12
+        },
+        {
+          "season": 3,
+          "episodes": 10
+        },
+        {
+          "season": 4,
+          "episodes": 13
+        }
+      ]
+    },
+    {
+      "key": "station-eleven",
+      "title": "Station Eleven",
+      "year": 2021,
+      "type": "tv",
+      "tmdbId": 90972,
+      "seasons": [
+        {
+          "season": 1,
+          "episodes": 10
+        }
+      ]
+    },
+    {
+      "key": "dune-2",
+      "title": "Dune: Part Two",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 693134
+    },
+    {
+      "key": "past-lives",
+      "title": "Past Lives",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 666277
+    },
+    {
+      "key": "aftersun",
+      "title": "Aftersun",
+      "year": 2022,
+      "type": "movie",
+      "tmdbId": 965150
+    },
+    {
+      "key": "perfect-days",
+      "title": "Perfect Days",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 976893
+    },
+    {
+      "key": "anatomy",
+      "title": "Anatomy of a Fall",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 915935
+    },
+    {
+      "key": "zone-of-interest",
+      "title": "The Zone of Interest",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 467244
+    },
+    {
+      "key": "poor-things",
+      "title": "Poor Things",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 792307
+    },
+    {
+      "key": "oppenheimer",
+      "title": "Oppenheimer",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 872585
+    },
+    {
+      "key": "eeaao",
+      "title": "Everything Everywhere All at Once",
+      "year": 2022,
+      "type": "movie",
+      "tmdbId": 545611
+    },
+    {
+      "key": "paterson",
+      "title": "Paterson",
+      "year": 2016,
+      "type": "movie",
+      "tmdbId": 370755
+    },
+    {
+      "key": "columbus",
+      "title": "Columbus",
+      "year": 2017,
+      "type": "movie",
+      "tmdbId": 414453
+    },
+    {
+      "key": "drive-my-car",
+      "title": "Drive My Car",
+      "year": 2021,
+      "type": "movie",
+      "tmdbId": 758866
+    },
+    {
+      "key": "jeanne-dielman",
+      "title": "Jeanne Dielman, 23, quai du Commerce, 1080 Bruxelles",
+      "year": 1976,
+      "type": "movie",
+      "tmdbId": 44012
+    },
+    {
+      "key": "petite-maman",
+      "title": "Petite Maman",
+      "year": 2021,
+      "type": "movie",
+      "tmdbId": 749004
+    },
+    {
+      "key": "holdovers",
+      "title": "The Holdovers",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 840430
+    },
+    {
+      "key": "challengers",
+      "title": "Challengers",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 937287
+    },
+    {
+      "key": "conclave",
+      "title": "Conclave",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 974576
+    },
+    {
+      "key": "brutalist",
+      "title": "The Brutalist",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 549509
+    },
+    {
+      "key": "flow",
+      "title": "Flow",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 823219
+    },
+    {
+      "key": "anora",
+      "title": "Anora",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 1064213
+    },
+    {
+      "key": "substance",
+      "title": "The Substance",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 933260
+    },
+    {
+      "key": "real-pain",
+      "title": "A Real Pain",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 1013850
+    },
+    {
+      "key": "nickel-boys",
+      "title": "Nickel Boys",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 1028196
+    },
+    {
+      "key": "tv-glow",
+      "title": "I Saw the TV Glow",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 858017
+    },
+    {
+      "key": "evil",
+      "title": "Evil Does Not Exist",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 1156125
+    },
+    {
+      "key": "fallen-leaves",
+      "title": "Fallen Leaves",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 986280
+    },
+    {
+      "key": "monster",
+      "title": "Monster",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 1050035
+    },
+    {
+      "key": "ich-war-zuhause",
+      "title": "Ich war zuhause, aber",
+      "year": 2019,
+      "type": "movie",
+      "tmdbId": 500895
+    },
+    {
+      "key": "furiosa",
+      "title": "Furiosa: A Mad Max Saga",
+      "year": 2024,
+      "type": "movie",
+      "tmdbId": 786892
+    },
+    {
+      "key": "parasite",
+      "title": "Parasite",
+      "year": 2019,
+      "type": "movie",
+      "tmdbId": 496243
+    },
+    {
+      "key": "portrait",
+      "title": "Portrait of a Lady on Fire",
+      "year": 2019,
+      "type": "movie",
+      "tmdbId": 531428
+    },
+    {
+      "key": "moonlight",
+      "title": "Moonlight",
+      "year": 2016,
+      "type": "movie",
+      "tmdbId": 376867
+    },
+    {
+      "key": "lady-bird",
+      "title": "Lady Bird",
+      "year": 2017,
+      "type": "movie",
+      "tmdbId": 391713
+    },
+    {
+      "key": "roma",
+      "title": "Roma",
+      "year": 2018,
+      "type": "movie",
+      "tmdbId": 426426
+    },
+    {
+      "key": "worst-person",
+      "title": "The Worst Person in the World",
+      "year": 2021,
+      "type": "movie",
+      "tmdbId": 660120
+    },
+    {
+      "key": "banshees",
+      "title": "The Banshees of Inisherin",
+      "year": 2022,
+      "type": "movie",
+      "tmdbId": 674324
+    },
+    {
+      "key": "godzilla-minus-one",
+      "title": "Godzilla Minus One",
+      "year": 2023,
+      "type": "movie",
+      "tmdbId": 940721
+    },
+    {
+      "key": "florida-project",
+      "title": "The Florida Project",
+      "year": 2017,
+      "type": "movie",
+      "tmdbId": 394117
+    },
+    {
+      "key": "minari",
+      "title": "Minari",
+      "year": 2021,
+      "type": "movie",
+      "tmdbId": 615643
+    },
+    {
+      "key": "nomadland",
+      "title": "Nomadland",
+      "year": 2021,
+      "type": "movie",
+      "tmdbId": 581734
+    }
+  ]
+}

@@ -13,8 +13,10 @@ import ListDetailsPage from "./lists/[id]/page";
 import ArchivedListsPage from "./lists/archived/page";
 import ListsPage from "./lists/page";
 import ProfilePage from "./profile/page";
-import { requireUser } from "./requireUser";
+import { requireUser, toClientUser } from "./requireUser";
 import SearchPage from "./search/page";
+import SeriesFinalePage from "./series-finale/[period]/page";
+import SeriesFinaleStoryPage from "./series-finale/[period]/story/page";
 
 vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 vi.mock("next/navigation", () => ({ notFound: vi.fn(), redirect: vi.fn() }));
@@ -48,6 +50,12 @@ vi.mock("@/components/profile/ProfileClient", () => ({
   ProfileClient: () => null,
 }));
 vi.mock("@/components/search/SearchClient", () => ({ SearchClient: () => null }));
+vi.mock("@/components/series-finale/RecapClient", () => ({
+  RecapClient: () => null,
+}));
+vi.mock("@/components/series-finale/StoryReel", () => ({
+  StoryReel: () => null,
+}));
 
 const signedInUser = { id: "u1", username: "alice" };
 
@@ -86,6 +94,31 @@ describe("requireUser", () => {
   });
 });
 
+// S12: toClientUser must mirror GET /api/auth/session's projection field for
+// field, or a component would see different data depending on whether it was
+// seeded by the server or refreshed by the client.
+describe("toClientUser", () => {
+  const dbUser = {
+    id: "u1",
+    username: "alice",
+    profilePictureUrl: null,
+    timezone: "UTC",
+    country: null,
+    shareStatsWithCollaborators: false,
+    tokenVersion: 0,
+    createdAt: new Date("2024-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+  };
+
+  it("mirrors shareStatsWithCollaborators", () => {
+    expect(toClientUser(dbUser).shareStatsWithCollaborators).toBe(false);
+    expect(
+      toClientUser({ ...dbUser, shareStatsWithCollaborators: true })
+        .shareStatsWithCollaborators,
+    ).toBe(true);
+  });
+});
+
 // UI-09: these pages used to return the bare string "Refresh if this page does
 // not go away" (or `null`) as their entire render output for a signed-out
 // visitor. Every one of them must redirect instead.
@@ -110,6 +143,17 @@ describe("authenticated pages with no session", () => {
     ["search", () => SearchPage(), "%2Fsearch"],
     ["activity", () => ActivityPage(), "%2Factivity"],
     ["profile", () => ProfilePage(), "%2Fprofile"],
+    [
+      "series finale",
+      () => SeriesFinalePage({ params: Promise.resolve({ period: "2026" }) }),
+      "%2Fseries-finale%2F2026",
+    ],
+    [
+      "series finale story",
+      () =>
+        SeriesFinaleStoryPage({ params: Promise.resolve({ period: "2026" }) }),
+      "%2Fseries-finale%2F2026%2Fstory",
+    ],
   ];
 
   it.each(cases)("%s redirects to /auth", async (_name, run, encodedPath) => {
@@ -159,6 +203,8 @@ describe("authenticated pages with no session", () => {
       "/lists/archived",
       "/profile",
       "/search",
+      "/series-finale/[period]",
+      "/series-finale/[period]/story",
     ].sort();
 
     expect(discovered).toEqual(covered);

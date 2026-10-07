@@ -37,7 +37,11 @@ erDiagram
 
   users ||--o{ activity_feed : emits
   lists ||--o{ activity_feed : referenced_by
+
+  users ||--o{ series_finale : recaps
 ```
+
+`tmdb_cache`, `tmdb_episode_runtime` and `tmdb_season_fetch` are global caches with no foreign keys.
 
 ## Table Reference
 
@@ -51,9 +55,11 @@ Primary user identity and profile preferences.
   - `profile_picture_url` (varchar(500), optional)
   - `timezone` (varchar(100), required, defaults to `UTC`)
   - `country` (varchar(2), optional)
+  - `share_stats_with_collaborators` (boolean, required, defaults to `true`)
   - `created_at`, `updated_at` (timestamptz, required)
 - Notes:
-  - `timezone` is stored as a string (typically an IANA name like `America/New_York`).
+  - `timezone` is stored as a string (typically an IANA name like `America/New_York`). Code resolves it through `resolveTimeZone` in [time.ts](../../src/lib/time.ts), which falls back to `UTC` for an unknown name.
+  - `share_stats_with_collaborators` is the Series Finale crew-comparison consent. It is a withdrawal switch: `false` removes the user from other people's crew and compare cards, including recaps already generated. See [series-finale.md](../domain/series-finale.md#crew-and-compare).
 
 ### passkey_credentials
 
@@ -230,9 +236,53 @@ Local cache of selected TMDB content fields, used to reduce API usage and speed 
   - `cast_ids` (int[], required, defaults to `[]`)
   - `keyword_ids` (int[], required, defaults to `[]`)
   - `adult` (boolean, optional)
+  - `runtime` (int, optional): film runtime in minutes. TV rows leave it null and use `tmdb_episode_runtime` instead.
   - `created_at`, `updated_at` (timestamptz, required)
 - Constraints:
   - Unique: (`tmdb_id`, `content_type`)
+
+### tmdb_episode_runtime
+
+Per-episode runtimes from TMDB, shared by every user. Series Finale's hours figure reads from it.
+
+- Columns:
+  - `tmdb_id`, `season_number`, `episode_number` (int, required)
+  - `runtime` (int, optional): minutes. Null means TMDB was asked and has no runtime; a missing row means it was never asked.
+  - `created_at`, `updated_at` (timestamptz, required)
+- Constraints:
+  - Unique: (`tmdb_id`, `season_number`, `episode_number`)
+
+### tmdb_season_fetch
+
+Records which (show, season) pairs have been fetched from TMDB. A season whose episodes all lack runtimes would otherwise be refetched forever.
+
+- Columns:
+  - `tmdb_id`, `season_number` (int, required)
+  - `fetched_at` (timestamptz, required)
+- Constraints:
+  - Unique: (`tmdb_id`, `season_number`)
+- Notes:
+  - The runtime backfill re-asks about seasons fetched more than 30 days ago. Recap generation never refetches a recorded season. See [tools/README.md](../../tools/README.md#series-finale-runtime-backfill).
+
+### series_finale
+
+One frozen Series Finale recap per user per period. It is written at generation and never recomputed on read. See [series-finale.md](../domain/series-finale.md).
+
+- Columns:
+  - `user_id` (uuid, required, FK → users.id, cascade delete)
+  - `period_start`, `period_end` (timestamptz, required): the canonical UTC calendar-year bounds, `[start, end)`
+  - `period_label` (varchar(32), required): e.g. `2025`, also the URL segment
+  - `payload` (jsonb, required): the `SeriesFinalePayload` ([types.ts](../../src/lib/series-finale/types.ts))
+  - `schema_version` (int, required): a row below `SERIES_FINALE_SCHEMA_VERSION` is regenerated on its next read
+  - `generated_at` (timestamptz, required)
+  - `dismissed_at` (timestamptz, optional): when the dashboard banner was put away, by "Not now" or by scrolling the recap page to its foot. The first time is kept.
+  - `story_completed_at` (timestamptz, optional): when the story was finished; it unlocks the recap on a phone
+- Constraints:
+  - Unique: (`user_id`, `period_start`, `period_end`). Generation upserts on this.
+- Indexes:
+  - (`user_id`, `period_start` DESC)
+- Notes:
+  - A regeneration replaces `payload`, `schema_version` and `generated_at`, and leaves `dismissed_at` and `story_completed_at` untouched.
 
 ## App-Level Enum Values
 

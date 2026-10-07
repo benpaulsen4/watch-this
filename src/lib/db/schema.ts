@@ -23,6 +23,12 @@ export const users = pgTable("users", {
   profilePictureUrl: varchar("profile_picture_url", { length: 500 }),
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   country: varchar("country", { length: 2 }),
+  // Series Finale crew comparisons. Default true, matching the app's existing
+  // posture that people sharing a list can already see each other's activity.
+  // This is a withdrawal switch, not an opt-in.
+  shareStatsWithCollaborators: boolean("share_stats_with_collaborators")
+    .default(true)
+    .notNull(),
   // Incremented to invalidate all outstanding session JWTs for this user
   // (e.g. on "sign out all devices" or passkey deletion). Sessions carry the
   // value they were minted with and are rejected once it falls behind.
@@ -329,6 +335,10 @@ export const tmdbCache = pgTable(
     castIds: integer("cast_ids").array().notNull().default([]),
     keywordIds: integer("keyword_ids").array().notNull().default([]),
     adult: boolean("adult"),
+    // Films only; TV rows leave this null and use `tmdb_episode_runtime`
+    // instead, because a series-level average is wrong for any show whose
+    // episodes vary in length -- which is most of them.
+    runtime: integer("runtime"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -337,6 +347,87 @@ export const tmdbCache = pgTable(
       .notNull(),
   },
   (table) => [unique().on(table.tmdbId, table.contentType)],
+);
+
+// Per-episode runtimes from TMDB. Global and user-independent: one fetch of a
+// season serves every user forever.
+export const tmdbEpisodeRuntime = pgTable(
+  "tmdb_episode_runtime",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tmdbId: integer("tmdb_id").notNull(),
+    seasonNumber: integer("season_number").notNull(),
+    episodeNumber: integer("episode_number").notNull(),
+    // Nullable: TMDB genuinely has no runtime for some episodes. A null here
+    // means "asked, and TMDB does not know", which is different from an
+    // absent row meaning "never asked".
+    runtime: integer("runtime"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique().on(table.tmdbId, table.seasonNumber, table.episodeNumber),
+  ],
+);
+
+// Records which (show, season) pairs have been fetched from TMDB. Exists only
+// to distinguish "TMDB has no runtime for these episodes" from "we never
+// asked" -- without it, a season whose episodes all lack runtimes is refetched
+// on every generation, forever.
+export const tmdbSeasonFetch = pgTable(
+  "tmdb_season_fetch",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tmdbId: integer("tmdb_id").notNull(),
+    seasonNumber: integer("season_number").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [unique().on(table.tmdbId, table.seasonNumber)],
+);
+
+// A frozen Series Finale recap. Written once per user per period and never
+// recomputed on read -- tmdb_cache.popularity drifts and users keep editing
+// status, so a live recompute would make an archived year disagree with the
+// share image somebody already posted.
+export const seriesFinale = pgTable(
+  "series_finale",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    // Exclusive. A period is [start, end).
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    periodLabel: varchar("period_label", { length: 32 }).notNull(),
+    payload: jsonb("payload").notNull(),
+    // Bumped when the payload shape changes. A snapshot below the current
+    // version is regenerated on read rather than rendered against a shape it
+    // was never written for.
+    schemaVersion: integer("schema_version").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    // Dashboard banner "Not now". Per-recap, so it needs no table of its own.
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    // Set once the viewer has gone through the whole story on a phone, so the
+    // recap can unlock there and stay unlocked across devices. Per-recap, like
+    // `dismissedAt`; the first write wins and later ones are no-ops.
+    storyCompletedAt: timestamp("story_completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    unique().on(table.userId, table.periodStart, table.periodEnd),
+    index("series_finale_user_id_period_start_idx").on(
+      table.userId,
+      table.periodStart.desc(),
+    ),
+  ],
 );
 
 // Relations
@@ -381,6 +472,15 @@ export type NewUserStreamingProvider =
 
 export type TMDBCache = typeof tmdbCache.$inferSelect;
 export type NewTMDBCache = typeof tmdbCache.$inferInsert;
+
+export type TmdbEpisodeRuntime = typeof tmdbEpisodeRuntime.$inferSelect;
+export type NewTmdbEpisodeRuntime = typeof tmdbEpisodeRuntime.$inferInsert;
+
+export type TmdbSeasonFetch = typeof tmdbSeasonFetch.$inferSelect;
+export type NewTmdbSeasonFetch = typeof tmdbSeasonFetch.$inferInsert;
+
+export type SeriesFinale = typeof seriesFinale.$inferSelect;
+export type NewSeriesFinale = typeof seriesFinale.$inferInsert;
 
 // Enums for type safety
 export const ListType = {

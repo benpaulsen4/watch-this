@@ -20,6 +20,8 @@ tags:
   - name: Profile
   - name: TMDB
   - name: Watch
+  - name: SeriesFinale
+    description: The annual Series Finale recap. See docs/domain/series-finale.md.
   - name: Admin
 components:
   securitySchemes:
@@ -70,6 +72,9 @@ components:
         createdAt:
           type: string
           format: date-time
+        shareStatsWithCollaborators:
+          type: boolean
+          description: Series Finale crew-comparison consent (a withdrawal switch, default true).
     SessionGetResponse:
       type: object
       required: [user]
@@ -86,6 +91,9 @@ components:
           type: [string, "null"]
         timezone:
           type: string
+        shareStatsWithCollaborators:
+          type: boolean
+          description: false removes the user from collaborators' Series Finale crew and compare cards.
     SessionPutResponse:
       type: object
       required: [success, user]
@@ -696,6 +704,312 @@ components:
           type: array
           items:
             type: string
+    SeriesFinaleHeadline:
+      type: object
+      required: [hours, minutes, episodes, titlesCompleted, titlesDropped, unknownRuntimeEpisodes, percentile]
+      properties:
+        hours:
+          type: integer
+        minutes:
+          type: integer
+        episodes:
+          type: integer
+        titlesCompleted:
+          type: integer
+        titlesDropped:
+          type: integer
+        unknownRuntimeEpisodes:
+          type: integer
+          description: Episodes and films left out of the hours because TMDB has no runtime.
+        percentile:
+          type: [integer, "null"]
+          description: '"Top N%" against comparable snapshots; null below a cohort of 10.'
+    SeriesFinaleArchetype:
+      type: [string, "null"]
+      enum:
+        - serial-abandoner
+        - completionist
+        - weekday-marathoner
+        - feast-or-famine
+        - nightly-ritualist
+        - one-genre-only
+        - deep-cut-hunter
+        - group-watcher
+        - null
+    SeriesFinalePayload:
+      type: object
+      description: |
+        The frozen recap. The authoritative contract, with per-field notes, is
+        `SeriesFinalePayload` in src/lib/series-finale/types.ts (schemaVersion 5).
+        Every field is present; optional cards are null rather than absent.
+        Weekday arrays are Monday-first.
+      required: [schemaVersion, period, headline, episodes, finished, topShow, niche, genres, months, soloTickTotal, bigDay, rhythm, shame, crew, compare, thin]
+      properties:
+        schemaVersion:
+          type: integer
+        period:
+          type: object
+          required: [start, end, label, timezone]
+          properties:
+            start:
+              type: string
+              format: date-time
+              description: Local midnight on 1 January in `timezone`.
+            end:
+              type: string
+              format: date-time
+              description: Exclusive.
+            label:
+              type: string
+              example: "2025"
+            timezone:
+              type: string
+              description: The IANA zone every local date and hour was computed in.
+        headline:
+          $ref: "#/components/schemas/SeriesFinaleHeadline"
+        episodes:
+          type: object
+          properties:
+            total:
+              type: integer
+            perDay:
+              type: number
+        finished:
+          type: object
+          properties:
+            films:
+              type: integer
+            shows:
+              type: integer
+            total:
+              type: integer
+        topShow:
+          type: [object, "null"]
+          properties:
+            tmdbId:
+              type: integer
+            title:
+              type: string
+            posterPath:
+              type: [string, "null"]
+            episodes:
+              type: integer
+            minutes:
+              type: integer
+            finishedAt:
+              type: [string, "null"]
+              description: Local date (YYYY-MM-DD) of the last episode watched.
+            alsoTopFor:
+              type: array
+              items:
+                type: string
+              description: Usernames of crew members whose top show was the same.
+        niche:
+          type: [object, "null"]
+          properties:
+            tmdbId:
+              type: integer
+            title:
+              type: string
+            posterPath:
+              type: [string, "null"]
+            popularity:
+              type: number
+            medianPopularity:
+              type: number
+            mostPopular:
+              type: [object, "null"]
+              properties:
+                tmdbId:
+                  type: integer
+                title:
+                  type: string
+                popularity:
+                  type: number
+            filmPopularities:
+              type: array
+              items:
+                type: number
+        genres:
+          type: array
+          description: Share of genre tags (not titles) across completed titles; top five plus "Everything else".
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              percent:
+                type: integer
+        months:
+          type: array
+          minItems: 12
+          maxItems: 12
+          items:
+            type: object
+            properties:
+              month:
+                type: integer
+                minimum: 1
+                maximum: 12
+              episodes:
+                type: integer
+        soloTickTotal:
+          type: integer
+          description: Episodes ticked individually (not in a batch write) across the period.
+        bigDay:
+          type: [object, "null"]
+          properties:
+            date:
+              type: string
+              description: Local date, YYYY-MM-DD.
+            episodes:
+              type: integer
+            minutes:
+              type: integer
+            timeline:
+              type: [array, "null"]
+              description: That day's solo ticks in time order; null below 50 solo ticks in the period.
+              items:
+                type: object
+                properties:
+                  at:
+                    type: string
+                    format: date-time
+                  title:
+                    type: [string, "null"]
+                  episode:
+                    type: string
+                    example: S2E03
+            soloTickCount:
+              type: integer
+            streak:
+              type: [object, "null"]
+              properties:
+                days:
+                  type: integer
+                start:
+                  type: string
+                end:
+                  type: string
+        rhythm:
+          type: object
+          properties:
+            archetype:
+              $ref: "#/components/schemas/SeriesFinaleArchetype"
+            weekdayCounts:
+              type: array
+              items:
+                type: integer
+            topWeekday:
+              type: [integer, "null"]
+            lateShare:
+              type: [number, "null"]
+            hourCounts:
+              type: [array, "null"]
+              items:
+                type: integer
+            sharedListShare:
+              type: [number, "null"]
+            topGenreName:
+              type: [string, "null"]
+            topGenreShare:
+              type: [number, "null"]
+        shame:
+          type: object
+          properties:
+            dropped:
+              type: array
+              items:
+                type: object
+                properties:
+                  tmdbId:
+                    type: integer
+                  title:
+                    type: string
+                  lastEpisode:
+                    type: [string, "null"]
+            stillPlanning:
+              type: array
+              items:
+                type: object
+                properties:
+                  tmdbId:
+                    type: integer
+                  title:
+                    type: string
+                  days:
+                    type: integer
+                  runtime:
+                    type: [integer, "null"]
+        crew:
+          type: array
+          maxItems: 8
+          description: Consenting collaborators, most active first. Withdrawn users are removed on read.
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              username:
+                type: string
+              episodes:
+                type: integer
+        compare:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              username:
+                type: string
+              onlyYou:
+                type: integer
+              both:
+                type: integer
+              onlyThem:
+                type: integer
+              theyFinishedYouDropped:
+                type: [string, "null"]
+              bothPlanningNeitherStarted:
+                type: [string, "null"]
+        thin:
+          type: boolean
+          description: Fewer than 10 episodes and fewer than 5 titles.
+    SeriesFinaleListResponse:
+      type: object
+      required: [periods]
+      properties:
+        periods:
+          type: array
+          description: Newest first.
+          items:
+            type: object
+            required: [label, generatedAt, dismissedAt, storyCompletedAt, headline]
+            properties:
+              label:
+                type: string
+                example: "2025"
+              generatedAt:
+                type: string
+                format: date-time
+              dismissedAt:
+                type: [string, "null"]
+                format: date-time
+              storyCompletedAt:
+                type: [string, "null"]
+                format: date-time
+              headline:
+                $ref: "#/components/schemas/SeriesFinaleHeadline"
+    SeriesFinalePeriodResponse:
+      type: object
+      required: [payload, storyCompletedAt]
+      properties:
+        payload:
+          $ref: "#/components/schemas/SeriesFinalePayload"
+        storyCompletedAt:
+          type: [string, "null"]
+          format: date-time
 paths:
   /api/auth/register/begin:
     post:
@@ -3041,6 +3355,213 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/series-finale:
+    get:
+      tags: [SeriesFinale]
+      summary: List the user's Series Finale periods
+      description: |
+        Every completed year from the user's recap start, newest first.
+        Generates any missing or stale snapshot first (the newest always; older
+        ones within a 5-second budget), so this can take seconds on a first call.
+        Responses carry `Cache-Control: private, no-store`.
+      responses:
+        "200":
+          description: Available periods
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesFinaleListResponse"
+        "401":
+          description: No session or invalid session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/series-finale/{period}:
+    get:
+      tags: [SeriesFinale]
+      summary: Get one period's frozen recap
+      description: |
+        Returns the stored payload, generating it on first read (or when stored
+        at an older schema version). Collaborators who have since withdrawn
+        consent are removed, and the rest shown under their current usernames.
+      parameters:
+        - in: path
+          name: period
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}$"
+          description: A calendar year, 1900-2999.
+      responses:
+        "200":
+          description: The recap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeriesFinalePeriodResponse"
+        "400":
+          description: Not a valid period label
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: No session or invalid session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Period not available to this user (not over in their timezone, or before their recaps start)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/series-finale/{period}/dismiss:
+    post:
+      tags: [SeriesFinale]
+      summary: Hide the dashboard banner for a period
+      description: |
+        Sent by "Not now", and by the recap page when its foot is scrolled into view.
+        The first dismissal is kept (repeat calls do not move it). The banner
+        also hides once the period's story has been completed.
+      parameters:
+        - in: path
+          name: period
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}$"
+          description: A calendar year, 1900-2999.
+      responses:
+        "200":
+          description: Dismissed (also returned when no row exists)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Not a valid period label
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: No session or invalid session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/series-finale/{period}/story-complete:
+    post:
+      tags: [SeriesFinale]
+      summary: Record that the user finished the story
+      description: Idempotent; the first timestamp is kept. Unlocks the recap page on phones.
+      parameters:
+        - in: path
+          name: period
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}$"
+          description: A calendar year, 1900-2999.
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Not a valid period label
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: No session or invalid session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No recap row for this period
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/series-finale/{period}/card:
+    get:
+      tags: [SeriesFinale]
+      summary: Render the 1080x1350 share image
+      description: |
+        Built from an allowlist of the viewer's own figures; no collaborator data
+        can reach it. The QR code links to the marketing home page.
+      parameters:
+        - in: path
+          name: period
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}$"
+          description: A calendar year, 1900-2999.
+      responses:
+        "200":
+          description: PNG image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Not a valid period label
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: No session or invalid session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Period not available, or a thin year
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
           content:
             application/json:
               schema:
