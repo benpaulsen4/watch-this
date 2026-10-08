@@ -134,20 +134,23 @@ function ensureSafeSlug(slug: string[]): void {
   }
 }
 
-async function resolveMarkdownFilePath(slug: string[]): Promise<string> {
+// The read happens here, next to the path.join on HELP_CONTENT_ROOT, rather than
+// in the caller: Turbopack's file tracer cannot follow a path through an awaited
+// return value, and treats an untraceable fs path as "could be anything", which
+// pulls the whole project into the server bundle. Keeping the read local lets it
+// see the path is scoped to content/help -- which still has to be traced, since
+// the sitemap revalidates at runtime and reads these files then.
+async function readMarkdownFile(slug: string[]): Promise<string> {
   ensureSafeSlug(slug);
 
   if (slug.length === 0) {
-    return path.join(HELP_CONTENT_ROOT, "index.md");
+    return fs.readFile(path.join(HELP_CONTENT_ROOT, "index.md"), "utf8");
   }
 
   const asIndex = path.join(HELP_CONTENT_ROOT, ...slug, "index.md");
-  if (await pathExists(asIndex)) return asIndex;
+  if (await pathExists(asIndex)) return fs.readFile(asIndex, "utf8");
 
-  const asNestedFile = path.join(HELP_CONTENT_ROOT, ...slug) + ".md";
-  if (await pathExists(asNestedFile)) return asNestedFile;
-
-  return asNestedFile;
+  return fs.readFile(path.join(HELP_CONTENT_ROOT, ...slug) + ".md", "utf8");
 }
 
 async function walkMarkdownFiles(dir: string): Promise<string[]> {
@@ -195,8 +198,7 @@ function compareNavItems(
 }
 
 export async function getHelpDocBySlug(slug: string[]): Promise<HelpDoc> {
-  const filePath = await resolveMarkdownFilePath(slug);
-  const raw = await fs.readFile(filePath, "utf8");
+  const raw = await readMarkdownFile(slug);
   const parsed = parseMarkdown(raw);
 
   // Testing the looked-up segment instead of `slug.length` is the same check --

@@ -6,13 +6,13 @@ import { getClientIp } from "@/lib/net/client-ip";
  * IP-based rate limiting for authentication and admin endpoints.
  *
  * NOTE ON DURABILITY: this uses a best-effort in-memory store scoped to a
- * single runtime instance. On serverless/edge platforms (e.g. Vercel) each
+ * single runtime instance. On serverless platforms (e.g. Vercel) each
  * instance has its own memory and instances scale horizontally, so this does
  * NOT provide global enforcement -- an attacker spread across instances, or a
  * cold start, resets the counters. For durable, cluster-wide limiting, swap
  * `inMemoryLimiter` for a shared-store implementation (e.g. Upstash Redis or
  * `@upstash/ratelimit`) that satisfies the same `RateLimiter` interface below.
- * The middleware body does not care which implementation is used.
+ * The proxy body does not care which implementation is used.
  */
 
 interface RateLimitResult {
@@ -88,7 +88,7 @@ const RULES: Array<{ prefix: string; limit: number; windowMs: number }> = [
   { prefix: "/api/admin/", limit: 10, windowMs: 60_000 },
 ];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const rule = RULES.find((r) => pathname.startsWith(r.prefix));
   if (!rule) return NextResponse.next();
