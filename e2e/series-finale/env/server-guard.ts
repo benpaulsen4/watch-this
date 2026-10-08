@@ -99,14 +99,14 @@ export function inspectListener(port = E2E_PORT): ListenerVerdict {
 
 function refusal(reason: string): Error {
   return new Error(
-    `Refusing to run: ${reason}. Only the e2e server (npm run e2e:start, or the one Playwright starts) may answer on port ${E2E_PORT}; stop the other server first.`,
+    `Refusing to run: ${reason}. Only the e2e server (pnpm e2e:start, or the one Playwright starts) may answer on port ${E2E_PORT}; stop the other server first.`,
   );
 }
 
 /** Throws unless the e2e server is the one listening on E2E_PORT. For register and the Playwright global setup. */
 export function assertE2eServer(): void {
   const verdict = inspectListener();
-  if (verdict.state === "none") throw refusal(`nothing is listening on port ${E2E_PORT}; start it first (npm run e2e:start)`);
+  if (verdict.state === "none") throw refusal(`nothing is listening on port ${E2E_PORT}; start it first (pnpm e2e:start)`);
   if (verdict.state === "foreign") throw refusal(verdict.reason);
 }
 

@@ -4,9 +4,9 @@
 // the passkey (`<username>.credential.json`) and a signed-in Playwright
 // storage state (`<username>.json`).
 //
-// Usage: npm run e2e:register              every PERSONAS entry with signsIn
-//        npm run e2e:register -- <user>...  just these (an override)
-// Needs the e2e app on E2E_BASE_URL (npm run e2e:start in another terminal).
+// Usage: pnpm e2e:register             every PERSONAS entry with signsIn
+//        pnpm e2e:register <user>...  just these (an override)
+// Needs the e2e app on E2E_BASE_URL (pnpm e2e:start in another terminal).
 //
 // Re-run safe: a user whose credential file exists AND whose row exists is
 // skipped. Registration creates the row with created_at = now(); the seeder

@@ -121,7 +121,7 @@ function cleanError(message: string | undefined): string {
 /**
  * Parses `text` as JSON, or throws an error naming the file (and line) and
  * what to do -- a run cut short can leave a truncated results file, and
- * `npm run e2e:gallery` is run by hand.
+ * `pnpm e2e:gallery` is run by hand.
  */
 function parseJson<T>(text: string, where: string): T {
   try {

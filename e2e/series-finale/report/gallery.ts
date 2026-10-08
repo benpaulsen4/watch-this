@@ -12,7 +12,7 @@
 // screenshots/<project>/**, cards/*.png, and mutation-i1/ when the one-off I1
 // mutation check (ruling E9) has left its evidence there.
 //
-// Nothing here touches the database or the app: `npm run e2e:gallery` can
+// Nothing here touches the database or the app: `pnpm e2e:gallery` can
 // rebuild both files from the artifacts at any time.
 //
 // The parts: load.ts reads the artifacts and links screenshots to checks,

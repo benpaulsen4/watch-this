@@ -1,0 +1,107 @@
+# Lifecycle scripts run only for packages listed here as true. Anything new
+# that ships one fails the install (strictDepBuilds) until it is reviewed.
+#
+# esbuild -- install.js validates the platform binary that pnpm installs as
+#   an optionalDependency and swaps it in for the JS shim.
+# @vercel/speed-insights -- a migration helper that reads .env* files looking
+#   for the old VERCEL_ANALYTICS_ID and rewrites the project. Nothing to build,
+#   and it has no business reading .env.local.
+# unrs-resolver -- `napi-postinstall ... check` only re-verifies the native
+#   binding pnpm already installed, and downloads one if it is missing. If it
+#   is ever missing, eslint fails loudly, which is preferable to a fetch here.
+allowBuilds:
+  esbuild: true
+  "@vercel/speed-insights": false
+  unrs-resolver: false
+
+# Every entry below must earn its place: an override silently violates what a
+# dependency declared it can work with, so it is only worth it to reach a
+# patched version the tree cannot otherwise resolve.
+#
+# postcss ^8.5.18 -- load-bearing. Without it the tree also resolves 8.4.31
+# and 8.5.15, both inside GHSA-r28c-9q8g-f849 (high, <=8.5.17).
+# @types/react, @types/react-dom -- pinned to match the react/react-dom
+# versions exactly; React 19 types are not compatible across minors.
+#
+# SUPPLY-13: brace-expansion is still NOT overridden, and no longer needs
+# to be. The versions this tree resolves -- 1.1.21 under eslint's
+# minimatch@3 and 5.0.12 under typescript-eslint's minimatch@10 -- are both
+# past the fixes for GHSA-mh99-v99m-4gvg and GHSA-rgw5-rvv9-x895, so
+# `pnpm audit` is clean on it without one. An override would still be wrong:
+# the 5.x line changed its export from `module.exports = expand` to
+# `{ expand }` and eslint's minimatch@3 calls the import directly, so pinning
+# ^5 breaks `eslint .` with 'expand is not a function'. Leave it unpinned and
+# let each consumer resolve the API it declares.
+#
+# SUPPLY-04: ajv, @babel/core, flatted, ws and js-yaml were removed because
+# the tree resolves to the same patched versions without them. sharp was
+# removed for the same reason, but only just: it was load-bearing against
+# next 16.2, which declares sharp ^0.34.5 and so resolved 0.34.5, inside
+# GHSA-f88m-g3jw-g9cj (high, <0.35.0). next 16.3 declares ^0.35.4 itself,
+# next is sharp's only consumer here, and 0.35.4 is also the floor for
+# GHSA-rgj7-g3m4-5g8c (high, <0.35.4, bundled libheif) -- so the override no
+# longer changes the resolution and cannot earn its place. It has to come
+# back if next's ^16.3.6 floor is ever lowered below 16.3. GHSA-wq5f-xc86-pv6w
+# (high, <0.35.5, bundled librsvg) has since raised the bar past next's own
+# floor: sharp 0.35.5 is inside next's ^0.35.4, so it needs no override, but
+# it is held by the LOCKFILE only. source-map-js 1.2.2, which closes
+# GHSA-68fv-2mgg-jv7q (high, <1.2.2), is in the same position under every
+# postcss's ^1.2.1. picomatch was
+# removed for a stronger reason: it forced micromatch (which declares ^2.3.1)
+# across two majors to 4.0.4, and micromatch's own resolution is 2.3.2 --
+# already the patched version, since the advisories are ranged <2.3.2. It
+# bought nothing and violated a declared range.
+#
+# SUPPLY-05: esbuild is still NOT overridden globally. Four consumers declare
+# mutually disjoint ranges (vite ^0.27.0, tsx ~0.28.0, drizzle-kit ^0.25.4,
+# @esbuild-kit/core-utils ~0.18.20), so no single version satisfies them and
+# any blanket pin violates three of the four. The old ^0.28.1 pin was for
+# GHSA-gv7w-rqvm-qjhr, which was WITHDRAWN on 2026-06-17.
+#
+# What IS pinned is one scoped override: esbuild ^0.25.12 under
+# @esbuild-kit/core-utils only, which clears GHSA-67mh-4wv8-2f99 (moderate,
+# <=0.24.2) without touching the esbuild that vite, tsx or drizzle-kit
+# resolve for themselves. Nothing else can clear it: @esbuild-kit/* is
+# deprecated and pinned to esbuild ~0.18.20 forever, drizzle-kit only drops
+# the dependency in its 1.0.0 prereleases, and npm's `audit fix --force`
+# offered to DOWNGRADE drizzle-kit to 0.18.1. The override is safe because
+# drizzle-kit 0.31 declares @esbuild-kit/esm-loader but never imports it --
+# it loads configs through tsx -- and because the transform API core-utils
+# calls is unchanged between 0.18 and 0.25. pnpm stores esbuild@0.25.12 once,
+# so core-utils and drizzle-kit share it. Under npm the hoisted copy cost a
+# second set of platform binaries; that cost is gone. Drop it once
+# drizzle-kit 1.0 is stable; the 1.0.0-rc line no longer depends on
+# @esbuild-kit at all.
+#
+# GHSA-g7r4-m6w7-qqqr (low, 0.27.3 - 0.28.0) is held closed on vite's path
+# by the LOCKFILE only, not by anything declared here. vite declares
+# ^0.27.0 and every 0.27.x above 0.27.2 is inside the advisory. The lockfile
+# resolves vite onto esbuild 0.27.2 and `pnpm install --frozen-lockfile`
+# reproduces it, but an unconstrained `pnpm update` can refloat vite to
+# 0.27.7 and silently reopen it. A scoped override was tried under npm and
+# reverted: npm leaked `"vite": { "esbuild": ... }` onto tsx as well, which
+# pulled tsx's esbuild to 0.27.2 against its declared ~0.28.0. pnpm's
+# `vite>esbuild` selector does not have that bug, so the override is worth
+# revisiting now. Until then, re-check this path after any dependency update;
+# it is the one advisory in the tree that nothing here is holding shut.
+#
+# GHSA-vfj7-8cjw-p6xm (high, braces <=3.0.3) is OPEN and cannot be closed
+# here. It has no patched release -- 3.0.3 is the latest braces -- so no
+# version bump or override reaches a fix. Its one remaining path is
+# @next/eslint-plugin-next, which pins fast-glob to exactly 3.3.1 in every
+# 16.x release including canary; every fast-glob depends on micromatch ^4,
+# which depends on braces ^3. npm's `audit fix --force` offered
+# eslint-config-next 14.2.35, a two-major downgrade that does not pair with
+# next 16, and was not taken. Exposure is nil in practice: the plugin only
+# globs `settings.next.rootDir` from eslint.config.mjs (unset here), in a
+# dev-only lint run that ships nothing. The other path, typescript-eslint
+# 8.46, was closed by moving it to 8.71, which replaced fast-glob with
+# tinyglobby -- but eslint-config-next declares ^8.46.0, so like vite's
+# esbuild that fix is held by the LOCKFILE only. Revisit when braces ships
+# a fix or @next/eslint-plugin-next drops fast-glob. It is the one finding
+# `pnpm audit` should report; anything else is new.
+overrides:
+  "@types/react": 19.2.2
+  "@types/react-dom": 19.2.2
+  "@esbuild-kit/core-utils>esbuild": ^0.25.12
+  postcss: ^8.5.18

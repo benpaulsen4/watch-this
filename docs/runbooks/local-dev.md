@@ -10,21 +10,21 @@ Primary references:
 
 ## Setup
 
-- Install dependencies and create `.env.local` from `.env.example`.
+- Install dependencies with `pnpm install` (not npm: `pnpm-lock.yaml` is the lockfile) and create `.env.local` from `.env.example`.
 - Ensure Postgres is running and `DATABASE_URL` points to it.
 - Set `TMDB_API_KEY`.
 - Set `WEBAUTHN_SECRET` (required for signing session + challenge tokens).
 
 ## Database
 
-- Fast dev approach: `npm run db:push`
-- Migration approach: `npm run db:generate` then `npm run db:migrate`
+- Fast dev approach: `pnpm db:push`
+- Migration approach: `pnpm db:generate` then `pnpm db:migrate`
 
 ## App
 
-- Start dev server: `npm run dev`
-- Build: `npm run build`
-- Start production server locally: `npm run start`
+- Start dev server: `pnpm dev`
+- Build: `pnpm build`
+- Start production server locally: `pnpm start`
 
 ## Auth Notes (WebAuthn)
 

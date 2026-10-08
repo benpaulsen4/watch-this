@@ -153,7 +153,7 @@ export const NOTES: NoteDef[] = [
   {
     title: "WebKit could not launch on this host",
     ids: [],
-    text: "Missing system libraries (Task 1); installing them needs `sudo npx playwright install-deps`, a system change outside this suite. webkit-phone skips with that reason, so there are no Safari-engine screenshots.",
+    text: "Missing system libraries (Task 1); installing them needs `sudo pnpm exec playwright install-deps`, a system change outside this suite. webkit-phone skips with that reason, so there are no Safari-engine screenshots.",
   },
   {
     title: "P19 logout flash not reproduced",

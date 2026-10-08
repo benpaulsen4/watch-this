@@ -11,7 +11,7 @@ const MUTATING_SPEC_PATTERN = /(8\d|9\d)-.*\.e2e\.ts$|.*\.mutating\.e2e\.ts$/;
 // desktop-mutating -- and names each invocation here, so each keeps its own
 // JSON results, HTML report and test output (results-readonly.json,
 // playwright-report-readonly/, test-output-readonly/, and the same for
-// "mutating"). A direct `npx playwright test` has no name and writes
+// "mutating"). A direct `pnpm exec playwright test` has no name and writes
 // results.json, playwright-report/ and test-output/.
 const REPORT_RUN = process.env.E2E_REPORT_RUN;
 const REPORT_SUFFIX = REPORT_RUN && /^[a-z-]+$/.test(REPORT_RUN) ? `-${REPORT_RUN}` : "";
@@ -78,9 +78,9 @@ export default defineConfig({
   // No `env` here, and no buildE2eEnv() at config load: Playwright's reporters
   // serialise the config, and a webServer env once wrote the real TMDB key
   // into artifacts/results.json (E7). run.ts builds the env for the server
-  // itself, and `npm run e2e:test` scans artifacts/ for secrets afterwards.
+  // itself, and `pnpm e2e:test` scans artifacts/ for secrets afterwards.
   webServer: {
-    command: "npx tsx e2e/series-finale/env/run.ts start",
+    command: "pnpm exec tsx e2e/series-finale/env/run.ts start",
     url: `${E2E_BASE_URL}/auth`,
     // Reused only if it is the e2e server: global-setup.ts checks the
     // listener's DATABASE_URL before any spec runs.

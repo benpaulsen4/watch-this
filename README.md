@@ -22,6 +22,8 @@ Movie and TV watchlists for you and your friends, with passkey security, shared 
 ## Prerequisites
 
 - Node.js 20.9+ (Next.js 16 requirement; CI runs 20.x)
+- pnpm -- the exact version is pinned by `packageManager` in `package.json`, and
+  any pnpm from 9.7 on switches to it automatically
 - PostgreSQL
 - TMDB API key
 
@@ -30,7 +32,7 @@ Movie and TV watchlists for you and your friends, with passkey security, shared 
 1. Install dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 2. Create your environment file
@@ -56,20 +58,20 @@ At minimum, set `DATABASE_URL` and `TMDB_API_KEY`.
 For development, the simplest approach is to push the schema:
 
 ```bash
-npm run db:push
+pnpm db:push
 ```
 
 If you want migrations instead:
 
 ```bash
-npm run db:generate
-npm run db:migrate
+pnpm db:generate
+pnpm db:migrate
 ```
 
 5. Run the app
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Open http://localhost:3000
@@ -99,20 +101,20 @@ validating passkey ceremonies against `localhost`.
 
 ## Scripts
 
-| Command               | Description                  |
-| --------------------- | ---------------------------- |
-| `npm run dev`         | Start dev server (Turbopack) |
-| `npm run build`       | Build for production         |
-| `npm run start`       | Start production server      |
-| `npm run lint`        | Run ESLint                   |
-| `npm run test`        | Run tests once (CI-friendly) |
-| `npm run test:coverage` | Run tests with a v8 coverage report and thresholds |
-| `npm run test:watch`  | Run tests in watch mode      |
-| `npm run test:ui`     | Run tests with Vitest UI     |
-| `npm run db:generate` | Generate Drizzle migrations  |
-| `npm run db:migrate`  | Apply Drizzle migrations     |
-| `npm run db:push`     | Push schema directly (dev)   |
-| `npm run db:studio`   | Open Drizzle Studio          |
+| Command              | Description                  |
+| -------------------- | ---------------------------- |
+| `pnpm dev`           | Start dev server (Turbopack) |
+| `pnpm build`         | Build for production         |
+| `pnpm start`         | Start production server      |
+| `pnpm lint`          | Run ESLint                   |
+| `pnpm test`          | Run tests once (CI-friendly) |
+| `pnpm test:coverage` | Run tests with a v8 coverage report and thresholds |
+| `pnpm test:watch`    | Run tests in watch mode      |
+| `pnpm test:ui`       | Run tests with Vitest UI     |
+| `pnpm db:generate`   | Generate Drizzle migrations  |
+| `pnpm db:migrate`    | Apply Drizzle migrations     |
+| `pnpm db:push`       | Push schema directly (dev)   |
+| `pnpm db:studio`     | Open Drizzle Studio          |
 
 ## Data sources & attribution
 

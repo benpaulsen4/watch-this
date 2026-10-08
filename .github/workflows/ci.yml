@@ -3,8 +3,11 @@ name: CI
 # SUPPLY-09: third-party actions are pinned to full commit SHAs, not to the
 # floating `@v4` tag. A major tag is mutable -- whoever controls the action
 # repository can repoint it at new code, which then runs here with access to the
-# checkout and the npm cache. The trailing comment is the version that SHA is,
+# checkout and the pnpm store. The trailing comment is the version that SHA is,
 # so the pin stays readable; update both together.
+#
+# pnpm/action-setup takes no version input: it reads the exact pnpm pin from
+# packageManager in package.json, so CI and local installs cannot drift apart.
 
 on:
   pull_request:
@@ -17,16 +20,18 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20.x"
-          cache: "npm"
-          cache-dependency-path: "package-lock.json"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
       - name: Install
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm typecheck
 
   lint:
     runs-on: ubuntu-latest
@@ -34,18 +39,20 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20.x"
-          cache: "npm"
-          cache-dependency-path: "package-lock.json"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
       - name: Install
-        run: npm ci
-      # `npm run lint` rewrites files with --fix, which would let a violation
+        run: pnpm install --frozen-lockfile
+      # `pnpm lint` rewrites files with --fix, which would let a violation
       # pass here. lint:ci is the non-mutating, warnings-are-errors form.
       - name: Lint
-        run: npm run lint:ci
+        run: pnpm lint:ci
 
   vitest:
     runs-on: ubuntu-latest
@@ -53,19 +60,21 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20.x"
-          cache: "npm"
-          cache-dependency-path: "package-lock.json"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
       - name: Install
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       # Runs the suite with coverage so the thresholds in vitest.config.mts are
       # actually enforced somewhere. They are floors just under current
       # coverage, so this fails on a real regression, not on ordinary churn.
       - name: Test
-        run: npm run test:coverage
+        run: pnpm test:coverage
         env:
           CI: true
 
@@ -75,16 +84,18 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20.x"
-          cache: "npm"
-          cache-dependency-path: "package-lock.json"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
       - name: Install
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Build
-        run: npm run build
+        run: pnpm build
         env:
           # src/lib/db/index.ts throws at module scope when DATABASE_URL is
           # unset, and `next build` evaluates route modules while collecting

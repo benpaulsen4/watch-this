@@ -45,7 +45,7 @@ function pngSize(bytes: Uint8Array): { width: number; height: number } {
 
 /**
  * For eyeballing the layout, not for assertions:
- * `SHARE_CARD_PNG_DIR=/some/dir npx vitest run share-card` writes each render
+ * `SHARE_CARD_PNG_DIR=/some/dir pnpm exec vitest run share-card` writes each render
  * there as `<name>.png`. Unset in normal runs, so nothing is written.
  */
 async function keepForInspection(name: string, png: Uint8Array) {

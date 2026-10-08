@@ -21,7 +21,7 @@ import { test } from "../support/test";
 // (Pixel 7 at 390 x 844, DPR 2, touch) rather than adding a phone-mutating
 // project, so run.ts's two invocations (read-only projects, then
 // desktop-mutating alone) and the report's project list stay as they are.
-// Leaves cy's 2025 marked: re-running needs a fresh database (npm run e2e:all).
+// Leaves cy's 2025 marked: re-running needs a fresh database (pnpm e2e:all).
 
 const CY = "e2e_cy";
 const YEAR = "2025";
@@ -60,7 +60,7 @@ function recordCompletions(page: Page): { status: number | null }[] {
 test("on a phone, reaching the summary card marks the story gone through; then the recap opens", async ({ page, hasTouch }) => {
   const before = storedCompletion();
   check("completion-precondition", "cy's 2025 story is not yet marked gone through (a fresh database)", "", before);
-  if (before !== "") throw new Error("cy's 2025 is already completed: reset the database (npm run e2e:all) before re-running this spec");
+  if (before !== "") throw new Error("cy's 2025 is already completed: reset the database (pnpm e2e:all) before re-running this spec");
 
   const posts = recordCompletions(page);
   await page.goto(RECAP_PATH);

@@ -2,13 +2,13 @@
 // Writes the e2e cast into the throwaway database, warms the TMDB caches
 // through the app's own code, and pre-generates the 2025 percentile cohort.
 //
-// Run through `npm run e2e:seed` (run.ts spawns this with buildE2eEnv(), so
+// Run through `pnpm e2e:seed` (run.ts spawns this with buildE2eEnv(), so
 // DATABASE_URL is the e2e database and never .env.local's). The signing-in
-// personas must already exist (`npm run e2e:register`). Re-runnable: every
+// personas must already exist (`pnpm e2e:register`). Re-runnable: every
 // seeded user's history, statuses, lists and snapshots are cleared first.
 //
-//   npm run e2e:seed                    the whole seed
-//   npm run e2e:seed -- --resolve-only  just resolve catalogue.lock.json
+//   pnpm e2e:seed                 the whole seed
+//   pnpm e2e:seed --resolve-only  just resolve catalogue.lock.json
 //
 // Everything that touches the database is imported dynamically, AFTER the
 // DATABASE_URL guard at the top of main(): a static import of src/lib/db
@@ -161,13 +161,13 @@ async function main(): Promise<void> {
     const fixedId = FIXED_IDS[persona.username];
     if (existing) {
       if (fixedId && existing.id !== fixedId) {
-        throw new Error(`${persona.username} exists with id ${existing.id}, not ${fixedId}; reset the e2e db (npm run e2e:db:reset)`);
+        throw new Error(`${persona.username} exists with id ${existing.id}, not ${fixedId}; reset the e2e db (pnpm e2e:db:reset)`);
       }
       ids.set(persona.username, existing.id);
       continue;
     }
     if (persona.signsIn) {
-      throw new Error(`${persona.username} signs in but is not registered; run npm run e2e:register first`);
+      throw new Error(`${persona.username} signs in but is not registered; run pnpm e2e:register first`);
     }
     const [row] = await db
       .insert(users)

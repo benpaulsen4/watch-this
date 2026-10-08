@@ -9,7 +9,7 @@
 // Run directly to resolve the lock once. It needs TMDB_API_KEY, so launch it
 // with buildE2eEnv() (the key comes from .env.local via readTmdbKey(); it is
 // never printed):
-//   npm run e2e:seed -- --resolve-only   (once Task 4 wires the flag)
+//   pnpm e2e:seed --resolve-only   (once Task 4 wires the flag)
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
