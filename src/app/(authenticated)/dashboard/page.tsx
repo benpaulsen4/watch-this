@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ActivityFeed } from "@/components/activity/ActivityFeed";
 import { ContentCardSkeleton } from "@/components/content/ContentCardSkeleton";
 import TrendingStrip from "@/components/content/TrendingStrip";
+import { SeriesFinaleBanner } from "@/components/series-finale/SeriesFinaleBanner";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ProfileImage } from "@/components/ui/ProfileImage";
@@ -42,6 +43,8 @@ export default async function DashboardPage() {
       </PageHeader>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <SeriesFinaleBanner />
+
         {/* Activity Feed */}
         <section className="mb-8">
           <ActivityFeed currentUsername={user.username} />

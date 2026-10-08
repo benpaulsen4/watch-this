@@ -1,0 +1,315 @@
+/**
+ * The Series Finale payload is the single contract between the aggregation
+ * engine and every consumer -- the story, the desktop recap, and the share
+ * image are three renderings of one object, not three query paths.
+ *
+ * Every optional-looking field is explicitly nullable rather than absent, so a
+ * consumer can distinguish "computed, and there is nothing to say" from "this
+ * payload predates the field". `schemaVersion` covers the second case.
+ */
+
+/**
+ * Bumped whenever a stored payload would read differently if generated today;
+ * a row below it regenerates on its next read.
+ *
+ * 2: crew entries no longer carry a collaborator's hours or top show, and
+ *    `shame.stillPlanning` leaves out films added after the period ended.
+ * 3: `period.timezone`, labelled `bigDay.timeline` points, `rhythm.hourCounts`
+ *    and `rhythm.sharedListShare`; the crew keeps the most active
+ *    collaborators rather than the lowest user ids.
+ * 4: `rhythm.topGenreName` and `rhythm.topGenreShare`, the title share the
+ *    one-genre-only archetype is classified on.
+ * 5: the weekday-marathoner rule is judged on the top weekday only, the day
+ *    its label names.
+ * 6: a batch is also any run of one show's ticks within `BATCH_GAP_MS` of
+ *    each other, not just rows sharing one timestamp, so seasons marked before
+ *    July 2026 stop counting as solo ticks.
+ */
+export const SERIES_FINALE_SCHEMA_VERSION = 6;
+
+/**
+ * Minimum individually-ticked episodes before any intra-day statistic is
+ * reported. Below this, a handful of ticks would be presented as a habit.
+ */
+export const SOLO_TICK_FLOOR = 50;
+
+/** Below both of these, the period is too thin to render as a story. */
+export const THIN_YEAR_EPISODES = 10;
+export const THIN_YEAR_TITLES = 5;
+
+export type ArchetypeId =
+  | "serial-abandoner"
+  | "completionist"
+  | "weekday-marathoner"
+  | "feast-or-famine"
+  | "nightly-ritualist"
+  | "one-genre-only"
+  | "deep-cut-hunter"
+  | "group-watcher";
+
+// ---------------------------------------------------------------------------
+// Input rows -- what the service loads and hands to the engine
+// ---------------------------------------------------------------------------
+
+export interface WatchedEpisodeRow {
+  tmdbId: number;
+  seasonNumber: number;
+  episodeNumber: number;
+  watchedAt: Date;
+}
+
+export interface ContentStatusRow {
+  tmdbId: number;
+  contentType: "movie" | "tv";
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TitleMeta {
+  tmdbId: number;
+  contentType: "movie" | "tv";
+  title: string;
+  posterPath: string | null;
+  genreIds: number[];
+  popularity: number;
+  runtime: number | null;
+}
+
+/**
+ * A collaborator as the payload stores them: exactly what the crew ranking
+ * renders, and nothing else. The payload reaches the viewer's browser whole,
+ * so a field kept here is disclosed whether or not a card draws it -- which
+ * is why a collaborator's hours and most-watched show are not here. The
+ * service computes those internally (see its `CollaboratorTotals`) and keeps
+ * only the `alsoTopFor` line derived from the latter.
+ */
+export interface CrewMemberTotals {
+  userId: string;
+  username: string;
+  episodes: number;
+}
+
+export interface ComparePeer {
+  userId: string;
+  username: string;
+  completedKeys: string[];
+  planningKeys: string[];
+  droppedKeys: string[];
+}
+
+/**
+ * What the loader hands the engine.
+ *
+ * The two row arrays are deliberately scoped differently, and nothing in the
+ * types can enforce it -- see the notes on each. Getting either wrong produces
+ * a plausible-looking recap rather than an error.
+ */
+export interface AggregationInput {
+  period: { start: Date; end: Date; label: string };
+  timeZone: string;
+  /**
+   * Episodes watched **inside the period**, and only those.
+   *
+   * Nothing downstream re-filters them: `headline.episodes`, `episodes.total`,
+   * `episodes.perDay`, `topShow`, `bigDay`, `rhythm`, `months` and the
+   * archetype's solo-tick inputs all consume this array whole. Hand it a
+   * user's entire history and every one of those silently describes their
+   * lifetime instead of their year -- a bigger `bigDay` than the year held, a
+   * streak that never happened, and a `perDay` computed over the wrong
+   * numerator. Nothing throws.
+   */
+  episodes: WatchedEpisodeRow[];
+  /**
+   * Status rows for **every title the user has**, all-time, not scoped to the
+   * period.
+   *
+   * The aggregators that want the period apply their own `isWithin` on
+   * `updatedAt` (`countFinished`, `countDropped`, `buildNiche`, `buildGenres`,
+   * `buildShame`'s dropped list, the paused count), so pre-filtering buys them
+   * nothing. One consumer deliberately wants everything before the period's
+   * end: `buildShame`'s `stillPlanning`, which is there to name the film added
+   * three years ago and never watched. A period-scoped array keeps only the
+   * rows touched this year, so exactly the worst offenders vanish and the list
+   * comes back short but well-formed -- again without throwing.
+   */
+  statuses: ContentStatusRow[];
+  titles: Map<string, TitleMeta>;
+  genreNames: Map<number, string>;
+  episodeMinutes: { minutes: number; unknownCount: number };
+  filmMinutes: { minutes: number; unknownCount: number };
+  episodeRuntimeLookup: Map<string, number | null>;
+  collaborativeCompletedKeys: Set<string>;
+  crew: CrewMemberTotals[];
+  peers: ComparePeer[];
+  percentile: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Payload
+// ---------------------------------------------------------------------------
+
+export interface SeriesFinalePayload {
+  schemaVersion: number;
+  /**
+   * `timezone` is the IANA zone the snapshot was generated in -- the zone
+   * every local date, weekday and hour below was computed in. A renderer
+   * placing `bigDay.timeline` instants on a clock must use it rather than the
+   * browser's own zone, or a recap viewed abroad would move its big day's
+   * episodes to hours they were not watched at.
+   */
+  period: { start: string; end: string; label: string; timezone: string };
+
+  headline: {
+    hours: number;
+    minutes: number;
+    episodes: number;
+    titlesCompleted: number;
+    titlesDropped: number;
+    unknownRuntimeEpisodes: number;
+    percentile: number | null;
+  };
+
+  episodes: { total: number; perDay: number };
+  finished: { films: number; shows: number; total: number };
+
+  topShow: {
+    tmdbId: number;
+    title: string;
+    posterPath: string | null;
+    episodes: number;
+    minutes: number;
+    finishedAt: string | null;
+    alsoTopFor: string[];
+  } | null;
+
+  niche: {
+    tmdbId: number;
+    title: string;
+    posterPath: string | null;
+    popularity: number;
+    medianPopularity: number;
+    mostPopular: { tmdbId: number; title: string; popularity: number } | null;
+    filmPopularities: number[];
+  } | null;
+
+  genres: { name: string; percent: number }[];
+  months: { month: number; episodes: number }[];
+
+  /**
+   * Individually-ticked episodes across the **whole period**.
+   *
+   * The third site of a name that means three different denominators, and the
+   * two payload-facing ones sit next to each other on purpose:
+   * `bigDay.soloTickCount` below counts one day's, this counts the year's, and
+   * `ArchetypeInput.soloTickCount` is this one. Disclosure copy explaining why
+   * an intra-day statistic is missing has to quote the period total -- it is
+   * the number `SOLO_TICK_FLOOR` is actually compared against -- so reaching
+   * for `bigDay.soloTickCount` instead would understate it, typecheck, and
+   * render.
+   */
+  soloTickTotal: number;
+
+  bigDay: {
+    date: string;
+    episodes: number;
+    minutes: number;
+    /**
+     * Individually-ticked episodes on `date`, in time order, or null when the
+     * period as a whole has too few of them to describe a time of day.
+     *
+     * The floor is a period-level gate, not a per-day one, so a non-null
+     * timeline may still hold very few points -- one is possible, for a user
+     * who ticks episodes individually all year but happened to bulk-mark their
+     * biggest day. Renderers should check the length before drawing anything
+     * that implies a session, rather than assuming non-null means chartable.
+     *
+     * Each point names the episode: `title` is the show's cached title, or
+     * null when the cache has none -- the point is kept, because its time is
+     * still true and dropping it would make the timeline disagree with
+     * `soloTickCount`. `episode` is a code in the same format as
+     * `shame.dropped[].lastEpisode` (`S2E03`).
+     */
+    timeline: { at: string; title: string | null; episode: string }[] | null;
+    /**
+     * Solo ticks on `date` only. Not the period-wide count that gates
+     * `timeline` and feeds `ArchetypeInput.soloTickCount` -- same name, and
+     * deliberately different denominators.
+     */
+    soloTickCount: number;
+    streak: { days: number; start: string; end: string } | null;
+  } | null;
+
+  rhythm: {
+    archetype: ArchetypeId | null;
+    weekdayCounts: number[];
+    topWeekday: number | null;
+    lateShare: number | null;
+    /**
+     * Solo ticks by local hour in `period.timezone`, 24 entries from 00:00, or
+     * null below `SOLO_TICK_FLOOR` -- the same gate as `lateShare`, for the
+     * same reason. Sums to `soloTickTotal` when present.
+     */
+    hourCounts: number[] | null;
+    /**
+     * Share of the titles finished in the period that sit on a list shared
+     * with someone else, unrounded -- the value the group-watcher archetype is
+     * classified on. Null when nothing was finished, where the archetype reads
+     * 0 because it has nothing to divide by.
+     */
+    sharedListShare: number | null;
+    /**
+     * The genre carried by the most titles finished in the period, and the
+     * share of those titles carrying it, unrounded -- the value the
+     * one-genre-only archetype is classified on. Not `genres[0]`: that ranks
+     * genre TAGS (a title carries two or three), so both its percent and, on
+     * a near tie, its genre can differ. The denominator is finished titles
+     * with cached metadata. Both null together, when no finished title has a
+     * known genre; the archetype then reads 0. The name is "Unknown" for a
+     * genre id with no name, as in `genres`.
+     */
+    topGenreName: string | null;
+    topGenreShare: number | null;
+  };
+
+  shame: {
+    dropped: {
+      tmdbId: number;
+      title: string;
+      /**
+       * Furthest episode reached, in season/episode order, **drawn only from
+       * `AggregationInput.episodes`** -- which is period-scoped. A show
+       * dropped in the period but last actually watched in an earlier one
+       * therefore reports null rather than the episode the user stopped on.
+       * Accepted: the alternative is loading an all-time episode map for a
+       * single line of copy. A caller that wants it can supply one.
+       */
+      lastEpisode: string | null;
+    }[];
+    stillPlanning: {
+      tmdbId: number;
+      title: string;
+      days: number;
+      runtime: number | null;
+    }[];
+  };
+
+  crew: CrewMemberTotals[];
+
+  compare: {
+    userId: string;
+    username: string;
+    onlyYou: number;
+    both: number;
+    onlyThem: number;
+    theyFinishedYouDropped: string | null;
+    bothPlanningNeitherStarted: string | null;
+  }[];
+
+  thin: boolean;
+}
+
+/** Stable key for a title across both content types. */
+export function titleKey(tmdbId: number, contentType: "movie" | "tv"): string {
+  return `${contentType}:${tmdbId}`;
+}

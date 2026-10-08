@@ -156,7 +156,7 @@ export async function generatePasskeyRegistrationOptions(username: string) {
     attestationType: "none",
     authenticatorSelection: {
       residentKey: "preferred",
-      userVerification: "preferred",
+      userVerification: "required",
       authenticatorAttachment: "platform",
     },
   };
@@ -252,7 +252,7 @@ export async function generateAdditionalPasskeyRegistrationOptions(
     attestationType: "none",
     authenticatorSelection: {
       residentKey: "preferred",
-      userVerification: "preferred",
+      userVerification: "required",
       authenticatorAttachment: "platform",
     },
   };
@@ -353,7 +353,7 @@ export async function generatePasskeyAuthenticationOptions() {
   const options: GenerateAuthenticationOptionsOpts = {
     rpID: getRpId(),
     timeout: 60000,
-    userVerification: "preferred",
+    userVerification: "required",
   };
 
   return await generateAuthenticationOptions(options);
@@ -392,6 +392,7 @@ export async function verifyPasskeyAuthentication(
     expectedChallenge,
     expectedOrigin: getWebAuthnOrigin(),
     expectedRPID: getRpId(),
+    requireUserVerification: true,
     credential: {
       id: credential.credentialId,
       publicKey: Buffer.from(credential.publicKey, "base64url"),

@@ -9,6 +9,9 @@ vi.mock("@/components/content/TrendingStrip", () => ({ default: () => null }));
 vi.mock("@/components/activity/ActivityFeed", () => ({
   ActivityFeed: () => null,
 }));
+vi.mock("@/components/series-finale/SeriesFinaleBanner", () => ({
+  SeriesFinaleBanner: () => null,
+}));
 
 /**
  * Emulates the sub-640px layout. Tailwind's `hidden` is display:none, which is

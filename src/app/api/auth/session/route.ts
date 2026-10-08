@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
         profilePictureUrl: user.profilePictureUrl,
         timezone: user.timezone,
         createdAt: user.createdAt,
+        shareStatsWithCollaborators: user.shareStatsWithCollaborators,
       },
     });
   } catch (error) {
@@ -64,7 +65,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { username, profilePictureUrl, timezone } = body;
+    const { username, profilePictureUrl, timezone, shareStatsWithCollaborators } =
+      body;
 
     // Validate input
     if (username !== undefined) {
@@ -140,6 +142,15 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    if (shareStatsWithCollaborators !== undefined) {
+      if (typeof shareStatsWithCollaborators !== "boolean") {
+        return NextResponse.json(
+          { error: "shareStatsWithCollaborators must be a boolean" },
+          { status: 400 },
+        );
+      }
+    }
+
     // Check if username is already taken (if username is being updated)
     if (username !== undefined && username !== user.username) {
       const existingUser = await db
@@ -173,6 +184,10 @@ export async function PUT(request: NextRequest) {
       updateData.timezone = timezone;
     }
 
+    if (shareStatsWithCollaborators !== undefined) {
+      updateData.shareStatsWithCollaborators = shareStatsWithCollaborators;
+    }
+
     const [updatedUser] = await db
       .update(users)
       .set(updateData)
@@ -196,6 +211,7 @@ export async function PUT(request: NextRequest) {
         profilePictureUrl: updatedUser.profilePictureUrl,
         timezone: updatedUser.timezone,
         createdAt: updatedUser.createdAt,
+        shareStatsWithCollaborators: updatedUser.shareStatsWithCollaborators,
       },
     });
   } catch (error) {

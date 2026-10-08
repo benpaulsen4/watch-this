@@ -31,6 +31,7 @@ This directory contains implementation-focused documentation for the WatchThis c
 - [Episodes](domain/episodes.md)
 - [Schedules](domain/schedules.md)
 - [Profile](domain/profile.md)
+- [Series Finale](domain/series-finale.md)
 
 ## Integrations
 
@@ -42,3 +43,4 @@ This directory contains implementation-focused documentation for the WatchThis c
 - [Testing](testing/overview.md)
 - [Local Development](runbooks/local-dev.md)
 - [Troubleshooting](runbooks/troubleshooting.md)
+- [Series Finale Launch](runbooks/series-finale-launch.md)

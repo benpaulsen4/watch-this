@@ -1,11 +1,13 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import React, {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -137,6 +139,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshSession();
   }, [refreshSession]);
+
+  // The app has one QueryClient, and much of what it caches is keyed without
+  // a user id -- the recap payload, the share card -- because the server scopes
+  // it by session. So whenever the signed-in user changes (A to signed out,
+  // signed out to B, A to B), everything cached belongs to someone else and
+  // is dropped. Not on the first resolution: nobody has been replaced yet,
+  // and clearing would only throw away the first page's data.
+  //
+  // `undefined` means no session has resolved yet; afterwards it is the
+  // resolved user id, or null for signed out. A ref, not state: this records
+  // whose data the cache holds and never drives a render.
+  const queryClient = useQueryClient();
+  const cacheOwner = useRef<string | null | undefined>(undefined);
+  const userId = state.user?.id ?? null;
+  useEffect(() => {
+    if (state.loading) return;
+    const previous = cacheOwner.current;
+    cacheOwner.current = userId;
+    if (previous !== undefined && previous !== userId) queryClient.clear();
+  }, [state.loading, userId, queryClient]);
 
   // Load streaming preferences once the user is known. The guard is
   // `streamingLoaded`, not `streamingPreferences`: a failed request leaves the

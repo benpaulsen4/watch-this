@@ -1,0 +1,76 @@
+#!/usr/bin/env tsx
+// Registers the signing-in accounts through the real /auth UI, one fresh
+// Chromium context each, and keeps what later specs need under .auth/:
+// the passkey (`<username>.credential.json`) and a signed-in Playwright
+// storage state (`<username>.json`).
+//
+// Usage: npm run e2e:register              every PERSONAS entry with signsIn
+//        npm run e2e:register -- <user>...  just these (an override)
+// Needs the e2e app on E2E_BASE_URL (npm run e2e:start in another terminal).
+//
+// Re-run safe: a user whose credential file exists AND whose row exists is
+// skipped. Registration creates the row with created_at = now(); the seeder
+// backdates it.
+import { existsSync } from "node:fs";
+
+import { chromium } from "@playwright/test";
+
+import { PERSONAS } from "../seed/personas";
+import { credentialPath, enableVirtualAuthenticator, exportCredential, registerViaUi, storageStatePath } from "../support/auth";
+import { assertUsername, userExists } from "../support/db";
+import { assertE2eServer } from "./server-guard";
+import { E2E_BASE_URL } from "./test-env";
+
+async function main(): Promise<void> {
+  const override = process.argv.slice(2);
+  const usernames = override.length > 0 ? override : PERSONAS.filter((p) => p.signsIn).map((p) => p.username);
+  usernames.forEach(assertUsername);
+  // The server on the port must be the e2e one (its DATABASE_URL is checked):
+  // registering through any other would create accounts in its database.
+  assertE2eServer();
+
+  const browser = await chromium.launch();
+  try {
+    for (const username of usernames) {
+      const hasCredential = existsSync(credentialPath(username));
+      const hasRow = userExists(username);
+      if (hasCredential && hasRow) {
+        console.log(`${username}: already registered, skipped`);
+        continue;
+      }
+      if (hasRow) {
+        // The passkey is gone, so this account can never sign in again, and
+        // the username is taken, so it cannot be registered afresh.
+        throw new Error(`${username} exists in the e2e db but has no saved credential; reset the db (db.sh reset)`);
+      }
+
+      const context = await browser.newContext({
+        baseURL: E2E_BASE_URL,
+        timezoneId: "Australia/Brisbane",
+        locale: "en-AU",
+      });
+      try {
+        const page = await context.newPage();
+        const auth = await enableVirtualAuthenticator(page);
+        await registerViaUi(page, username);
+        // The row must be in the e2e database (read through podman, not the
+        // app): if it is not, the server that took the registration is not ours.
+        if (!userExists(username)) {
+          throw new Error(`${username} registered through ${E2E_BASE_URL}, but no such row is in the e2e database; stop that server`);
+        }
+        await exportCredential(auth, username);
+        await context.storageState({ path: storageStatePath(username) });
+        console.log(`${username}: registered`);
+      } finally {
+        await context.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});

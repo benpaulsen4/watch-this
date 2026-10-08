@@ -44,6 +44,12 @@ yarn-error.log*
 # agent worktrees (full repo checkouts - never commit these)
 .claude/worktrees/
 
+# series finale e2e: generated output and the per-run WebAuthn secret
+/e2e/series-finale/artifacts/
+/e2e/series-finale/.auth/
+/playwright-report/
+/test-results/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

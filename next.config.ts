@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-// SUPPLY-01. The app shipped with no security headers at all. `src/middleware.ts`
+// SUPPLY-01. The app shipped with no security headers at all. `src/proxy.ts`
 // exists but its matcher is scoped to /api/auth/* and /api/admin/* for rate
 // limiting, so it is the wrong place for site-wide headers -- these belong here,
 // where they apply to every response including static assets and /_next/image.

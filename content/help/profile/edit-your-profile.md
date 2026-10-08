@@ -36,7 +36,7 @@ To remove your picture, clear the URL and save.
 
 ## Change Your Timezone
 
-Your timezone affects schedule and “today” prompts for TV shows.
+Your timezone affects schedule and “today” prompts for TV shows. It also decides when each year's [Series Finale](/help/series-finale/what-is-series-finale) arrives, and which day and time each episode counts towards in it.
 
 1. Click **Change Timezone**.
 2. Choose your timezone from the list.
