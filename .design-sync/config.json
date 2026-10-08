@@ -6,7 +6,7 @@
   "srcDir": "src/components",
   "tsconfig": "tsconfig.json",
   "entry": ".design-sync/entry.tsx",
-  "buildCmd": "node .design-sync/build-css.mjs",
+  "buildCmd": "node .design-sync/build-css.mjs && node .design-sync/build-types.mjs",
   "cssEntry": ".design-sync/.cache/tailwind.css",
   "provider": {
     "component": "WatchThisPreviewRoot"

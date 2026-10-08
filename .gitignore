@@ -60,3 +60,5 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+# emitted by .design-sync/build-types.mjs for prop extraction
+/dist/types/

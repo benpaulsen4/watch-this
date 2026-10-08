@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "incremental": false,
+    "outDir": "../dist/types"
+  },
+  "exclude": [
+    "../node_modules",
+    "../dist",
+    "../.ds-sync",
+    "../ds-bundle",
+    "../.claude"
+  ],
+  "include": [
+    "../next-env.d.ts",
+    "../**/*.ts",
+    "../**/*.tsx",
+    "entry.tsx"
+  ]
+}

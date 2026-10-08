@@ -34,6 +34,19 @@ machine-readable side.
   `.design-sync/preview-root.tsx` reproduces it as `cfg.provider`; without it
   cards render dark-on-white and `useMutation` components throw.
 
+- **No declarations means no props.** The app ships no `.d.ts`, and until
+  Oct 2026 every emitted `<Name>.d.ts` was an empty `[key: string]: unknown`
+  bag, so the design agent had no typed API for anything.
+  `.design-sync/build-types.mjs` (second half of `cfg.buildCmd`) emits one into
+  `dist/types/` via `.design-sync/tsconfig.types.json`. Three constraints shape
+  it: the converter only probes fixed dirs (`dist/types` is one; there is no
+  config key for it); the tsconfig has to build the whole project, because a
+  narrower include loses Next's global types and `fetch(..., { next })` fails
+  to typecheck; and the emitted `.design-sync/` subtree is renamed to
+  `design-sync/` because the converter's glob skips dot-directories
+  (`BrandLogoProps` lives there). `dist/types/`, `.ds-sync/` and `ds-bundle/`
+  are also in `eslint.config.mjs` ignores, or local lint fails after a sync.
+
 ## Excluded, and why
 
 - **Async Server Components cannot render client-side** — `TrendingStrip`,
@@ -126,6 +139,20 @@ change.
   0 identical-variant, 0 floor cards.
 
 ## Re-sync risks — read this first
+
+- **Prop contracts are partial.** 20 of 30 `.d.ts` carry real props. Still
+  empty: the four no-prop components (`ContentCardSkeleton`, `BrandColors`,
+  `BrandTypography`, `BrandFoundations`) — correct; the `Card*` subparts, whose
+  props are plain `HTMLAttributes` that the converter filters by design; and
+  `Markdown` / `LandingSpotlightClient`, whose props are inline object types —
+  the converter only finds `<Name>Props` declarations (its call-signature
+  fallback needs a root `index.d.ts`). Naming those prop types in source would
+  fix them. Named app types are **not inlined**: `StatusBadge` says
+  `status: WatchStatusEnum` with no definition (also `ContentTypeEnum`,
+  `TMDBContent`, `ActivityItem`, `DropdownOption`, `ListListsResponse`).
+  Previews carry the real values. Two converter blemishes: `style?:
+  CSSProperties` is un-namespaced, and a `tw?: string` prop leaks in from
+  next/og's React augmentation — it does nothing in a design.
 
 - **Mock data is inlined in `.design-sync/previews/*.tsx` and will rot.**
   `ContentCard` (TMDBContent), `ListCard` (ListListsResponse) and `ActivityEntry`

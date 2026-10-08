@@ -6,7 +6,11 @@ export function Default() {
 
 export function WithActions() {
   return (
-    <PageHeader title="Weekend Watchlist" backLinkHref="/lists">
+    <PageHeader
+      title="Weekend Watchlist"
+      backLinkHref="/lists"
+      backLinkLabel="Back to lists"
+    >
       <Button size="sm" variant="outline">
         Share
       </Button>
@@ -20,6 +24,7 @@ export function WithSubheader() {
     <PageHeader
       title="Weekend Watchlist"
       backLinkHref="/lists"
+      backLinkLabel="Back to lists"
       subheaderSlot={
         <p className="text-sm text-gray-400">
           Shared with Ana and Marcus · 12 titles
