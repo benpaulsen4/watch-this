@@ -379,8 +379,8 @@ export const PERSONAS: PersonaSpec[] = [
     planning: [{ key: "nomadland", addedOn: "2026-05-03" }],
   },
 
-  // Batch ticker: every 2025 episode shares its timestamp with another, so no
-  // intra-day statistic can be shown.
+  // Batch ticker: every 2025 episode is part of a batch (within seconds of
+  // another), so no intra-day statistic can be shown.
   {
     username: "e2e_bat",
     signsIn: true,

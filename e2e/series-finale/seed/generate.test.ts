@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildPayload } from "../../../src/lib/series-finale/aggregate";
+import { BATCH_GAP_MS, partitionSoloTicks } from "../../../src/lib/series-finale/solo-ticks";
 import { THIN_YEAR_EPISODES, THIN_YEAR_TITLES, titleKey, type TitleMeta } from "../../../src/lib/series-finale/types";
 import { getTimezoneDateKey, getTimezoneHour } from "../../../src/lib/time";
 import { type CatalogueEntry, loadCatalogue } from "./catalogue";
@@ -104,11 +105,31 @@ function localYear(year: number, zoneOffsetHours: number): { start: Date; end: D
 
 const inside = (at: Date, window: { start: Date; end: Date }) => at >= window.start && at < window.end;
 
-function uniqueInstants(rows: EpisodeRow[]): EpisodeRow[] {
-  const counts = new Map<number, number>();
-  for (const row of rows) counts.set(row.watchedAt.getTime(), (counts.get(row.watchedAt.getTime()) ?? 0) + 1);
-  return rows.filter((row) => counts.get(row.watchedAt.getTime()) === 1);
+/** The rows the app counts as solo ticks. */
+const soloTicks = (rows: EpisodeRow[]): EpisodeRow[] => partitionSoloTicks(rows).solo;
+
+/**
+ * Each sitting, solo or batch, by the app's rule: rows are one sitting when
+ * they share an instant, or are the same show within the batch gap.
+ */
+function sittings(rows: EpisodeRow[]): EpisodeRow[][] {
+  const byTime = rows.slice().sort((a, b) => a.watchedAt.getTime() - b.watchedAt.getTime());
+  const parent = byTime.map((_, i) => i);
+  const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i]!)));
+  const join = (a: number, b: number) => (parent[root(a)] = root(b));
+  const lastOfShow = new Map<number, number>();
+  byTime.forEach((row, i) => {
+    if (i > 0 && byTime[i - 1]!.watchedAt.getTime() === row.watchedAt.getTime()) join(i - 1, i);
+    const previous = lastOfShow.get(row.tmdbId);
+    if (previous !== undefined && row.watchedAt.getTime() - byTime[previous]!.watchedAt.getTime() <= BATCH_GAP_MS) join(previous, i);
+    lastOfShow.set(row.tmdbId, i);
+  });
+  const groups = new Map<number, EpisodeRow[]>();
+  byTime.forEach((row, i) => groups.set(root(i), [...(groups.get(root(i)) ?? []), row]));
+  return [...groups.values()];
 }
+
+const sharesOneInstant = (batch: EpisodeRow[]) => new Set(batch.map((row) => row.watchedAt.getTime())).size === 1;
 
 function countBy<T>(items: T[], keyOf: (item: T) => string): Map<string, number> {
   const counts = new Map<string, number>();
@@ -173,17 +194,41 @@ describe("generate", () => {
     expect(inside(edge(40)!.watchedAt, year2025)).toBe(false);
   });
 
-  it("ticks soloShare of episodes alone, and batches the rest in 2-6 rows sharing a timestamp", () => {
-    const solo = uniqueInstants(rows.episodes);
+  it("ticks soloShare of episodes alone, and batches the rest in 2-6 rows", () => {
+    const solo = soloTicks(rows.episodes);
     expect(Math.abs(solo.length / rows.episodes.length - 0.5)).toBeLessThanOrEqual(0.02);
 
-    const batchSizes = [...countBy(rows.episodes, (row) => String(row.watchedAt.getTime())).values()].filter((n) => n > 1);
-    expect(batchSizes.length).toBeGreaterThan(0);
-    expect(batchSizes.every((n) => n >= 2 && n <= 6)).toBe(true);
+    const batches = sittings(rows.episodes).filter((sitting) => sitting.length > 1);
+    expect(batches.length).toBeGreaterThan(0);
+    expect(batches.every((batch) => batch.length >= 2 && batch.length <= 6)).toBe(true);
+  });
+
+  it("writes batches in both shapes the app has: one shared instant, and one row at a time", () => {
+    const batches = sittings(rows.episodes).filter((sitting) => sitting.length > 1);
+    const shared = batches.filter(sharesOneInstant);
+    const legacy = batches.filter((batch) => !sharesOneInstant(batch));
+    expect(shared.length).toBeGreaterThan(0);
+    expect(legacy.length).toBeGreaterThan(0);
+    // Every row of a one-at-a-time batch has its own instant, seconds apart at most.
+    for (const batch of legacy) {
+      expect(new Set(batch.map((row) => row.watchedAt.getTime())).size).toBe(batch.length);
+      expect(new Set(batch.map((row) => row.tmdbId)).size).toBe(1);
+      expect(batch.at(-1)!.watchedAt.getTime() - batch[0]!.watchedAt.getTime()).toBeLessThan(5_000);
+    }
+  });
+
+  it("ticks some of a day's shows straight after one another, and they stay solo ticks", () => {
+    const solo = soloTicks(rows.episodes).sort((a, b) => a.watchedAt.getTime() - b.watchedAt.getTime());
+    const pairs = solo.slice(1).filter((row, i) => row.watchedAt.getTime() - solo[i]!.watchedAt.getTime() <= 60_000);
+    expect(pairs.length).toBeGreaterThan(0);
+    for (const row of pairs) {
+      const previous = solo[solo.indexOf(row) - 1]!;
+      expect(row.tmdbId).not.toBe(previous.tmdbId);
+    }
   });
 
   it("puts lateShareOfSolo of the solo ticks at 21:00 local or later", () => {
-    const solo = uniqueInstants(rows.episodes);
+    const solo = soloTicks(rows.episodes);
     const late = solo.filter((row) => getTimezoneHour(row.watchedAt, BRISBANE) >= 21);
     expect(Math.abs(late.length / solo.length - 0.45)).toBeLessThanOrEqual(0.03);
   });
@@ -191,7 +236,7 @@ describe("generate", () => {
   it("gives the big day exactly its episodes, all solo, and more than any other day", () => {
     const onBigDay = inYear.filter((row) => dateKey(row) === "2025-03-15");
     expect(onBigDay).toHaveLength(14);
-    const solo = new Set(uniqueInstants(rows.episodes));
+    const solo = new Set(soloTicks(rows.episodes));
     expect(onBigDay.every((row) => solo.has(row))).toBe(true);
 
     const perDay = countBy(inYear, dateKey);
@@ -236,12 +281,11 @@ describe("generate", () => {
     ]);
   });
 
-  it("produces no unique timestamps for a batch-only persona", () => {
+  it("produces no solo ticks for a batch-only persona", () => {
     const batch = generate(BATCH_ONLY, CATALOGUE);
     expect(batch.episodes).toHaveLength(220);
-    expect(uniqueInstants(batch.episodes)).toHaveLength(0);
-    const sizes = [...countBy(batch.episodes, (row) => String(row.watchedAt.getTime())).values()];
-    expect(sizes.every((n) => n >= 2 && n <= 6)).toBe(true);
+    expect(soloTicks(batch.episodes)).toHaveLength(0);
+    expect(sittings(batch.episodes).every((sitting) => sitting.length >= 2 && sitting.length <= 6)).toBe(true);
     expect(batch.episodes.every((row) => inside(row.watchedAt, localYear(2025, 0)))).toBe(true);
   });
 

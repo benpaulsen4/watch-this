@@ -531,8 +531,8 @@ export function longestStreak(
  * The day with the most episodes.
  *
  * The date, count and minutes use every episode. The `timeline` uses only solo
- * ticks and is null below the floor -- a batch of eleven episodes shares one
- * timestamp, so charting it would draw a single spike and describe it as an
+ * ticks and is null below the floor -- a batch of eleven episodes lands within
+ * seconds, so charting it would draw a single spike and describe it as an
  * eight-hour session.
  *
  * Each timeline point names its episode from `titles`, looked up as a show:

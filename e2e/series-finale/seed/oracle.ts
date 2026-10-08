@@ -55,7 +55,7 @@ export interface OracleYear {
   weekdayCounts: number[];
   /** The first weekday (Monday = 0) with the most episodes; null with none (aggregate.ts:605-607). */
   topWeekday: number | null;
-  /** Episodes ticked alone: a watched_at no other episode of the period shares (solo-ticks.ts partitionSoloTicks). */
+  /** Episodes ticked alone: no other row at the same instant, and no other episode of the same show within 2 minutes either side (solo-ticks.ts partitionSoloTicks). */
   soloTicks: number;
   /** Solo ticks from local 21:00 on (aggregate.ts:609-614, buildRhythm). */
   lateSoloTicks: number;
@@ -128,6 +128,9 @@ const THIN_YEAR_TITLES = 5;
 
 // types.ts:24 -- below this many solo ticks the late share is null.
 const SOLO_TICK_FLOOR = 50;
+
+// solo-ticks.ts BATCH_GAP_MS -- a show's ticks this close together are a batch.
+const BATCH_GAP_SECONDS = 120;
 
 // service.ts:227 CREW_LIMIT; :301-314 mostActiveCollaborators -- every
 // consenting collaborator ranked by episodes in the viewer's window (the
@@ -213,6 +216,28 @@ async function windowOf(zone: string, year: number): Promise<Window> {
     select (make_timestamp(${year}, 1, 1, 0, 0, 0) at time zone ${zone}) as start,
            (make_timestamp(${year + 1}, 1, 1, 0, 0, 0) at time zone ${zone}) as "end"`;
   return { zone, start: row!.start, end: row!.end };
+}
+
+/**
+ * The window's solo ticks, as a query fragment: rows sharing their instant
+ * with no other row, whose neighbours in time *of the same show* are both more
+ * than BATCH_GAP_SECONDS away. A show's batch is caught whether its rows share
+ * one instant or arrived one write at a time; different shows ticked close
+ * together stay solo (solo-ticks.ts partitionSoloTicks).
+ */
+function soloTicksOf(userId: string, w: Window) {
+  return sql`
+    select watched_at, tmdb_id, season_number, episode_number from (
+      select watched_at, tmdb_id, season_number, episode_number,
+             count(*) over (partition by watched_at) as sharing,
+             lag(watched_at) over (partition by tmdb_id order by watched_at) as prev,
+             lead(watched_at) over (partition by tmdb_id order by watched_at) as next
+      from episode_watch_status
+      where user_id = ${userId} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
+    ) ticks
+    where sharing = 1
+      and (prev is null or watched_at - prev > ${BATCH_GAP_SECONDS} * interval '1 second')
+      and (next is null or next - watched_at > ${BATCH_GAP_SECONDS} * interval '1 second')`;
 }
 
 /** Episodes watched in the window: count and top show, per user. */
@@ -402,36 +427,25 @@ async function oracleYear(user: { id: string; username: string; timezone: string
     select count(*)::int as solo,
            (count(*) filter (where extract(hour from watched_at at time zone ${w.zone}) >= 21))::int as late
     from (
-      select watched_at from episode_watch_status
-      where user_id = ${u} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
-      group by watched_at having count(*) = 1
+      ${soloTicksOf(u, w)}
     ) solo`;
 
   // Solo ticks by local hour, the busiest three hours of them, and the
   // biggest day's solo ticks in time order -- all null below the floor.
   const hourRows = await sql<{ h: number; n: number }[]>`
     select extract(hour from watched_at at time zone ${w.zone})::int as h, count(*)::int as n from (
-      select watched_at from episode_watch_status
-      where user_id = ${u} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
-      group by watched_at having count(*) = 1
+      ${soloTicksOf(u, w)}
     ) solo group by h`;
   const hourCounts =
     ticks!.solo >= SOLO_TICK_FLOOR ? Array.from({ length: 24 }, (_, h) => hourRows.find((row) => row.h === h)?.n ?? 0) : null;
   let bigDayTimeline: OracleYear["bigDayTimeline"] = null;
   if (bigDay && ticks!.solo >= SOLO_TICK_FLOOR) {
     const points = await sql<{ time: string; title: string | null; season: number; episode: number }[]>`
-      with solo as (
-        select watched_at from episode_watch_status
-        where user_id = ${u} and watched and watched_at >= ${w.start} and watched_at < ${w.end}
-        group by watched_at having count(*) = 1
-      )
       select to_char(e.watched_at at time zone ${w.zone}, 'HH24:MI') as time, c.title,
              e.season_number as season, e.episode_number as episode
-      from episode_watch_status e
-      join solo on solo.watched_at = e.watched_at
+      from (${soloTicksOf(u, w)}) e
       left join tmdb_cache c on c.tmdb_id = e.tmdb_id and c.content_type = 'tv'
-      where e.user_id = ${u} and e.watched and e.watched_at >= ${w.start} and e.watched_at < ${w.end}
-        and to_char(e.watched_at at time zone ${w.zone}, 'YYYY-MM-DD') = ${bigDay.date}
+      where to_char(e.watched_at at time zone ${w.zone}, 'YYYY-MM-DD') = ${bigDay.date}
       order by e.watched_at`;
     bigDayTimeline = points.map((p) => ({ time: p.time, title: p.title, episode: episodeCodeOf(p.season, p.episode) }));
   }

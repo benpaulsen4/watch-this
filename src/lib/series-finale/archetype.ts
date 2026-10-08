@@ -116,7 +116,7 @@ export function maxWindowShare(hours: number[], windowSize: number): number {
  * Rules are evaluated in order and the first match wins, so an input satisfying
  * several resolves deterministically rather than depending on iteration order.
  * Rule 5 is skipped when there are too few individually-ticked episodes to say
- * anything about time of day -- batch writes share one timestamp, so a bulk
+ * anything about time of day -- a batch write lands within seconds, so a bulk
  * marker would otherwise satisfy the window test trivially.
  */
 export function classifyArchetype(input: ArchetypeInput): ArchetypeId | null {

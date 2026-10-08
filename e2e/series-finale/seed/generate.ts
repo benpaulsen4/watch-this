@@ -10,9 +10,15 @@
 //   Every weekday gets about the same number of active dates, so a heavy
 //   weekday means bigger sittings rather than more of them -- which is what
 //   makes a Sunday-heavy persona a Sunday marathoner, not a daily one.
-// - Each free day is split into solo ticks and batches of 2-6 rows sharing one
-//   timestamp, steering towards `soloShare`; solo ticks are then marked late
-//   (21:00+) or not to hit `lateShareOfSolo` across the whole year.
+// - Each free day is split into solo ticks and batches of 2-6 rows, steering
+//   towards `soloShare`; solo ticks are then marked late (21:00+) or not to
+//   hit `lateShareOfSolo` across the whole year. Batches alternate between the
+//   two shapes the app has written: rows sharing one timestamp (since July
+//   2026) and one show's rows LEGACY_BATCH_STEP_MS apart (before it).
+// - Some solo ticks are followed 15-45 seconds later by another show's solo
+//   tick: ticking the day's schedule in one go, which must stay two solo ticks.
+// - Otherwise slots on a day sit at least SLOT_SPACING_MINUTES apart, and no
+//   show is ever dealt twice within the app's 2-minute batch gap across slots.
 // - 31 December never gets free episodes, film completions or show outcomes, so
 //   a UTC persona's year holds the same rows whether it is read in UTC or in a
 //   Brisbane viewer's window (crew counts use the viewer's window).
@@ -55,6 +61,14 @@ const DAY_LAST_MINUTE = 24 * 60 - 1;
 const FILM_FIRST_MINUTE = 19 * 60;
 const FILM_LAST_MINUTE = 22 * 60 + 59;
 const MAX_BATCH = 6;
+/** Minutes kept clear between slots on a day: more than the app's 2-minute batch gap, whatever the seconds. */
+const SLOT_SPACING_MINUTES = 3;
+/** solo-ticks.ts BATCH_GAP_MS: the generator refuses a cast whose separate slots fall this close. */
+const BATCH_GAP_MS = 2 * MINUTE_MS;
+/** How far apart a pre-July-2026 batch write landed its rows: one write after another. */
+const LEGACY_BATCH_STEP_MS = 250;
+/** How often a solo tick has another show's solo tick straight after it, as when ticking the day's schedule. */
+const SCHEDULE_PAIR_CHANCE = 0.25;
 
 type Rng = () => number;
 
@@ -123,7 +137,7 @@ function batchSizes(rng: Rng, total: number): number[] {
 function pickMinute(rng: Rng, used: Set<number>, lo: number, hi: number): number {
   for (let attempt = 0; attempt < 10_000; attempt += 1) {
     const minute = randomInt(rng, lo, hi);
-    if (!used.has(minute)) {
+    if (![...used].some((taken) => Math.abs(taken - minute) < SLOT_SPACING_MINUTES)) {
       used.add(minute);
       return minute;
     }
@@ -131,10 +145,11 @@ function pickMinute(rng: Rng, used: Set<number>, lo: number, hi: number): number
   throw new Error(`no free minute left between ${lo} and ${hi}`);
 }
 
-/** One timestamp: a solo tick (size 1) or a batch sharing it. */
+/** One sitting at the checkbox: a solo tick (size 1), or a batch whose rows start at `at`, `stepMs` apart. */
 interface Slot {
   at: Date;
   size: number;
+  stepMs: number;
 }
 
 interface ExtraRow {
@@ -155,7 +170,7 @@ function layOutYear(persona: PersonaSpec, year: number, spec: YearSpec, rng: Rng
   const sequential = spec.shows.reduce((sum, show) => sum + show.episodes, 0);
   const extras = (spec.extraEpisodes ?? []).map((extra) => {
     const { dateKey, minute } = parseLocalDateTime(extra.localDateTime);
-    return { ...extra, minute, at: localInstant(offset, dateKey, minute) };
+    return { ...extra, dateKey, minute, at: localInstant(offset, dateKey, minute) };
   });
   const bigDay = spec.bigDay;
   const streak = spec.streak;
@@ -243,21 +258,34 @@ function layOutYear(persona: PersonaSpec, year: number, spec: YearSpec, rng: Rng
   );
 
   const slots: Slot[] = bigDay
-    ? bigDayMinutes.map((minute) => ({ at: localInstant(offset, bigDay.date, minute), size: 1 }))
+    ? bigDayMinutes.map((minute) => ({ at: localInstant(offset, bigDay.date, minute), size: 1, stepMs: 0 }))
     : [];
   let flag = 0;
+  let batchCount = 0;
   for (const day of days) {
-    const used = new Set<number>();
+    const used = new Set(extras.filter((extra) => extra.dateKey === day.date).map((extra) => extra.minute));
     for (let i = 0; i < day.solo; i += 1) {
       const late = lateFlags[flag++] ?? false;
       const minute = late
         ? pickMinute(rng, used, LATE_FIRST_MINUTE, DAY_LAST_MINUTE)
         : pickMinute(rng, used, DAY_FIRST_MINUTE, LATE_FIRST_MINUTE - 1);
-      slots.push({ at: localInstant(offset, day.date, minute, randomInt(rng, 0, 59)), size: 1 });
+      // The next solo tick, when it falls the same side of 21:00, is sometimes
+      // another show ticked straight after this one; both stay inside the
+      // minute. A one-show year has no second show to tick.
+      const paired =
+        spec.shows.length > 1 && i + 1 < day.solo && (lateFlags[flag] ?? false) === late && rng() < SCHEDULE_PAIR_CHANCE;
+      const at = localInstant(offset, day.date, minute, randomInt(rng, 0, paired ? 14 : 59));
+      slots.push({ at, size: 1, stepMs: 0 });
+      if (paired) {
+        i += 1;
+        flag += 1;
+        slots.push({ at: new Date(at.getTime() + randomInt(rng, 15, 45) * 1000), size: 1, stepMs: 0 });
+      }
     }
     for (const size of day.batches) {
       const minute = pickMinute(rng, used, DAY_FIRST_MINUTE, DAY_LAST_MINUTE);
-      slots.push({ at: localInstant(offset, day.date, minute, randomInt(rng, 0, 59)), size });
+      const stepMs = batchCount++ % 2 === 0 ? 0 : LEGACY_BATCH_STEP_MS;
+      slots.push({ at: localInstant(offset, day.date, minute, randomInt(rng, 0, 59)), size, stepMs });
     }
   }
 
@@ -308,7 +336,9 @@ export function generate(persona: PersonaSpec, catalogue: Map<string, CatalogueE
     return next;
   };
 
-  const episodes: (EpisodeRow & { key: string; year: number })[] = [];
+  // `slot` numbers each sitting, for the spacing check at the end.
+  const episodes: (EpisodeRow & { key: string; year: number; slot: number })[] = [];
+  let slotNumber = 0;
   const statuses: (StatusRow & { key: string })[] = [];
   const createdAtMidnight = localInstant(offset, persona.createdAt, 0);
   const showOutcome = new Map<string, { year: number; outcome: StatusRow["status"]; outcomeOn?: string }>();
@@ -327,18 +357,55 @@ export function generate(persona: PersonaSpec, catalogue: Map<string, CatalogueE
         return Array.from({ length: show.episodes }, () => show.key);
       }),
     );
+    // Swaps the first deck entry from `from` on that `fits` into `to`, so the
+    // deck keeps its counts; false when no entry fits.
+    const pullForward = (to: number, from: number, fits: (key: string) => boolean) => {
+      for (let j = from; j < deck.length; j += 1) {
+        if (fits(deck[j]!)) {
+          [deck[to], deck[j]] = [deck[j]!, deck[to]!];
+          return true;
+        }
+      }
+      return false;
+    };
+    const lastDealt = new Map<string, { at: number; slot: number }>();
     let dealt = 0;
     for (const slot of slots.sort((a, b) => a.at.getTime() - b.at.getTime())) {
+      slotNumber += 1;
+      const at = slot.at.getTime();
+      // A show dealt to another slot within the batch gap would merge with it.
+      const clear = (key: string) => {
+        const last = lastDealt.get(key);
+        return !last || at - last.at > BATCH_GAP_MS;
+      };
+      if (!clear(deck[dealt]!) && !pullForward(dealt, dealt + 1, clear)) {
+        throw new Error(`${where}: no show left to deal at ${slot.at.toISOString()} without merging into a batch`);
+      }
+      let stepMs = slot.stepMs;
+      if (stepMs > 0) {
+        // One write after another was always one show: gather the batch from
+        // the first show, or write it as one instant if too few remain.
+        const key = deck[dealt]!;
+        const remaining = deck.slice(dealt).filter((k) => k === key).length;
+        if (remaining >= slot.size) {
+          for (let i = 1; i < slot.size; i += 1) pullForward(dealt + i, dealt + i, (k) => k === key);
+        } else {
+          stepMs = 0;
+        }
+      }
       for (let i = 0; i < slot.size; i += 1) {
         const key = deck[dealt++]!;
         const { season, episode } = nextEpisode(key, where);
         const tmdbId = catalogue.get(key)!.tmdbId;
-        episodes.push({ key, year, tmdbId, seasonNumber: season, episodeNumber: episode, watchedAt: slot.at });
+        const watchedAt = new Date(at + i * stepMs);
+        episodes.push({ key, year, tmdbId, seasonNumber: season, episodeNumber: episode, watchedAt, slot: slotNumber });
+        lastDealt.set(key, { at: watchedAt.getTime(), slot: slotNumber });
       }
     }
     for (const extra of extras) {
+      slotNumber += 1;
       const tmdbId = catalogue.get(extra.key)!.tmdbId;
-      episodes.push({ key: extra.key, year, tmdbId, seasonNumber: extra.season, episodeNumber: extra.episode, watchedAt: extra.at });
+      episodes.push({ key: extra.key, year, tmdbId, seasonNumber: extra.season, episodeNumber: extra.episode, watchedAt: extra.at, slot: slotNumber });
     }
 
     for (const show of spec.shows) {
@@ -392,12 +459,31 @@ export function generate(persona: PersonaSpec, catalogue: Map<string, CatalogueE
     seen.add(status.key);
   }
 
-  // Every slot must be its own instant: two solo ticks sharing one would read
-  // as a batch, and a batch merging with another would exceed six rows. A
-  // slot's rows share one Date object, so objects count slots.
-  const slotCount = new Set(episodes.map((row) => row.watchedAt)).size;
-  const instantCount = new Set(episodes.map((row) => row.watchedAt.getTime())).size;
-  if (instantCount !== slotCount) throw new Error(`${persona.username}: two slots landed on the same instant`);
+  // Every slot must stay its own sitting by the app's rule (solo-ticks.ts):
+  // no two slots on one instant, and no show in two slots within the batch
+  // gap. Otherwise two solo ticks would read as a batch, and a batch merging
+  // with another would exceed six rows.
+  const instants = new Map<number, number>();
+  for (const row of episodes) {
+    const slot = instants.get(row.watchedAt.getTime());
+    if (slot !== undefined && slot !== row.slot) {
+      throw new Error(`${persona.username}: two slots landed on the same instant, ${row.watchedAt.toISOString()}`);
+    }
+    instants.set(row.watchedAt.getTime(), row.slot);
+  }
+  const byShowAndTime = episodes
+    .slice()
+    .sort((a, b) => a.tmdbId - b.tmdbId || a.watchedAt.getTime() - b.watchedAt.getTime());
+  for (let i = 1; i < byShowAndTime.length; i += 1) {
+    const [previous, current] = [byShowAndTime[i - 1]!, byShowAndTime[i]!];
+    if (
+      previous.tmdbId === current.tmdbId &&
+      previous.slot !== current.slot &&
+      current.watchedAt.getTime() - previous.watchedAt.getTime() <= BATCH_GAP_MS
+    ) {
+      throw new Error(`${persona.username}: two slots of one show landed within the batch gap at ${current.watchedAt.toISOString()}`);
+    }
+  }
 
   const ordered = episodes
     .map(({ tmdbId, seasonNumber, episodeNumber, watchedAt }) => ({ tmdbId, seasonNumber, episodeNumber, watchedAt }))
