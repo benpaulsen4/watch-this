@@ -2,11 +2,11 @@
 
 import { Archive,Plus } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import ListSettingsModal from "@/components/lists/ListSettingsModal";
 import { Button } from "@/components/ui/Button";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import { ListListsResponse } from "@/lib/lists/types";
 
 import { PageHeader } from "../ui/PageHeader";
@@ -21,7 +21,7 @@ export default function ListsClient({
   title?: string;
   isArchivedView?: boolean;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [lists, setLists] = useState<ListListsResponse[]>(initialLists);
   const [showCreateModal, setShowCreateModal] = useState(false);
 

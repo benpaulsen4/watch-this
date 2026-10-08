@@ -2,7 +2,6 @@
 
 import { X } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import {
   type ReactNode,
   useCallback,
@@ -13,6 +12,7 @@ import {
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { usePhoneViewport } from "@/hooks/usePhoneViewport";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import {
   SeriesFinaleUnavailableError,
   useSeriesFinale,
@@ -117,7 +117,7 @@ interface StoryReelProps {
  * only send the reader straight back here, so it goes to the dashboard.
  */
 export function StoryReel({ period, user }: StoryReelProps) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const isPhone = usePhoneViewport();
   const { data: payload, isLoading, error, refetch } = useSeriesFinale(period);
   const { data: storyCompletedAt } = useStoryCompletedAt(period);

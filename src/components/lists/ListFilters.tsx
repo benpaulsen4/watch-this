@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
 import { StatusSegmentedSelector } from "@/components/content/StatusSegmentedSelector";
 import { Button } from "@/components/ui/Button";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import { ListTypeEnum,WatchStatusEnum } from "@/lib/db/schema";
 
 interface ListFiltersProps {
@@ -13,7 +14,7 @@ interface ListFiltersProps {
 }
 
 export function ListFilters({ listType }: ListFiltersProps) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 

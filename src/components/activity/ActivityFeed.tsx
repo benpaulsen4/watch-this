@@ -3,11 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity as ActivityIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import ListSettingsModal from "@/components/lists/ListSettingsModal";
 import { Button } from "@/components/ui/Button";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import type { ActivityTimelineResponse } from "@/lib/activity/types";
 
 import { LoadingSpinner } from "../ui/LoadingSpinner";
@@ -24,7 +24,7 @@ const MOBILE_ACTIVITY_COUNT = 5;
 const DESKTOP_ACTIVITY_COUNT = 10;
 
 export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
-  const router = useRouter();
+  const router = useProgressRouter();
   // Resolved from matchMedia on the first client render rather than defaulted to
   // false and corrected in the effect. It is only used to slice, so getting it
   // right up front avoids rendering five entries and then ten.

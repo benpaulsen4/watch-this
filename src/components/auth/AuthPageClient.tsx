@@ -2,7 +2,7 @@
 
 import { Fingerprint, Shield, Smartphone } from "lucide-react";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { UAParser } from "ua-parser-js";
 
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import {
   authenticatePasskey,
   isPasskeySupported,
@@ -21,7 +22,7 @@ import {
 type AuthMode = "signin" | "register";
 
 function AuthPageContent() {
-  const router = useRouter();
+  const router = useProgressRouter();
   const { refreshSession } = useAuth();
   const searchParams = useSearchParams();
   const redirectTo = decodeURIComponent(

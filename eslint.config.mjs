@@ -57,6 +57,27 @@ const config = [
     },
   },
   {
+    // useProgressRouter starts the top-of-page navigation bar on push and
+    // replace; a bare useRouter navigates without it.
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: ["src/hooks/useProgressRouter.ts", "**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "next/navigation",
+              importNames: ["useRouter"],
+              message:
+                "Use useProgressRouter from @/hooks/useProgressRouter, so navigation shows the progress bar.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // share-card.tsx is drawn by Satori (next/og), which knows plain <img>
     // and nothing of next/image.
     files: [
