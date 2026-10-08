@@ -10,6 +10,15 @@
 
 import "./process-shim";
 
+export * from "../src/components/activity/ActivityEntry";
+export * from "../src/components/content/ContentCard";
+export * from "../src/components/content/ContentCardSkeleton";
+export * from "../src/components/content/StatusBadge";
+export * from "../src/components/content/StatusSegmentedSelector";
+export * from "../src/components/help/Markdown";
+export * from "../src/components/landing/LandingSpotlightClient";
+export * from "../src/components/lists/ListCard";
+export * from "../src/components/search/SearchInput";
 export * from "../src/components/ui/Badge";
 export * from "../src/components/ui/Button";
 export * from "../src/components/ui/Card";
@@ -22,15 +31,9 @@ export * from "../src/components/ui/ProfileImage";
 export { default as QRCode } from "../src/components/ui/QRCode";
 export * from "../src/components/ui/Switch";
 
-export * from "../src/components/activity/ActivityEntry";
-export * from "../src/components/content/ContentCard";
-export * from "../src/components/content/ContentCardSkeleton";
-export * from "../src/components/content/StatusBadge";
-export * from "../src/components/content/StatusSegmentedSelector";
-export * from "../src/components/help/Markdown";
-export * from "../src/components/landing/LandingSpotlightClient";
-export * from "../src/components/lists/ListCard";
-export * from "../src/components/search/SearchInput";
+// Providers back cfg.provider (preview-root.tsx); they are not cards.
+export * from "../src/components/providers/AuthProvider";
+export * from "../src/components/providers/ReactQueryProvider";
 
 // Brand foundations. Authored for the design system, not present in src/:
 // this repo is an app, so it never packaged its own brand layer. BrandLogo
@@ -39,7 +42,4 @@ export * from "./brand/BrandColors";
 export * from "./brand/BrandFoundations";
 export * from "./brand/BrandLogo";
 export * from "./brand/BrandTypography";
-
-export * from "../src/components/providers/AuthProvider";
-export * from "../src/components/providers/ReactQueryProvider";
 export * from "./preview-root";

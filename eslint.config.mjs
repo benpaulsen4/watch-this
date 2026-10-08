@@ -58,8 +58,10 @@ const config = [
   },
   {
     // share-card.tsx is drawn by Satori (next/og), which knows plain <img>
-    // and nothing of next/image.
+    // and nothing of next/image. BrandLogo renders data-URI marks inside the
+    // standalone design-sync bundle, where next/image's loader is unavailable.
     files: [
+      ".design-sync/brand/BrandLogo.tsx",
       "src/components/ui/QRCode.tsx",
       "src/lib/series-finale/share-card.tsx",
     ],

@@ -17,8 +17,9 @@
 //
 // The symlink is how the bare `playwright` import resolves; it is gitignored,
 // so recreating it is part of fresh-clone setup.
-import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+
 import { chromium } from "playwright";
 
 const REPO = new URL("../../", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
