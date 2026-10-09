@@ -11,7 +11,7 @@ through `buildE2eEnv()` and refuses to run unless `DATABASE_URL` points at
 
 The matching Playwright browsers must already be cached locally
 (`~/.cache/ms-playwright`) -- this suite never runs `playwright install`. If
-`npx playwright --version` or the browser revisions don't match what's
+`pnpm exec playwright --version` or the browser revisions don't match what's
 cached, stop and ask before downloading anything.
 
 The seeder fetches the cast's TMDB metadata through the app's own cache
@@ -21,55 +21,55 @@ environment, else the one line in the repo's `.env.local`; never printed).
 ## Running
 
 ```bash
-npm run e2e:db:up       # starts postgres:17 in podman, localhost:5433 only
-npm run e2e:migrate     # drizzle-kit migrate against the e2e database
-npm run e2e:build       # next build (production)
-npm run e2e:start       # the app on :3100, built env; keep it running in another terminal for:
-npm run e2e:register    # passkeys for every signing-in persona via /auth; refuses unless the server
-                        # on :3100 is the e2e one (see "Safety"); `-- <username>...` registers just those
-npm run e2e:seed        # the cast's history, lists, TMDB caches and the 2025 cohort snapshots
-                        # (needs e2e:register first); `-- --resolve-only` just resolves the catalogue lock
-npm run e2e:oracle      # artifacts/oracle.json: what each recap must show, from plain SQL
-npm run e2e:test        # empties artifacts/evidence.jsonl, runs Playwright twice (starts/reuses the
-                        # app via run.ts start): the read-only projects, then desktop-mutating
-                        # whatever the first run's result; fails if either failed; then scans
-                        # artifacts/ for secrets. `-- <playwright args>` go to both runs; args
-                        # with --project run as one plain `playwright test` instead
-npm run e2e:scan-secrets  # fail if any artifact holds the TMDB key or WebAuthn secret (names files only)
-npm run e2e:gallery     # artifacts/index.html + artifacts/report.md from whatever artifacts/ holds
-                        # (no db, no app), then the secret scan
-npm run e2e:db:reset    # a fresh, empty container (down + up)
-npm run e2e:db:down     # stops and removes the throwaway container
+pnpm e2e:db:up       # starts postgres:17 in podman, localhost:5433 only
+pnpm e2e:migrate     # drizzle-kit migrate against the e2e database
+pnpm e2e:build       # next build (production)
+pnpm e2e:start       # the app on :3100, built env; keep it running in another terminal for:
+pnpm e2e:register    # passkeys for every signing-in persona via /auth; refuses unless the server
+                     # on :3100 is the e2e one (see "Safety"); `<username>...` registers just those
+pnpm e2e:seed        # the cast's history, lists, TMDB caches and the 2025 cohort snapshots
+                     # (needs e2e:register first); `--resolve-only` just resolves the catalogue lock
+pnpm e2e:oracle      # artifacts/oracle.json: what each recap must show, from plain SQL
+pnpm e2e:test        # empties artifacts/evidence.jsonl, runs Playwright twice (starts/reuses the
+                     # app via run.ts start): the read-only projects, then desktop-mutating
+                     # whatever the first run's result; fails if either failed; then scans
+                     # artifacts/ for secrets. `<playwright args>` go to both runs; args
+                     # with --project run as one plain `playwright test` instead
+pnpm e2e:scan-secrets  # fail if any artifact holds the TMDB key or WebAuthn secret (names files only)
+pnpm e2e:gallery     # artifacts/index.html + artifacts/report.md from whatever artifacts/ holds
+                     # (no db, no app), then the secret scan
+pnpm e2e:db:reset    # a fresh, empty container (down + up)
+pnpm e2e:db:down     # stops and removes the throwaway container
 ```
 
 Or everything in one go:
 
 ```bash
-npm run e2e:all   # about 5-10 minutes; nothing may be listening on :3100 when it starts.
-                  # evidence, screenshots, cards and the old gallery/report cleared; db reset,
-                  # migrate, build, start the app, register, seed, oracle, the two Playwright
-                  # runs as e2e:test, the gallery and report (built even when tests fail), secret
-                  # scan. Stops the app it started; leaves the database up -- after the mutating
-                  # specs it holds bo renamed, cy opted out and her 2025 story gone through, so
-                  # `npm run e2e:seed` alone cannot restore it (reset first, or rename bo back);
-                  # npm run e2e:db:down removes it.
+pnpm e2e:all   # about 5-10 minutes; nothing may be listening on :3100 when it starts.
+               # evidence, screenshots, cards and the old gallery/report cleared; db reset,
+               # migrate, build, start the app, register, seed, oracle, the two Playwright
+               # runs as e2e:test, the gallery and report (built even when tests fail), secret
+               # scan. Stops the app it started; leaves the database up -- after the mutating
+               # specs it holds bo renamed, cy opted out and her 2025 story gone through, so
+               # `pnpm e2e:seed` alone cannot restore it (reset first, or rename bo back);
+               # pnpm e2e:db:down removes it.
 ```
 
 Individual Playwright invocations work too, e.g.:
 
 ```bash
-npx playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
+pnpm exec playwright test --project=desktop e2e/series-finale/specs/00-smoke.e2e.ts
 ```
 
-A bare `npx playwright test` runs every project, `desktop-mutating` last by
+A bare `pnpm exec playwright test` runs every project, `desktop-mutating` last by
 config order, but nothing holds it back if a read-only project is still
-failing or was not selected -- `npm run e2e:test` is the ordered way.
+failing or was not selected -- `pnpm e2e:test` is the ordered way.
 
 ## Safety: the server on port 3100
 
 Playwright reuses whatever answers on `http://localhost:3100`, and the specs
 register accounts, rename users and withdraw consent through it. A server
-started any other way -- a plain `npx next start -p 3100` loads
+started any other way -- a plain `pnpm exec next start -p 3100` loads
 `.env.local`, whose `DATABASE_URL` is the real database -- would take all of
 that. So before anything signs in, the process listening on 3100 must have
 been started with `DATABASE_URL` equal to the e2e URL (read from
@@ -77,7 +77,7 @@ been started with `DATABASE_URL` equal to the e2e URL (read from
 "Refusing to run":
 
 - `env/global-setup.ts` (Playwright's `globalSetup`, after the `webServer`
-  step): every `e2e:test`, `e2e:all` and direct `npx playwright test`;
+  step): every `e2e:test`, `e2e:all` and direct `pnpm exec playwright test`;
 - `e2e:test` before it starts Playwright (a foreign listener; nothing
   listening is fine, Playwright then starts `run.ts start`);
 - `e2e:register` (the e2e server must be up), which also fails unless each
@@ -108,7 +108,7 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   `buildE2eEnv()`, the single explicit environment every child process
   (migrate, seed, build, start, Playwright's own `webServer`) is given.
   `.env.local`'s real `DATABASE_URL` is never inherited.
-- `env/run.ts` -- `npm run e2e:*` scripts all funnel through this so every
+- `env/run.ts` -- `pnpm e2e:*` scripts all funnel through this so every
   subcommand asserts the database URL before doing anything.
 - `env/server-guard.ts` -- who listens on 3100 (`/proc/net/tcp{,6}` and
   `/proc/<pid>/fd`) and whether it was started with the e2e `DATABASE_URL`:
@@ -144,7 +144,7 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
 - `support/evidence.ts` -- `check()`: a soft assertion that also appends a
   line to `artifacts/evidence.jsonl`; `note()`: an informational line
   (timings) that never fails the test. Each line records its spec file.
-- `report/` -- `npm run e2e:gallery` (and the end of `e2e:all`).
+- `report/` -- `pnpm e2e:gallery` (and the end of `e2e:all`).
   `load.ts` reads evidence.jsonl, both invocations' results JSON (a
   truncated file is named, not stack-traced), oracle.json, the screenshots
   and cards (and `artifacts/mutation-i1/` if present) and links each
@@ -351,7 +351,7 @@ dates in `seed/personas.ts`, then `SUITE_LAST_DAY` in `env/test-env.ts`.
   and per Playwright invocation its JSON results, HTML report and test
   output (traces): `results-readonly.json`, `playwright-report-readonly/`,
   `test-output-readonly/`, and the same with `-mutating` (a direct
-  `npx playwright test` writes the unsuffixed `results.json`,
+  `pnpm exec playwright test` writes the unsuffixed `results.json`,
   `playwright-report/`, `test-output/`). `mutation-i1/` holds the one-off
   I1 mutation check (ruling E9: 90-account-switch against a build with
   AuthProvider's cache clear reverted, in a scratch worktree); `e2e:all`
@@ -396,5 +396,5 @@ second invocation runs whatever the first one's result, and `run.ts` exits
 non-zero if either failed.
 
 `webkit-phone` cannot launch on this dev host (missing system libraries;
-`sudo npx playwright install-deps` would fix it, but that's out of scope), so
+`sudo pnpm exec playwright install-deps` would fix it, but that's out of scope), so
 the visual specs skip it with that reason.

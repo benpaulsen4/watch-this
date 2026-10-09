@@ -18,9 +18,9 @@ References:
 
 Scripts are defined in [package.json](../../package.json):
 
-- `npm run test` (CI-friendly)
-- `npm run test:watch` (watch mode)
-- `npm run test:ui` (Vitest UI)
+- `pnpm test` (CI-friendly)
+- `pnpm test:watch` (watch mode)
+- `pnpm test:ui` (Vitest UI)
 
 ## Conventions
 
@@ -40,11 +40,11 @@ Series Finale has a Playwright suite in [e2e/series-finale/](../../e2e/series-fi
 What it covers:
 
 - A seeded multi-account cast: a rich main viewer with eight collaborators on a shared list, a thin year, a batch-ticking user, a films-only user with a very long username, a user who joined this year, and a percentile cohort.
-- An independent SQL oracle (`npm run e2e:oracle`) that recomputes what each recap must show. Specs check the UI and the share card against it, not against the app's own numbers.
+- An independent SQL oracle (`pnpm e2e:oracle`) that recomputes what each recap must show. Specs check the UI and the share card against it, not against the app's own numbers.
 - Desktop, phone and small-phone projects, plus a WebKit phone project for the visual specs. Signing in uses Chromium's virtual WebAuthn authenticator.
 - Mutating flows (rename, consent withdrawal, story completion, banner dismissal) in a separate project that runs last.
 - Screenshots of every surface and a gallery report (`artifacts/index.html`, `artifacts/report.md`).
 
-Run everything with `npm run e2e:all` (about 5–10 minutes; nothing may be listening on 3100). Remove the container afterwards with `npm run e2e:db:down`. Read the suite's README before running it: it explains the safety guards, the 2026 date guard, and how to roll the cast forward a year.
+Run everything with `pnpm e2e:all` (about 5–10 minutes; nothing may be listening on 3100). Remove the container afterwards with `pnpm e2e:db:down`. Read the suite's README before running it: it explains the safety guards, the 2026 date guard, and how to roll the cast forward a year.
 
-The e2e scripts never read `.env.local`'s `DATABASE_URL`. Every child process gets an explicit environment from `buildE2eEnv()`, and `npm run e2e:scan-secrets` fails the run if any artifact contains the TMDB key or the WebAuthn secret.
+The e2e scripts never read `.env.local`'s `DATABASE_URL`. Every child process gets an explicit environment from `buildE2eEnv()`, and `pnpm e2e:scan-secrets` fails the run if any artifact contains the TMDB key or the WebAuthn secret.

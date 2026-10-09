@@ -31,7 +31,7 @@ All three are additive: new tables, plus columns that are nullable or have a def
 2. Apply the pending ones:
 
    ```bash
-   DATABASE_URL=<target> npm run db:migrate
+   DATABASE_URL=<target> pnpm db:migrate
    ```
 
    `drizzle.config.ts` falls back to `.env.local` **only when `DATABASE_URL` is unset**. Set it explicitly so you know which database you are migrating.
@@ -41,7 +41,7 @@ All three are additive: new tables, plus columns that are nullable or have a def
 The "hours watched" headline reads per-episode runtimes from a cache that starts out empty. Without a warm cache, every user's first recap makes thousands of TMDB requests inside their page load.
 
 ```bash
-DATABASE_URL=<target> TMDB_API_KEY=<key> npm run backfill:runtimes
+DATABASE_URL=<target> TMDB_API_KEY=<key> pnpm backfill:runtimes
 ```
 
 - The script does **not** read `.env.local`. Both variables must be in the environment.

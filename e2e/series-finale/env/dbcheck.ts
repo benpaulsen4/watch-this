@@ -2,7 +2,7 @@
 // production (E4): this must be run with buildE2eEnv() as its process env
 // (NODE_ENV=production, DATABASE_URL=E2E_DATABASE_URL) so it exercises the
 // same `ssl: "require"`-unless-the-URL-says-otherwise logic in
-// src/lib/db/index.ts that a real request would. Run via `npm run
+// src/lib/db/index.ts that a real request would. Run via `pnpm
 // e2e:dbcheck`, which spawns this as its own tsx child through run.ts --
 // never import this file into a process that already has some other
 // DATABASE_URL loaded.

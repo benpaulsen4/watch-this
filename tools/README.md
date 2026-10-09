@@ -13,13 +13,13 @@ This tool converts SeriesGuide JSON exports to the WatchThis import format.
 
 ```bash
 # Basic usage - converts input file and creates output with "-watchthis-import" suffix
-npx tsx seriesguide-converter.ts <input-file>
+pnpm exec tsx seriesguide-converter.ts <input-file>
 
 # Specify custom output file
-npx tsx seriesguide-converter.ts <input-file> <output-file>
+pnpm exec tsx seriesguide-converter.ts <input-file> <output-file>
 
 # Example
-npx tsx seriesguide-converter.ts seriesguide-snippet.json my-watchthis-import.json
+pnpm exec tsx seriesguide-converter.ts seriesguide-snippet.json my-watchthis-import.json
 ```
 
 ### What it does
@@ -85,11 +85,11 @@ database; everything else here is a standalone converter.
 ### Running it
 
 ```bash
-npm run backfill:runtimes
+pnpm backfill:runtimes
 ```
 
-The npm script runs the file through `tsx`, which this project now declares as
-a devDependency, so `npm install` is all it takes to have it.
+The package script runs the file through `tsx`, which this project now declares as
+a devDependency, so `pnpm install` is all it takes to have it.
 
 ### Environment
 

@@ -188,7 +188,7 @@ test("ava's recap withholds cy on read; her stored snapshot is untouched", async
 test("bo renames himself e2e_bo_renamed through the profile", async ({ page }) => {
   const precondition = { bo: userExists(BO), renamed: userExists(BO_RENAMED) };
   check("rename-precondition", "e2e_bo exists and e2e_bo_renamed does not (a fresh database)", { bo: true, renamed: false }, precondition);
-  if (!precondition.bo) throw new Error("e2e_bo is already renamed: reset the database (npm run e2e:all) before re-running this spec");
+  if (!precondition.bo) throw new Error("e2e_bo is already renamed: reset the database (pnpm e2e:all) before re-running this spec");
 
   await signInAs(page, BO);
   const opened = await openProfileTab(page, "profile");

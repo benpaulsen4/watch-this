@@ -7,7 +7,7 @@
  * a third case -- not a cache hit, not fetchable either -- and is reported
  * separately rather than retried forever; see the comment in `backfillFilms`.
  *
- * Usage: npm run backfill:runtimes
+ * Usage: pnpm backfill:runtimes
  */
 import { eq, sql } from "drizzle-orm";
 

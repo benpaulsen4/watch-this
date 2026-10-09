@@ -11,7 +11,7 @@
 // The percentile is not predicted: it depends on the cohort at the moment of
 // generation, so it is recorded as null and the specs check presence/absence.
 //
-// Run through `npm run e2e:oracle` (run.ts spawns this with buildE2eEnv()).
+// Run through `pnpm e2e:oracle` (run.ts spawns this with buildE2eEnv()).
 // Writes artifacts/oracle.json and prints ava's 2025 block. Specs read the
 // JSON; importing this module (for `OracleYear`) runs nothing.
 import { mkdirSync, writeFileSync } from "node:fs";
