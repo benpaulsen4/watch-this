@@ -44,3 +44,13 @@ flowchart TD
 ## Suspense & Loading States
 
 Interactive modules and data-heavy sections can be wrapped in Suspense at the page level. This keeps the initial server render fast while allowing client data fetching (React Query) to proceed independently.
+
+## Navigation Progress Bar
+
+Because most pages are server components, a client-side navigation waits on a server render before the URL changes. A thin red-to-orange bar along the top of the viewport covers that wait.
+
+- The bar is mounted once in the root layout: [NavigationProgress.tsx](../../src/components/ui/NavigationProgress.tsx).
+- Link clicks start it automatically. A document-level click listener catches any same-origin `<a>` (including `next/link`), skipping modifier clicks, cancelled clicks, `target="_blank"`, downloads, and same-URL or hash-only links.
+- Programmatic navigation uses `useProgressRouter` from [useProgressRouter.ts](../../src/hooks/useProgressRouter.ts) in place of `useRouter`; its `push` and `replace` start the bar, and everything else (`refresh`, `back`, …) passes through untouched. ESLint rejects importing `useRouter` from `next/navigation` outside that hook and tests.
+- The bar finishes when the pathname or search params change. It only appears if the navigation takes longer than 120ms, so prefetched routes never flash it.
+- Some navigations never change the URL, so the bar also finishes on back/forward (`popstate`), on a back/forward-cache restore (`pageshow` with `persisted`), on a navigation to the current URL, and after 15 seconds regardless ([navigation-progress.ts](../../src/lib/navigation-progress.ts)).

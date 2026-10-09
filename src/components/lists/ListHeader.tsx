@@ -11,11 +11,11 @@ import {
   Share,
   Users,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import { GetListResponse } from "@/lib/lists/types";
 
 import { useUser } from "../providers/AuthProvider";
@@ -28,7 +28,7 @@ interface ListHeaderProps {
 }
 
 export default function ListHeader({ initialList }: ListHeaderProps) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const user = useUser();
   const [list, setList] = useState<GetListResponse>(initialList);
   const [showCollaborationModal, setShowCollaborationModal] = useState(false);

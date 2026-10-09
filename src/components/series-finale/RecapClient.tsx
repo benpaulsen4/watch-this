@@ -2,7 +2,6 @@
 
 import { Play } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Children,
   type ReactNode,
@@ -18,6 +17,7 @@ import { Card } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { usePhoneViewport } from "@/hooks/usePhoneViewport";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import {
   SeriesFinaleUnavailableError,
   useDismissSeriesFinale,
@@ -88,7 +88,7 @@ interface RecapClientProps {
  * then this route hands over to the story. A desktop always gets the recap.
  */
 export function RecapClient({ period, user }: RecapClientProps) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const isPhone = usePhoneViewport();
   const { data: payload, isLoading, error, refetch } = useSeriesFinale(period);
   const { data: storyCompletedAt } = useStoryCompletedAt(period);

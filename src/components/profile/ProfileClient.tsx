@@ -1,13 +1,13 @@
 "use client";
 
 import { LogOut, Settings, Shield, Tv,User as UserIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { CrewComparisonToggle } from "@/components/series-finale/CrewComparisonToggle";
 import { ProfileFinaleRows } from "@/components/series-finale/ProfileFinaleRows";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useFragmentNavigation } from "@/hooks/useFragmentNavigation";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import type { User } from "@/lib/auth/client";
 
 import { useAuth } from "../providers/AuthProvider";
@@ -33,7 +33,7 @@ const PROFILE_TABS: ProfileTab[] = [
 ];
 
 export function ProfileClient({ initialUser }: { initialUser: User }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const { user: contextUser, refreshSession, clearAuth } = useAuth();
 
   // Seeded from the server render, so there is nothing to wait on: the page has

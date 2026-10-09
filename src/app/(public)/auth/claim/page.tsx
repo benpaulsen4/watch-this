@@ -2,12 +2,13 @@
 
 import { startRegistration } from "@simplewebauthn/browser";
 import { useMutation } from "@tanstack/react-query";
-import { useRouter,useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense,useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent,CardHeader, CardTitle } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useProgressRouter } from "@/hooks/useProgressRouter";
 import {
   beginClaimRegistration,
   verifyClaimRegistration,
@@ -15,7 +16,7 @@ import {
 
 function ClaimPageContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const router = useProgressRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const token = searchParams.get("token") || "";

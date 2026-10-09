@@ -7,6 +7,7 @@ import { Geist } from "next/font/google";
 
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { ReactQueryProvider } from "@/components/providers/ReactQueryProvider";
+import { NavigationProgress } from "@/components/ui/NavigationProgress";
 import { getMetadataBase } from "@/lib/seo/site";
 
 const geistSans = Geist({
@@ -64,6 +65,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} antialiased bg-gray-950 text-gray-100 min-h-screen`}
       >
+        <NavigationProgress />
         <ReactQueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </ReactQueryProvider>
