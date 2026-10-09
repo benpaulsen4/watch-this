@@ -10,8 +10,17 @@ const config = [
     // as a --ignore-pattern flag in the package scripts, so a bare `pnpm exec eslint .`
     // and editor integrations honour it too. The e2e suite's artifacts/ is
     // generated too: a failing test's HTML report bundles Playwright's
-    // minified trace viewer there.
-    ignores: [".claude/**", ".next/**", "coverage/**", "e2e/series-finale/artifacts/**"],
+    // minified trace viewer there. design-sync's staged converter, bundle
+    // output and emitted declarations are gitignored build products too.
+    ignores: [
+      ".claude/**",
+      ".next/**",
+      "coverage/**",
+      "e2e/series-finale/artifacts/**",
+      ".ds-sync/**",
+      "ds-bundle/**",
+      "dist/types/**",
+    ],
   },
   ...eslintConfigNext,
   {
@@ -79,8 +88,10 @@ const config = [
   },
   {
     // share-card.tsx is drawn by Satori (next/og), which knows plain <img>
-    // and nothing of next/image.
+    // and nothing of next/image. BrandLogo renders data-URI marks inside the
+    // standalone design-sync bundle, where next/image's loader is unavailable.
     files: [
+      ".design-sync/brand/BrandLogo.tsx",
       "src/components/ui/QRCode.tsx",
       "src/lib/series-finale/share-card.tsx",
     ],
