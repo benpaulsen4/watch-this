@@ -4,8 +4,8 @@ import type { MetadataRoute } from "next";
 // without one the site never declares a display mode and the installed app shows
 // Chrome's title bar. `display: "standalone"` is the documented way to avoid it.
 //
-// Icons live in public/ rather than pointing at src/app/icon*.png because those
-// metadata routes return 404 in production, though they resolve locally.
+// Icons live in public/ so their sizes are spelled out in the path rather than
+// hidden behind the numbered names Next requires for src/app/icon*.png.
 const SHORTCUT_ICONS = [
   { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
 ];

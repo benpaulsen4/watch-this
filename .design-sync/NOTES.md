@@ -81,7 +81,7 @@ where something is not lifted from the repo.
   rendered designs get only the bundle and the styles.css closure.
 - **`logo-data.ts` and `mark.svg` are generated** — run
   `node .design-sync/brand/regenerate.mjs` (see `brand/README.md`) after any
-  change to `public/*.svg` or `src/app/icon192.png`. Never hand-edit them.
+  change to `public/*.svg` or `src/app/icon1.png`. Never hand-edit them.
   The `icon` mark is the `layer1` group lifted out of the wordmark and cropped
   by **rasterising and scanning the alpha channel**: its drop-shadow filter has
   asymmetric margins, so computing the viewBox arithmetically leaves the glyph
