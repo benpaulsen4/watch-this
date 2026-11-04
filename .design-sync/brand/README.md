@@ -9,7 +9,7 @@ app and nowhere else.
 | --- | --- | --- |
 | `WORDMARK` | `public/logo-master.svg` | Full lockup, glyph + "WatchThis" |
 | `ICON` | derived from `logo-master.svg` | The `layer1` glyph alone, tight-cropped |
-| `APP_ICON` | `src/app/icon192.png` | Home-screen artwork, glyph on its dark circle |
+| `APP_ICON` | `src/app/icon1.png` | Home-screen artwork, glyph on its dark circle |
 | `TMDB` | `public/tmdb.svg` | Third-party attribution mark |
 | `JUSTWATCH` | `public/justwatch.svg` | Third-party attribution mark |
 
@@ -21,7 +21,7 @@ arithmetically leaves the mark floating in dead space.
 
 ## Regenerating
 
-Run this whenever `public/*.svg` or `src/app/icon192.png` changes:
+Run this whenever `public/*.svg` or `src/app/icon1.png` changes:
 
 ```bash
 ln -sfn ../.ds-sync/node_modules .design-sync/node_modules

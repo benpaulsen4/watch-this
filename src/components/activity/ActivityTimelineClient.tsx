@@ -9,6 +9,7 @@ import type {
   ActivityItem,
   ActivityTimelineResponse,
 } from "@/lib/activity/types";
+import { refetchOnResume } from "@/lib/refetch-on-resume";
 
 import { useUser } from "../providers/AuthProvider";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
@@ -20,6 +21,7 @@ export function ActivityTimelineClient() {
     data,
     isLoading,
     isFetchingNextPage,
+    isFetchNextPageError,
     error,
     fetchNextPage,
     hasNextPage,
@@ -36,6 +38,7 @@ export function ActivityTimelineClient() {
     initialPageParam: undefined,
     getNextPageParam: (lastPage: ActivityTimelineResponse) =>
       lastPage.nextCursor || undefined,
+    refetchOnWindowFocus: refetchOnResume,
   });
 
   const activities = useMemo(() => {
@@ -68,7 +71,9 @@ export function ActivityTimelineClient() {
     );
   }
 
-  if (error) {
+  // A failed background refresh keeps its data; stale activity beats an error.
+  // A failed load-more still lands here, or the feed would silently stop growing.
+  if (error && (!data || isFetchNextPageError)) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-red-600 dark:text-red-400 mb-4">

@@ -12,7 +12,7 @@ inside the Next app.
 | --- | --- | --- |
 | `wordmark` *(default)* | Glyph + "WatchThis" lockup | Anywhere with horizontal room |
 | `icon` | The glyph alone, scalable | Compact headers, nav rails, tab bars, avatars — the same mark as the favicon |
-| `appIcon` | The shipped `icon192` artwork, glyph on its dark circle | Depicting the installed app only |
+| `appIcon` | The shipped `icon1` artwork, glyph on its dark circle | Depicting the installed app only |
 | `tmdb` / `justwatch` | Third-party marks | Attribution |
 
 ## Rules
