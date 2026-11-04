@@ -1,6 +1,11 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
-import { beforeEach,describe, expect, it, vi } from "vitest";
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
+import { act } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ActivityType } from "@/lib/db/schema";
 
@@ -74,6 +79,91 @@ describe("ActivityTimelineClient", () => {
     expect(
       await screen.findByText(/created list "My List"/),
     ).toBeInTheDocument();
+  });
+
+  it("keeps loaded activity when a refresh on resume fails", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const page = {
+        activities: [
+          {
+            id: "a1",
+            activityType: ActivityType.LIST_CREATED,
+            user: { id: "u1", username: "alice", profilePictureUrl: null },
+            metadata: { listName: "My List" },
+            isCollaborative: false,
+            collaborators: [],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+        nextCursor: undefined,
+      };
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => page })
+        .mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+      global.fetch = fetchMock;
+      const { ActivityTimelineClient } =
+        await import("./ActivityTimelineClient");
+      renderWithClient(<ActivityTimelineClient />);
+      await screen.findByText(/created list "My List"/);
+
+      await act(async () => {
+        focusManager.setFocused(false);
+        vi.setSystemTime(Date.now() + 120_000);
+        focusManager.setFocused(true);
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await act(async () => {});
+
+      expect(screen.getByText(/created list "My List"/)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Failed to fetch activities/),
+      ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+      focusManager.setFocused(undefined);
+    }
+  });
+
+  it("still shows the error when loading the next page fails", async () => {
+    const mockUseInfiniteQuery = vi.fn().mockReturnValue({
+      data: {
+        pages: [
+          {
+            activities: [
+              {
+                id: "a",
+                activityType: ActivityType.LIST_CREATED,
+                user: { id: "u", username: "alice" },
+                metadata: { listName: "X" },
+                isCollaborative: false,
+                collaborators: [],
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: true,
+      error: new Error("Failed to fetch activities"),
+      fetchNextPage: vi.fn(),
+      hasNextPage: true,
+    });
+
+    vi.resetModules();
+    await vi.doMock("@tanstack/react-query", async (importOriginal) => {
+      const mod =
+        await importOriginal<typeof import("@tanstack/react-query")>();
+      return { ...mod, useInfiniteQuery: mockUseInfiniteQuery };
+    });
+    const { ActivityTimelineClient: Timeline } =
+      await import("./ActivityTimelineClient");
+    renderWithClient(<Timeline />);
+    expect(screen.getByText("Try Again")).toBeInTheDocument();
+    vi.resetModules();
   });
 
   it("shows 'Loading more...' when fetching next page", async () => {

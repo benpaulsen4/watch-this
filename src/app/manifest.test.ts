@@ -41,7 +41,7 @@ describe("web app manifest", () => {
     }
   });
 
-  it("gives every shortcut an icon, because Chrome can drop those without one", () => {
+  it("gives every shortcut an icon", () => {
     expect(result.shortcuts?.map((shortcut) => shortcut.url)).toEqual([
       "/activity",
       "/lists",

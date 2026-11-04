@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
 
 // Chrome on Android mints a WebAPK for this site with or without a manifest, but
-// without one the site never declares a display mode and the installed app gets
-// Chrome's title bar. `display: "standalone"` is what removes it.
+// without one the site never declares a display mode and the installed app shows
+// Chrome's title bar. `display: "standalone"` is the documented way to avoid it.
 //
 // Icons live in public/ rather than pointing at src/app/icon*.png because those
-// metadata routes only resolve at their hashed URLs.
+// metadata routes return 404 in production, though they resolve locally.
 const SHORTCUT_ICONS = [
   { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
 ];

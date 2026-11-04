@@ -9,6 +9,7 @@ import ListSettingsModal from "@/components/lists/ListSettingsModal";
 import { Button } from "@/components/ui/Button";
 import { useProgressRouter } from "@/hooks/useProgressRouter";
 import type { ActivityTimelineResponse } from "@/lib/activity/types";
+import { refetchOnResume } from "@/lib/refetch-on-resume";
 
 import { LoadingSpinner } from "../ui/LoadingSpinner";
 import { ActivityEntry } from "./ActivityEntry";
@@ -61,6 +62,7 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
       if (!response.ok) throw new Error("Failed to fetch activities");
       return response.json();
     },
+    refetchOnWindowFocus: refetchOnResume,
   });
 
   const activities = useMemo(
@@ -97,7 +99,8 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
     );
   }
 
-  if (error) {
+  // A failed background refresh keeps its data; stale activity beats an error.
+  if (error && !activitiesData) {
     return (
       <div>
         <div className="flex items-center justify-between mb-6">

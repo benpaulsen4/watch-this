@@ -1,7 +1,12 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach,describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ActivityType } from "@/lib/db/schema";
 
@@ -96,6 +101,91 @@ describe("ActivityFeed", () => {
 
     // Activity entry shows description from metadata
     expect(screen.getByText(/created list "My List"/)).toBeInTheDocument();
+  });
+
+  describe("resuming the installed app", () => {
+    const listActivity = {
+      id: "a1",
+      activityType: ActivityType.LIST_CREATED,
+      user: { id: "u1", username: "alice", profilePictureUrl: null },
+      metadata: { listName: "My List" },
+      isCollaborative: false,
+      collaborators: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      focusManager.setFocused(undefined);
+    });
+
+    async function resumeAfterTwoMinutes() {
+      await act(async () => {
+        focusManager.setFocused(false);
+        vi.setSystemTime(Date.now() + 120_000);
+        focusManager.setFocused(true);
+      });
+    }
+
+    it("shows a friend's new activity without navigating", async () => {
+      const respondWith = (activities: unknown[]) => ({
+        ok: true,
+        json: async () => ({ activities, upcoming: [], hasMore: false }),
+      });
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(respondWith([listActivity]))
+        .mockResolvedValueOnce(
+          respondWith([
+            {
+              ...listActivity,
+              id: "a2",
+              metadata: { listName: "Friend's List" },
+            },
+          ]),
+        );
+      global.fetch = fetchMock;
+      renderWithClient(<ActivityFeed currentUsername="alice" />);
+      await screen.findByText(/created list "My List"/);
+
+      await resumeAfterTwoMinutes();
+
+      expect(
+        await screen.findByText(/created list "Friend's List"/),
+      ).toBeInTheDocument();
+    });
+
+    // The network is often not ready the moment Android resumes an app, so a
+    // failed refresh must not replace content the user could already see.
+    it("keeps showing loaded activity when the refresh fails", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            activities: [listActivity],
+            upcoming: [],
+            hasMore: false,
+          }),
+        })
+        .mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+      global.fetch = fetchMock;
+      renderWithClient(<ActivityFeed currentUsername="alice" />);
+      await screen.findByText(/created list "My List"/);
+
+      await resumeAfterTwoMinutes();
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await act(async () => {});
+
+      expect(screen.getByText(/created list "My List"/)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Failed to fetch activities/),
+      ).not.toBeInTheDocument();
+    });
   });
 
   // UI-10: the request limit was derived from `mdUp`, which starts false and is
