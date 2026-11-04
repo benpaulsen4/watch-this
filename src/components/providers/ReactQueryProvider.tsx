@@ -13,8 +13,11 @@ export function ReactQueryProvider({
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Avoid aggressive refetching; tune as needed
-            refetchOnWindowFocus: false,
+            // The installed app resumes rather than reloads, so without this a
+            // friend's activity stays hidden until the next navigation. The age
+            // check keeps quick app switches from refetching everything.
+            refetchOnWindowFocus: (query) =>
+              Date.now() - query.state.dataUpdatedAt > 60_000,
             retry: 1,
           },
         },
