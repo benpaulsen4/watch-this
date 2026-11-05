@@ -42,6 +42,8 @@
 - `name` and `username` are trimmed by the schema. Services already trim `name`, and the UI trims both.
 - A TMDB failure on these routes now returns 503 through `handleApiError` instead of a generic 500.
 - 500 messages come from each contract's `label`, such as `Add item to list failed`.
+- A POST to list items missing `tmdbId` or `contentType` now returns the specific field message (`tmdbId must be a positive integer`, or `contentType must be either "movie" or "tv"`) instead of `tmdbId and contentType are required`. Nothing matches on that text.
+- `ListSelector`'s lists error now shows the server's message instead of always "Failed to fetch lists".
 
 ---
 
