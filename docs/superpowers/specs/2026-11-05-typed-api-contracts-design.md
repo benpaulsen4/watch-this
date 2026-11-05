@@ -1,7 +1,7 @@
 # Typed API Contracts — Design
 
 Date: 2026-11-05
-Status: Awaiting review
+Status: Approved; amended 2026-11-05 after prototyping (schema placement)
 
 ## Summary
 
@@ -39,6 +39,7 @@ Record of what was chosen and why, so implementation does not relitigate them.
 | Approach | Our own contracts on Zod, about 150–200 lines of infrastructure | Keeps URLs, file-based routes, the proxy's path-prefix rate limits, and tests that call route exports directly. |
 | Rejected: tRPC | Not used | Moves calls behind one RPC endpoint, which breaks the proxy's prefix rules and the REST surface, and fits the binary and cookie-setting routes poorly. |
 | Rejected: oRPC, ts-rest | Not used | A dependency at the centre of every route, with no need it meets that our own small layer does not. The main draw is generated OpenAPI, which nothing here consumes. |
+| Schema placement | Zod schemas live in a server-only `schemas.ts`; contracts reference them with `import type` | Measured on 2026-11-05: Zod in contracts adds about 55 KB gzipped to the client, and `zod/mini` does not help because Turbopack bundles all its locales, even with named imports. The client never runs validators, so keeping them on the server costs 706 bytes in total. |
 | Response validation | TypeScript only, no runtime check | Reuses `lib/*/types.ts`, avoids schemas for large TMDB payloads, and adds no per-request cost. |
 | Error wire format | `error` stays, `code` is added | Installed PWAs may run older client code, which reads `error`. |
 | Validation strictness | Reject what is nonsense or would crash; keep deliberate leniency | Closes the bugs above without breaking old filter URLs. See "Validation strictness". |
@@ -58,21 +59,28 @@ Record of what was chosen and why, so implementation does not relitigate them.
 - Extending `Cache-Control: private, no-store` beyond the Series Finale routes
   that set it today.
 - Validating inputs on the client before sending. Forms keep their existing
-  checks. Sharing schemas with forms is possible later and is not part of this.
+  checks. Schemas stay server-only, so sharing them with forms would need its own
+  answer to the bundle cost.
 
 ## Architecture
 
 ```
-src/lib/api/contract.ts         defineContract, type<T>(), q helpers, Jsonify (client-safe)
+src/lib/api/contract.ts         defineContract, type<T>(), schemas<S>(), Jsonify (client-safe)
 src/lib/api/errors.ts           universal error codes, ApiErrorBody type (client-safe)
+src/lib/api/query.ts            q helpers, searchParamsToObject (server only)
 src/lib/api/route.ts            authedRoute, publicRoute (server only)
 src/lib/api/client.ts           api(), ApiError, isApiError, errorMessage (client-safe)
 src/lib/<feature>/contract.ts   that feature's endpoints (client-safe)
+src/lib/<feature>/schemas.ts    that feature's Zod schemas (server only)
 ```
 
 Contract files must not import `@/lib/db`, services, or anything else server-only.
-A lint rule enforces this. `@/lib/db/schema` is allowed because 14 components
-already import its enums.
+`@/lib/db/schema` is allowed because 14 components already import its enums.
+
+Contracts, the client, components, and hooks must not import Zod or a `schemas.ts`
+at runtime; `import type` is allowed because it is erased. Lint rules enforce both.
+The second uses `@typescript-eslint/no-restricted-imports`, which supports
+`allowTypeImports`.
 
 The ESLint config's existing `no-restricted-imports` entry for `src/**` would be
 replaced, not merged, by a later block matching the same files. The contract-file
@@ -81,16 +89,23 @@ rule must repeat the `useRouter` restriction.
 ## Contract
 
 ```ts
-// src/lib/lists/contract.ts
-export const addCollaborator = defineContract({
-  method: "POST",
-  path: "/api/lists/[id]/collaborators",
-  label: "Add collaborator",
+// src/lib/lists/schemas.ts - server only
+export const addCollaboratorSchemas = {
   params: z.object({ id: z.uuid() }),
   body: z.object({
     username: z.string().trim().min(1, "Username is required"),
     permissionLevel: z.enum(PermissionLevel).default(PermissionLevel.COLLABORATOR),
   }),
+};
+
+// src/lib/lists/contract.ts - client-safe; the schemas import is type-only
+import type { addCollaboratorSchemas } from "./schemas";
+
+export const addCollaborator = defineContract({
+  method: "POST",
+  path: "/api/lists/[id]/collaborators",
+  label: "Add collaborator",
+  schemas: schemas<typeof addCollaboratorSchemas>(),
   response: type<CollaboratorResponse>(),
   errors: {
     notFound: { status: 404, message: "List not found" },
@@ -103,9 +118,9 @@ export const addCollaborator = defineContract({
 
 | Field | Required | Purpose |
 | --- | --- | --- |
-| `method`, `path` | Yes | `path` uses folder syntax. The type system requires `params` keys to match its `[segments]`. |
+| `method`, `path` | Yes | `path` uses folder syntax. |
 | `label` | Yes | Used for logging and the 500 message, as `handleApiError(error, context)` does today. |
-| `params`, `query`, `body` | No | Zod schemas. Handlers receive the parsed output; clients provide the input. |
+| `schemas` | No | `schemas<typeof x>()`, a compile-time marker for the endpoint's `{ params, query, body }` object. The type system requires `params` keys to match the path's `[segments]`. Handlers receive the parsed output; clients provide the input. |
 | `response` | Yes | `type<T>()`, a compile-time marker. `T` must be an object or array type. |
 | `status` | No | Success status, defaulting to 200. Six places use 201. |
 | `errors` | No | The route's failure codes, each with a status and a message. |
@@ -123,7 +138,7 @@ an object before validating:
 - `?x=` counts as absent, matching today's `if (param)` checks.
 - A repeated key becomes an array.
 
-Schemas use these helpers:
+Schemas use these helpers, from `src/lib/api/query.ts`:
 
 - `q.int({ min, max })` accepts whole digit strings only. `z.coerce.number()` would
   turn an empty string into `0`. It replaces `validatePagination`.
@@ -133,13 +148,17 @@ Schemas use these helpers:
 ## Server wrapper
 
 ```ts
-export const POST = authedRoute(addCollaborator, async ({ user, params, body }) =>
-  createListCollaborator(user.id, params.id, body),
+export const POST = authedRoute(
+  addCollaborator,
+  addCollaboratorSchemas,
+  ({ user, params, body }) => createListCollaborator(user.id, params.id, body),
 );
 ```
 
-`authedRoute(contract, handler, options?)` and `publicRoute(contract, handler, options?)`
-return a Next route handler. In order, the wrapper:
+`authedRoute(contract, schemas, handler, options?)` and
+`publicRoute(contract, schemas, handler, options?)` return a Next route handler. The
+schemas are passed at runtime because the contract only holds their type, and the types
+require them to be the ones the contract names. A contract with no schemas passes `{}`. In order, the wrapper:
 
 1. **Authenticates** (`authedRoute` only), through `withAuth`, so 401s and cookie
    clearing do not change. This runs before validation, so anonymous callers learn
@@ -361,22 +380,24 @@ Old and new routes coexist throughout. Each PR is independently shippable.
 | --- | --- | --- |
 | 1 | Foundation, `zod` dependency, `withAuth` context forwarding, `handleApiError` fix, retry default, plus schedules as the proving route | 1 |
 | 2 | Lists, including `content/[id]/lists` | 8 |
-| 3 | Status: content, episodes, next episode | 3 |
+| 3 | Status: content, episodes, next episode, and the `message.includes("404")` checks | 3 |
 | 4 | TMDB and watch providers | 10 |
 | 5 | Profile, activity | 7 |
 | 6 | Series Finale, including card's `ctx.params` | 5 |
 | 7 | Auth and admin, moved late because a mistake here locks users out | 9 |
-| 8 | Lint rules, expired-session handling, route consistency test, remove `validatePagination`, docs | 0 |
+| 8 | `fetch` lint rule, expired-session handling, route consistency test, remove `validatePagination`, docs | 0 |
 
-**Foundation checks that gate PR 1**
+**Foundation checks, prototyped on 2026-11-05 (Next 16.3.8)**
 
-- **Next's route types.** Next generates checks on route export signatures, and these
-  have not been run against the wrapper. Confirm the wrapper's signature passes
-  `pnpm build`.
-- **Client bundle.** Contracts bring Zod into the client. Compare First Load JS from
-  `pnpm build` before and after. If a route grows by more than 10 kB gzipped, switch
-  contracts to `zod/mini`, which is built for tree-shaking. `zod` is only a transitive
-  dependency today, so it needs adding directly.
+- **Next's route types.** Next generates checks on route export signatures. A temporary
+  dynamic route using both wrappers passed `pnpm build`.
+- **Client bundle.** Next 16's build no longer prints First Load JS, so this is measured
+  as the gzipped total of `.next/static/chunks/*.js`. Baseline: 507,379 bytes. With
+  schemas server-only: 508,085 bytes (+706), and no Zod in any client chunk. Each PR
+  keeps the total growth under 10 kB gzipped.
+
+PR 1 also adds the contract and schema lint rules, because contract files start there.
+PR 8 adds the `fetch` rule.
 
 ## Risks
 
