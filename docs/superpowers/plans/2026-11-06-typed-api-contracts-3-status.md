@@ -502,7 +502,7 @@ describe("PUT /api/status/content", () => {
 - [ ] **Step 2: Run it to verify it fails**
 
 Run: `pnpm exec vitest run src/app/api/status/content`
-Expected: FAIL. The `550abc` case passes, a string `tmdbId` reaches the service, and the PUT call with no status passes `status: undefined`, so the expected argument doesn't match.
+Expected: FAIL. The `550abc` case passes, a string `tmdbId` reaches the service, and bodies lack `code`.
 
 - [ ] **Step 3: Write the schemas and contract**
 
@@ -1013,7 +1013,7 @@ describe("POST /api/status/episodes/next", () => {
 - [ ] **Step 2: Run it to verify it fails**
 
 Run: `pnpm exec vitest run src/app/api/status/episodes`
-Expected: FAIL. Fractional, string and negative numbers and a string `watched` reach the service, bodies lack `code`, and the episode-0 GET filter and the default `watched` aren't parsed the way the tests expect.
+Expected: FAIL. Fractional, string and negative numbers and a string `watched` reach the service, and bodies lack `code`.
 
 - [ ] **Step 3: Write the types, schemas and contract**
 
