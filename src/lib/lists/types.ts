@@ -77,6 +77,11 @@ export interface ListItemRow {
   createdAt: string;
 }
 
+export interface ContentListEntry {
+  listId: string;
+  itemId: string;
+}
+
 export interface Collaborator {
   id: string;
   userId: string;

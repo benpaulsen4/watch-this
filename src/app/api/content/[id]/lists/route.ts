@@ -1,38 +1,20 @@
 import { and, eq, or } from "drizzle-orm";
-import { NextResponse } from "next/server";
 
-import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
+import { authedRoute } from "@/lib/api/route";
 import { db } from "@/lib/db";
-import { listCollaborators,listItems, lists } from "@/lib/db/schema";
+import { listCollaborators, listItems, lists } from "@/lib/db/schema";
+import * as listsApi from "@/lib/lists/contract";
+import { listContentListsSchemas } from "@/lib/lists/schemas";
 
-async function handler(request: AuthenticatedRequest) {
-  try {
-    const userId = request.user.id;
-    const url = new URL(request.url);
-    const id = url.pathname.split("/").slice(-2, -1)[0]; // Get the [id] part from /api/content/[id]/lists
-
-    const contentId = parseInt(id ?? "");
-    if (isNaN(contentId)) {
-      return NextResponse.json(
-        { error: "Invalid content ID" },
-        { status: 400 },
-      );
-    }
-
-    // A TMDB id is only unique within a content type, and `list_items` is keyed
-    // on (listId, tmdbId, contentType) - so the same id legitimately appears
-    // twice in one list, once as a movie and once as a show. Matching on the id
-    // alone reported the movie's row for the show and vice versa, which showed
-    // an "Added" badge for a list the title was never in and made Remove delete
-    // the unrelated row. The caller must say which one it means.
-    const contentType = url.searchParams.get("contentType");
-    if (contentType !== "movie" && contentType !== "tv") {
-      return NextResponse.json(
-        { error: "Invalid content type" },
-        { status: 400 },
-      );
-    }
-
+// GET /api/content/[id]/lists - The user's lists containing this content
+//
+// Matching on the TMDB id alone reported the movie's row for the show and vice
+// versa, which showed an "Added" badge for a list the title was never in and
+// made Remove delete the unrelated row, so the query filters on the type too.
+export const GET = authedRoute(
+  listsApi.listContentLists,
+  listContentListsSchemas,
+  async ({ user, params, query }) => {
     // Find all lists where the user is owner or collaborator that contain this content
     const userListsWithContent = await db
       .select({
@@ -44,25 +26,15 @@ async function handler(request: AuthenticatedRequest) {
       .leftJoin(listCollaborators, eq(listCollaborators.listId, lists.id))
       .where(
         and(
-          or(eq(lists.ownerId, userId), eq(listCollaborators.userId, userId)),
-          eq(listItems.tmdbId, contentId),
-          eq(listItems.contentType, contentType),
+          or(eq(lists.ownerId, user.id), eq(listCollaborators.userId, user.id)),
+          eq(listItems.tmdbId, params.id),
+          eq(listItems.contentType, query.contentType),
         ),
       );
 
-    const results = userListsWithContent.map((item) => ({
+    return userListsWithContent.map((item) => ({
       listId: item.listId,
       itemId: item.itemId,
     }));
-
-    return NextResponse.json(results);
-  } catch (error) {
-    console.error("Error fetching lists with content:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
-}
-
-export const GET = withAuth(handler);
+  },
+);

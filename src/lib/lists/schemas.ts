@@ -4,7 +4,6 @@ import { q } from "../api/query";
 import {
   ContentType,
   ListType,
-  PermissionLevel,
   WatchStatus,
 } from "../db/schema";
 
@@ -46,3 +45,48 @@ export const updateListSchemas = {
 };
 
 export const deleteListSchemas = { params: listParams };
+
+export const getListItemsSchemas = {
+  params: listParams,
+  // Deliberately forgiving: old URLs can carry filter values that no longer
+  // exist, through ListFilters, and those are ignored rather than rejected.
+  query: z.object({
+    watchStatus: q
+      .list(z.enum({ ...WatchStatus, NONE: "none" }), { dropInvalid: true })
+      .optional(),
+    sortOrder: z
+      .enum(["ascending", "descending"])
+      .default("ascending")
+      .catch("ascending"),
+  }),
+};
+
+export const createListItemSchemas = {
+  params: listParams,
+  body: z.object({
+    // A positive integer at the boundary (API-06), so a crafted string (e.g.
+    // "../../authentication/token/new") can never reach the upstream TMDB path
+    // template.
+    tmdbId: z.int(TMDB_ID_INVALID).positive(TMDB_ID_INVALID),
+    contentType: z.enum(
+      ContentType,
+      'contentType must be either "movie" or "tv"',
+    ),
+  }),
+};
+
+export const deleteListItemSchemas = {
+  params: z.object({
+    id: z.uuid("Invalid list ID"),
+    itemId: z.uuid("Invalid item ID"),
+  }),
+};
+
+export const listContentListsSchemas = {
+  params: z.object({ id: q.int({ min: 1, message: "Invalid content ID" }) }),
+  query: z.object({
+    // A TMDB id is only unique within a content type, and `list_items` is keyed
+    // on (listId, tmdbId, contentType), so the caller must say which it means.
+    contentType: z.enum(ContentType, "Invalid content type"),
+  }),
+};
