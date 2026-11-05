@@ -81,7 +81,10 @@ describe("ScheduleManager", () => {
           const day = Number(params.get("dayOfWeek"));
           return {
             ok: true,
-            json: async () => ({ dayOfWeek: day }),
+            json: async () => ({
+              message: "Removed 1 schedule(s)",
+              deletedSchedules: [{ id: "s1", tmdbId, dayOfWeek: day }],
+            }),
           } as Response;
         }
         return { ok: true, json: async () => ({}) } as Response;
@@ -110,5 +113,37 @@ describe("ScheduleManager", () => {
         screen.getAllByRole("button", { name: /Add/i }).length,
       ).toBeGreaterThan(0),
     );
+  });
+
+  it("shows the server's message when adding fails", async () => {
+    vi.spyOn(global, "fetch").mockImplementation((async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      if (init?.method === "POST") {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            error: "Show is already scheduled for this day",
+            code: "duplicate",
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ schedules: {}, totalShows: 0 }),
+      } as Response;
+    }) as any);
+
+    renderWithQuery(<ScheduleManager tmdbId={tmdbId} watchStatus="watching" />);
+
+    const user = userEvent.setup();
+    const addButtons = await screen.findAllByRole("button", { name: /Add/i });
+    await user.click(addButtons[0]!);
+
+    expect(
+      await screen.findByText("Show is already scheduled for this day"),
+    ).toBeInTheDocument();
   });
 });
