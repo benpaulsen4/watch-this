@@ -3,6 +3,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useState } from "react";
 
+import { shouldRetry } from "@/lib/api/client";
+
 export function ReactQueryProvider({
   children,
 }: {
@@ -15,7 +17,7 @@ export function ReactQueryProvider({
           queries: {
             // Avoid aggressive refetching; tune as needed
             refetchOnWindowFocus: false,
-            retry: 1,
+            retry: shouldRetry,
           },
         },
       }),
