@@ -16,10 +16,9 @@ import {
   Tabs,
 } from "react-aria-components";
 
-import type {
-  CreateOrUpdateContentStatusResult,
-  TMDBContent,
-} from "@/lib/content-status/types";
+import { api } from "@/lib/api/client";
+import * as contentStatusApi from "@/lib/content-status/contract";
+import type { TMDBContent } from "@/lib/content-status/types";
 import type { WatchStatusEnum } from "@/lib/db/schema";
 import type {
   TMDBMovieDetails,
@@ -137,21 +136,14 @@ export function ContentDetailsModal({
   const contentStreaming = contentProvidersQuery.data?.providers || null;
 
   const updateStatusMutation = useMutation({
-    mutationFn: async (
-      newStatus: WatchStatusEnum,
-    ): Promise<CreateOrUpdateContentStatusResult> => {
-      const response = await fetch("/api/status/content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    mutationFn: (newStatus: WatchStatusEnum) =>
+      api(contentStatusApi.createOrUpdateContentStatus, {
+        body: {
           tmdbId: content.tmdbId,
           contentType: content.contentType,
           status: newStatus,
-        }),
-      });
-      if (!response.ok) throw new Error("Failed to update watch status");
-      return response.json();
-    },
+        },
+      }),
     onSuccess: (_data, variables) => {
       setWatchStatus(variables);
       onShowStatusChanged?.(variables);
