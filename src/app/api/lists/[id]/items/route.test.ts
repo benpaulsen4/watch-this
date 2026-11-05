@@ -2,6 +2,8 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { routeContext } from "@/test/route-context";
+
 const createListItem = vi.fn();
 const deleteListItem = vi.fn();
 const getListItems = vi.fn();
@@ -23,7 +25,7 @@ const LIST_ID = "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
 const ITEM_ID = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const URL_BASE = `http://localhost/api/lists/${LIST_ID}/items`;
 const headers = { cookie: "session=valid" };
-const context = { params: Promise.resolve({ id: LIST_ID }) };
+const context = routeContext({ id: LIST_ID });
 
 function get(search = "") {
   return GET(new NextRequest(`${URL_BASE}${search}`, { headers }), context);
@@ -101,6 +103,7 @@ describe("POST /api/lists/[id]/items", () => {
     ['{"tmdbId":1.5,"contentType":"movie"}'],
     ['{"tmdbId":-1,"contentType":"movie"}'],
     ['{"contentType":"movie"}'],
+    ['{"tmdbId":"550","contentType":"movie"}'],
     ['{"tmdbId":1,"contentType":"book"}'],
     ['{"tmdbId":1}'],
   ])("rejects %s", async (body) => {
@@ -126,7 +129,7 @@ describe("DELETE /api/lists/[id]/items/[itemId]", () => {
   const del = (itemId = ITEM_ID) =>
     DELETE(
       new NextRequest(`${URL_BASE}/${itemId}`, { method: "DELETE", headers }),
-      { params: Promise.resolve({ id: LIST_ID, itemId }) },
+      routeContext({ id: LIST_ID, itemId }),
     );
 
   it("passes both ids to the service", async () => {

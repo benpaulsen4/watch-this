@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TMDBHttpError } from "@/lib/tmdb/client";
+import { routeContext } from "@/test/route-context";
 
 vi.mock("@/lib/auth/webauthn", () => ({
   getCurrentUser: vi.fn(async (token?: string) => {
@@ -65,9 +66,7 @@ describe("withAuth", () => {
     const handler = withAuth(async (_request, context) =>
       NextResponse.json(await context.params),
     );
-    const response = await handler(request("valid"), {
-      params: Promise.resolve({ id: "abc" }),
-    });
+    const response = await handler(request("valid"), routeContext({ id: "abc" }));
     await expect(response.json()).resolves.toEqual({ id: "abc" });
   });
 

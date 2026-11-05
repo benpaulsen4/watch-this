@@ -2,6 +2,8 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { routeContext } from "@/test/route-context";
+
 const createList = vi.fn();
 const listLists = vi.fn();
 const deleteList = vi.fn();
@@ -31,7 +33,7 @@ const single = await import("./[id]/route");
 const LIST_ID = "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
 const BASE = "http://localhost/api/lists";
 const headers = { cookie: "session=valid" };
-const context = (id = LIST_ID) => ({ params: Promise.resolve({ id }) });
+const context = (id = LIST_ID) => routeContext({ id });
 
 function send(url: string, method: string, body: string) {
   return new NextRequest(url, { method, headers, body });

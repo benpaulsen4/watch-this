@@ -2,6 +2,8 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { routeContext } from "@/test/route-context";
+
 // Records the conditions the handler builds so we can assert that content type
 // is part of the filter, without standing up a real database.
 const recorded: { conditions: unknown[] } = { conditions: [] };
@@ -46,11 +48,10 @@ vi.mock("@/lib/auth/webauthn", () => ({
 
 const { GET } = await import("./route");
 
-function get(url: string) {
-  const id = new URL(url).pathname.split("/")[3]!;
+function get(id: string, url: string) {
   return GET(
     new NextRequest(url, { headers: { cookie: "session=valid" } }),
-    { params: Promise.resolve({ id }) },
+    routeContext({ id }),
   );
 }
 
@@ -73,6 +74,7 @@ describe("GET /api/content/[id]/lists", () => {
 
   it("rejects a content id with trailing characters", async () => {
     const response = await get(
+      "550abc",
       "http://localhost/api/content/550abc/lists?contentType=movie",
     );
 
@@ -82,6 +84,7 @@ describe("GET /api/content/[id]/lists", () => {
 
   it("rejects a non-numeric content id", async () => {
     const response = await get(
+      "abc",
       "http://localhost/api/content/abc/lists?contentType=movie",
     );
 
@@ -98,6 +101,7 @@ describe("GET /api/content/[id]/lists", () => {
   // unrelated row.
   it("requires a content type", async () => {
     const response = await get(
+      "550",
       "http://localhost/api/content/550/lists",
     );
 
@@ -111,6 +115,7 @@ describe("GET /api/content/[id]/lists", () => {
 
   it("rejects a content type that is not movie or tv", async () => {
     const response = await get(
+      "550",
       "http://localhost/api/content/550/lists?contentType=book",
     );
 
@@ -120,6 +125,7 @@ describe("GET /api/content/[id]/lists", () => {
 
   it("filters on both tmdb id and content type", async () => {
     const response = await get(
+      "550",
       "http://localhost/api/content/550/lists?contentType=tv",
     );
 

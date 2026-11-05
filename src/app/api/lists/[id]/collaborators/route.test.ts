@@ -2,6 +2,8 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { routeContext } from "@/test/route-context";
+
 const createListCollaborator = vi.fn();
 const deleteListCollaborator = vi.fn();
 const listListCollaborators = vi.fn();
@@ -28,10 +30,8 @@ const LIST_ID = "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
 const USER_ID = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const BASE = `http://localhost/api/lists/${LIST_ID}/collaborators`;
 const headers = { cookie: "session=valid" };
-const listContext = { params: Promise.resolve({ id: LIST_ID }) };
-const userContext = (userId = USER_ID) => ({
-  params: Promise.resolve({ id: LIST_ID, userId }),
-});
+const listContext = routeContext({ id: LIST_ID });
+const userContext = (userId = USER_ID) => routeContext({ id: LIST_ID, userId });
 
 function post(body: string) {
   return collection.POST(
