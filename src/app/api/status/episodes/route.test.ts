@@ -109,8 +109,23 @@ describe("POST /api/status/episodes", () => {
     });
   });
 
+  it("accepts an episode numbered 0", async () => {
+    updateEpisodeStatus.mockResolvedValue({ episode: {}, newStatus: null });
+    const response = await send(
+      "POST",
+      '{"tmdbId":1399,"seasonNumber":1,"episodeNumber":0}',
+    );
+    expect(response.status).toBe(201);
+    expect(updateEpisodeStatus).toHaveBeenCalledWith("user-1", {
+      tmdbId: 1399,
+      seasonNumber: 1,
+      episodeNumber: 0,
+      watched: true,
+    });
+  });
+
   it.each([
-    ['{"tmdbId":1399,"seasonNumber":1,"episodeNumber":0}'],
+    ['{"tmdbId":1399,"seasonNumber":1,"episodeNumber":-1}'],
     ['{"tmdbId":1399,"seasonNumber":-1,"episodeNumber":1}'],
     ['{"tmdbId":1399,"seasonNumber":1.5,"episodeNumber":1}'],
     ['{"tmdbId":1399,"seasonNumber":"1","episodeNumber":1}'],

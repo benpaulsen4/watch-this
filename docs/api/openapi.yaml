@@ -538,7 +538,7 @@ components:
           minimum: 0
         episodeNumber:
           type: integer
-          minimum: 1
+          minimum: 0
         watched:
           type: boolean
           default: true

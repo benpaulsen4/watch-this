@@ -12,7 +12,7 @@ const EPISODE_ITEM_INVALID =
 const tmdbId = z.int(TMDB_ID_INVALID).positive(TMDB_ID_INVALID);
 
 // Season 0 holds specials, and some seasons number an episode 0, so the
-// filters accept 0 for both.
+// filters and the single-episode POST accept 0 for both.
 const episodeQuery = z.object({
   tmdbId: q.int({ min: 1, message: TMDB_ID_INVALID }),
   seasonNumber: q
@@ -33,7 +33,7 @@ export const updateEpisodeStatusSchemas = {
       .min(0, EPISODE_NUMBERS_INVALID),
     episodeNumber: z
       .int(EPISODE_NUMBERS_REQUIRED)
-      .min(1, EPISODE_NUMBERS_INVALID),
+      .min(0, EPISODE_NUMBERS_INVALID),
     watched: z.boolean().default(true),
   }),
 };
