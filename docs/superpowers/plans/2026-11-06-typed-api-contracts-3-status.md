@@ -39,9 +39,12 @@
 - **TMDB 404s:** a non-TMDB error whose message mentions "404" is no longer reported as "not found". In `createOrUpdateContentStatus`, the old check wrapped the database transaction too.
 - **IDs:** `tmdbId` must be a positive integer everywhere. Before, POST and PUT bodies accepted any truthy value, and `parseInt` read `550abc` as 550.
 - **Episode numbers:** fractional, negative and string season and episode numbers return 400 instead of reaching the database. Query filters now reject negatives but accept 0, because season 0 holds specials and some seasons number an episode 0.
-- **Single-episode POST:** still requires `episodeNumber` of at least 1, and batch PUT still accepts 0, as before. `watched` must be a boolean when given.
+- **Single-episode POST:** `watched` must be a boolean when given.
 - **Messages:** a missing field returns that field's message, for example `tmdbId must be a positive integer` instead of `tmdbId and contentType are required`. A movie sent a status that isn't a TV status gets the TV-status message.
 - **`ContentDetailsModal`:** a failed status change now carries the server's message instead of a fixed string. Nothing displays it today.
+- **PUT status:** PUT `/api/status/content` with `status` of `""` or `null` returns 400. The old `if (status)` skipped validation and passed those values to the service. No client calls PUT.
+- **Error messages in the UI:** `EpisodeTracker`'s load error now shows the server's message, `Could not reach the server`, or `Get episode status failed`, instead of a fixed string. `ContentCard`'s quick-complete overlay falls back to the contract label, such as `Mark next episode as watched failed`, when the error body is not JSON.
+- **Episode 0:** a single episode numbered 0 can now be marked watched. It used to fail with a 400 that the UI only logged.
 
 ## Known, not changed here
 

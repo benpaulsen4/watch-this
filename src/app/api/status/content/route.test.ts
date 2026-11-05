@@ -109,6 +109,18 @@ describe("POST /api/status/content", () => {
     expect(createOrUpdateContentStatus).not.toHaveBeenCalled();
   });
 
+  it("gives a movie with an unknown status the TV-status message", async () => {
+    const response = await send(
+      "POST",
+      '{"tmdbId":550,"contentType":"movie","status":"binged"}',
+    );
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe(
+      "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'",
+    );
+    expect(createOrUpdateContentStatus).not.toHaveBeenCalled();
+  });
+
   it("maps notFound to a 404", async () => {
     createOrUpdateContentStatus.mockResolvedValue("notFound");
     const response = await send(
@@ -135,6 +147,15 @@ describe("PUT /api/status/content", () => {
     const response = await send(
       "PUT",
       '{"tmdbId":550,"contentType":"movie","status":"paused"}',
+    );
+    expect(response.status).toBe(400);
+    expect(updateContentStatus).not.toHaveBeenCalled();
+  });
+
+  it.each(['""', "null"])("rejects a status of %s", async (status) => {
+    const response = await send(
+      "PUT",
+      `{"tmdbId":550,"contentType":"tv","status":${status}}`,
     );
     expect(response.status).toBe(400);
     expect(updateContentStatus).not.toHaveBeenCalled();
