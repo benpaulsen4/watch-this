@@ -11,7 +11,7 @@ import type {
   ListListsResponse,
 } from "./types";
 
-export const LIST_NOT_FOUND = { status: 404, message: "List not found" };
+const LIST_NOT_FOUND = { status: 404, message: "List not found" };
 
 export const listLists = defineContract({
   method: "GET",

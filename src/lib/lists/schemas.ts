@@ -11,7 +11,7 @@ import {
 const LIST_NAME_REQUIRED = "List name is required";
 const LIST_NAME_TOO_LONG = "List name must be 100 characters or less";
 const LIST_TYPE_INVALID = "Invalid list type. Must be 'movies', 'tv', or 'mixed'";
-export const TMDB_ID_INVALID = "tmdbId must be a positive integer";
+const TMDB_ID_INVALID = "tmdbId must be a positive integer";
 
 const listName = z
   .string(LIST_NAME_REQUIRED)
@@ -19,7 +19,7 @@ const listName = z
   .min(1, LIST_NAME_REQUIRED)
   .max(100, LIST_NAME_TOO_LONG);
 
-export const listParams = z.object({ id: z.uuid("Invalid list ID") });
+const listParams = z.object({ id: z.uuid("Invalid list ID") });
 
 export const getListSchemas = { params: listParams };
 
