@@ -619,6 +619,7 @@ components:
       properties:
         tmdbId:
           type: integer
+          minimum: 1
         dayOfWeek:
           type: integer
           minimum: 0
@@ -2410,6 +2411,7 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
         - in: query
           name: dayOfWeek
           required: false
@@ -2424,6 +2426,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GetSchedulesResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Authentication required
           content:
@@ -2496,6 +2504,7 @@ paths:
           required: true
           schema:
             type: integer
+            minimum: 1
         - in: query
           name: dayOfWeek
           required: false

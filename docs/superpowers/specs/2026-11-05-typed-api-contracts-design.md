@@ -120,7 +120,7 @@ export const addCollaborator = defineContract({
 | --- | --- | --- |
 | `method`, `path` | Yes | `path` uses folder syntax. |
 | `label` | Yes | Used for logging and the 500 message, as `handleApiError(error, context)` does today. |
-| `schemas` | No | `schemas<typeof x>()`, a compile-time marker for the endpoint's `{ params, query, body }` object. The type system requires `params` keys to match the path's `[segments]`. Handlers receive the parsed output; clients provide the input. |
+| `schemas` | No | `schemas<typeof x>()`, a compile-time marker for the endpoint's `{ params, query, body }` object. The type system requires `params` keys to equal the path's `[segments]`, with none missing and none extra. Values may be any schema that accepts a string, including `q.int`. Handlers receive the parsed output; clients provide the input. |
 | `response` | Yes | `type<T>()`, a compile-time marker. `T` must be an object or array type. |
 | `status` | No | Success status, defaulting to 200. Six places use 201. |
 | `errors` | No | The route's failure codes, each with a status and a message. |
@@ -143,7 +143,10 @@ Schemas use these helpers, from `src/lib/api/query.ts`:
 - `q.int({ min, max })` accepts whole digit strings only. `z.coerce.number()` would
   turn an empty string into `0`. It replaces `validatePagination`.
 - `q.list(schema)` accepts one value or many and always outputs an array, for
-  parameters like `watchStatus`.
+  parameters like `watchStatus`. `q.list(schema, { dropInvalid: true })` keeps the
+  valid elements and silently drops the rest, using per-element `safeParse`;
+  without the option, an invalid element fails validation. The array form is tried
+  first, so an element schema with `.catch()` cannot swallow a whole array.
 
 ## Server wrapper
 
@@ -190,7 +193,7 @@ a new failure code stops the route compiling until the contract declares it.
 | `series-finale/[period]/card` (PNG) | No contract. Uses `withAuth` directly, reading `ctx.params`. |
 | `profile/import` (multipart) | No contract. Uses `withAuth` directly. Its size checks run before the file is read and must keep doing so. |
 | `auth/signout` (lenient body) | No `body` schema. The handler reads `request` itself and tolerates a bad body, as it does now. |
-| `admin/device-claim` | `publicRoute`, with the constant-time secret check left in the handler. There is only one such route, so it gets no auth mode of its own. |
+| `admin/device-claim` | `publicRoute` with no `body` schema. The handler checks the secret in constant time and logs failed attempts first, then parses the body with the schema itself. The wrapper validates before calling the handler, so a `body` schema would give unauthorized callers a 400 listing schema issues and skip the audit log. There is only one such route, so it gets no auth mode of its own. |
 | `auth/session` | Reads the cookie itself today. Moves to `authedRoute` if its 401 behaviour matches `withAuth`'s when migrated; otherwise `publicRoute`. Its existing tests decide. |
 
 ### Validation strictness
@@ -202,7 +205,11 @@ deliberate.**
   `limit=abc`, and malformed IDs on `uuid` params.
 - Still accepted: unknown `watchStatus` values and `sortOrder` on the list items
   route, which ignores them today. Old URLs can carry these through `ListFilters`.
-  These use `.catch()`.
+  `watchStatus` uses `q.list(schema, { dropInvalid: true })`, so `watching&bogus`
+  keeps `watching`. `sortOrder` uses `z.enum([...]).default("ascending").catch("ascending")`:
+  `.default()` keeps the key optional in `api()` input and covers a missing value,
+  and `.catch()` covers a bad one. A bare `.catch()` makes the key required in
+  `z.input`, and `.optional().catch()` returns `undefined` for a missing value.
 
 Each migration PR checks its routes for other deliberate leniency and keeps it.
 
@@ -248,6 +255,8 @@ are not written for end users.
 - The `message.includes("404")` checks in `lib/episodes/service.ts` and
   `lib/content-status/service.ts` use `isTMDBHttpError`.
 - `withAuth` and the proxy add `code` to their error bodies.
+- `PasskeyDevicesViewer.tsx:88` matches "rate limit" in message text. It moves to
+  `code` in the profile PR.
 - `AuthPageClient`'s `error.includes("username")` and `UsernameChanger`'s
   `response.status === 409` move to `code`, in the auth PR.
 
