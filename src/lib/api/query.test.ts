@@ -38,6 +38,14 @@ describe("q.int", () => {
     },
   );
 
+  it("rejects a digit string beyond the safe integer range", () => {
+    const result = q.int({ message: "Bad number" }).safeParse(
+      "99999999999999999999",
+    );
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("Bad number");
+  });
+
   it("can be optional", () => {
     expect(schema.optional().parse(undefined)).toBeUndefined();
   });
@@ -56,5 +64,48 @@ describe("q.list", () => {
 
   it("rejects a value outside the schema", () => {
     expect(schema.safeParse(["a", "c"]).success).toBe(false);
+  });
+});
+
+describe("q.list with catching or lenient schemas", () => {
+  it("keeps every element of an array when the element schema catches", () => {
+    const schema = q.list(z.enum(["a", "b"]).catch("a"));
+    expect(schema.parse(["b", "b"])).toEqual(["b", "b"]);
+  });
+
+  describe("dropInvalid", () => {
+    const schema = q.list(z.enum(["a", "b"]), { dropInvalid: true });
+
+    it("keeps valid elements and drops invalid ones", () => {
+      expect(schema.parse(["a", "bogus"])).toEqual(["a"]);
+    });
+
+    it("gives an empty array for one invalid value", () => {
+      expect(schema.parse("bogus")).toEqual([]);
+    });
+
+    it("wraps one valid value", () => {
+      expect(schema.parse("b")).toEqual(["b"]);
+    });
+  });
+});
+
+// The form for an optional query param with a default. A bare `.catch()` would
+// leave the key required in `z.input`, and `.optional().catch()` returns
+// undefined for a missing value; contract.types.test.ts proves `.default().catch()`
+// keeps it optional for `api()`.
+describe("optional defaulted query param", () => {
+  const sortOrder = z
+    .enum(["ascending", "descending"])
+    .default("ascending")
+    .catch("ascending");
+
+  it.each([
+    [undefined, "ascending"],
+    ["bogus", "ascending"],
+    ["descending", "descending"],
+    ["ascending", "ascending"],
+  ])("parses %s as %s", (input, expected) => {
+    expect(sortOrder.parse(input)).toBe(expected);
   });
 });

@@ -16,6 +16,15 @@ export function searchParamsToObject(
   return result;
 }
 
+const DROPPED = Symbol("dropped");
+
+/**
+ * Helpers for query strings. For an optional param with a default that also
+ * tolerates bad values (such as `sortOrder`), use
+ * `z.enum([...]).default("x").catch("x")`. A bare `.catch()` leaves the key
+ * required in `z.input`, so `api()` would demand it, and `.optional().catch()`
+ * returns undefined for a missing value because `.optional()` accepts it first.
+ */
 export const q = {
   /**
    * A whole number in a query string. Only digit strings pass: `parseInt` would
@@ -34,6 +43,7 @@ export const q = {
         const parsed = Number(text);
         if (
           !/^\d+$/.test(text) ||
+          !Number.isSafeInteger(parsed) ||
           (min !== undefined && parsed < min) ||
           (max !== undefined && parsed > max)
         ) {
@@ -44,12 +54,23 @@ export const q = {
       });
   },
 
-  /** One value or many, always output as an array. */
-  list<S extends z.ZodType>(schema: S) {
-    return z
-      .union([schema, z.array(schema)])
-      .transform(
-        (value) => (Array.isArray(value) ? value : [value]) as z.output<S>[],
-      );
+  /**
+   * One value or many, always output as an array. The array form is tried
+   * first: a catching element schema would otherwise accept a whole array as
+   * one invalid value. With `dropInvalid`, elements that fail the schema are
+   * dropped instead of failing the query, which keeps a list route lenient.
+   */
+  list<S extends z.ZodType>(
+    schema: S,
+    { dropInvalid = false }: { dropInvalid?: boolean } = {},
+  ) {
+    // An invalid element becomes the marker, which the transform removes.
+    const element = dropInvalid ? schema.catch(DROPPED as never) : schema;
+    return z.union([z.array(element), element]).transform(
+      (value) =>
+        (Array.isArray(value) ? value : [value]).filter(
+          (item) => item !== DROPPED,
+        ) as z.output<S>[],
+    );
   },
 };
