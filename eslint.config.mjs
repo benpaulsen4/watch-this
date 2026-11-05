@@ -87,6 +87,63 @@ const config = [
     },
   },
   {
+    // Contracts and client code ship to the browser. A runtime import of Zod or
+    // a feature's schemas.ts adds about 55 KB gzipped to run validators the
+    // client never calls, and tree-shaking does not remove it (zod/mini included).
+    // `import type` is erased, so it stays allowed. @/lib/db/schema is allowed
+    // because components already import its enums.
+    files: [
+      "src/lib/**/contract.ts",
+      "src/lib/api/client.ts",
+      "src/lib/api/errors.ts",
+      "src/components/**/*.{ts,tsx}",
+      "src/hooks/**/*.{ts,tsx}",
+    ],
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^zod(/|$)|(^|/)schemas$",
+              allowTypeImports: true,
+              message:
+                "Schemas are server-only. Use `import type` so Zod stays out of the client bundle.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // A contract is imported by client code, so it must not reach server modules.
+    files: ["src/lib/**/contract.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "next/navigation",
+              importNames: ["useRouter"],
+              message:
+                "Use useProgressRouter from @/hooks/useProgressRouter, so navigation shows the progress bar.",
+            },
+            { name: "next/server", message: "Contracts are client-safe." },
+          ],
+          patterns: [
+            {
+              regex: "(^|/)(db|service)$|^@/lib/auth/(webauthn|api-middleware)$",
+              message: "Contracts are client-safe; this module is server-only.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // share-card.tsx is drawn by Satori (next/og), which knows plain <img>
     // and nothing of next/image. BrandLogo renders data-URI marks inside the
     // standalone design-sync bundle, where next/image's loader is unavailable.
