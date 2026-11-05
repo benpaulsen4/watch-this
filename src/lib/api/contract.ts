@@ -40,17 +40,23 @@ export type PathParamNames<Path extends string> =
     ? Name | PathParamNames<Rest>
     : never;
 
-/** Rejects a contract whose `params` schema does not cover its path's segments. */
+/**
+ * Rejects a contract whose `params` keys differ from its path's segments, in
+ * either direction. Values are not checked: any schema accepting a string
+ * works, including `q.int`, whose input is `string | number`.
+ */
 type ParamsMatchPath<Path extends string, S extends ContractSchemas> = [
   PathParamNames<Path>,
 ] extends [never]
   ? S extends { params: z.ZodType }
     ? { schemas: never }
     : unknown
-  : S extends {
-        params: z.ZodType<unknown, Record<PathParamNames<Path>, string>>;
-      }
-    ? unknown
+  : S extends { params: z.ZodType<unknown, infer Input> }
+    ? [PathParamNames<Path>] extends [keyof Input]
+      ? [keyof Input] extends [PathParamNames<Path>]
+        ? unknown
+        : { schemas: never }
+      : { schemas: never }
     : { schemas: never };
 
 export interface ApiContract<

@@ -27,6 +27,29 @@ const listThings = defineContract({
   label: "List things",
   response: type<{ count: number }[]>(),
 });
+const intIdSchemas = { params: z.object({ id: q.int({ min: 1 }) }) };
+const intIdContract = defineContract({
+  method: "GET",
+  path: "/api/ints/[id]",
+  label: "Get int",
+  schemas: schemas<typeof intIdSchemas>(),
+  response: type<{ ok: true }>(),
+});
+const _extraKey = {
+  params: z.object({ id: z.string(), nope: z.string() }),
+};
+const _sortSchemas = {
+  query: z.object({
+    sortOrder: z.enum(["ascending", "descending"]).default("ascending").catch("ascending"),
+  }),
+};
+const sortContract = defineContract({
+  method: "GET",
+  path: "/api/sorted",
+  label: "Sorted",
+  schemas: schemas<typeof _sortSchemas>(),
+  response: type<{ ok: true }>(),
+});
 const _missingSub = { params: z.object({ id: z.string() }) };
 const _staticParams = { params: z.object({ id: z.string() }) };
 
@@ -39,6 +62,14 @@ export async function typeChecks() {
     label: "x",
     // @ts-expect-error params must cover every path segment
     schemas: schemas<typeof _missingSub>(),
+    response: type<{ a: 1 }>(),
+  });
+  defineContract({
+    method: "GET",
+    path: "/api/a/[id]",
+    label: "x",
+    // @ts-expect-error params must not have keys the path lacks
+    schemas: schemas<typeof _extraKey>(),
     response: type<{ a: 1 }>(),
   });
   // @ts-expect-error a path with segments needs a params schema
@@ -95,6 +126,15 @@ export async function typeChecks() {
     query: { page: 3 },
     body: { name: "n" },
   });
+  authedRoute(intIdContract, intIdSchemas, ({ params }) => {
+    const id: number = params.id;
+    void id;
+    return { ok: true as const };
+  });
+  await api(intIdContract, { params: { id: 5 } });
+  await api(intIdContract, { params: { id: "5" } });
+  // An optional defaulted query param stays optional for callers.
+  await api(sortContract);
   const things = await api(listThings);
   const count: number = things[0]!.count;
   void count;
