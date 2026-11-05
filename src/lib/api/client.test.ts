@@ -139,6 +139,22 @@ describe("api", () => {
       api(getThings, {}, { signal: controller.signal }),
     ).rejects.toBe(abort);
   });
+
+  it("rethrows an abort during the body read as is", async () => {
+    const controller = new AbortController();
+    const abort = new DOMException("Aborted", "AbortError");
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => {
+        controller.abort();
+        throw abort;
+      },
+    } as unknown as Response);
+    await expect(
+      api(getThings, {}, { signal: controller.signal }),
+    ).rejects.toBe(abort);
+  });
 });
 
 describe("isApiError", () => {

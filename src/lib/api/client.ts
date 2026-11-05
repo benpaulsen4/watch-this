@@ -128,7 +128,11 @@ export async function api<C extends AnyContract>(
     throw new ApiError("network", 0, "Could not reach the server");
   }
 
-  const parsed: unknown = await response.json().catch(() => undefined);
+  const parsed: unknown = await response.json().catch((error: unknown) => {
+    // An abort while reading the body is a cancellation too.
+    if (init?.signal?.aborted) throw error;
+    return undefined;
+  });
 
   if (!response.ok) {
     if (isErrorBody(parsed)) {
