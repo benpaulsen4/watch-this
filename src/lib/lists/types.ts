@@ -36,8 +36,8 @@ export interface ListListsResponse {
   isArchived: boolean;
   syncWatchStatus: boolean;
   ownerId: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   itemCount: number;
   collaborators: number;
   posterPaths: string[];

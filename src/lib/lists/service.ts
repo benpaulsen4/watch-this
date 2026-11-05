@@ -173,6 +173,8 @@ async function fetchLists(
 
   return userListsWithCounts.map((list) => ({
     ...list,
+    createdAt: list.createdAt.toISOString(),
+    updatedAt: list.updatedAt.toISOString(),
     posterPaths: postersByList.get(list.id) ?? [],
   }));
 }
@@ -407,8 +409,8 @@ export async function createList(
     isArchived: newList.isArchived,
     syncWatchStatus: newList.syncWatchStatus,
     ownerId: newList.ownerId,
-    createdAt: newList.createdAt,
-    updatedAt: newList.updatedAt,
+    createdAt: newList.createdAt.toISOString(),
+    updatedAt: newList.updatedAt.toISOString(),
     itemCount: 0,
     collaborators: 0,
     posterPaths: [],
@@ -495,8 +497,8 @@ export async function updateList(
     isArchived: updated.isArchived,
     syncWatchStatus: updated.syncWatchStatus,
     ownerId: updated.ownerId,
-    createdAt: updated.createdAt,
-    updatedAt: updated.updatedAt,
+    createdAt: updated.createdAt.toISOString(),
+    updatedAt: updated.updatedAt.toISOString(),
     itemCount: itemCountResult[0]?.count || 0,
     collaborators: collaboratorCountResult[0]?.count || 0,
     posterPaths: [],
