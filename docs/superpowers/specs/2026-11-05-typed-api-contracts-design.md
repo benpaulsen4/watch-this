@@ -45,6 +45,7 @@ Record of what was chosen and why, so implementation does not relitigate them.
 | Validation strictness | Reject what is nonsense or would crash; keep deliberate leniency | Closes the bugs above without breaking old filter URLs. See "Validation strictness". |
 | React Query | Not converted in a separate pass | 21 of the 24 files that call `fetch` already use a React Query hook. See "Client". |
 | Query keys | Hand-written, not generated from contracts | Hierarchical keys such as `["lists", listId, ...]` are what make broad invalidation work. |
+| Contract naming | Named after the service function, imported as `import * as listsApi from ".../contract"` | Found in layer 2: contract names clash with service functions in routes and with handlers such as `addCollaborator` in components. A namespace avoids aliases. Layer 1's schedules predates this and can stay as it is. |
 | `withAuth` | Kept permanently | It is the layer under `authedRoute`, and the routes without contracts use it directly. |
 | Rollout | One feature per PR, no flag | Old and new routes coexist, and the wire change is additive. |
 
