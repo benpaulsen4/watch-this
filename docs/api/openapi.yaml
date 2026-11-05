@@ -1459,6 +1459,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
     get:
       tags: [Lists]
       summary: Get list details
@@ -1586,6 +1587,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       - in: query
         name: watchStatus
         required: false
@@ -1705,11 +1707,13 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       - in: path
         name: itemId
         required: true
         schema:
           type: string
+          format: uuid
     delete:
       tags: [Lists]
       summary: Remove item from list
@@ -1753,6 +1757,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
     get:
       tags: [Lists]
       summary: List collaborators (owner only)
@@ -1865,11 +1870,13 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       - in: path
         name: userId
         required: true
         schema:
           type: string
+          format: uuid
     put:
       tags: [Lists]
       summary: Update collaborator permissions (owner only)
@@ -1974,6 +1981,14 @@ paths:
         required: true
         schema:
           type: integer
+          minimum: 1
+      - in: query
+        name: contentType
+        required: true
+        description: A TMDB id is only unique within a content type.
+        schema:
+          type: string
+          enum: [movie, tv]
     get:
       tags: [Lists]
       summary: Get lists containing a specific TMDB content id
