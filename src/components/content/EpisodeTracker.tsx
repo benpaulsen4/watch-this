@@ -12,12 +12,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { api } from "@/lib/api/client";
 import { WatchStatusEnum } from "@/lib/db";
-import type {
-  BatchUpdateEpisodesResult,
-  EpisodeStatusItem,
-  UpdateEpisodeStatusResult,
-} from "@/lib/episodes/types";
+import * as episodesApi from "@/lib/episodes/contract";
+import type { EpisodeStatusItem } from "@/lib/episodes/types";
 import type { TMDBSeason, TMDBTVShowDetails } from "@/lib/tmdb/client";
 import { cn } from "@/lib/utils";
 
@@ -63,12 +61,10 @@ export function EpisodeTracker({
   const seasonsQuery = useQuery<SeasonData[]>({
     queryKey: ["episodes", tvShowId],
     queryFn: async () => {
-      const statusResponse = await fetch(
-        `/api/status/episodes?tmdbId=${tvShowId}`,
+      const { episodes: watchStatuses } = await api(
+        episodesApi.listEpisodeStatuses,
+        { query: { tmdbId: tvShowId } },
       );
-      if (!statusResponse.ok)
-        throw new Error("Failed to fetch episode watch statuses");
-      const { episodes: watchStatuses } = await statusResponse.json();
 
       const seasonPromises: Array<
         Promise<{ seasonNumber: number; season: TMDBSeason }>
@@ -114,20 +110,10 @@ export function EpisodeTracker({
       seasonNumber: number;
       episodeNumber: number;
       watched: boolean;
-    }): Promise<UpdateEpisodeStatusResult> => {
-      const response = await fetch("/api/status/episodes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tmdbId: tvShowId,
-          seasonNumber,
-          episodeNumber,
-          watched,
-        }),
-      });
-      if (!response.ok) throw new Error("Failed to update episode status");
-      return response.json();
-    },
+    }) =>
+      api(episodesApi.updateEpisodeStatus, {
+        body: { tmdbId: tvShowId, seasonNumber, episodeNumber, watched },
+      }),
     onSuccess: ({ newStatus }, variables) => {
       if (newStatus) onShowStatusChanged?.(newStatus as WatchStatusEnum);
       queryClient.setQueryData<SeasonData[]>(["episodes", tvShowId], (prev) => {
@@ -214,15 +200,10 @@ export function EpisodeTracker({
         episodeNumber: number;
         watched: boolean;
       }>;
-    }): Promise<BatchUpdateEpisodesResult> => {
-      const response = await fetch("/api/status/episodes", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tmdbId: tvShowId, episodes: payload.episodes }),
-      });
-      if (!response.ok) throw new Error("Failed to update season status");
-      return response.json();
-    },
+    }) =>
+      api(episodesApi.batchUpdateEpisodeStatuses, {
+        body: { tmdbId: tvShowId, episodes: payload.episodes },
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["episodes", tvShowId] });
     },
