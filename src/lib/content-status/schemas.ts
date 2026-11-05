@@ -1,18 +1,19 @@
 import { z } from "zod";
 
 import { q } from "../api/query";
-import { ContentType, MovieWatchStatus, WatchStatus } from "../db/schema";
+import { ContentType, MovieWatchStatus, TVWatchStatus } from "../db/schema";
 
 const TMDB_ID_INVALID = "tmdbId must be a positive integer";
 const CONTENT_TYPE_INVALID = "Invalid content type. Must be 'movie' or 'tv'";
 const MOVIE_STATUS_INVALID =
   "Invalid movie status. Must be 'planning' or 'completed'";
-// Every status is a TV status, so this is the message for one outside the set.
+// The TV set is the full set of statuses, so this is also the message for a
+// value outside every set.
 const STATUS_INVALID =
   "Invalid TV status. Must be 'planning', 'watching', 'paused', 'completed', or 'dropped'";
 
 const contentType = z.enum(ContentType, CONTENT_TYPE_INVALID);
-const status = z.enum(WatchStatus, STATUS_INVALID);
+const status = z.enum(TVWatchStatus, STATUS_INVALID);
 
 /** Movies only have two statuses; TV shows use all of them. */
 function checkMovieStatus(
