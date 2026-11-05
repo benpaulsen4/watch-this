@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import type { ApiErrorBody } from "@/lib/api/errors";
 import { getCurrentUser } from "@/lib/auth/webauthn";
+import { isTMDBHttpError } from "@/lib/tmdb/client";
 
 import { User } from "../db";
 
@@ -8,9 +10,17 @@ export interface AuthenticatedRequest extends NextRequest {
   user: User;
 }
 
+/** The App Router's second handler argument. Next resolves `params` from the path. */
+export interface RouteContext {
+  params: Promise<Record<string, string | string[] | undefined>>;
+}
+
 export type AuthenticatedHandler = (
   request: AuthenticatedRequest,
+  context: RouteContext,
 ) => Promise<NextResponse> | NextResponse;
+
+const NO_PARAMS: RouteContext = { params: Promise.resolve({}) };
 
 /**
  * Higher-order function that wraps API route handlers with authentication
@@ -18,14 +28,17 @@ export type AuthenticatedHandler = (
  * @returns A wrapped handler that checks authentication before proceeding
  */
 export function withAuth(handler: AuthenticatedHandler) {
-  return async function (request: NextRequest): Promise<NextResponse> {
+  return async function (
+    request: NextRequest,
+    context: RouteContext = NO_PARAMS,
+  ): Promise<NextResponse> {
     try {
       // Check authentication
       const sessionToken = request.cookies.get("session")?.value;
 
       if (!sessionToken) {
         return NextResponse.json(
-          { error: "Authentication required" },
+          { error: "Authentication required", code: "unauthenticated" },
           { status: 401 },
         );
       }
@@ -35,7 +48,7 @@ export function withAuth(handler: AuthenticatedHandler) {
       if (!user) {
         // Clear invalid session cookie
         const response = NextResponse.json(
-          { error: "Invalid session" },
+          { error: "Invalid session", code: "invalidSession" },
           { status: 401 },
         );
         response.cookies.delete("session");
@@ -46,11 +59,11 @@ export function withAuth(handler: AuthenticatedHandler) {
       const authenticatedRequest = request as AuthenticatedRequest;
       authenticatedRequest.user = user;
 
-      return await handler(authenticatedRequest);
+      return await handler(authenticatedRequest, context);
     } catch (error) {
       console.error("Authentication middleware error:", error);
       return NextResponse.json(
-        { error: "Authentication failed" },
+        { error: "Authentication failed", code: "internal" },
         { status: 500 },
       );
     }
@@ -66,23 +79,30 @@ export function withAuth(handler: AuthenticatedHandler) {
 export function handleApiError(error: unknown, context: string): NextResponse {
   console.error(`${context} error:`, error);
 
-  if (error instanceof Error) {
-    if (error.message.includes("TMDB API error")) {
+  if (isTMDBHttpError(error)) {
+    if (error.status === 429) {
       return NextResponse.json(
-        { error: "External service unavailable" },
-        { status: 503 },
-      );
-    }
-
-    if (error.message.includes("rate limit")) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again later." },
+        {
+          error: "Rate limit exceeded. Please try again later.",
+          code: "rateLimited",
+        } satisfies ApiErrorBody,
         { status: 429 },
       );
     }
+
+    return NextResponse.json(
+      {
+        error: "External service unavailable",
+        code: "upstreamUnavailable",
+      } satisfies ApiErrorBody,
+      { status: 503 },
+    );
   }
 
-  return NextResponse.json({ error: `${context} failed` }, { status: 500 });
+  return NextResponse.json(
+    { error: `${context} failed`, code: "internal" } satisfies ApiErrorBody,
+    { status: 500 },
+  );
 }
 
 /**
