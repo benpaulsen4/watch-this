@@ -1,12 +1,16 @@
 import { defineContract, schemas, type } from "../api/contract";
 import type {
+  createListCollaboratorSchemas,
   createListItemSchemas,
   createListSchemas,
+  deleteListCollaboratorSchemas,
   deleteListItemSchemas,
   deleteListSchemas,
   getListItemsSchemas,
   getListSchemas,
   listContentListsSchemas,
+  listListCollaboratorsSchemas,
+  updateListCollaboratorSchemas,
   updateListSchemas,
 } from "./schemas";
 import type {
@@ -14,8 +18,10 @@ import type {
   DeleteResponse,
   GetListItemsResponse,
   GetListResponse,
+  ListCollaboratorsResponse,
   ListItemRow,
   ListListsResponse,
+  UpdateCollaboratorsResponse,
 } from "./types";
 
 const LIST_NOT_FOUND = { status: 404, message: "List not found" };
@@ -122,4 +128,74 @@ export const listContentLists = defineContract({
   label: "Get lists containing content",
   schemas: schemas<typeof listContentListsSchemas>(),
   response: type<ContentListEntry[]>(),
+});
+
+export const listListCollaborators = defineContract({
+  method: "GET",
+  path: "/api/lists/[id]/collaborators",
+  label: "Get collaborators",
+  schemas: schemas<typeof listListCollaboratorsSchemas>(),
+  response: type<ListCollaboratorsResponse>(),
+  errors: {
+    notFound: LIST_NOT_FOUND,
+    forbidden: {
+      status: 403,
+      message: "Only the list owner can view collaborators",
+    },
+  },
+});
+
+export const createListCollaborator = defineContract({
+  method: "POST",
+  path: "/api/lists/[id]/collaborators",
+  label: "Add collaborator",
+  schemas: schemas<typeof createListCollaboratorSchemas>(),
+  response: type<UpdateCollaboratorsResponse>(),
+  errors: {
+    notFound: LIST_NOT_FOUND,
+    forbidden: {
+      status: 403,
+      message: "Only the list owner can add collaborators",
+    },
+    invalidUser: { status: 400, message: "Invalid target user" },
+    conflict: {
+      status: 409,
+      message: "User is already a collaborator on this list",
+    },
+  },
+});
+
+const COLLABORATOR_NOT_FOUND = {
+  status: 404,
+  message: "List or collaborator not found",
+};
+
+export const updateListCollaborator = defineContract({
+  method: "PUT",
+  path: "/api/lists/[id]/collaborators/[userId]",
+  label: "Update collaborator",
+  schemas: schemas<typeof updateListCollaboratorSchemas>(),
+  response: type<UpdateCollaboratorsResponse>(),
+  errors: {
+    notFound: COLLABORATOR_NOT_FOUND,
+    forbidden: {
+      status: 403,
+      message: "Only the list owner can update collaborator permissions",
+    },
+  },
+});
+
+export const deleteListCollaborator = defineContract({
+  method: "DELETE",
+  path: "/api/lists/[id]/collaborators/[userId]",
+  label: "Remove collaborator",
+  schemas: schemas<typeof deleteListCollaboratorSchemas>(),
+  response: type<DeleteResponse>(),
+  errors: {
+    notFound: COLLABORATOR_NOT_FOUND,
+    forbidden: {
+      status: 403,
+      message: "Only the list owner can remove collaborators",
+    },
+  },
 });

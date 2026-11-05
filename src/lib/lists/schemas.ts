@@ -4,6 +4,7 @@ import { q } from "../api/query";
 import {
   ContentType,
   ListType,
+  PermissionLevel,
   WatchStatus,
 } from "../db/schema";
 
@@ -90,3 +91,35 @@ export const listContentListsSchemas = {
     contentType: z.enum(ContentType, "Invalid content type"),
   }),
 };
+
+const collaboratorParams = z.object({
+  id: z.uuid("Invalid list ID"),
+  userId: z.uuid("Invalid user ID"),
+});
+
+export const listListCollaboratorsSchemas = { params: listParams };
+
+export const createListCollaboratorSchemas = {
+  params: listParams,
+  body: z.object({
+    username: z
+      .string("Username is required")
+      .trim()
+      .min(1, "Username is required"),
+    permissionLevel: z
+      .enum(PermissionLevel, "Invalid permission level")
+      .default(PermissionLevel.COLLABORATOR),
+  }),
+};
+
+export const updateListCollaboratorSchemas = {
+  params: collaboratorParams,
+  body: z.object({
+    permissionLevel: z.enum(
+      PermissionLevel,
+      "Valid permission level is required",
+    ),
+  }),
+};
+
+export const deleteListCollaboratorSchemas = { params: collaboratorParams };

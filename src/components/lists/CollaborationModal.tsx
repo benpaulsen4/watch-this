@@ -8,11 +8,10 @@ import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
+import { api, errorMessage } from "@/lib/api/client";
 import { PermissionLevel, type PermissionLevelEnum } from "@/lib/db/schema";
-import {
-  Collaborator,
-  CreateCollaboratorInput,
-} from "@/lib/lists/types";
+import * as listsApi from "@/lib/lists/contract";
+import { CreateCollaboratorInput } from "@/lib/lists/types";
 
 import { ProfileImage } from "../ui/ProfileImage";
 
@@ -40,19 +39,14 @@ export default function CollaborationModal({
   const [newUsername, setNewUsername] = useState("");
   const [newPermissionLevel, setNewPermissionLevel] =
     useState<PermissionLevelEnum>(PermissionLevel.COLLABORATOR);
-  const [addingCollaborator, setAddingCollaborator] = useState(false);
 
   const queryClient = useQueryClient();
 
-  const collaboratorsQuery = useQuery<{ collaborators: Collaborator[] }>({
+  const collaboratorsQuery = useQuery({
     queryKey: ["lists", listId, "collaborators"],
     enabled: isOpen && isOwner,
-    queryFn: async () => {
-      const response = await fetch(`/api/lists/${listId}/collaborators`);
-      if (!response.ok) throw new Error("Failed to fetch collaborators");
-      const data = await response.json();
-      return data;
-    },
+    queryFn: ({ signal }) =>
+      api(listsApi.listListCollaborators, { params: { id: listId } }, { signal }),
   });
 
   const addCollaborator = async () => {
@@ -69,21 +63,11 @@ export default function CollaborationModal({
   };
 
   const addCollaboratorMutation = useMutation({
-    mutationFn: async ({
-      username,
-      permissionLevel,
-    }: CreateCollaboratorInput) => {
-      setAddingCollaborator(true);
-      const response = await fetch(`/api/lists/${listId}/collaborators`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, permissionLevel }),
-      });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "Failed to add collaborator");
-      return data;
-    },
+    mutationFn: (input: CreateCollaboratorInput) =>
+      api(listsApi.createListCollaborator, {
+        params: { id: listId },
+        body: input,
+      }),
     onSuccess: (data) => {
       setSuccess(data.message);
       setNewUsername("");
@@ -93,11 +77,8 @@ export default function CollaborationModal({
       });
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof Error ? err.message : "Failed to add collaborator",
-      );
+      setError(errorMessage(err, "Failed to add collaborator"));
     },
-    onSettled: () => setAddingCollaborator(false),
   });
 
   const removeCollaborator = async (
@@ -116,20 +97,10 @@ export default function CollaborationModal({
   };
 
   const removeCollaboratorMutation = useMutation({
-    mutationFn: async ({
-      collaboratorUserId,
-    }: {
-      collaboratorUserId: string;
-    }) => {
-      const response = await fetch(
-        `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
-        { method: "DELETE" },
-      );
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "Failed to remove collaborator");
-      return { collaboratorUserId, message: data.message };
-    },
+    mutationFn: ({ collaboratorUserId }: { collaboratorUserId: string }) =>
+      api(listsApi.deleteListCollaborator, {
+        params: { id: listId, userId: collaboratorUserId },
+      }),
     onSuccess: ({ message }) => {
       setSuccess(message);
       queryClient.invalidateQueries({
@@ -137,9 +108,7 @@ export default function CollaborationModal({
       });
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof Error ? err.message : "Failed to remove collaborator",
-      );
+      setError(errorMessage(err, "Failed to remove collaborator"));
     },
   });
 
@@ -153,26 +122,17 @@ export default function CollaborationModal({
   };
 
   const updatePermissionMutation = useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       collaboratorUserId,
       newPermission,
     }: {
       collaboratorUserId: string;
       newPermission: PermissionLevelEnum;
-    }) => {
-      const response = await fetch(
-        `/api/lists/${listId}/collaborators/${collaboratorUserId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ permissionLevel: newPermission }),
-        },
-      );
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "Failed to update permission");
-      return { collaboratorUserId, newPermission, message: data.message };
-    },
+    }) =>
+      api(listsApi.updateListCollaborator, {
+        params: { id: listId, userId: collaboratorUserId },
+        body: { permissionLevel: newPermission },
+      }),
     onSuccess: ({ message }) => {
       setSuccess(message);
       queryClient.invalidateQueries({
@@ -180,9 +140,7 @@ export default function CollaborationModal({
       });
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof Error ? err.message : "Failed to update permission",
-      );
+      setError(errorMessage(err, "Failed to update permission"));
     },
   });
 
@@ -276,8 +234,8 @@ export default function CollaborationModal({
                 />
                 <Button
                   onClick={addCollaborator}
-                  disabled={addingCollaborator || !newUsername.trim()}
-                  loading={addingCollaborator}
+                  disabled={addCollaboratorMutation.isPending || !newUsername.trim()}
+                  loading={addCollaboratorMutation.isPending}
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
                   Add
