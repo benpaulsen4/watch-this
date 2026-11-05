@@ -88,7 +88,8 @@ const config = [
   },
   {
     // Contracts and client code ship to the browser. A runtime import of Zod or
-    // a feature's schemas.ts adds about 55 KB gzipped to run validators the
+    // a feature's schemas.ts, or api/query or api/route (which pull in Zod, auth
+    // and the database), adds about 55 KB gzipped to run validators the
     // client never calls, and tree-shaking does not remove it (zod/mini included).
     // `import type` is erased, so it stays allowed. @/lib/db/schema is allowed
     // because components already import its enums.
@@ -96,6 +97,7 @@ const config = [
       "src/lib/**/contract.ts",
       "src/lib/api/client.ts",
       "src/lib/api/errors.ts",
+      "src/lib/auth/client.ts",
       "src/components/**/*.{ts,tsx}",
       "src/hooks/**/*.{ts,tsx}",
     ],
@@ -106,7 +108,7 @@ const config = [
         {
           patterns: [
             {
-              regex: "^zod(/|$)|(^|/)schemas$",
+              regex: "^zod(/|$)|(^|/)schemas$|(^|/)api/(query|route)$",
               allowTypeImports: true,
               message:
                 "Schemas are server-only. Use `import type` so Zod stays out of the client bundle.",

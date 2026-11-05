@@ -7,9 +7,9 @@ import type { AnyContract } from "./contract";
 
 const LIB = path.join(process.cwd(), "src/lib");
 
-const files = readdirSync(LIB)
-  .map((feature) => path.join(LIB, feature, "contract.ts"))
-  .filter((file) => existsSync(file));
+const files = readdirSync(LIB, { recursive: true, encoding: "utf8" })
+  .filter((entry) => path.basename(entry) === "contract.ts")
+  .map((entry) => path.join(LIB, entry));
 
 const modules: [string, Record<string, unknown>][] = await Promise.all(
   files.map(

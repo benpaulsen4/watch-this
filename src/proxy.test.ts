@@ -62,17 +62,18 @@ describe("proxy rate-limit keying (AUTH-05 bypass regression)", () => {
     // client cannot forge) rotating a forged X-Forwarded-For on every request.
     // The old code keyed on the left-most XFF entry, so each of these got a
     // fresh bucket and the limiter never tripped. The key must ignore XFF.
-    let lastStatus = 0;
+    let last: Response | undefined;
     for (let i = 0; i <= limit; i++) {
-      lastStatus = proxy(
+      last = proxy(
         authRequest({
           "x-forwarded-for": `1.2.3.${i}, 10.0.0.1`,
           "x-real-ip": "203.0.113.7",
         }),
-      ).status;
+      );
     }
 
-    expect(lastStatus).toBe(429);
+    expect(last?.status).toBe(429);
+    expect(await last?.json()).toMatchObject({ code: "rateLimited" });
   });
 
   it("keys buckets off the trusted platform IP, not the forwarded chain", async () => {
