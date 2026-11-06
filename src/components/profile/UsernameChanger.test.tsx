@@ -92,7 +92,10 @@ describe("UsernameChanger", () => {
       {
         ok: false,
         status: 409,
-        json: async () => ({ error: "This username is already taken" }),
+        json: async () => ({
+          error: "Username is already taken",
+          code: "usernameTaken",
+        }),
       },
     );
 
@@ -108,7 +111,9 @@ describe("UsernameChanger", () => {
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/already taken/i)).toBeInTheDocument();
+      expect(
+        screen.getByText("This username is already taken"),
+      ).toBeInTheDocument();
     });
   });
 });
