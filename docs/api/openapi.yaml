@@ -38,7 +38,7 @@ components:
   schemas:
     ErrorResponse:
       type: object
-      required: [error]
+      required: [error, code]
       properties:
         error:
           type: string
@@ -2799,7 +2799,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ImportResult"
         "400":
-          description: Validation or parse error
+          description: "`validation` for a missing file or a format other than json; `invalidFile` when the file is not valid JSON"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: "`tooLarge`: the file is over 1 MB or has too many entries"
           content:
             application/json:
               schema:
