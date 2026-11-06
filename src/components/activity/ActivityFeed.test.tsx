@@ -65,7 +65,7 @@ describe("ActivityFeed", () => {
     global.fetch = vi.fn(async () => ({ ok: false, json: async () => ({}) }));
     renderWithClient(<ActivityFeed currentUsername="alice" />);
     expect(
-      await screen.findByText(/Failed to fetch activities/),
+      await screen.findByText(/Get activity timeline failed/),
     ).toBeInTheDocument();
   });
 
@@ -183,7 +183,7 @@ describe("ActivityFeed", () => {
 
       expect(screen.getByText(/created list "My List"/)).toBeInTheDocument();
       expect(
-        screen.queryByText(/Failed to fetch activities/),
+        screen.queryByText(/Get activity timeline failed/),
       ).not.toBeInTheDocument();
     });
   });

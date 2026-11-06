@@ -49,7 +49,7 @@ describe("ActivityTimelineClient", () => {
     const { ActivityTimelineClient } = await import("./ActivityTimelineClient");
     renderWithClient(<ActivityTimelineClient />);
     expect(
-      await screen.findByText(/Failed to fetch activities/),
+      await screen.findByText(/Get activity timeline failed/),
     ).toBeInTheDocument();
     // Retry button is present
     expect(screen.getByText("Try Again")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("ActivityTimelineClient", () => {
 
       expect(screen.getByText(/created list "My List"/)).toBeInTheDocument();
       expect(
-        screen.queryByText(/Failed to fetch activities/),
+        screen.queryByText(/Get activity timeline failed/),
       ).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -148,7 +148,7 @@ describe("ActivityTimelineClient", () => {
       isLoading: false,
       isFetchingNextPage: false,
       isFetchNextPageError: true,
-      error: new Error("Failed to fetch activities"),
+      error: new Error("Get activity timeline failed"),
       fetchNextPage: vi.fn(),
       hasNextPage: true,
     });

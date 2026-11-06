@@ -8,7 +8,8 @@ import { useEffect, useMemo, useState } from "react";
 import ListSettingsModal from "@/components/lists/ListSettingsModal";
 import { Button } from "@/components/ui/Button";
 import { useProgressRouter } from "@/hooks/useProgressRouter";
-import type { ActivityTimelineResponse } from "@/lib/activity/types";
+import * as activityApi from "@/lib/activity/contract";
+import { api } from "@/lib/api/client";
 import { refetchOnResume } from "@/lib/refetch-on-resume";
 
 import { LoadingSpinner } from "../ui/LoadingSpinner";
@@ -53,15 +54,14 @@ export function ActivityFeed({ currentUsername }: ActivityFeedProps) {
     isLoading,
     error,
     refetch,
-  } = useQuery<ActivityTimelineResponse>({
+  } = useQuery({
     queryKey: ["activity", "feed"],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/activity?limit=${DESKTOP_ACTIVITY_COUNT}`,
-      );
-      if (!response.ok) throw new Error("Failed to fetch activities");
-      return response.json();
-    },
+    queryFn: ({ signal }) =>
+      api(
+        activityApi.listActivityTimeline,
+        { query: { limit: DESKTOP_ACTIVITY_COUNT } },
+        { signal },
+      ),
     refetchOnWindowFocus: refetchOnResume,
   });
 
