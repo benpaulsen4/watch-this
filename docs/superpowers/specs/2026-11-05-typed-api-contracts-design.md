@@ -52,7 +52,10 @@ Record of what was chosen and why, so implementation does not relitigate them.
 ## Non-goals
 
 - Generating `docs/api/openapi.yaml`. It stays manually maintained.
-- Changing URLs, HTTP methods, or success response shapes.
+- Changing URLs, HTTP methods, or success response shapes. One exception is allowed and was
+  taken: a route that returned a bare JSON string such as `"success"` now returns
+  `{ success: true }`, because a returned string reads as an error code in the contract
+  system (layer 5: passkey delete and claim cancel).
 - Changing how server components call services.
 - Moving `AuthProvider`, `ProfileClient` sign-out, or the passkey flows onto React
   Query hooks. They call `api()` directly instead.
@@ -128,7 +131,8 @@ export const addCollaborator = defineContract({
 
 Params that hold a `uuid` primary key, such as list IDs, use `z.uuid()`. A malformed ID
 then returns 400 instead of reaching Postgres. Not every `[id]` is one: TMDB IDs are
-integers, and `profile/devices/[id]` holds a credential ID. Each migration PR checks the
+integers, and both `profile/devices/[id]` and `profile/devices/claims/[id]` hold `uuid`
+primary keys (`passkey_credentials.id`, `passkey_claims.id`). Each migration PR checks the
 column behind each param before choosing its schema.
 
 ### Query helpers
