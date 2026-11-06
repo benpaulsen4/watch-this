@@ -8,7 +8,8 @@ import {
 } from "@simplewebauthn/browser";
 import { UAParser } from "ua-parser-js";
 
-import type { ClaimInitiateResponse } from "@/lib/profile/devices/types";
+import { api } from "@/lib/api/client";
+import * as devicesApi from "@/lib/profile/devices/contract";
 
 export interface RegistrationOptions {
   username: string;
@@ -110,13 +111,8 @@ export async function authenticatePasskey() {
 }
 
 // Initiate a claim to add a new passkey
-export async function initiatePasskeyClaim(): Promise<ClaimInitiateResponse> {
-  const response = await fetch("/api/profile/devices", { method: "POST" });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to initiate passkey claim");
-  }
-  return await response.json();
+export function initiatePasskeyClaim() {
+  return api(devicesApi.initiateClaim);
 }
 
 // Begin claim registration on another device using the magic link token

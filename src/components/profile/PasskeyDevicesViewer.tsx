@@ -18,10 +18,11 @@ import { Input } from "@/components/ui/Input";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import Modal from "@/components/ui/Modal";
 import QRCode from "@/components/ui/QRCode";
+import { api, errorMessage, isApiError } from "@/lib/api/client";
 import { initiatePasskeyClaim } from "@/lib/auth/client";
+import * as devicesApi from "@/lib/profile/devices/contract";
 import type {
   ClaimInitiateResponse,
-  PasskeyDevice,
 } from "@/lib/profile/devices/types";
 
 export function PasskeyDevicesViewer() {
@@ -30,16 +31,9 @@ export function PasskeyDevicesViewer() {
     isLoading,
     error,
     refetch,
-  } = useQuery<{ devices: PasskeyDevice[] }>({
+  } = useQuery({
     queryKey: ["profile", "devices"],
-    queryFn: async () => {
-      const response = await fetch("/api/profile/devices");
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to load devices");
-      }
-      return response.json();
-    },
+    queryFn: ({ signal }) => api(devicesApi.listDevices, {}, { signal }),
   });
 
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
@@ -82,12 +76,10 @@ export function PasskeyDevicesViewer() {
       setIsClaimModalOpen(true);
     },
     onError: (err) => {
-      const message =
-        (err as Error)?.message || "Failed to initiate passkey claim";
       setClaimError(
-        message.toLowerCase().includes("rate limit")
+        isApiError(err, devicesApi.initiateClaim) && err.code === "rateLimit"
           ? "Too many Add Passkey attempts in the last hour. Please try again later."
-          : message
+          : errorMessage(err, "Failed to initiate passkey claim")
       );
     },
   });
@@ -104,16 +96,8 @@ export function PasskeyDevicesViewer() {
   const canDelete = (devicesData?.devices?.length || 0) > 1;
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/profile/devices/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to delete device");
-      }
-      return await res.json();
-    },
+    mutationFn: (id: string) =>
+      api(devicesApi.deletePasskey, { params: { id } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile", "devices"] });
     },
@@ -341,10 +325,9 @@ export function PasskeyDevicesViewer() {
                 size="sm"
                 onClick={async () => {
                   try {
-                    await fetch(
-                      `/api/profile/devices/claims/${claimInfo.claimId}`,
-                      { method: "DELETE" }
-                    );
+                    await api(devicesApi.cancelClaim, {
+                      params: { id: claimInfo.claimId },
+                    });
                     setIsClaimModalOpen(false);
                     setClaimInfo(null);
                   } catch {}

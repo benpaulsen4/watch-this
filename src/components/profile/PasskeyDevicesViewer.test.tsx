@@ -8,6 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/api/client";
 import { initiatePasskeyClaim } from "@/lib/auth/client";
 
 import { PasskeyDevicesViewer } from "./PasskeyDevicesViewer";
@@ -224,7 +225,9 @@ describe("PasskeyDevicesViewer", () => {
     );
     (
       initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
-    ).mockRejectedValueOnce(new Error("Rate limit exceeded"));
+    ).mockRejectedValueOnce(
+      new ApiError("rateLimit", 429, "Rate limit exceeded. Try later."),
+    );
 
     window.addEventListener("unhandledrejection", (e) => e.preventDefault());
 
@@ -236,6 +239,30 @@ describe("PasskeyDevicesViewer", () => {
     expect(
       await screen.findByText(/too many add passkey attempts/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows the server's message for other claim failures", async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      { ok: true, json: async () => ({ devices: [] }) },
+    );
+    (
+      initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(
+      new ApiError("maxDevices", 400, "Maximum devices reached"),
+    );
+
+    window.addEventListener("unhandledrejection", (e) => e.preventDefault());
+
+    renderWithProviders(<PasskeyDevicesViewer />);
+    await screen.findByText(/passkey devices/i);
+    await userEvent.click(screen.getByRole("button", { name: /add passkey/i }));
+
+    expect(
+      await screen.findByText("Maximum devices reached"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/too many add passkey attempts/i),
+    ).not.toBeInTheDocument();
   });
 
   it("shows polling indicator when claim modal is open", async () => {
