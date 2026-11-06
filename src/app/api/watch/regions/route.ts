@@ -1,15 +1,8 @@
-import { NextResponse } from "next/server";
-
-import { handleApiError,withAuth } from "@/lib/auth/api-middleware";
+import { authedRoute } from "@/lib/api/route";
 import { tmdbClient } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
 
-async function handler() {
-  try {
-    const regions = await tmdbClient.getWatchProviderRegions();
-    return NextResponse.json(regions);
-  } catch (error) {
-    return handleApiError(error, "Fetch watch provider regions");
-  }
-}
-
-export const GET = withAuth(handler);
+// GET /api/watch/regions - Regions TMDB has watch providers for
+export const GET = authedRoute(tmdbApi.getWatchProviderRegions, {}, () =>
+  tmdbClient.getWatchProviderRegions(),
+);

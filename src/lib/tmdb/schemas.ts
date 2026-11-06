@@ -103,3 +103,24 @@ export const getTrendingSchemas = {
       .default("week"),
   }),
 };
+
+export const getContentWatchProvidersSchemas = {
+  query: z.object({
+    type: z.enum(["movie", "tv"], "type must be 'movie' or 'tv'"),
+    id: q.int({ min: 1, message: "id must be a valid number" }),
+    region: z
+      .string("region is required")
+      .trim()
+      .min(1, "region is required")
+      .transform((region) => region.toUpperCase()),
+  }),
+};
+
+export const getRegionWatchProvidersSchemas = {
+  query: z.object({
+    region: z
+      .string("region query parameter is required")
+      .trim()
+      .min(1, "region query parameter is required"),
+  }),
+};

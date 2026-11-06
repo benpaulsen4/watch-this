@@ -1,50 +1,26 @@
-import { NextResponse } from "next/server";
+import { authedRoute } from "@/lib/api/route";
+import { tmdbClient, type TMDBWatchProvider } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
+import { getRegionWatchProvidersSchemas } from "@/lib/tmdb/schemas";
 
-import {
-  type AuthenticatedRequest,
-  handleApiError,
-  withAuth,
-} from "@/lib/auth/api-middleware";
-import { tmdbClient } from "@/lib/tmdb/client";
-
-async function handler(request: AuthenticatedRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const region = searchParams.get("region");
-
-    if (!region) {
-      return NextResponse.json(
-        { error: "region query parameter is required" },
-        { status: 400 },
-      );
-    }
-
+// GET /api/watch/providers?region=US - Movie and TV providers in a region
+export const GET = authedRoute(
+  tmdbApi.getRegionWatchProviders,
+  getRegionWatchProvidersSchemas,
+  async ({ query }) => {
     const [movieProviders, tvProviders] = await Promise.all([
-      tmdbClient.getWatchProviders("movie", region),
-      tmdbClient.getWatchProviders("tv", region),
+      tmdbClient.getWatchProviders("movie", query.region),
+      tmdbClient.getWatchProviders("tv", query.region),
     ]);
 
     // Merge and de-duplicate providers by provider_id
-    const map = new Map<
-      number,
-      {
-        provider_id: number;
-        provider_name: string;
-        logo_path: string | null;
-        display_priority: number;
-      }
-    >();
-
+    const map = new Map<number, TMDBWatchProvider>();
     [...movieProviders.results, ...tvProviders.results].forEach((p) => {
       if (!map.has(p.provider_id)) {
         map.set(p.provider_id, p);
       }
     });
 
-    return NextResponse.json({ results: Array.from(map.values()) });
-  } catch (error) {
-    return handleApiError(error, "Fetch watch providers for region");
-  }
-}
-
-export const GET = withAuth(handler);
+    return { results: Array.from(map.values()) };
+  },
+);

@@ -10,13 +10,20 @@ import type {
 import type {
   discoverContentSchemas,
   getContentDetailsSchemas,
+  getContentWatchProvidersSchemas,
   getCreditsSchemas,
   getGenresSchemas,
+  getRegionWatchProvidersSchemas,
   getSeasonOrEpisodeSchemas,
   getTrendingSchemas,
   searchContentSchemas,
 } from "./schemas";
-import type { CastMember } from "./types";
+import type {
+  CastMember,
+  ContentWatchProvidersResponse,
+  RegionWatchProvidersResponse,
+  WatchProviderRegion,
+} from "./types";
 
 export const getContentDetails = defineContract({
   method: "GET",
@@ -77,4 +84,27 @@ export const getTrending = defineContract({
   label: "TMDB trending",
   schemas: schemas<typeof getTrendingSchemas>(),
   response: type<TMDBContentSearchResult>(),
+});
+
+export const getContentWatchProviders = defineContract({
+  method: "GET",
+  path: "/api/watch/content",
+  label: "Fetch content watch providers",
+  schemas: schemas<typeof getContentWatchProvidersSchemas>(),
+  response: type<ContentWatchProvidersResponse>(),
+});
+
+export const getRegionWatchProviders = defineContract({
+  method: "GET",
+  path: "/api/watch/providers",
+  label: "Fetch watch providers for region",
+  schemas: schemas<typeof getRegionWatchProvidersSchemas>(),
+  response: type<RegionWatchProvidersResponse>(),
+});
+
+export const getWatchProviderRegions = defineContract({
+  method: "GET",
+  path: "/api/watch/regions",
+  label: "Fetch watch provider regions",
+  response: type<{ results: WatchProviderRegion[] }>(),
 });

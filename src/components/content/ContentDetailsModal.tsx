@@ -93,30 +93,7 @@ export function ContentDetailsModal({
       ? detailedContent.number_of_episodes
       : null;
 
-  const contentProvidersQuery = useQuery<{
-    providers: {
-      flatrate?: Array<{
-        provider_id: number;
-        provider_name: string;
-        logo_path: string | null;
-      }>;
-      ads?: Array<{
-        provider_id: number;
-        provider_name: string;
-        logo_path: string | null;
-      }>;
-      buy?: Array<{
-        provider_id: number;
-        provider_name: string;
-        logo_path: string | null;
-      }>;
-      rent?: Array<{
-        provider_id: number;
-        provider_name: string;
-        logo_path: string | null;
-      }>;
-    } | null;
-  }>({
+  const contentProvidersQuery = useQuery({
     queryKey: [
       "watch",
       "content",
@@ -125,13 +102,18 @@ export function ContentDetailsModal({
       streamingPreferences?.country?.toUpperCase() ?? null,
     ],
     enabled: isOpen && !!streamingPreferences?.country,
-    queryFn: async () => {
-      const region = streamingPreferences!.country!.toUpperCase();
-      const providersRes = await fetch(
-        `/api/watch/content?type=${content.contentType}&id=${content.tmdbId}&region=${region}`,
-      );
-      return providersRes.json();
-    },
+    queryFn: ({ signal }) =>
+      api(
+        tmdbApi.getContentWatchProviders,
+        {
+          query: {
+            type: content.contentType,
+            id: content.tmdbId,
+            region: streamingPreferences!.country!.toUpperCase(),
+          },
+        },
+        { signal },
+      ),
   });
   const streamingLoading = contentProvidersQuery.isLoading;
   const contentStreaming = contentProvidersQuery.data?.providers || null;

@@ -8,8 +8,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
+import { api } from "@/lib/api/client";
 import type { StreamingPreferences as StreamingPreferencesType } from "@/lib/profile/streaming/types";
 import { getImageUrl } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
 
 import { useStreamingPreferences } from "../providers/AuthProvider";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
@@ -43,10 +45,13 @@ export function StreamingPreferences() {
   // React Query: regions
   const regionsQuery = useQuery<Region[]>({
     queryKey: ["watch", "regions"],
-    queryFn: async () => {
-      const regionsRes = await fetch("/api/watch/regions");
-      const regionsData = await regionsRes.json();
-      return (regionsData?.results || []) as Region[];
+    queryFn: async ({ signal }) => {
+      const regionsData = await api(
+        tmdbApi.getWatchProviderRegions,
+        {},
+        { signal },
+      );
+      return regionsData.results;
     },
   });
 
@@ -54,10 +59,13 @@ export function StreamingPreferences() {
   const providersQuery = useQuery<Provider[]>({
     queryKey: ["watch", "providers", region],
     enabled: !!region,
-    queryFn: async () => {
-      const res = await fetch(`/api/watch/providers?region=${region}`);
-      const data = await res.json();
-      return (data?.results || []) as Provider[];
+    queryFn: async ({ signal }) => {
+      const data = await api(
+        tmdbApi.getRegionWatchProviders,
+        { query: { region } },
+        { signal },
+      );
+      return data.results;
     },
   });
 
