@@ -187,6 +187,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (sessionError) {
         // Only the server saying so ends the session; a failed check does not.
         if (isSignedOut(sessionError)) {
+          // Before the re-render syncs it, so a 401 still in flight is ignored.
+          heldUser.current = false;
           clearAuth();
           router.refresh();
         }
