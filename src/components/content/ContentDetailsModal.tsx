@@ -26,6 +26,7 @@ import type {
   UserStreamingProvider,
 } from "@/lib/tmdb/client";
 import { getImageUrl } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
 import { cn, formatVoteAverage } from "@/lib/utils";
 
 import { useStreamingPreferences } from "../providers/AuthProvider";
@@ -67,15 +68,15 @@ export function ContentDetailsModal({
   const year = new Date(content.releaseDate).getFullYear();
 
   // Type-specific data from detailed content
-  const detailsQuery = useQuery<TMDBMovieDetails | TMDBTVShowDetails>({
+  const detailsQuery = useQuery({
     queryKey: ["tmdb", "details", content.contentType, content.tmdbId],
     enabled: isOpen,
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/tmdb/details?type=${content.contentType}&id=${content.tmdbId}`,
-      );
-      return res.json();
-    },
+    queryFn: ({ signal }) =>
+      api(
+        tmdbApi.getContentDetails,
+        { query: { type: content.contentType, id: content.tmdbId } },
+        { signal },
+      ),
   });
   const detailedContent: TMDBMovieDetails | TMDBTVShowDetails | null =
     detailsQuery.data ?? null;
