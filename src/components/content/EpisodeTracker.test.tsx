@@ -129,4 +129,105 @@ describe("EpisodeTracker", () => {
     const futureToggle = toggles[1];
     expect(futureToggle).toBeDisabled();
   });
+
+  describe("season failures", () => {
+    const twoSeasons = {
+      id: tvShowId,
+      name: "Track Show",
+      overview: "Overview",
+      poster_path: null,
+      backdrop_path: null,
+      first_air_date: "2023-01-01",
+      vote_average: 7.2,
+      vote_count: 100,
+      genre_ids: [],
+      original_language: "en",
+      original_name: "Track Show",
+      popularity: 0,
+      number_of_seasons: 2,
+      number_of_episodes: 2,
+      genres: [],
+    } as any as TMDBTVShowDetails;
+
+    function mockSeason2(
+      respond: () => Promise<Response> | Response | never,
+    ) {
+      const original = vi.mocked(global.fetch).getMockImplementation()!;
+      vi.mocked(global.fetch).mockImplementation(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+          if (String(input) === `/api/tmdb/episodes/${tvShowId}?season=2`) {
+            return respond();
+          }
+          return original(input, init);
+        },
+      );
+    }
+
+    it("skips a season TMDB reports as not found", async () => {
+      mockSeason2(
+        () =>
+          ({
+            ok: false,
+            status: 404,
+            json: async () => ({
+              error: "Season not found",
+              code: "seasonNotFound",
+            }),
+          }) as Response,
+      );
+
+      renderWithQuery(
+        <EpisodeTracker tvShowId={tvShowId} tvShowDetails={twoSeasons} />,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: /Season 1/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Season 2/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows the error state when a season is unavailable upstream", async () => {
+      mockSeason2(
+        () =>
+          ({
+            ok: false,
+            status: 503,
+            json: async () => ({
+              error: "TMDB is unavailable",
+              code: "upstreamUnavailable",
+            }),
+          }) as Response,
+      );
+
+      renderWithQuery(
+        <EpisodeTracker tvShowId={tvShowId} tvShowDetails={twoSeasons} />,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: /Retry/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Season 1/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows the error state when a season request cannot reach the server", async () => {
+      mockSeason2(() => {
+        throw new TypeError("Failed to fetch");
+      });
+
+      renderWithQuery(
+        <EpisodeTracker tvShowId={tvShowId} tvShowDetails={twoSeasons} />,
+      );
+
+      expect(
+        await screen.findByRole("button", { name: /Retry/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Season 1/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

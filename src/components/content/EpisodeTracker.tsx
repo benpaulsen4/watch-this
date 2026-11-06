@@ -61,14 +61,15 @@ export function EpisodeTracker({
   // Aggregate query: episode watch statuses and season episodes
   const seasonsQuery = useQuery<SeasonData[]>({
     queryKey: ["episodes", tvShowId],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const { episodes: watchStatuses } = await api(
         episodesApi.listEpisodeStatuses,
         { query: { tmdbId: tvShowId } },
       );
 
-      // A season TMDB cannot return is left out rather than failing the
-      // whole tracker. Only an unreachable server fails it.
+      // A season TMDB doesn't have is left out rather than failing the
+      // whole tracker. Any other failure, such as a rate limit or an
+      // unreachable server, fails it so the retry UI shows.
       const seasonPromises: Array<
         Promise<{ seasonNumber: number; season: TMDBSeason } | null>
       > = [];
@@ -78,10 +79,11 @@ export function EpisodeTracker({
         seasonNum++
       ) {
         seasonPromises.push(
-          api(tmdbApi.getSeasonOrEpisode, {
-            params: { id: tvShowId },
-            query: { season: seasonNum },
-          })
+          api(
+            tmdbApi.getSeasonOrEpisode,
+            { params: { id: tvShowId }, query: { season: seasonNum } },
+            { signal },
+          )
             .then((data) =>
               "season" in data
                 ? { seasonNumber: seasonNum, season: data.season }
@@ -90,7 +92,7 @@ export function EpisodeTracker({
             .catch((error: unknown) => {
               if (
                 isApiError(error, tmdbApi.getSeasonOrEpisode) &&
-                error.code !== "network"
+                error.code === "seasonNotFound"
               ) {
                 return null;
               }
