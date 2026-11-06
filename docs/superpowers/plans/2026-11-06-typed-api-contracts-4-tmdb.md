@@ -43,7 +43,8 @@
 - **IDs:** malformed IDs are rejected consistently. `Number()` used to accept `1e3` and negative IDs for watch content, and `parseInt` read `550abc` as 550.
 - **Messages:** a missing `id`, `region` or `season` gets the field's invalid message instead of a "required" one.
 - **Search sort:** the search page's "Title" sort is removed. The route never accepted `title.asc` and silently fell back to popularity, so the option never did anything.
-- **Callers:** `CastTab`, the details panel and the provider lists still show their empty state when a lookup fails. They now retry once for a server error, as every query does. `EpisodeTracker` still skips a season TMDB can't return, but a network failure now fails the tracker instead of being swallowed per season.
+- **Callers:** `CastTab`, the details panel and the provider lists still show their empty state when a lookup fails. They now retry once for a server error, as every query does. `EpisodeTracker` skips a season only when TMDB reports it doesn't exist. Any other failure for a season, including a rate limit or an unreachable server, now shows the tracker's error and retry state instead of silently dropping that season.
+- **Details rate limit:** `/api/tmdb/details` returns 429 `rateLimited` for a TMDB rate limit instead of 503, matching every other route, so the details query no longer retries it.
 
 ---
 
