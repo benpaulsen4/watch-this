@@ -4,11 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { type ReactElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/api/client";
 import { getCurrentSession } from "@/lib/auth/client";
 
 import { AuthProvider, useAuth, useStreamingPreferences } from "./AuthProvider";
 
 vi.mock("@/lib/auth/client", () => ({ getCurrentSession: vi.fn() }));
+
+const router = { refresh: vi.fn(), push: vi.fn(), replace: vi.fn() };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const signedIn = {
   user: {
@@ -264,6 +268,164 @@ describe("AuthProvider", () => {
       await waitFor(() => expect(who()).toBe("alice-renamed"));
 
       expect(client.getQueryData(SEEDED)).toBe("alice's card");
+    });
+  });
+
+  describe("a 401 while signed in", () => {
+    const SEEDED = ["cached-for-alice"];
+    const expired = () =>
+      new ApiError("unauthenticated", 401, "Authentication required");
+
+    function UserProbe() {
+      const { user, loading } = useAuth();
+      return (
+        <span data-testid="who">
+          {loading ? "loading" : (user?.username ?? "signed-out")}
+        </span>
+      );
+    }
+    const who = () => screen.getByTestId("who").textContent;
+
+    /** The streaming preferences load succeeds; the session check answers `session`. */
+    function stubFetch(session: { ok: boolean; status: number; body: unknown }) {
+      const fetchMock = vi.fn(async (url: string) =>
+        url === "/api/auth/session"
+          ? { ok: session.ok, status: session.status, json: async () => session.body }
+          : {
+              ok: true,
+              status: 200,
+              json: async () => ({ country: "GB", providers: [] }),
+            },
+      );
+      vi.spyOn(global, "fetch").mockImplementation(fetchMock as any);
+      return () =>
+        fetchMock.mock.calls.filter(([url]) => url === "/api/auth/session")
+          .length;
+    }
+    const sessionGone = {
+      ok: false,
+      status: 401,
+      body: { error: "Invalid session", code: "invalidSession" },
+    };
+
+    async function renderSignedIn(client = new QueryClient()) {
+      render(
+        <AuthProvider>
+          <UserProbe />
+        </AuthProvider>,
+        client,
+      );
+      await waitFor(() => expect(who()).toBe("alice"));
+      return client;
+    }
+
+    const failQuery = (client: QueryClient, key: string, error: Error) =>
+      client
+        .fetchQuery({
+          queryKey: [key],
+          queryFn: () => Promise.reject(error),
+          retry: false,
+        })
+        .catch(() => {});
+
+    it("signs out, clears the cache and refreshes the route when the server confirms", async () => {
+      const sessionChecks = stubFetch(sessionGone);
+      const client = await renderSignedIn();
+      client.setQueryData(SEEDED, "alice's data");
+
+      await failQuery(client, "lists", expired());
+
+      await waitFor(() => expect(who()).toBe("signed-out"));
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+      expect(client.getQueryData(SEEDED)).toBeUndefined();
+      expect(sessionChecks()).toBe(1);
+    });
+
+    it("reacts to a failed mutation too", async () => {
+      stubFetch(sessionGone);
+      const client = await renderSignedIn();
+
+      await client
+        .getMutationCache()
+        .build(client, { mutationFn: () => Promise.reject(expired()) })
+        .execute(undefined)
+        .catch(() => {});
+
+      await waitFor(() => expect(who()).toBe("signed-out"));
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the user when the session is still valid", async () => {
+      const sessionChecks = stubFetch({
+        ok: true,
+        status: 200,
+        body: signedIn,
+      });
+      const client = await renderSignedIn();
+
+      await failQuery(client, "lists", expired());
+      await waitFor(() => expect(sessionChecks()).toBe(1));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(who()).toBe("alice");
+      expect(router.refresh).not.toHaveBeenCalled();
+    });
+
+    it("keeps the user when the session check itself fails", async () => {
+      const sessionChecks = stubFetch({ ok: false, status: 503, body: {} });
+      const client = await renderSignedIn();
+
+      await failQuery(client, "lists", expired());
+      await waitFor(() => expect(sessionChecks()).toBe(1));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(who()).toBe("alice");
+      expect(router.refresh).not.toHaveBeenCalled();
+    });
+
+    it("checks once when many requests fail together", async () => {
+      const sessionChecks = stubFetch(sessionGone);
+      const client = await renderSignedIn();
+
+      await Promise.all([
+        failQuery(client, "a", expired()),
+        failQuery(client, "b", expired()),
+        failQuery(client, "c", expired()),
+      ]);
+
+      await waitFor(() => expect(who()).toBe("signed-out"));
+      expect(sessionChecks()).toBe(1);
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores other errors", async () => {
+      const sessionChecks = stubFetch(sessionGone);
+      const client = await renderSignedIn();
+
+      await failQuery(client, "a", new ApiError("notFound", 404, "Not found"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(sessionChecks()).toBe(0);
+      expect(who()).toBe("alice");
+    });
+
+    it("does nothing for an anonymous visitor", async () => {
+      (getCurrentSession as any).mockResolvedValue(null);
+      const sessionChecks = stubFetch(sessionGone);
+      const client = new QueryClient();
+      render(
+        <AuthProvider>
+          <UserProbe />
+        </AuthProvider>,
+        client,
+      );
+      await waitFor(() => expect(who()).toBe("signed-out"));
+
+      await failQuery(client, "a", expired());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(sessionChecks()).toBe(0);
+      expect(router.refresh).not.toHaveBeenCalled();
     });
   });
 });
