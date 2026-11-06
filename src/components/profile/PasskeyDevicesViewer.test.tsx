@@ -332,4 +332,42 @@ describe("PasskeyDevicesViewer", () => {
       ).toBe(true);
     });
   });
+
+  it("closes the claim modal when the server rejects the cancel", async () => {
+    (
+      initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce({
+      claimId: "c-4",
+      claimCode: "CODE00000004",
+      token: "tkn4",
+      magicLink: "https://site/auth/claim?token=tkn4",
+      qrPayload: "https://site/auth/claim?token=tkn4",
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async (url: any) => {
+        const u = String(url);
+        if (u.includes("/api/profile/devices/claims/")) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ error: "Cancel claim failed", code: "internal" }),
+          } as any;
+        }
+        return { ok: true, json: async () => ({ devices: [] }) } as any;
+      },
+    );
+
+    renderWithProviders(<PasskeyDevicesViewer />);
+    await screen.findByText(/passkey devices/i);
+    await userEvent.click(screen.getByRole("button", { name: /add passkey/i }));
+    await screen.findByText(/claim code/i);
+
+    await userEvent.click(screen.getByRole("button", { name: /cancel claim/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/claim code/i)).not.toBeInTheDocument();
+    });
+  });
 });

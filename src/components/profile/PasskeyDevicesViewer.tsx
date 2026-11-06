@@ -328,9 +328,20 @@ export function PasskeyDevicesViewer() {
                     await api(devicesApi.cancelClaim, {
                       params: { id: claimInfo.claimId },
                     });
-                    setIsClaimModalOpen(false);
-                    setClaimInfo(null);
-                  } catch {}
+                  } catch (error) {
+                    // Any server answer closes the modal, as the old fetch did;
+                    // only a network failure keeps it open.
+                    if (
+                      !(
+                        isApiError(error, devicesApi.cancelClaim) &&
+                        error.code !== "network"
+                      )
+                    ) {
+                      return;
+                    }
+                  }
+                  setIsClaimModalOpen(false);
+                  setClaimInfo(null);
                 }}
               >
                 Cancel Claim
