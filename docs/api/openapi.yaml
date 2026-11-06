@@ -68,9 +68,6 @@ components:
       properties:
         success:
           type: boolean
-    StringSuccessResponse:
-      type: string
-      enum: [success]
     UserSummary:
       type: object
       required: [id, username, createdAt]
@@ -1345,6 +1342,7 @@ paths:
           schema:
             type: integer
             default: 10
+            description: Clamped to 1-100. A value that isn't a whole number uses the default.
         - in: query
           name: cursor
           required: false
@@ -2654,6 +2652,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
     delete:
       tags: [Profile]
       summary: Delete passkey device
@@ -2665,7 +2664,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StringSuccessResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "400":
           description: Minimum device count violation
           content:
@@ -2697,6 +2696,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
     delete:
       tags: [Profile]
       summary: Cancel a passkey claim
@@ -2708,7 +2708,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StringSuccessResponse"
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid claim ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Authentication required
           content:
