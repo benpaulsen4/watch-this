@@ -62,7 +62,10 @@ const { POST } = await import("./route");
 // Next passes the `[period]` segment as route context; tests take it from the
 // URL they built.
 function send(
-  handler: (request: NextRequest, context: ReturnType<typeof routeContext>) => Promise<Response>,
+  handler: (
+    request: NextRequest,
+    context: ReturnType<typeof routeContext>,
+  ) => Promise<Response>,
   request: NextRequest,
 ) {
   const period = new URL(request.url).pathname.split("/")[3] ?? "";
@@ -84,7 +87,8 @@ describe("POST /api/series-finale/[period]/story-complete", () => {
   });
 
   it("rejects a request with no session", async () => {
-    const response = await send(POST, 
+    const response = await send(
+      POST,
       new NextRequest("http://localhost/api/series-finale/2025/story-complete", {
         method: "POST",
       }),
@@ -96,7 +100,8 @@ describe("POST /api/series-finale/[period]/story-complete", () => {
   });
 
   it("rejects a label that is not a plausible year", async () => {
-    const response = await send(POST, 
+    const response = await send(
+      POST,
       authedRequest(
         "http://localhost/api/series-finale/abcd/story-complete",
       ),
@@ -110,7 +115,8 @@ describe("POST /api/series-finale/[period]/story-complete", () => {
   });
 
   it("marks the story completed for the current user and period", async () => {
-    const response = await send(POST, 
+    const response = await send(
+      POST,
       authedRequest(
         "http://localhost/api/series-finale/2025/story-complete",
       ),
@@ -134,7 +140,8 @@ describe("POST /api/series-finale/[period]/story-complete", () => {
   // read-then-write, so it asserts the SET argument carries a `sql` fragment
   // rather than asserting on a stored value the mock DB doesn't model.
   it("uses coalesce so the first completion timestamp wins", async () => {
-    await send(POST, 
+    await send(
+      POST,
       authedRequest(
         "http://localhost/api/series-finale/2025/story-complete",
       ),
@@ -146,7 +153,8 @@ describe("POST /api/series-finale/[period]/story-complete", () => {
   it("returns 404 when the user has no snapshot for the period", async () => {
     returningResult = [];
 
-    const response = await send(POST, 
+    const response = await send(
+      POST,
       authedRequest(
         "http://localhost/api/series-finale/2025/story-complete",
       ),

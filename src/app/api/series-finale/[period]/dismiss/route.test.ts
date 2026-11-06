@@ -51,7 +51,10 @@ const { POST } = await import("./route");
 // Next passes the `[period]` segment as route context; tests take it from the
 // URL they built.
 function send(
-  handler: (request: NextRequest, context: ReturnType<typeof routeContext>) => Promise<Response>,
+  handler: (
+    request: NextRequest,
+    context: ReturnType<typeof routeContext>,
+  ) => Promise<Response>,
   request: NextRequest,
 ) {
   const period = new URL(request.url).pathname.split("/")[3] ?? "";
@@ -72,7 +75,8 @@ describe("POST /api/series-finale/[period]/dismiss", () => {
   });
 
   it("rejects a label that is not a plausible year", async () => {
-    const response = await send(POST, 
+    const response = await send(
+      POST,
       authedRequest("http://localhost/api/series-finale/abcd/dismiss"),
     );
 
@@ -85,7 +89,8 @@ describe("POST /api/series-finale/[period]/dismiss", () => {
   });
 
   it("keeps a signed-out 401 out of shared caches too", async () => {
-    const response = await send(POST, 
+    const response = await send(
+      POST,
       new NextRequest("http://localhost/api/series-finale/2025/dismiss", {
         method: "POST",
       }),
@@ -97,7 +102,8 @@ describe("POST /api/series-finale/[period]/dismiss", () => {
   });
 
   it("marks the recap dismissed for the current user and period", async () => {
-    const response = await send(POST, 
+    const response = await send(
+      POST,
       authedRequest("http://localhost/api/series-finale/2025/dismiss"),
     );
 
