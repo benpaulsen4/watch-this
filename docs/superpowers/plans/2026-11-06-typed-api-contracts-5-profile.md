@@ -43,7 +43,8 @@
 - **Passkey delete and claim cancel:** both return `{ success: true }` instead of `"success"`. A malformed ID returns 400 instead of 404.
 - **Rate-limit detection:** `PasskeyDevicesViewer` shows its "Too many Add Passkey attempts" message for the `rateLimit` code. A different error whose message happens to mention "rate limit" now shows that message as-is.
 - **Streaming preferences:** a malformed body returns 400 instead of 500, for example a string `providerId`.
-- **Error copy:** activity and device lists show the server's message, or the contract label such as `Get activity timeline failed`, instead of fixed strings. Streaming preference load failures still show `Failed to load streaming preferences (<status>)` when the server answered.
+- **Error copy:** activity and device lists show the server's message, or the contract label such as `Get activity timeline failed`, instead of fixed strings. Streaming preference load failures still show `Failed to load streaming preferences (<status>)` when the server answered. Export failures show `Export data failed` instead of `Failed to export data`, and claim initiation failures show `Initiate claim failed` instead of `Failed to initiate claim`. A failed request shows `Could not reach the server` instead of the browser's `Failed to fetch`.
+- **Activity query:** `cursor` or `type` given twice in the query now returns 400. No caller repeats them.
 
 ## Known, not changed here
 
