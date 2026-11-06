@@ -3,7 +3,7 @@
 WatchThis keeps most state server-side (Postgres via Drizzle) and uses client-side state primarily for UI concerns and caching. The high-level mental model is:
 
 - Server components and API routes read/write the database as the source of truth.
-- Client components fetch/mutate via `/api/**` and rely on React Query for caching and request lifecycle.
+- Client components fetch/mutate via `/api/**`, calling `api()` with each endpoint's contract, and rely on React Query for caching and request lifecycle.
 - Authentication state is derived from a `session` cookie (JWT) and exposed to client components via a small auth context.
 
 Related docs: [overview.md](./overview.md), [routing-and-rendering.md](./routing-and-rendering.md)
@@ -12,7 +12,8 @@ Related docs: [overview.md](./overview.md), [routing-and-rendering.md](./routing
 
 - **Server-side source of truth**: persisted domain state lives in Postgres; UI state is ephemeral.
 - **Server components first**: pages render on the server by default; client components are “islands” for interactivity.
-- **Thin API routes**: API handlers mostly validate inputs, call a service, and return JSON.
+- **Thin API routes**: API handlers declare their inputs in a contract, call a service, and return JSON. The wrapper validates the inputs.
+- **One contract per endpoint**: the server route and the client call share a typed contract, so inputs, responses and error codes are checked at compile time. See [conventions.md](../api/conventions.md).
 - **Explicit caching**: React Query caches client fetches; server-side caches exist where external APIs are expensive.
 
 ## Where State Lives
@@ -35,7 +36,7 @@ Authentication is cookie-based:
 Relevant code:
 
 - Session verification + current user: [webauthn.ts](../../src/lib/auth/webauthn.ts)
-- API auth wrapper: [api-middleware.ts](../../src/lib/auth/api-middleware.ts)
+- API route wrappers: [route.ts](../../src/lib/api/route.ts) (`authedRoute`, built on `withAuth` in [api-middleware.ts](../../src/lib/auth/api-middleware.ts))
 
 ### Client Cache (React Query)
 
@@ -44,7 +45,7 @@ Client components use React Query to cache API responses and manage request life
 - Provider: [ReactQueryProvider.tsx](../../src/components/providers/ReactQueryProvider.tsx)
 - Root mount: [app/layout.tsx](../../src/app/layout.tsx)
 
-Default query behavior is intentionally conservative (no refetch-on-focus, low retry count) to reduce surprise network traffic.
+Default query behavior is intentionally conservative to reduce surprise network traffic: no refetch-on-focus, and one retry, never for a 4xx `ApiError`, which a retry cannot fix.
 
 ### Client Context (AuthProvider)
 
@@ -54,6 +55,8 @@ Auth state is held in a small React context for convenience (not as a general ap
 - Client helpers: [client.ts](../../src/lib/auth/client.ts)
 
 In addition to `user/loading/error`, the provider also manages streaming preferences loaded from `/api/profile/streaming`.
+
+It also watches React Query for expired sessions. When a query or mutation fails with `unauthenticated` or `invalidSession` while a user is held, it asks `GET /api/auth/session` once. If the server confirms the session is gone, it drops the user, which clears the query cache, and refreshes the route so the page's `requireUser` redirects to `/auth`. A failed check, or a 401 seen by an anonymous visitor, changes nothing.
 
 ### Local Component State (UI Only)
 
@@ -76,27 +79,29 @@ This means any client component can:
 
 ### Server-Side Enforcement (APIs)
 
-Authenticated API routes should wrap handlers with `withAuth`, which:
+Authenticated API routes use `authedRoute`, which authenticates through `withAuth` before validating any input. `withAuth`:
 
 - Reads the `session` cookie
 - Verifies it and loads the user
-- Injects `request.user` for downstream logic
-- Returns `401` and clears the cookie if invalid
+- Passes the user to the handler
+- Returns `401` (`unauthenticated` or `invalidSession`) and clears the cookie if invalid
 
 Relevant code:
 
-- [withAuth](../../src/lib/auth/api-middleware.ts)
+- [authedRoute](../../src/lib/api/route.ts) and [withAuth](../../src/lib/auth/api-middleware.ts)
 - Example authenticated route: [status/content/route.ts](../../src/app/api/status/content/route.ts)
 
 ### Client-Side Guarding (Pages)
 
-Protected UI routes are grouped under `src/app/(authenticated)` and gated by a client layout that redirects unauthenticated users:
+Protected UI routes are grouped under `src/app/(authenticated)`. Each page calls `requireUser(pathname)` during its server render, which redirects to `/auth?redirect=<path>` when there is no valid session:
 
 Route-group directory names (like `(authenticated)`) are not part of the URL path; they are only for organization.
 
-- Authenticated layout: [src/app/(authenticated)/layout.tsx](../../src/app/%28authenticated%29/layout.tsx)
+- Guard: [requireUser.ts](../../src/app/%28authenticated%29/requireUser.ts)
 
-Some server pages also read cookies and resolve the current user to prefetch initial data during the server render:
+If a session expires while a page is open, `AuthProvider` refreshes the route once the server confirms it, so the same redirect runs.
+
+Server pages also use the resolved user to prefetch initial data during the server render:
 
 - Example: [lists/page.tsx](../../src/app/%28authenticated%29/lists/page.tsx)
 
@@ -125,7 +130,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-  UI[Client Component] -->|fetch JSON| API[/src/app/api/**/route.ts]
+  UI[Client Component] -->|"api(contract)"| API[/src/app/api/**/route.ts]
   API -->|call| Svc[src/lib/**/service.ts]
   Svc -->|query/update| DB[(Postgres via Drizzle)]
   DB --> Svc
@@ -174,21 +179,19 @@ These server-side caches reduce rate-limit pressure and keep API responses consi
 
 ## Error Handling & API Response Conventions
 
-API routes generally return JSON with appropriate HTTP status codes:
+API routes return JSON with appropriate HTTP status codes. The full rules are in [conventions.md](../api/conventions.md).
 
-- **Success**: arbitrary JSON payload (`200`, `201`, etc.)
-- **Failure**: `{ error: string }` with a non-2xx status code
-
-Shared helper:
-
-- [handleApiError](../../src/lib/auth/api-middleware.ts)
+- **Success**: the contract's response type (`200`, `201`, etc.)
+- **Failure**: `{ error, code, issues? }` with a non-2xx status code. Branch on `code`, never on `error`.
 
 Common patterns:
 
-- **Validation errors**: `400` with `{ error: "..." }`
-- **Not found**: `404` with `{ error: "..." }` (or service returns `"notFound"` and the route maps it)
-- **Auth**: `401` with `{ error: "Authentication required" }` and (when needed) cookie clearing
-- **Upstream issues**: `503` when TMDB is unavailable, `429` when rate-limited (via `handleApiError`)
+- **Validation errors**: `400` `validation`, with `issues` listing each failed field, produced by the route wrapper
+- **Domain failures**: the service returns a code such as `"notFound"`, and the contract maps it to a status and message
+- **Auth**: `401` `unauthenticated` or `invalidSession`, with cookie clearing when needed
+- **Upstream issues**: `503` `upstreamUnavailable` when TMDB is unavailable, `429` `rateLimited` when rate-limited (via [handleApiError](../../src/lib/auth/api-middleware.ts))
+
+On the client, `api()` throws an `ApiError` carrying the same `code`; `isApiError(err, contract)` narrows it to that endpoint's codes.
 
 ## Practical Guidelines
 

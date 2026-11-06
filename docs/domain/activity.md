@@ -128,7 +128,7 @@ Collaboration syncing helper (used by status/episode flows): [activityUtils.ts](
 
 Implemented in [route.ts](../../src/app/api/activity/route.ts).
 
-- Authentication: enforced via `withAuth` (cookie session)
+- Authentication: enforced via `authedRoute` (cookie session)
 - Query params:
   - `limit` (number, default `10`): page size
   - `cursor` (string, optional): a `nextCursor` value from a previous response (`<ISO>|<uuid>`, or a bare ISO timestamp from older clients)

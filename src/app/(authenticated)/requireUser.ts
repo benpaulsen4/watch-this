@@ -34,17 +34,12 @@ export async function requireUser(pathname: string) {
  * Mirrors the projection in `src/app/api/auth/session/route.ts` field for field
  * -- the two must agree, or a component would see different data depending on
  * whether it was seeded by the server or refreshed by the client.
- *
- * `profilePictureUrl` is nullable in the database but typed as a string on the
- * client. Every consumer tests it for truthiness, so "" and null are already
- * interchangeable there; the API route only gets away with returning null
- * because its JSON response is untyped.
  */
 export function toClientUser(user: DbUser): ClientUser {
   return {
     id: user.id,
     username: user.username,
-    profilePictureUrl: user.profilePictureUrl ?? "",
+    profilePictureUrl: user.profilePictureUrl,
     timezone: user.timezone,
     createdAt: user.createdAt.toISOString(),
     shareStatsWithCollaborators: user.shareStatsWithCollaborators,

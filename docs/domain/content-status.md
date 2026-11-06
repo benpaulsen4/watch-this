@@ -114,7 +114,7 @@ This prevents “completed” from sticking when a new episode has aired since t
 
 ## API: `/api/status/content`
 
-All endpoints are authenticated (wrapped with `withAuth` in [route.ts](../../src/app/api/status/content/route.ts)).
+All endpoints are authenticated (wrapped with `authedRoute` in [route.ts](../../src/app/api/status/content/route.ts)).
 
 - `GET /api/status/content?tmdbId=123&contentType=tv`
   - Response: `{ status: ContentStatusItem | null }`

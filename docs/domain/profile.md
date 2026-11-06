@@ -67,7 +67,7 @@ The Profile page is a server component that renders a single client “island”
 
 ## APIs
 
-All profile APIs are authenticated. Profile uses `withAuth` middleware to guarantee `request.user` exists on protected routes.
+All profile APIs are authenticated. Profile routes use `authedRoute`, which guarantees a signed-in user before the handler runs. Import, a multipart upload, uses `withAuth` directly.
 
 ### Session (profile fields)
 
