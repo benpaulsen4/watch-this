@@ -1,65 +1,27 @@
-import { NextResponse } from "next/server";
-
-import {
-  AuthenticatedRequest,
-  handleApiError,
-  withAuth,
-} from "@/lib/auth/api-middleware";
-import {
-  mapAllWithContentStatus,
-} from "@/lib/content-status/service";
-import { TMDBContentSearchResult } from "@/lib/content-status/types";
+import { authedRoute } from "@/lib/api/route";
+import { mapAllWithContentStatus } from "@/lib/content-status/service";
 import { tmdbClient } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
+import { getTrendingSchemas } from "@/lib/tmdb/schemas";
 
-export const GET = withAuth(async (request: AuthenticatedRequest) => {
-  try {
-    const { searchParams } = new URL(request.url);
-    const mediaType = searchParams.get("media_type") as
-      | "all"
-      | "movie"
-      | "tv"
-      | null;
-    const timeWindow = searchParams.get("time_window") as "day" | "week" | null;
-
-    const validMediaTypes = ["all", "movie", "tv"];
-    const validTimeWindows = ["day", "week"];
-
-    if (mediaType && !validMediaTypes.includes(mediaType)) {
-      return NextResponse.json(
-        { error: 'Media type must be "all", "movie", or "tv"' },
-        { status: 400 }
-      );
-    }
-
-    if (timeWindow && !validTimeWindows.includes(timeWindow)) {
-      return NextResponse.json(
-        { error: 'Time window must be "day" or "week"' },
-        { status: 400 }
-      );
-    }
-
+// GET /api/tmdb/trending - Trending content with the user's watch status
+export const GET = authedRoute(
+  tmdbApi.getTrending,
+  getTrendingSchemas,
+  async ({ user, query }) => {
     const intermediateResults = await tmdbClient.getTrending(
-      mediaType || "all",
-      timeWindow || "week"
+      query.media_type,
+      query.time_window,
     );
 
-    const finalResults: TMDBContentSearchResult = {
+    return {
       page: intermediateResults.page,
-      results: [],
+      results:
+        intermediateResults.results?.length > 0
+          ? await mapAllWithContentStatus(intermediateResults.results, user.id)
+          : [],
       totalPages: intermediateResults.total_pages,
       totalResults: intermediateResults.total_results,
     };
-
-    // Enrich results with watch status
-    if (intermediateResults.results && intermediateResults.results.length > 0) {
-      finalResults.results = await mapAllWithContentStatus(
-        intermediateResults.results,
-        request.user.id
-      );
-    }
-
-    return NextResponse.json(finalResults);
-  } catch (error) {
-    return handleApiError(error, "TMDB trending");
-  }
-});
+  },
+);

@@ -8,8 +8,9 @@ import { SearchInput } from "@/components/search/SearchInput";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import Dropdown from "@/components/ui/Dropdown";
-import { TMDBContentSearchResult } from "@/lib/content-status/types";
+import { api } from "@/lib/api/client";
 import type { TMDBGenre } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
 
 import { ContentCard } from "../content/ContentCard";
 import { ContentCardSkeleton } from "../content/ContentCardSkeleton";
@@ -19,8 +20,7 @@ type ContentType = "all" | "movie" | "tv";
 type SortBy =
   | "popularity.desc"
   | "vote_average.desc"
-  | "release_date.desc"
-  | "title.asc";
+  | "release_date.desc";
 
 export interface SearchClientProps {
   genres: TMDBGenre[];
@@ -35,25 +35,26 @@ export function SearchClient({ genres, children }: SearchClientProps) {
   const [sortBy, setSortBy] = useState<SortBy>("popularity.desc");
   const [showFilters, setShowFilters] = useState(false);
 
-  const discoverQuery = useInfiniteQuery<TMDBContentSearchResult>({
+  const discoverQuery = useInfiniteQuery({
     queryKey: [
       "tmdb",
       "discover",
       { contentType, sortBy, selectedGenre, selectedYear },
     ],
-    queryFn: async ({ pageParam = 1 }) => {
-      const pageNum = typeof pageParam === "number" ? pageParam : 1;
-      const params = new URLSearchParams({
-        page: pageNum.toString(),
-        sort_by: sortBy,
-      });
-      if (contentType !== "all") params.append("type", contentType);
-      if (selectedGenre) params.append("genre", selectedGenre);
-      if (selectedYear) params.append("year", selectedYear);
-      const response = await fetch(`/api/tmdb/discover?${params}`);
-      if (!response.ok) throw new Error("Failed to load discover content");
-      return response.json();
-    },
+    queryFn: ({ pageParam, signal }) =>
+      api(
+        tmdbApi.discoverContent,
+        {
+          query: {
+            page: pageParam,
+            sort_by: sortBy,
+            type: contentType === "all" ? undefined : contentType,
+            genre: selectedGenre || undefined,
+            year: selectedYear || undefined,
+          },
+        },
+        { signal },
+      ),
     initialPageParam: 1,
     getNextPageParam: (lastPage, pages) => {
       const currentPage = pages.length;
@@ -63,17 +64,22 @@ export function SearchClient({ genres, children }: SearchClientProps) {
     },
   });
 
-  const searchResultsQuery = useQuery<TMDBContentSearchResult>({
+  const searchResultsQuery = useQuery({
     queryKey: ["tmdb", "search", { q: searchQuery, contentType, selectedYear }],
     enabled: !!searchQuery.trim(),
-    queryFn: async () => {
-      const params = new URLSearchParams({ q: searchQuery, type: contentType });
-      if (selectedYear && contentType !== "all")
-        params.append("year", selectedYear);
-      const response = await fetch(`/api/tmdb/search?${params}`);
-      if (!response.ok) throw new Error("Search failed");
-      return response.json();
-    },
+    queryFn: ({ signal }) =>
+      api(
+        tmdbApi.searchContent,
+        {
+          query: {
+            q: searchQuery,
+            type: contentType,
+            year:
+              selectedYear && contentType !== "all" ? selectedYear : undefined,
+          },
+        },
+        { signal },
+      ),
   });
 
   const handleSearch = useCallback((query: string) => {
@@ -214,7 +220,6 @@ export function SearchClient({ genres, children }: SearchClientProps) {
                       { key: "popularity.desc", label: "Popularity" },
                       { key: "vote_average.desc", label: "Rating" },
                       { key: "release_date.desc", label: "Release Date" },
-                      { key: "title.asc", label: "Title" },
                     ]}
                   />
                 </div>
