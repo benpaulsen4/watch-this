@@ -63,6 +63,10 @@ export const POST = publicRoute(
       });
     } catch (error) {
       if (error instanceof ClaimUnavailableError) return "notActive";
+      // Thrown by the WebAuthn helper when the account is already at the cap.
+      if (error instanceof Error && error.message === "Maximum devices reached") {
+        return "maxDevices";
+      }
       throw error;
     }
 

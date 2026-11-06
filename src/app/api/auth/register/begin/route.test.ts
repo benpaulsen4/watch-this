@@ -131,6 +131,8 @@ describe("POST /api/auth/register/verify", () => {
   it.each([
     [{ username: "sam" }, "Missing required fields"],
     [{ username: "sam", registrationResponse: { noId: true } }, "Missing required fields"],
+    [{ username: "sam", registrationResponse: { id: "" } }, "Missing required fields"],
+    [{ ...body, deviceName: "x".repeat(101) }, "Device name must be 100 characters or less"],
     [{ ...body, timezone: "Mars/Olympus" }, "Invalid timezone"],
   ])("rejects %j", async (input, error) => {
     const response = await registerVerify.POST(

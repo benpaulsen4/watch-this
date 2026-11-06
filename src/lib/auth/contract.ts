@@ -45,7 +45,7 @@ export const updateSession = defineContract({
 export const registerBegin = defineContract({
   method: "POST",
   path: "/api/auth/register/begin",
-  label: "Generate registration options",
+  label: "Registration setup",
   schemas: schemas<typeof registerBeginSchemas>(),
   response: type<RegisterBeginResponse>(),
   errors: { usernameTaken: USERNAME_EXISTS },
@@ -70,7 +70,7 @@ export const registerVerify = defineContract({
 export const authenticateBegin = defineContract({
   method: "GET",
   path: "/api/auth/authenticate/begin",
-  label: "Generate authentication options",
+  label: "Sign-in setup",
   response: type<AuthenticateBeginResponse>(),
 });
 
@@ -92,11 +92,12 @@ export const authenticateVerify = defineContract({
 
 const INVALID_TOKEN = { status: 401, message: "Invalid token" };
 const CLAIM_NOT_ACTIVE = { status: 400, message: "Claim not active" };
+const MAX_DEVICES = { status: 400, message: "Maximum devices reached" };
 
 export const claimBegin = defineContract({
   method: "GET",
   path: "/api/auth/claim/begin",
-  label: "Begin claim",
+  label: "Claim lookup",
   schemas: schemas<typeof claimBeginSchemas>(),
   response: type<ClaimBeginResponse>(),
   errors: {
@@ -110,13 +111,14 @@ export const claimBegin = defineContract({
 export const claimVerify = defineContract({
   method: "POST",
   path: "/api/auth/claim/verify",
-  label: "Verify claim",
+  label: "Passkey claim",
   schemas: schemas<typeof claimVerifySchemas>(),
   response: type<{ success: true }>(),
   errors: {
     invalidToken: INVALID_TOKEN,
     invalidChallenge: { status: 400, message: "Invalid challenge" },
     notActive: CLAIM_NOT_ACTIVE,
+    maxDevices: MAX_DEVICES,
   },
 });
 
@@ -136,7 +138,7 @@ export const adminDeviceClaim = defineContract({
   errors: {
     unauthorized: { status: 401, message: "Unauthorized" },
     notFound: { status: 404, message: "User not found" },
-    maxDevices: { status: 400, message: "Maximum devices reached" },
+    maxDevices: MAX_DEVICES,
     rateLimit: {
       status: 429,
       message: "Too many claims for this user, try again later",

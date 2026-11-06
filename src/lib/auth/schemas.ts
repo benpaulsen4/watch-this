@@ -30,9 +30,13 @@ const credentialResponse = (message: string) =>
     (value) =>
       typeof value === "object" &&
       value !== null &&
-      typeof (value as { id?: unknown }).id === "string",
+      typeof (value as { id?: unknown }).id === "string" &&
+      (value as { id: string }).id.length > 0,
     message,
   );
+
+/** Fits the passkey_credentials.device_name column. */
+const deviceName = z.string().max(100, "Device name must be 100 characters or less");
 
 export const updateSessionSchemas = {
   body: z.object({
@@ -69,7 +73,7 @@ export const registerVerifySchemas = {
   body: z.object({
     username: z.string("Missing required fields").trim().min(1, "Missing required fields"),
     registrationResponse: credentialResponse("Missing required fields"),
-    deviceName: z.string().optional(),
+    deviceName: deviceName.optional(),
     timezone: timezone.optional(),
   }),
 };
@@ -89,7 +93,7 @@ export const claimVerifySchemas = {
     token: z.string("Missing parameters").min(1, "Missing parameters"),
     challengeToken: z.string("Missing parameters").min(1, "Missing parameters"),
     registrationResponse: credentialResponse("Missing parameters"),
-    deviceName: z.string().optional(),
+    deviceName: deviceName.optional(),
   }),
 };
 

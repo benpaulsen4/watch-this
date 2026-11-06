@@ -155,4 +155,19 @@ describe("claim verify route atomicity (AUTH-03)", () => {
     expect(db.__state.claims[0]!.status).toBe("active");
     expect(db.__state.credentials).toHaveLength(0);
   });
+
+  it("answers maxDevices and keeps the claim when the account is at the cap", async () => {
+    vi.mocked(verifyAdditionalPasskeyRegistration).mockRejectedValueOnce(
+      new Error("Maximum devices reached"),
+    );
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      code: "maxDevices",
+      error: "Maximum devices reached",
+    });
+    expect(db.__state.claims[0]!.status).toBe("active");
+  });
 });
