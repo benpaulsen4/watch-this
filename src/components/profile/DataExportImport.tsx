@@ -15,7 +15,7 @@ import { useRef,useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { api } from "@/lib/api/client";
+import { api, ApiError } from "@/lib/api/client";
 import * as dataApi from "@/lib/profile/data/contract";
 import type { ImportResult } from "@/lib/profile/data/types";
 
@@ -101,8 +101,13 @@ export function DataExportImport() {
         body: formData,
       });
       const result = await response.json();
+      // An ApiError, so a 401 here also reaches AuthProvider's session check.
       if (!response.ok)
-        throw new Error(result.error || "Failed to import data");
+        throw new ApiError(
+          result.code ?? "invalidResponse",
+          response.status,
+          result.error || "Failed to import data",
+        );
       return result as ImportResult;
     },
     onSuccess: (result) => {

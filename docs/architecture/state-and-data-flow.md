@@ -56,7 +56,7 @@ Auth state is held in a small React context for convenience (not as a general ap
 
 In addition to `user/loading/error`, the provider also manages streaming preferences loaded from `/api/profile/streaming`.
 
-It also watches React Query for expired sessions. When a query or mutation fails with `unauthenticated` or `invalidSession` while a user is held, it asks `GET /api/auth/session` once. If the server confirms the session is gone, it drops the user, which clears the query cache, and refreshes the route so the page's `requireUser` redirects to `/auth`. A failed check, or a 401 seen by an anonymous visitor, changes nothing.
+It also watches React Query for expired sessions. When a query or mutation fails with `unauthenticated` or `invalidSession` while a user is held, it asks `GET /api/auth/session`, one check at a time. If the server confirms the session is gone, it drops the user, which clears the query cache, and refreshes the route so the page's `requireUser` redirects to `/auth`. A failed check, or a 401 seen by an anonymous visitor, changes nothing.
 
 ### Local Component State (UI Only)
 

@@ -13,7 +13,7 @@ Every endpoint is described by a **contract**: its method, path, inputs, respons
   - `schemas.ts`: the Zod schemas. Server-only.
   - `types.ts`: request and response types.
   - `service.ts`: business logic and data access.
-- Contracts are named after the service function they call (`getSchedules`, `addSchedule`) and imported by namespace: `import * as schedulesApi from "@/lib/schedules/contract"`.
+- Contracts are named after the service function they call (`listLists`, `createList`; schedules predates the rule) and imported by namespace: `import * as schedulesApi from "@/lib/schedules/contract"`.
 
 ## Contracts and Schemas
 

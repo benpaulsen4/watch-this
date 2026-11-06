@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { ApiErrorBody } from "@/lib/api/errors";
+import { validationFailure } from "@/lib/api/route";
 import { AuthenticatedRequest, withAuth } from "@/lib/auth/api-middleware";
 import { importUserData } from "@/lib/profile/data/service";
 
@@ -13,11 +14,7 @@ function failure(status: number, body: ApiErrorBody) {
 }
 
 function invalidField(path: string, message: string) {
-  return failure(400, {
-    error: message,
-    code: "validation",
-    issues: [{ path, message }],
-  });
+  return validationFailure([{ path, message }]);
 }
 
 // POST /api/profile/import - Import user's lists data from JSON only. A

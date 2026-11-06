@@ -165,30 +165,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // A query or mutation answered 401: the session may have expired, or been
   // revoked from another device, while this page was open. Ask the server. If
-  // it confirms the session is gone, drop the user (which clears the cache above) and
-  // refresh the route, so an authenticated page's `requireUser` redirects to
-  // /auth with this page as `?redirect`. Only while a user is held: an
-  // anonymous visitor's 401s are expected. One check at a time, because a
-  // dead session fails every request on the page at once.
+  // it confirms the session is gone, drop the user (which clears the cache
+  // above) and refresh the route, so an authenticated page's `requireUser`
+  // redirects to /auth with this page as `?redirect`. If another account has
+  // signed in from a different tab, load that one instead. Only while a user
+  // is held: an anonymous visitor's 401s are expected. One check at a time,
+  // because a dead session fails every request on the page at once.
   const router = useProgressRouter();
-  const heldUser = useRef(false);
+  const heldUserId = useRef<string | null>(null);
   useEffect(() => {
-    heldUser.current = state.user !== null;
-  }, [state.user]);
+    heldUserId.current = userId;
+  }, [userId]);
   const checkingSession = useRef(false);
   useEffect(() => {
     const onError = async (error: unknown) => {
-      if (!isSignedOut(error) || !heldUser.current || checkingSession.current) {
+      if (!isSignedOut(error) || !heldUserId.current || checkingSession.current) {
         return;
       }
       checkingSession.current = true;
       try {
-        await api(authApi.getSession);
+        const { user } = await api(authApi.getSession);
+        if (user.id !== heldUserId.current) void refreshSession();
       } catch (sessionError) {
         // Only the server saying so ends the session; a failed check does not.
         if (isSignedOut(sessionError)) {
           // Before the re-render syncs it, so a 401 still in flight is ignored.
-          heldUser.current = false;
+          heldUserId.current = null;
           clearAuth();
           router.refresh();
         }
@@ -212,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribeQueries();
       unsubscribeMutations();
     };
-  }, [queryClient, clearAuth, router]);
+  }, [queryClient, clearAuth, refreshSession, router]);
 
   // Load streaming preferences once the user is known. The guard is
   // `streamingLoaded`, not `streamingPreferences`: a failed request leaves the

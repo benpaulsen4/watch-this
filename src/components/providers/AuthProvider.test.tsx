@@ -371,6 +371,17 @@ describe("AuthProvider", () => {
       expect(router.refresh).not.toHaveBeenCalled();
     });
 
+    it("loads the other account when another tab has signed in", async () => {
+      stubFetch({ ok: true, status: 200, body: signedInAs("u2", "bob") });
+      const client = await renderSignedIn();
+
+      (getCurrentSession as any).mockResolvedValue(signedInAs("u2", "bob"));
+      await failQuery(client, "lists", expired());
+
+      await waitFor(() => expect(who()).toBe("bob"));
+      expect(router.refresh).not.toHaveBeenCalled();
+    });
+
     it("keeps the user when the session check itself fails", async () => {
       const sessionChecks = stubFetch({ ok: false, status: 503, body: {} });
       const client = await renderSignedIn();
