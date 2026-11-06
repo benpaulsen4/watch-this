@@ -58,3 +58,43 @@ describe("contracts", () => {
     );
   });
 });
+
+const API = path.join(process.cwd(), "src/app/api");
+
+const routeFiles = readdirSync(API, { recursive: true, encoding: "utf8" })
+  .filter((entry) => /^route\.tsx?$/.test(path.basename(entry)))
+  .map((entry) => entry.split(path.sep).join("/"));
+
+/**
+ * Routes `authedRoute` and `publicRoute` do not fit: the share card answers
+ * with a PNG, and import reads a multipart upload. Both still use `withAuth`.
+ */
+const NOT_ON_A_WRAPPER = [
+  "series-finale/[period]/card/route.tsx",
+  "profile/import/route.ts",
+];
+
+const HANDLER = /export (?:const|(?:async )?function) (GET|POST|PUT|PATCH|DELETE)\b(.*)/g;
+
+describe("routes", () => {
+  it("finds routes to check", () => {
+    expect(routeFiles.length).toBeGreaterThan(0);
+  });
+
+  it.each(NOT_ON_A_WRAPPER)("%s still exists", (file) => {
+    expect(routeFiles).toContain(file);
+  });
+
+  // Read as text so this test does not load database code.
+  it.each(routeFiles.filter((file) => !NOT_ON_A_WRAPPER.includes(file)))(
+    "%s uses authedRoute or publicRoute for every method",
+    (file) => {
+      const source = readFileSync(path.join(API, file), "utf8");
+      const handlers = [...source.matchAll(HANDLER)];
+      expect(handlers.length, "no route handlers found").toBeGreaterThan(0);
+      for (const [, method, rest] of handlers) {
+        expect(rest, method).toMatch(/^ = (authedRoute|publicRoute)\(/);
+      }
+    },
+  );
+});

@@ -94,6 +94,8 @@ export function DataExportImport() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("format", "json");
+      // A multipart upload, which api() does not send.
+      // eslint-disable-next-line no-restricted-globals
       const response = await fetch("/api/profile/import", {
         method: "POST",
         body: formData,

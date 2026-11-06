@@ -119,6 +119,31 @@ const config = [
     },
   },
   {
+    // Components and hooks call the API through `api()` and a contract, which
+    // gives them typed inputs, typed error codes and an always-read body. The
+    // two responses `api()` cannot handle, the share card's PNG and the import's
+    // multipart upload, disable this on their line.
+    files: ["src/components/**/*.{ts,tsx}", "src/hooks/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "fetch",
+          message: "Use api() from @/lib/api/client with the endpoint's contract.",
+        },
+      ],
+      "no-restricted-properties": [
+        "error",
+        ...["window", "globalThis", "self"].map((object) => ({
+          object,
+          property: "fetch",
+          message: "Use api() from @/lib/api/client with the endpoint's contract.",
+        })),
+      ],
+    },
+  },
+  {
     // A contract is imported by client code, so it must not reach server modules.
     files: ["src/lib/**/contract.ts"],
     ignores: ["**/*.test.ts"],
