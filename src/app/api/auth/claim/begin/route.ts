@@ -1,24 +1,23 @@
 import { eq } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
 
+import { publicRoute } from "@/lib/api/route";
+import * as authApi from "@/lib/auth/contract";
+import { claimBeginSchemas } from "@/lib/auth/schemas";
 import {
   createChallengeToken,
   generateAdditionalPasskeyRegistrationOptions,
   verifyClaimToken,
 } from "@/lib/auth/webauthn";
-import { db , passkeyClaims } from "@/lib/db";
+import { db, passkeyClaims } from "@/lib/db";
 
-export async function GET(request: NextRequest) {
-  try {
-    const token = request.nextUrl.searchParams.get("token");
-    if (!token) {
-      return NextResponse.json({ error: "Missing token" }, { status: 400 });
-    }
-
+// GET /api/auth/claim/begin?token=... - registration options for a passkey on
+// a new device, from a claim link
+export const GET = publicRoute(
+  authApi.claimBegin,
+  claimBeginSchemas,
+  async ({ query: { token } }) => {
     const verified = await verifyClaimToken(token);
-    if (!verified) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
+    if (!verified) return "invalidToken";
 
     const claimRows = await db
       .select()
@@ -27,15 +26,10 @@ export async function GET(request: NextRequest) {
       .limit(1);
 
     const claim = claimRows[0];
-    if (!claim) {
-      return NextResponse.json({ error: "Claim not found" }, { status: 404 });
-    }
-
-    if (claim.status !== "active") {
-      return NextResponse.json({ error: "Claim not active" }, { status: 400 });
-    }
+    if (!claim) return "notFound";
+    if (claim.status !== "active") return "notActive";
     if (claim.expiresAt && claim.expiresAt.getTime() < Date.now()) {
-      return NextResponse.json({ error: "Claim expired" }, { status: 400 });
+      return "expired";
     }
 
     const options = await generateAdditionalPasskeyRegistrationOptions(
@@ -47,12 +41,6 @@ export async function GET(request: NextRequest) {
       claimId: verified.claimId,
     });
 
-    return NextResponse.json({ options, challengeToken });
-  } catch (error) {
-    console.error("Claim begin error:", error);
-    return NextResponse.json(
-      { error: "Failed to begin claim" },
-      { status: 500 },
-    );
-  }
-}
+    return { options, challengeToken };
+  },
+);

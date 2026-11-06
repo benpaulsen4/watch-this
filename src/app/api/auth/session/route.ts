@@ -1,155 +1,36 @@
 import { eq } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
 
-import { getCurrentUser } from "@/lib/auth/webauthn";
+import { authedRoute } from "@/lib/api/route";
+import * as authApi from "@/lib/auth/contract";
+import { updateSessionSchemas } from "@/lib/auth/schemas";
+import type { SessionUser } from "@/lib/auth/types";
 import { db } from "@/lib/db";
-import { NewUser, users } from "@/lib/db/schema";
+import { NewUser, User, users } from "@/lib/db/schema";
 
-export async function GET(request: NextRequest) {
-  try {
-    const sessionToken = request.cookies.get("session")?.value;
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: "No session found" }, { status: 401 });
-    }
-
-    const user = await getCurrentUser(sessionToken);
-
-    if (!user) {
-      // Clear invalid session cookie
-      const response = NextResponse.json(
-        { error: "Invalid session" },
-        { status: 401 },
-      );
-      response.cookies.delete("session");
-      return response;
-    }
-
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        profilePictureUrl: user.profilePictureUrl,
-        timezone: user.timezone,
-        createdAt: user.createdAt,
-        shareStatsWithCollaborators: user.shareStatsWithCollaborators,
-      },
-    });
-  } catch (error) {
-    console.error("Session check error:", error);
-
-    return NextResponse.json(
-      { error: "Failed to check session" },
-      { status: 500 },
-    );
-  }
+function sessionUser(user: User): SessionUser {
+  return {
+    id: user.id,
+    username: user.username,
+    profilePictureUrl: user.profilePictureUrl,
+    timezone: user.timezone,
+    createdAt: user.createdAt,
+    shareStatsWithCollaborators: user.shareStatsWithCollaborators,
+  };
 }
 
-export async function PUT(request: NextRequest) {
-  try {
-    const sessionToken = request.cookies.get("session")?.value;
+// GET /api/auth/session - the signed-in user. A missing or invalid session is
+// a 401 from `withAuth`, which also clears an invalid session cookie.
+export const GET = authedRoute(authApi.getSession, {}, ({ user }) => ({
+  user: sessionUser(user),
+}));
 
-    if (!sessionToken) {
-      return NextResponse.json({ error: "No session found" }, { status: 401 });
-    }
-
-    const user = await getCurrentUser(sessionToken);
-
-    if (!user) {
-      const response = NextResponse.json(
-        { error: "Invalid session" },
-        { status: 401 },
-      );
-      response.cookies.delete("session");
-      return response;
-    }
-
-    const body = await request.json();
+// PUT /api/auth/session - update the signed-in user's profile
+export const PUT = authedRoute(
+  authApi.updateSession,
+  updateSessionSchemas,
+  async ({ user, body }) => {
     const { username, profilePictureUrl, timezone, shareStatsWithCollaborators } =
       body;
-
-    // Validate input
-    if (username !== undefined) {
-      if (typeof username !== "string" || username.trim().length === 0) {
-        return NextResponse.json(
-          { error: "Username must be a non-empty string" },
-          { status: 400 },
-        );
-      }
-      // Validate username format
-      const usernameRegex = /^[a-zA-Z0-9_-]{3,50}$/;
-      if (!usernameRegex.test(username.trim())) {
-        return NextResponse.json(
-          {
-            error:
-              "Username must be 3-50 characters and contain only letters, numbers, underscores, and hyphens",
-          },
-          { status: 400 },
-        );
-      }
-    }
-
-    if (profilePictureUrl !== undefined) {
-      if (profilePictureUrl !== null && typeof profilePictureUrl !== "string") {
-        return NextResponse.json(
-          { error: "Profile picture URL must be a string or null" },
-          { status: 400 },
-        );
-      }
-      if (profilePictureUrl && profilePictureUrl.length > 500) {
-        return NextResponse.json(
-          { error: "Profile picture URL must be 500 characters or less" },
-          { status: 400 },
-        );
-      }
-      // Basic URL validation
-      if (profilePictureUrl && profilePictureUrl.trim()) {
-        try {
-          new URL(profilePictureUrl);
-        } catch {
-          return NextResponse.json(
-            { error: "Profile picture URL must be a valid URL" },
-            { status: 400 },
-          );
-        }
-      }
-    }
-
-    // Validate timezone if provided
-    if (timezone !== undefined) {
-      if (typeof timezone !== "string" || timezone.trim().length === 0) {
-        return NextResponse.json(
-          { error: "Timezone must be a non-empty string" },
-          { status: 400 },
-        );
-      }
-      if (timezone.length > 100) {
-        return NextResponse.json(
-          { error: "Timezone must be 100 characters or less" },
-          { status: 400 },
-        );
-      }
-      try {
-        // Validate via Intl API
-        new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(
-          new Date(),
-        );
-      } catch {
-        return NextResponse.json(
-          { error: "Invalid timezone" },
-          { status: 400 },
-        );
-      }
-    }
-
-    if (shareStatsWithCollaborators !== undefined) {
-      if (typeof shareStatsWithCollaborators !== "boolean") {
-        return NextResponse.json(
-          { error: "shareStatsWithCollaborators must be a boolean" },
-          { status: 400 },
-        );
-      }
-    }
 
     // Check if username is already taken (if username is being updated)
     if (username !== undefined && username !== user.username) {
@@ -159,31 +40,17 @@ export async function PUT(request: NextRequest) {
         .where(eq(users.username, username))
         .limit(1);
 
-      if (existingUser.length > 0) {
-        return NextResponse.json(
-          { error: "Username is already taken" },
-          { status: 409 },
-        );
-      }
+      if (existingUser.length > 0) return "usernameTaken";
     }
 
-    // Update user profile
     const updateData: Partial<NewUser> = {
       updatedAt: new Date(),
     };
-
-    if (username !== undefined) {
-      updateData.username = username;
-    }
-
+    if (username !== undefined) updateData.username = username;
     if (profilePictureUrl !== undefined) {
       updateData.profilePictureUrl = profilePictureUrl || null;
     }
-
-    if (timezone !== undefined) {
-      updateData.timezone = timezone;
-    }
-
+    if (timezone !== undefined) updateData.timezone = timezone;
     if (shareStatsWithCollaborators !== undefined) {
       updateData.shareStatsWithCollaborators = shareStatsWithCollaborators;
     }
@@ -196,30 +63,12 @@ export async function PUT(request: NextRequest) {
 
     // The session was valid when this request started, but the account can be
     // deleted between authenticating and this UPDATE, leaving it matching no
-    // rows. Fall through to the catch below, which already answers 500 for this
-    // route -- the throw only replaces an opaque property-access TypeError with
-    // a message that says what actually happened.
+    // rows. The wrapper answers 500 for a throw -- this only replaces an
+    // opaque property-access TypeError with a message that says what happened.
     if (!updatedUser) {
       throw new Error(`Profile update matched no user row for id ${user.id}`);
     }
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: updatedUser.id,
-        username: updatedUser.username,
-        profilePictureUrl: updatedUser.profilePictureUrl,
-        timezone: updatedUser.timezone,
-        createdAt: updatedUser.createdAt,
-        shareStatsWithCollaborators: updatedUser.shareStatsWithCollaborators,
-      },
-    });
-  } catch (error) {
-    console.error("Profile update error:", error);
-
-    return NextResponse.json(
-      { error: "Failed to update profile" },
-      { status: 500 },
-    );
-  }
-}
+    return { success: true as const, user: sessionUser(updatedUser) };
+  },
+);

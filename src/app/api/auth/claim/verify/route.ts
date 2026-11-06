@@ -1,5 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 
+import { publicRoute } from "@/lib/api/route";
+import * as authApi from "@/lib/auth/contract";
+import { claimVerifySchemas } from "@/lib/auth/schemas";
 import {
   verifyAdditionalPasskeyRegistration,
   verifyChallengeToken,
@@ -12,74 +15,57 @@ import { consumeClaim } from "@/lib/profile/devices/service";
 // consumed/cancelled/expired), to roll back the surrounding transaction.
 class ClaimUnavailableError extends Error {}
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { token, challengeToken, registrationResponse, deviceName } =
-      body || {};
-
-    if (!token || !challengeToken || !registrationResponse) {
-      return NextResponse.json(
-        { error: "Missing parameters" },
-        { status: 400 },
-      );
-    }
+// POST /api/auth/claim/verify - attach the new device's passkey to the account
+export const POST = publicRoute(
+  authApi.claimVerify,
+  claimVerifySchemas,
+  async ({ body }) => {
+    const { token, challengeToken, registrationResponse, deviceName } = body;
 
     const claim = await verifyClaimToken(token);
-    if (!claim) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
+    if (!claim) return "invalidToken";
 
     const challenge = await verifyChallengeToken(challengeToken, {
       flow: "claim",
       userId: claim.userId,
       claimId: claim.claimId,
     });
-    if (!challenge) {
-      return NextResponse.json({ error: "Invalid challenge" }, { status: 400 });
-    }
+    if (!challenge) return "invalidChallenge";
 
     // Consume the claim and register the passkey atomically. The claim is
     // consumed first via a single conditional UPDATE, so concurrent redemptions
     // cannot both proceed; if registration then fails, the transaction rolls
     // back the consume and the claim stays available for a retry.
-    await db.transaction(async (tx) => {
-      const consumed = await consumeClaim(tx, claim.claimId);
-      if (!consumed) {
-        throw new ClaimUnavailableError();
-      }
+    try {
+      await db.transaction(async (tx) => {
+        const consumed = await consumeClaim(tx, claim.claimId);
+        if (!consumed) {
+          throw new ClaimUnavailableError();
+        }
 
-      // Register the passkey on the SAME transaction, so if anything after
-      // this (or this itself) throws, the credential insert rolls back
-      // alongside the claim consumption -- no orphan credential can persist
-      // while the claim reverts to active.
-      await verifyAdditionalPasskeyRegistration(
-        claim.userId,
-        registrationResponse,
-        challenge.challenge,
-        deviceName,
-        tx,
-      );
+        // Register the passkey on the SAME transaction, so if anything after
+        // this (or this itself) throws, the credential insert rolls back
+        // alongside the claim consumption -- no orphan credential can persist
+        // while the claim reverts to active.
+        await verifyAdditionalPasskeyRegistration(
+          claim.userId,
+          registrationResponse as unknown as RegistrationResponseJSON,
+          challenge.challenge,
+          deviceName,
+          tx,
+        );
 
-      await tx.insert(activityFeed).values({
-        userId: claim.userId,
-        activityType: "claim_consumed",
-        metadata: { claimId: claim.claimId },
+        await tx.insert(activityFeed).values({
+          userId: claim.userId,
+          activityType: "claim_consumed",
+          metadata: { claimId: claim.claimId },
+        });
       });
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    if (error instanceof ClaimUnavailableError) {
-      return NextResponse.json(
-        { error: "Claim not active" },
-        { status: 400 },
-      );
+    } catch (error) {
+      if (error instanceof ClaimUnavailableError) return "notActive";
+      throw error;
     }
-    console.error("Claim verify error:", error);
-    return NextResponse.json(
-      { error: "Failed to verify claim" },
-      { status: 500 },
-    );
-  }
-}
+
+    return { success: true as const };
+  },
+);

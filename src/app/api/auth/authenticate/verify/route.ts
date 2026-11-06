@@ -1,59 +1,48 @@
-import { AuthenticationResponseJSON } from "@simplewebauthn/browser";
-import { NextRequest, NextResponse } from "next/server";
+import type { AuthenticationResponseJSON } from "@simplewebauthn/browser";
+import { NextResponse } from "next/server";
 
+import { publicRoute } from "@/lib/api/route";
+import * as authApi from "@/lib/auth/contract";
+import { authenticateVerifySchemas } from "@/lib/auth/schemas";
+import type { AuthenticateVerifyResponse } from "@/lib/auth/types";
 import {
   createSessionToken,
   verifyChallengeToken,
   verifyPasskeyAuthentication,
 } from "@/lib/auth/webauthn";
 
-interface RequestBody {
-  authenticationResponse: unknown;
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const body: RequestBody = await request.json();
-    const { authenticationResponse } = body;
-
-    if (
-      !authenticationResponse ||
-      !(authenticationResponse as AuthenticationResponseJSON)?.id
-    ) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    // Verify challenge
+// POST /api/auth/authenticate/verify - sign in with a passkey
+export const POST = publicRoute(
+  authApi.authenticateVerify,
+  authenticateVerifySchemas,
+  async ({ request, body: { authenticationResponse } }) => {
     const storedChallenge = request.cookies.get(
-      "authentication-challenge"
+      "authentication-challenge",
     )?.value;
-    if (!storedChallenge) {
-      return NextResponse.json(
-        { error: "Invalid or expired challenge" },
-        { status: 400 }
-      );
-    }
+    if (!storedChallenge) return "invalidChallenge";
 
     const challengePayload = await verifyChallengeToken(storedChallenge, {
       flow: "authenticate",
     });
-    if (!challengePayload) {
-      return NextResponse.json(
-        { error: "Invalid or expired challenge" },
-        { status: 400 }
+    if (!challengePayload) return "invalidChallenge";
+
+    let authenticated: Awaited<ReturnType<typeof verifyPasskeyAuthentication>>;
+    try {
+      authenticated = await verifyPasskeyAuthentication(
+        authenticationResponse as unknown as AuthenticationResponseJSON,
+        challengePayload.challenge,
       );
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "Credential not found") return "credentialNotFound";
+        if (error.message === "Authentication verification failed") {
+          return "verificationFailed";
+        }
+      }
+      throw error;
     }
+    const { user, credential } = authenticated;
 
-    // Verify authentication
-    const { user, credential } = await verifyPasskeyAuthentication(
-      authenticationResponse as AuthenticationResponseJSON,
-      challengePayload.challenge
-    );
-
-    // Create session token
     const token = await createSessionToken(user);
 
     const response = NextResponse.json({
@@ -68,7 +57,7 @@ export async function POST(request: NextRequest) {
         deviceName: credential.deviceName,
         lastUsed: credential.lastUsed,
       },
-    });
+    } satisfies AuthenticateVerifyResponse);
 
     // Clear authentication challenge cookie
     response.cookies.delete("authentication-challenge");
@@ -83,28 +72,5 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch (error) {
-    console.error("Authentication verification error:", error);
-
-    if (error instanceof Error) {
-      if (error.message === "Credential not found") {
-        return NextResponse.json(
-          { error: "Credential not found" },
-          { status: 404 }
-        );
-      }
-
-      if (error.message === "Authentication verification failed") {
-        return NextResponse.json(
-          { error: "Authentication verification failed" },
-          { status: 400 }
-        );
-      }
-    }
-
-    return NextResponse.json(
-      { error: "Authentication failed" },
-      { status: 500 }
-    );
-  }
-}
+  },
+);

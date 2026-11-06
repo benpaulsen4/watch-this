@@ -1,90 +1,52 @@
-import { RegistrationResponseJSON } from "@simplewebauthn/server";
-import { NextRequest, NextResponse } from "next/server";
+import type { RegistrationResponseJSON } from "@simplewebauthn/server";
+import { NextResponse } from "next/server";
 
+import { publicRoute } from "@/lib/api/route";
+import * as authApi from "@/lib/auth/contract";
+import { registerVerifySchemas } from "@/lib/auth/schemas";
+import type { RegisterVerifyResponse } from "@/lib/auth/types";
 import {
   createSessionToken,
   verifyChallengeToken,
   verifyPasskeyRegistration,
 } from "@/lib/auth/webauthn";
 
-interface RequestBody {
-  username: string;
-  registrationResponse: unknown;
-  deviceName?: string;
-  timezone?: string;
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const body: RequestBody = await request.json();
+// POST /api/auth/register/verify - create the account and sign it in
+export const POST = publicRoute(
+  authApi.registerVerify,
+  registerVerifySchemas,
+  async ({ request, body }) => {
     const { username, registrationResponse, deviceName, timezone } = body;
 
-    if (
-      !username ||
-      !registrationResponse ||
-      !(registrationResponse as RegistrationResponseJSON)?.id
-    ) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    // Verify challenge
-    const storedChallenge = request.cookies.get(
-      "registration-challenge"
-    )?.value;
-    if (!storedChallenge) {
-      return NextResponse.json(
-        { error: "Invalid or expired challenge" },
-        { status: 400 }
-      );
-    }
+    const storedChallenge = request.cookies.get("registration-challenge")?.value;
+    if (!storedChallenge) return "invalidChallenge";
 
     const challengePayload = await verifyChallengeToken(storedChallenge, {
       flow: "register",
-      username: username.trim(),
+      username,
     });
-    if (!challengePayload) {
-      return NextResponse.json(
-        { error: "Invalid or expired challenge" },
-        { status: 400 }
+    if (!challengePayload) return "invalidChallenge";
+
+    let registered: Awaited<ReturnType<typeof verifyPasskeyRegistration>>;
+    try {
+      registered = await verifyPasskeyRegistration(
+        username,
+        registrationResponse as unknown as RegistrationResponseJSON,
+        challengePayload.challenge,
+        deviceName,
+        timezone,
       );
-    }
-
-    // Verify registration
-    // Validate timezone if provided
-    let validatedTimezone: string | undefined = undefined;
-    if (timezone !== undefined) {
-      if (typeof timezone !== "string" || timezone.trim().length === 0) {
-        return NextResponse.json(
-          { error: "Timezone must be a non-empty string" },
-          { status: 400 }
-        );
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "Username already exists") return "usernameTaken";
+        if (error.message === "Registration verification failed") {
+          return "verificationFailed";
+        }
       }
-      try {
-        // Validate via Intl API
-        new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(
-          new Date()
-        );
-        validatedTimezone = timezone;
-      } catch {
-        return NextResponse.json(
-          { error: "Invalid timezone" },
-          { status: 400 }
-        );
-      }
+      throw error;
     }
+    const { user, credential } = registered;
 
-    const { user, credential } = await verifyPasskeyRegistration(
-      username.trim(),
-      registrationResponse as RegistrationResponseJSON,
-      challengePayload.challenge,
-      deviceName,
-      validatedTimezone
-    );
-
-    // Create session token
     const token = await createSessionToken(user);
 
     const response = NextResponse.json({
@@ -101,7 +63,7 @@ export async function POST(request: NextRequest) {
         deviceName: credential.deviceName,
         createdAt: credential.createdAt,
       },
-    });
+    } satisfies RegisterVerifyResponse);
 
     // Clear registration challenge cookie
     response.cookies.delete("registration-challenge");
@@ -116,25 +78,5 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch (error) {
-    console.error("Registration verification error:", error);
-
-    if (error instanceof Error) {
-      if (error.message === "Username already exists") {
-        return NextResponse.json(
-          { error: "Username already exists" },
-          { status: 409 }
-        );
-      }
-
-      if (error.message === "Registration verification failed") {
-        return NextResponse.json(
-          { error: "Registration verification failed" },
-          { status: 400 }
-        );
-      }
-    }
-
-    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
-  }
-}
+  },
+);
