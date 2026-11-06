@@ -332,10 +332,8 @@ export function PasskeyDevicesViewer() {
                     // Any server answer closes the modal, as the old fetch did;
                     // only a network failure keeps it open.
                     if (
-                      !(
-                        isApiError(error, devicesApi.cancelClaim) &&
-                        error.code !== "network"
-                      )
+                      !isApiError(error, devicesApi.cancelClaim) ||
+                      error.code === "network"
                     ) {
                       return;
                     }
