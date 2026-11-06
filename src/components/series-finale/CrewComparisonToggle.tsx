@@ -4,6 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { Switch } from "@/components/ui/Switch";
+import { api } from "@/lib/api/client";
+import * as authApi from "@/lib/auth/contract";
 
 type Props = {
   user: { shareStatsWithCollaborators: boolean };
@@ -50,18 +52,10 @@ export function CrewComparisonToggle({ user, onUpdate }: Props) {
   }
 
   const mutation = useMutation({
-    mutationFn: async (next: boolean) => {
-      const response = await fetch("/api/auth/session", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shareStatsWithCollaborators: next }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to save");
-      }
-      return data;
-    },
+    mutationFn: (next: boolean) =>
+      api(authApi.updateSession, {
+        body: { shareStatsWithCollaborators: next },
+      }),
     onSuccess: async () => {
       await onUpdate();
     },

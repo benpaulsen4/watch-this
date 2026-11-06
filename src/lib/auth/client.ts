@@ -1,14 +1,12 @@
 "use client";
 
-import {
-  type PublicKeyCredentialCreationOptionsJSON,
-  type PublicKeyCredentialRequestOptionsJSON,
-  startAuthentication,
-  startRegistration,
-} from "@simplewebauthn/browser";
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { UAParser } from "ua-parser-js";
 
 import { api } from "@/lib/api/client";
+import type { Jsonify } from "@/lib/api/contract";
+import * as authApi from "@/lib/auth/contract";
+import type { SessionUser } from "@/lib/auth/types";
 import * as devicesApi from "@/lib/profile/devices/contract";
 
 export interface RegistrationOptions {
@@ -25,44 +23,17 @@ export async function registerPasskey({
     // Detect browser timezone
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     // Get registration options from server
-    const optionsResponse = await fetch("/api/auth/register/begin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username }),
-    });
-
-    if (!optionsResponse.ok) {
-      const error = await optionsResponse.json();
-      throw new Error(error.message || "Failed to get registration options");
-    }
-
-    const { options } = await optionsResponse.json();
+    const { options } = await api(authApi.registerBegin, { body: { username } });
 
     // Start registration with the browser
     const registrationResponse = await startRegistration({
-      optionsJSON: options as PublicKeyCredentialCreationOptionsJSON,
+      optionsJSON: options,
     });
 
     // Verify registration with server
-    const verificationResponse = await fetch("/api/auth/register/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username,
-        registrationResponse,
-        deviceName,
-        timezone,
-      }),
+    return await api(authApi.registerVerify, {
+      body: { username, registrationResponse, deviceName, timezone },
     });
-
-    if (!verificationResponse.ok) {
-      const error = await verificationResponse.json();
-      throw new Error(error.message || "Registration verification failed");
-    }
-
-    const result = await verificationResponse.json();
-
-    return result;
   } catch (error) {
     console.error("Registration error:", error);
     throw error;
@@ -73,37 +44,17 @@ export async function registerPasskey({
 export async function authenticatePasskey() {
   try {
     // Get authentication options from server
-    const optionsResponse = await fetch("/api/auth/authenticate/begin");
-
-    if (!optionsResponse.ok) {
-      const error = await optionsResponse.json();
-      throw new Error(error.message || "Failed to get authentication options");
-    }
-
-    const { options } = await optionsResponse.json();
+    const { options } = await api(authApi.authenticateBegin);
 
     // Start authentication with the browser
     const authenticationResponse = await startAuthentication({
-      optionsJSON: options as PublicKeyCredentialRequestOptionsJSON,
+      optionsJSON: options,
     });
 
     // Verify authentication with server
-    const verificationResponse = await fetch("/api/auth/authenticate/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        authenticationResponse,
-      }),
+    return await api(authApi.authenticateVerify, {
+      body: { authenticationResponse },
     });
-
-    if (!verificationResponse.ok) {
-      const error = await verificationResponse.json();
-      throw new Error(error.message || "Authentication verification failed");
-    }
-
-    const result = await verificationResponse.json();
-
-    return result;
   } catch (error) {
     console.error("Authentication error:", error);
     throw error;
@@ -116,22 +67,12 @@ export function initiatePasskeyClaim() {
 }
 
 // Begin claim registration on another device using the magic link token
-export async function beginClaimRegistration(token: string): Promise<{
-  options: PublicKeyCredentialCreationOptionsJSON;
-  challengeToken: string;
-}> {
-  const response = await fetch(
-    `/api/auth/claim/begin?token=${encodeURIComponent(token)}`,
-  );
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to begin claim registration");
-  }
-  return await response.json();
+export function beginClaimRegistration(token: string) {
+  return api(authApi.claimBegin, { query: { token } });
 }
 
 // Verify claim registration and attach credential to existing user
-export async function verifyClaimRegistration({
+export function verifyClaimRegistration({
   token,
   challengeToken,
   registrationResponse,
@@ -139,9 +80,9 @@ export async function verifyClaimRegistration({
 }: {
   token: string;
   challengeToken: string;
-  registrationResponse: unknown;
+  registrationResponse: { id: string };
   deviceName?: string;
-}): Promise<{ success: boolean }> {
+}) {
   const { browser, os } = UAParser(navigator.userAgent);
   const computedDeviceName =
     deviceName ||
@@ -149,30 +90,20 @@ export async function verifyClaimRegistration({
       os.version
     }`;
 
-  const response = await fetch("/api/auth/claim/verify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  return api(authApi.claimVerify, {
+    body: {
       token,
       challengeToken,
       registrationResponse,
       deviceName: computedDeviceName,
-    }),
+    },
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to verify claim registration");
-  }
-  return await response.json();
 }
 
-// Get current user session
-export async function getCurrentSession(): Promise<{ user: User } | null> {
+// Get current user session, or null when signed out or unreachable
+export async function getCurrentSession() {
   try {
-    const response = await fetch("/api/auth/session");
-    if (!response.ok) return null;
-    return await response.json();
+    return await api(authApi.getSession);
   } catch {
     return null;
   }
@@ -199,11 +130,6 @@ export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
   }
 }
 
-export type User = {
-  id: string;
-  username: string;
-  profilePictureUrl: string;
-  timezone: string;
-  createdAt: string;
-  shareStatsWithCollaborators: boolean;
-};
+// The session user as the client receives it. `profilePictureUrl` is null
+// for a user without one.
+export type User = Jsonify<SessionUser>;

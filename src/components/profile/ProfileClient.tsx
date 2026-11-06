@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useFragmentNavigation } from "@/hooks/useFragmentNavigation";
 import { useProgressRouter } from "@/hooks/useProgressRouter";
+import { api, isApiError } from "@/lib/api/client";
 import type { User } from "@/lib/auth/client";
+import * as authApi from "@/lib/auth/contract";
 
 import { useAuth } from "../providers/AuthProvider";
 import { PageHeader } from "../ui/PageHeader";
@@ -51,7 +53,13 @@ export function ProfileClient({ initialUser }: { initialUser: User }) {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/signout", { method: "POST" });
+      // Any answer from the server signs out here, an error included, as the
+      // plain fetch this replaced did; only an unreachable server stops it.
+      await api(authApi.signOut).catch((error: unknown) => {
+        if (!isApiError(error, authApi.signOut) || error.code === "network") {
+          throw error;
+        }
+      });
       // Navigation alone leaves the context holding this user. Clearing it
       // is what makes AuthProvider drop the query cache, so the next person
       // to sign in on this tab never sees this user's cached data.

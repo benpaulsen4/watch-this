@@ -221,6 +221,23 @@ describe("ProfileClient", () => {
     await waitFor(() => expect(authState.current.clearAuth).toHaveBeenCalled());
   });
 
+  // The server answering with an error still signs this device out, as the
+  // plain fetch the typed client replaced did.
+  it("still clears the auth context when sign-out answers with an error", async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      {
+        ok: false,
+        status: 500,
+        json: async () => ({ error: "Sign out failed", code: "internal" }),
+      },
+    );
+    render(<ProfileClient initialUser={SERVER_USER} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /logout/i }));
+
+    await waitFor(() => expect(authState.current.clearAuth).toHaveBeenCalled());
+  });
+
   it("logs out and navigates to /auth", async () => {
     (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       { ok: true, json: async () => ({}) },

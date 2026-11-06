@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
+import { api, errorMessage } from "@/lib/api/client";
+import * as authApi from "@/lib/auth/contract";
 
 type Props = {
   user: { timezone?: string };
@@ -66,22 +68,13 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
   };
 
   const saveTimezoneMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/auth/session", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timezone }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to update timezone");
-      return data;
-    },
+    mutationFn: () => api(authApi.updateSession, { body: { timezone } }),
     onSuccess: async () => {
       await onUserUpdate();
       setIsEditing(false);
     },
     onError: (e: unknown) => {
-      setError(e instanceof Error ? e.message : "Failed to update timezone");
+      setError(errorMessage(e, "Failed to update timezone"));
     },
     onSettled: () => setSaving(false),
   });
