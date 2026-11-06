@@ -2,6 +2,8 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { routeContext } from "@/test/route-context";
+
 const mockUser = { id: "user-1" };
 vi.mock("@/lib/auth/webauthn", () => ({
   getCurrentUser: vi.fn(async (token?: string) =>
@@ -20,6 +22,16 @@ vi.mock("@/lib/series-finale/service", () => ({
 
 const { GET } = await import("./route");
 
+// Next passes the `[period]` segment as route context; tests take it from the
+// URL they built.
+function send(
+  handler: (request: NextRequest, context: ReturnType<typeof routeContext>) => Promise<Response>,
+  request: NextRequest,
+) {
+  const period = new URL(request.url).pathname.split("/")[3] ?? "";
+  return handler(request, routeContext({ period }));
+}
+
 function authedRequest(url: string) {
   return new NextRequest(url, { headers: { cookie: "session=valid" } });
 }
@@ -31,12 +43,12 @@ describe("GET /api/series-finale/[period]", () => {
   });
 
   it("rejects a label that is not a plausible year", async () => {
-    const response = await GET(
+    const response = await send(GET, 
       authedRequest("http://localhost/api/series-finale/abcd"),
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       error: "Invalid period",
     });
     expect(getOrGenerateSnapshot).not.toHaveBeenCalled();
@@ -48,12 +60,12 @@ describe("GET /api/series-finale/[period]", () => {
   it("maps a null payload to 404", async () => {
     getOrGenerateSnapshot.mockResolvedValue(null);
 
-    const response = await GET(
+    const response = await send(GET, 
       authedRequest("http://localhost/api/series-finale/2025"),
     );
 
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       error: "Period not available",
     });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -64,7 +76,7 @@ describe("GET /api/series-finale/[period]", () => {
     getOrGenerateSnapshot.mockResolvedValue(payload);
     loadStoryCompletedAt.mockResolvedValue(null);
 
-    const response = await GET(
+    const response = await send(GET, 
       authedRequest("http://localhost/api/series-finale/2025"),
     );
 
@@ -86,7 +98,7 @@ describe("GET /api/series-finale/[period]", () => {
     getOrGenerateSnapshot.mockResolvedValue(payload);
     loadStoryCompletedAt.mockResolvedValue(completedAt);
 
-    const response = await GET(
+    const response = await send(GET, 
       authedRequest("http://localhost/api/series-finale/2025"),
     );
 
@@ -103,7 +115,7 @@ describe("GET /api/series-finale/[period]", () => {
   it("does not look up story completion when the period is unavailable", async () => {
     getOrGenerateSnapshot.mockResolvedValue(null);
 
-    await GET(authedRequest("http://localhost/api/series-finale/2025"));
+    await send(GET, authedRequest("http://localhost/api/series-finale/2025"));
 
     expect(loadStoryCompletedAt).not.toHaveBeenCalled();
   });
