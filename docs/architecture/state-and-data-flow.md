@@ -91,7 +91,7 @@ Relevant code:
 - [authedRoute](../../src/lib/api/route.ts) and [withAuth](../../src/lib/auth/api-middleware.ts)
 - Example authenticated route: [status/content/route.ts](../../src/app/api/status/content/route.ts)
 
-### Client-Side Guarding (Pages)
+### Page Guarding (Server-Side)
 
 Protected UI routes are grouped under `src/app/(authenticated)`. Each page calls `requireUser(pathname)` during its server render, which redirects to `/auth?redirect=<path>` when there is no valid session:
 

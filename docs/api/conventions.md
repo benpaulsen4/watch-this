@@ -162,7 +162,7 @@ onError: (err) => {
 },
 ```
 
-`isApiError(err, contract)` narrows `code` to that contract's codes plus the universal ones. `errorMessage(err, fallback)` gives the error's message or the fallback.
+`isApiError(err, contract)` narrows `code` to that contract's codes plus the universal and client-only ones. `errorMessage(err, fallback)` gives the error's message or the fallback.
 
 - Inside React Query, pass the query's `signal`: `queryFn: ({ signal }) => api(contract, input, { signal })`. The default retry policy retries once, but never a 4xx `ApiError`.
 - A lint rule bans the `fetch` global in `src/components` and `src/hooks`. The share card's PNG download and the import upload disable it on their line, since `api()` handles neither.

@@ -2804,14 +2804,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "413":
-          description: "`tooLarge`: the file is over 1 MB or has too many entries"
+        "401":
+          description: Authentication required
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Authentication required
+        "413":
+          description: "`tooLarge`: the file is over 1 MB or has too many entries"
           content:
             application/json:
               schema:
