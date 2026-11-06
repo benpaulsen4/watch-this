@@ -52,7 +52,10 @@ describe("useSeriesFinale", () => {
     const { result } = renderHook(() => useSeriesFinale("2026"), { wrapper });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(fetchMock).toHaveBeenCalledWith("/api/series-finale/2026");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/series-finale/2026",
+      expect.objectContaining({ method: "GET" }),
+    );
   });
 
   it("surfaces a 404 as SeriesFinaleUnavailableError", async () => {
