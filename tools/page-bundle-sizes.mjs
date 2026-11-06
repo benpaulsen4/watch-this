@@ -42,9 +42,9 @@ for (const file of walk(join(NEXT, "server", "app"))) {
   const source = readFileSync(file, "utf8");
   const manifest = JSON.parse(source.slice(source.indexOf("= {") + 2).replace(/;\s*$/, ""));
   const chunks = new Set(rootChunks);
-  for (const module of Object.values(manifest.clientModules)) {
-    if (module.async) continue;
-    for (const chunk of module.chunks) chunks.add(chunk);
+  for (const entry of Object.values(manifest.clientModules)) {
+    if (entry.async) continue;
+    for (const chunk of entry.chunks) chunks.add(chunk);
   }
   sizes[page] = [...chunks].reduce((total, chunk) => total + gzipped(chunk), 0);
 }
