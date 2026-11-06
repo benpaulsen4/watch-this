@@ -59,7 +59,10 @@ const { GET } = await import("./route");
 // Next passes the `[period]` segment as route context; tests take it from the
 // URL they built.
 function send(
-  handler: (request: NextRequest, context: ReturnType<typeof routeContext>) => Promise<Response>,
+  handler: (
+    request: NextRequest,
+    context: ReturnType<typeof routeContext>,
+  ) => Promise<Response>,
   request: NextRequest,
 ) {
   const period = new URL(request.url).pathname.split("/")[3] ?? "";
@@ -212,13 +215,16 @@ describe("GET /api/series-finale/[period]/card", () => {
   });
 
   it("rejects a label that is not a plausible year", async () => {
-    const response = await send(GET, 
+    const response = await send(
+      GET,
       authedRequest("http://localhost/api/series-finale/abcd/card"),
     );
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
       error: "Invalid period",
+      code: "validation",
+      issues: [{ path: "period", message: "Invalid period" }],
     });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(getOrGenerateSnapshot).not.toHaveBeenCalled();
@@ -264,6 +270,21 @@ describe("GET /api/series-finale/[period]/card", () => {
     expect(text).toContain("The Bear");
     expect(text).toContain("Ich war zuhause, aber");
     expect(text).toContain("The Sunday Marathoner");
+  });
+
+  it("reads the period from the route context, not the URL", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+
+    const response = await GET(
+      authedRequest("http://localhost/api/series-finale/abcd/card"),
+      routeContext({ period: "2025" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(getOrGenerateSnapshot).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ label: "2025" }),
+    );
   });
 
   it("draws nobody else's name, only the viewer's", async () => {

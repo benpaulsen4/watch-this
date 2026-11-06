@@ -8,7 +8,7 @@ import {
   withAuth,
 } from "@/lib/auth/api-middleware";
 import { getSiteUrl } from "@/lib/seo/site";
-import { parsePeriodLabel } from "@/lib/series-finale/periods";
+import { getOrGenerateSnapshotSchemas } from "@/lib/series-finale/schemas";
 import { getOrGenerateSnapshot } from "@/lib/series-finale/service";
 import { shareQrDataUrl, stripCrossUserData } from "@/lib/series-finale/share";
 import {
@@ -73,15 +73,24 @@ async function posterDataUrl(
 // contract; its error bodies follow the contract shape all the same.
 const handler = withAuth(async (request: AuthenticatedRequest, context) => {
   try {
-    const { period: label } = await context.params;
-    const period = typeof label === "string" ? parsePeriodLabel(label) : null;
+    const parsed = getOrGenerateSnapshotSchemas.params.safeParse(
+      await context.params,
+    );
 
-    if (!period) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid period", code: "validation" },
+        {
+          error: parsed.error.issues[0]?.message ?? "Invalid period",
+          code: "validation",
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.map(String).join("."),
+            message: issue.message,
+          })),
+        },
         { status: 400 },
       );
     }
+    const { period } = parsed.data;
 
     const full = await getOrGenerateSnapshot(request.user.id, period);
 
