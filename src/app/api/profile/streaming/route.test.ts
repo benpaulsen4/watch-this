@@ -74,6 +74,25 @@ describe("POST /api/profile/streaming", () => {
     updateStreamingPreferences.mockResolvedValue({ country: "US", providers: [] });
     const response = await post({ country: "US" });
     expect(response.status).toBe(200);
+    expect(updateStreamingPreferences).toHaveBeenCalledWith("user-1", {
+      country: "US",
+      region: "US",
+    });
+  });
+
+  it("passes an explicit region through unchanged", async () => {
+    updateStreamingPreferences.mockResolvedValue({ country: "AU", providers: [] });
+    const response = await post({
+      country: "AU",
+      region: "NZ",
+      providers: [provider],
+    });
+    expect(response.status).toBe(200);
+    expect(updateStreamingPreferences).toHaveBeenCalledWith("user-1", {
+      country: "AU",
+      region: "NZ",
+      providers: [provider],
+    });
   });
 
   it.each([
