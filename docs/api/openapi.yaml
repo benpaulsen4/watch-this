@@ -2907,17 +2907,23 @@ paths:
           required: false
           schema:
             type: string
+            default: all
             enum: [all, movie, tv]
         - in: query
           name: year
           required: false
           schema:
             type: integer
+            minimum: 1900
+            description: "At most five years from now. Not allowed when type is all."
         - in: query
           name: page
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 1000
+            default: 1
       responses:
         "200":
           description: Search results
@@ -2973,21 +2979,38 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            description: Ignored when invalid.
         - in: query
           name: year
           required: false
           schema:
             type: integer
+            minimum: 1900
+            description: At most five years from now. Ignored when invalid.
         - in: query
           name: sort_by
           required: false
           schema:
             type: string
+            enum:
+              - popularity.desc
+              - popularity.asc
+              - vote_average.desc
+              - vote_average.asc
+              - release_date.desc
+              - release_date.asc
+              - first_air_date.desc
+              - first_air_date.asc
+            description: Ignored when invalid.
         - in: query
           name: page
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 1000
+            default: 1
       responses:
         "200":
           description: Discover results
@@ -2995,6 +3018,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TMDBContentSearchResult"
+        "400":
+          description: Invalid type or page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Authentication required
           content:
@@ -3025,12 +3054,14 @@ paths:
           required: false
           schema:
             type: string
+            default: all
             enum: [all, movie, tv]
         - in: query
           name: time_window
           required: false
           schema:
             type: string
+            default: week
             enum: [day, week]
       responses:
         "200":
@@ -3075,6 +3106,7 @@ paths:
           required: true
           schema:
             type: integer
+            minimum: 1
         - in: query
           name: type
           required: true
@@ -3135,6 +3167,7 @@ paths:
           required: true
           schema:
             type: integer
+            minimum: 1
       responses:
         "200":
           description: Cast list
@@ -3233,16 +3266,19 @@ paths:
         required: true
         schema:
           type: integer
+          minimum: 1
       - in: query
         name: season
         required: true
         schema:
           type: integer
+          minimum: 0
       - in: query
         name: episode
         required: false
         schema:
           type: integer
+          minimum: 0
     get:
       tags: [TMDB]
       summary: Get TV season or episode details
@@ -3388,6 +3424,7 @@ paths:
           required: true
           schema:
             type: integer
+            minimum: 1
         - in: query
           name: region
           required: true
