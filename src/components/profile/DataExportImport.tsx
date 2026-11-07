@@ -15,7 +15,7 @@ import { useRef,useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { api, ApiError } from "@/lib/api/client";
+import { api, ApiError, errorMessage } from "@/lib/api/client";
 import * as dataApi from "@/lib/profile/data/contract";
 import type { ImportResult } from "@/lib/profile/data/types";
 
@@ -59,7 +59,7 @@ export function DataExportImport() {
     },
     onError: (error: unknown) => {
       console.error("Export failed:", error);
-      alert(error instanceof Error ? error.message : "Failed to export data");
+      alert(errorMessage(error, "Failed to export data"));
     },
     onSettled: () => setExportLoading(false),
   });
@@ -128,7 +128,7 @@ export function DataExportImport() {
           tvShowSchedules: 0,
         },
         errors: [
-          error instanceof Error ? error.message : "Failed to import data",
+          errorMessage(error, "Failed to import data"),
         ],
       });
       setImportStatus("error");

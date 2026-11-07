@@ -30,10 +30,10 @@ export class SeriesFinaleUnavailableError extends Error {
 }
 
 /**
- * Run a dismissal or completion POST, failing with `failure`. The client reads
- * the response body to its end even when unused: an unread body leaves the
- * request open in the browser, so a page that has posted never goes
- * network-idle -- and the recap posts a dismissal whenever its foot is reached.
+ * Run a dismissal or completion POST, failing with `failure` and keeping the
+ * underlying error as its `cause`. `api()` reads the response body to its end,
+ * which the recap relies on: it posts a dismissal whenever its foot is reached,
+ * and an unread body would keep the page from going network-idle.
  */
 async function post(request: Promise<unknown>, failure: string): Promise<void> {
   try {

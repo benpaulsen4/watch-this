@@ -18,7 +18,6 @@ interface UsernameChangerProps {
 export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [newUsername, setNewUsername] = useState(user.username);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -61,7 +60,6 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
       return;
     }
 
-    setLoading(true);
     setError(null);
     try {
       await saveUsernameMutation.mutateAsync();
@@ -84,8 +82,8 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
           : errorMessage(err, "Failed to update username"),
       );
     },
-    onSettled: () => setLoading(false),
   });
+  const loading = saveUsernameMutation.isPending;
 
   const handleCancel = () => {
     setNewUsername(user.username);

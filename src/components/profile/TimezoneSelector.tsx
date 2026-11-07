@@ -18,7 +18,6 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
   const [timezones, setTimezones] = useState<string[]>([]);
   const [timezone, setTimezone] = useState<string>(user.timezone || "UTC");
   const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,7 +57,6 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
   }, [user.timezone]);
 
   const handleSave = async () => {
-    setSaving(true);
     setError(null);
     try {
       await saveTimezoneMutation.mutateAsync();
@@ -76,8 +74,8 @@ export function TimezoneSelector({ user, onUserUpdate }: Props) {
     onError: (e: unknown) => {
       setError(errorMessage(e, "Failed to update timezone"));
     },
-    onSettled: () => setSaving(false),
   });
+  const saving = saveTimezoneMutation.isPending;
 
   const handleCancel = () => {
     setTimezone(user.timezone || "UTC");

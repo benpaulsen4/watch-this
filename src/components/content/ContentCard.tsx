@@ -5,7 +5,7 @@ import { Play, Star } from "lucide-react";
 import Image from "next/image";
 import { forwardRef, useEffect, useRef, useState } from "react";
 
-import { api } from "@/lib/api/client";
+import { api, errorMessage } from "@/lib/api/client";
 import * as contentStatusApi from "@/lib/content-status/contract";
 import type { WatchStatusEnum } from "@/lib/db/schema";
 import * as episodesApi from "@/lib/episodes/contract";
@@ -117,7 +117,7 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
       } catch (error) {
         console.error("Quick complete error:", error);
         setQuickCompleteMessage(
-          error instanceof Error ? error.message : "Failed to update status",
+          errorMessage(error, "Failed to update status"),
         );
         dismissOverlayAfter(3000);
       } finally {

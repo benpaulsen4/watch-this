@@ -89,8 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         user: null,
         loading: false,
-        error:
-          error instanceof Error ? error.message : "Failed to load session",
+        error: errorMessage(error, "Failed to load session"),
       }));
     }
   }, []);
