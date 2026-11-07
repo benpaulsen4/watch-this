@@ -1,90 +1,27 @@
-import { NextResponse } from "next/server";
-
-import {
-  AuthenticatedRequest,
-  handleApiError,
-  validatePagination,
-  withAuth,
-} from "@/lib/auth/api-middleware";
-import {
-  mapAllWithContentStatus,
-} from "@/lib/content-status/service";
-import {
-  TMDBContentSearchResult,
-} from "@/lib/content-status/types";
+import { authedRoute } from "@/lib/api/route";
+import { mapAllWithContentStatus } from "@/lib/content-status/service";
 import { tmdbClient, TMDBSearchResult } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
+import { discoverContentSchemas } from "@/lib/tmdb/schemas";
 
-export const GET = withAuth(async (request: AuthenticatedRequest) => {
-  try {
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type") as "movie" | "tv";
-    const genre = searchParams.get("genre");
-    const year = searchParams.get("year");
-    const sortBy = searchParams.get("sort_by");
-
-    if (type && !["movie", "tv"].includes(type)) {
-      return NextResponse.json(
-        { error: 'Type must be either "movie" or "tv"' },
-        { status: 400 }
-      );
-    }
-
-    const { page: validatedPage, error: pageError } = validatePagination(
-      searchParams.get("page")
-    );
-    if (pageError) {
-      return pageError;
-    }
-
-    const params: {
-      page?: number;
-      genre?: number;
-      year?: number;
-      sortBy?: string;
-    } = {
-      page: validatedPage,
+// GET /api/tmdb/discover - Browse movies, TV shows, or both, with the user's
+// watch status on each result
+export const GET = authedRoute(
+  tmdbApi.discoverContent,
+  discoverContentSchemas,
+  async ({ user, query }) => {
+    const params = {
+      page: query.page,
+      genre: query.genre,
+      year: query.year,
+      sortBy: query.sort_by,
     };
-
-    if (genre) {
-      const genreId = parseInt(genre);
-      if (!isNaN(genreId) && genreId > 0) {
-        params.genre = genreId;
-      }
-    }
-
-    if (year) {
-      const yearNum = parseInt(year);
-      if (
-        !isNaN(yearNum) &&
-        yearNum >= 1900 &&
-        yearNum <= new Date().getFullYear() + 5
-      ) {
-        params.year = yearNum;
-      }
-    }
-
-    if (sortBy) {
-      const validSortOptions = [
-        "popularity.desc",
-        "popularity.asc",
-        "vote_average.desc",
-        "vote_average.asc",
-        "release_date.desc",
-        "release_date.asc",
-        "first_air_date.desc",
-        "first_air_date.asc",
-      ];
-
-      if (validSortOptions.includes(sortBy)) {
-        params.sortBy = sortBy;
-      }
-    }
 
     let intermediateResults: TMDBSearchResult;
 
-    if (type === "movie") {
+    if (query.type === "movie") {
       intermediateResults = await tmdbClient.discoverMovies(params);
-    } else if (type === "tv") {
+    } else if (query.type === "tv") {
       intermediateResults = await tmdbClient.discoverTVShows(params);
     } else {
       const [movies, tvShows] = await Promise.all([
@@ -92,34 +29,25 @@ export const GET = withAuth(async (request: AuthenticatedRequest) => {
         tmdbClient.discoverTVShows(params),
       ]);
       const combinedDiscover = [...movies.results, ...tvShows.results].sort(
-        (a, b) => b.popularity - a.popularity
+        (a, b) => b.popularity - a.popularity,
       );
 
       intermediateResults = {
-        page: validatedPage,
+        page: query.page,
         results: combinedDiscover,
         total_pages: movies.total_pages + tvShows.total_pages,
         total_results: movies.total_results + tvShows.total_results,
       };
     }
 
-    const finalResults: TMDBContentSearchResult = {
+    return {
       page: intermediateResults.page,
-      results: [],
+      results:
+        intermediateResults.results?.length > 0
+          ? await mapAllWithContentStatus(intermediateResults.results, user.id)
+          : [],
       totalPages: intermediateResults.total_pages,
       totalResults: intermediateResults.total_results,
     };
-
-    // Enrich results with watch status
-    if (intermediateResults.results && intermediateResults.results.length > 0) {
-      finalResults.results = await mapAllWithContentStatus(
-        intermediateResults.results,
-        request.user.id
-      );
-    }
-
-    return NextResponse.json(finalResults);
-  } catch (error) {
-    return handleApiError(error, "TMDB discover");
-  }
-});
+  },
+);

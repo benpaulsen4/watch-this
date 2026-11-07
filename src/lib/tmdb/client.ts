@@ -150,6 +150,7 @@ export interface TMDBContentWatchProviders {
     [region: string]: {
       link?: string;
       flatrate?: TMDBWatchProvider[];
+      ads?: TMDBWatchProvider[];
       rent?: TMDBWatchProvider[];
       buy?: TMDBWatchProvider[];
     };

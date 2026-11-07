@@ -1,102 +1,45 @@
-import { NextResponse } from "next/server";
-
-import {
-  AuthenticatedRequest,
-  handleApiError,
-  validatePagination,
-  withAuth,
-} from "@/lib/auth/api-middleware";
-import {
-  mapAllWithContentStatus,
-} from "@/lib/content-status/service";
-import {
-  TMDBContentSearchResult,
-} from "@/lib/content-status/types";
+import { authedRoute } from "@/lib/api/route";
+import { mapAllWithContentStatus } from "@/lib/content-status/service";
 import { tmdbClient, TMDBSearchResult } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
+import { searchContentSchemas } from "@/lib/tmdb/schemas";
 
-export const GET = withAuth(async (request: AuthenticatedRequest) => {
-  try {
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get("q");
-    const type = searchParams.get("type") as "all" | "movie" | "tv" | null;
-    const year = searchParams.get("year");
-
-    if (!query || query.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Search query is required" },
-        { status: 400 }
-      );
-    }
-    if (year) {
-      const yearNum = parseInt(year);
-      if (!type || type === "all") {
-        return NextResponse.json(
-          { error: "Year cannot be used with multi search" },
-          { status: 400 }
-        );
-      }
-      if (
-        isNaN(yearNum) ||
-        yearNum < 1900 ||
-        yearNum > new Date().getFullYear() + 5
-      ) {
-        return NextResponse.json(
-          { error: "Year must be between 1900 and next 5 years" },
-          { status: 400 }
-        );
-      }
-    }
-
-    const { page: validatedPage, error: pageError } = validatePagination(
-      searchParams.get("page")
-    );
-    if (pageError) {
-      return pageError;
-    }
-
+// GET /api/tmdb/search - Search movies, TV shows, or both, with the user's
+// watch status on each result
+export const GET = authedRoute(
+  tmdbApi.searchContent,
+  searchContentSchemas,
+  async ({ user, query }) => {
     let intermediateResults: TMDBSearchResult;
 
-    switch (type) {
+    switch (query.type) {
       case "movie":
         intermediateResults = await tmdbClient.searchMovies(
-          query.trim(),
-          validatedPage,
-          year ? parseInt(year) : undefined
+          query.q,
+          query.page,
+          query.year,
         );
         break;
       case "tv":
         intermediateResults = await tmdbClient.searchTVShows(
-          query.trim(),
-          validatedPage,
-          year ? parseInt(year) : undefined
+          query.q,
+          query.page,
+          query.year,
         );
         break;
       case "all":
-      default:
-        intermediateResults = await tmdbClient.searchMulti(
-          query.trim(),
-          validatedPage
-        );
+        intermediateResults = await tmdbClient.searchMulti(query.q, query.page);
         break;
     }
 
-    const finalResults: TMDBContentSearchResult = {
+    return {
       page: intermediateResults.page,
-      results: [],
+      results:
+        intermediateResults.results?.length > 0
+          ? await mapAllWithContentStatus(intermediateResults.results, user.id)
+          : [],
       totalPages: intermediateResults.total_pages,
       totalResults: intermediateResults.total_results,
     };
-
-    // Enrich results with watch status
-    if (intermediateResults.results && intermediateResults.results.length > 0) {
-      finalResults.results = await mapAllWithContentStatus(
-        intermediateResults.results,
-        request.user.id
-      );
-    }
-
-    return NextResponse.json(finalResults);
-  } catch (error) {
-    return handleApiError(error, "TMDB search");
-  }
-});
+  },
+);

@@ -12,11 +12,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { api } from "@/lib/api/client";
+import { api, isApiError } from "@/lib/api/client";
 import { WatchStatusEnum } from "@/lib/db";
 import * as episodesApi from "@/lib/episodes/contract";
 import type { EpisodeStatusItem } from "@/lib/episodes/types";
 import type { TMDBSeason, TMDBTVShowDetails } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
 import { cn } from "@/lib/utils";
 
 import { Button } from "../ui/Button";
@@ -60,14 +61,17 @@ export function EpisodeTracker({
   // Aggregate query: episode watch statuses and season episodes
   const seasonsQuery = useQuery<SeasonData[]>({
     queryKey: ["episodes", tvShowId],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const { episodes: watchStatuses } = await api(
         episodesApi.listEpisodeStatuses,
         { query: { tmdbId: tvShowId } },
       );
 
+      // A season TMDB doesn't have is left out rather than failing the
+      // whole tracker. Any other failure, such as a rate limit or an
+      // unreachable server, fails it so the retry UI shows.
       const seasonPromises: Array<
-        Promise<{ seasonNumber: number; season: TMDBSeason }>
+        Promise<{ seasonNumber: number; season: TMDBSeason } | null>
       > = [];
       for (
         let seasonNum = 1;
@@ -75,15 +79,31 @@ export function EpisodeTracker({
         seasonNum++
       ) {
         seasonPromises.push(
-          fetch(`/api/tmdb/episodes/${tvShowId}?season=${seasonNum}`)
-            .then((res) => res.json())
-            .then((data) => ({ seasonNumber: seasonNum, ...data })),
+          api(
+            tmdbApi.getSeasonOrEpisode,
+            { params: { id: tvShowId }, query: { season: seasonNum } },
+            { signal },
+          )
+            .then((data) =>
+              "season" in data
+                ? { seasonNumber: seasonNum, season: data.season }
+                : null,
+            )
+            .catch((error: unknown) => {
+              if (
+                isApiError(error, tmdbApi.getSeasonOrEpisode) &&
+                error.code === "seasonNotFound"
+              ) {
+                return null;
+              }
+              throw error;
+            }),
         );
       }
 
       const seasonResults = await Promise.all(seasonPromises);
       const seasonsData: SeasonData[] = seasonResults
-        .filter((result) => result.season)
+        .filter((result) => result !== null)
         .map((result) => ({
           season: result.season,
           watchStatuses: watchStatuses.filter(

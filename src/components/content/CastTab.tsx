@@ -5,7 +5,9 @@ import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
+import { api } from "@/lib/api/client";
 import { getImageUrl } from "@/lib/tmdb/client";
+import * as tmdbApi from "@/lib/tmdb/contract";
 
 import { Button } from "../ui/Button";
 import { LoadingSpinner } from "../ui/LoadingSpinner";
@@ -19,21 +21,15 @@ export function CastTab({ contentType, contentId }: CastTabProps) {
   const [page, setPage] = useState<number>(1);
   const PER_PAGE = 12;
 
-  const castQuery = useQuery<{
-    cast: {
-      id: number;
-      name: string;
-      character: string | null;
-      profile_path: string | null;
-    }[];
-  }>({
+  // A failed lookup shows the empty state, as a missing cast does.
+  const castQuery = useQuery({
     queryKey: ["tmdb", "credits", contentType, contentId],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/tmdb/credits?type=${contentType}&id=${contentId}`,
-      );
-      return res.json();
-    },
+    queryFn: ({ signal }) =>
+      api(
+        tmdbApi.getCredits,
+        { query: { type: contentType, id: contentId } },
+        { signal },
+      ),
   });
 
   const castList = castQuery.data?.cast || [];
