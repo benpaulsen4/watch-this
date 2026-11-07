@@ -65,6 +65,14 @@ function toIssues(error: z.ZodError): ApiErrorIssue[] {
   }));
 }
 
+/**
+ * A 400 for input a handler has to validate itself, such as a body read only
+ * after its own authorization check. Shaped like the wrapper's own failures.
+ */
+export function invalidInput(error: z.ZodError): NextResponse {
+  return validationFailure(toIssues(error));
+}
+
 type ParsedInputs = Record<"params" | "query" | "body", unknown>;
 
 /** Validates params, then query, then body. Returns a response on the first failure. */

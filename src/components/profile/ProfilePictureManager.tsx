@@ -7,7 +7,9 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { api, errorMessage } from "@/lib/api/client";
 import { User } from "@/lib/auth/client";
+import * as authApi from "@/lib/auth/contract";
 
 interface ProfilePictureManagerProps {
   user: User;
@@ -44,26 +46,17 @@ export function ProfilePictureManager({
   };
 
   const updatePictureMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/auth/session", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profilePictureUrl: newUrl.trim() || null }),
-      });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "Failed to update profile picture");
-      return data;
-    },
+    mutationFn: () =>
+      api(authApi.updateSession, {
+        body: { profilePictureUrl: newUrl.trim() || null },
+      }),
     onSuccess: (data) => {
       onUserUpdate(data.user);
       setIsEditing(false);
       setPreviewError(false);
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof Error ? err.message : "Failed to update profile picture",
-      );
+      setError(errorMessage(err, "Failed to update profile picture"));
     },
     onSettled: () => setLoading(false),
   });

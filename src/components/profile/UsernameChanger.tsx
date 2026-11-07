@@ -6,7 +6,9 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { api, errorMessage, isApiError } from "@/lib/api/client";
 import { User } from "@/lib/auth/client";
+import * as authApi from "@/lib/auth/contract";
 
 interface UsernameChangerProps {
   user: User;
@@ -69,28 +71,17 @@ export function UsernameChanger({ user, onUserUpdate }: UsernameChangerProps) {
   };
 
   const saveUsernameMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/auth/session", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: newUsername.trim() }),
-      });
-      const errorData = await response.json();
-      if (!response.ok) {
-        if (response.status === 409) {
-          throw new Error("This username is already taken");
-        }
-        throw new Error(errorData.error || "Failed to update username");
-      }
-      return errorData;
-    },
+    mutationFn: () =>
+      api(authApi.updateSession, { body: { username: newUsername.trim() } }),
     onSuccess: (updatedUser) => {
       onUserUpdate(updatedUser.user);
       setIsEditing(false);
     },
     onError: (err: unknown) => {
       setError(
-        err instanceof Error ? err.message : "Failed to update username",
+        isApiError(err, authApi.updateSession) && err.code === "usernameTaken"
+          ? "This username is already taken"
+          : errorMessage(err, "Failed to update username"),
       );
     },
     onSettled: () => setLoading(false),

@@ -12,12 +12,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useProgressRouter } from "@/hooks/useProgressRouter";
+import { errorMessage, isApiError } from "@/lib/api/client";
 import {
   authenticatePasskey,
   isPasskeySupported,
   isPlatformAuthenticatorAvailable,
   registerPasskey,
 } from "@/lib/auth/client";
+import * as authApi from "@/lib/auth/contract";
+
+/** Whether a registration failure is about the username, to show it there. */
+function isUsernameError(error: unknown) {
+  return (
+    isApiError(error, authApi.registerBegin) &&
+    (error.code === "usernameTaken" ||
+      (error.issues ?? []).some((issue) => issue.path === "username"))
+  );
+}
 
 type AuthMode = "signin" | "register";
 
@@ -33,6 +44,7 @@ function AuthPageContent() {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [usernameError, setUsernameError] = useState("");
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [platformAuthAvailable, setPlatformAuthAvailable] = useState(false);
 
@@ -55,12 +67,13 @@ function AuthPageContent() {
     e.preventDefault();
 
     if (!username.trim()) {
-      setError("Username is required");
+      setUsernameError("Username is required");
       return;
     }
 
     setLoading(true);
     setError("");
+    setUsernameError("");
 
     try {
       const { browser, os } = UAParser(navigator.userAgent);
@@ -73,7 +86,9 @@ function AuthPageContent() {
       await refreshSession();
       router.push(redirectTo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      const message = errorMessage(err, "Registration failed");
+      if (isUsernameError(err)) setUsernameError(message);
+      else setError(message);
     } finally {
       setLoading(false);
     }
@@ -84,13 +99,14 @@ function AuthPageContent() {
 
     setLoading(true);
     setError("");
+    setUsernameError("");
 
     try {
       await authenticatePasskey();
       await refreshSession();
       router.push(redirectTo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed");
+      setError(errorMessage(err, "Authentication failed"));
     } finally {
       setLoading(false);
     }
@@ -169,13 +185,11 @@ function AuthPageContent() {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username"
                   required={true}
-                  error={
-                    error && error.includes("username") ? error : undefined
-                  }
+                  error={usernameError || undefined}
                 />
               )}
 
-              {error && !error.includes("username") && (
+              {error && (
                 <div className="p-3 rounded-lg bg-red-600/20 border border-red-500/30">
                   <p className="text-red-400 text-sm">{error}</p>
                 </div>
@@ -234,6 +248,7 @@ function AuthPageContent() {
                 onClick={() => {
                   setMode(mode === "register" ? "signin" : "register");
                   setError("");
+                  setUsernameError("");
                   setUsername("");
                 }}
                 className="mt-1"

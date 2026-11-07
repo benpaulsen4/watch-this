@@ -2,8 +2,8 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Real cookie/getCurrentUser auth is exercised here (this route does not use
-// `withAuth`); `getCurrentUser` is mocked because the real module imports
+// Real cookie/getCurrentUser auth is exercised here, through `authedRoute`;
+// `getCurrentUser` is mocked because the real module imports
 // `../db/index`, which throws at import time without a `DATABASE_URL` -- see
 // global-constraints.md.
 const mockUser = {
@@ -139,6 +139,29 @@ describe("PUT /api/auth/session", () => {
     const response = await PUT(unauthedPutRequest());
 
     expect(response.status).toBe(401);
+  });
+
+  it("stores the username trimmed", async () => {
+    mockDb.__state.updatedUser = { ...mockUser, username: "bob" };
+
+    const response = await PUT(authedPutRequest({ username: "  bob  " }));
+
+    expect(response.status).toBe(200);
+    expect(mockDb.__lastUpdateData).toEqual(
+      expect.objectContaining({ username: "bob" }),
+    );
+  });
+
+  it("answers usernameTaken when another user has the username", async () => {
+    mockDb.__state.usernameTaken = true;
+
+    const response = await PUT(authedPutRequest({ username: "bob" }));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "usernameTaken",
+    });
+    expect(mockDb.__lastUpdateData).toBeUndefined();
   });
 
   it("rejects a non-boolean shareStatsWithCollaborators", async () => {
