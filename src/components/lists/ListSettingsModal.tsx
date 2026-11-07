@@ -15,7 +15,9 @@ import Dropdown from "@/components/ui/Dropdown";
 import { Input, Textarea } from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { Switch } from "@/components/ui/Switch";
+import { api, errorMessage } from "@/lib/api/client";
 import { ListTypeEnum } from "@/lib/db/schema";
+import * as listsApi from "@/lib/lists/contract";
 import {
   GetListResponse,
   ListListsResponse,
@@ -59,10 +61,8 @@ export default function ListSettingsModal({
   });
 
   const [formData, setFormData] = useState<ListFormData>(formDataFromProps);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // All four call sites render this modal unconditionally and toggle `isOpen` as
   // a prop, so it never unmounts and the state initialiser above runs exactly
@@ -110,27 +110,19 @@ export default function ListSettingsModal({
   // having re-rendered before the request was built. Passing it explicitly
   // removes the ordering question altogether.
   const updateListMutation = useMutation({
-    mutationFn: async (payload: ListFormData) => {
-      const response = await fetch(`/api/lists/${list?.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    mutationFn: (payload: ListFormData) =>
+      api(listsApi.updateList, {
+        params: { id: list!.id },
+        body: {
           name: payload.name.trim(),
           description: (payload.description ?? "").trim() || null,
           listType: payload.listType,
           isPublic: payload.isPublic,
           isArchived: payload.isArchived,
           syncWatchStatus: payload.syncWatchStatus,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to update list");
-      return data;
-    },
-    onSuccess: (data) => {
-      const updated =
-        (data as { list: ListListsResponse }).list ??
-        (data as ListListsResponse);
+        },
+      }),
+    onSuccess: ({ list: updated }) => {
       onListUpdate?.({
         name: updated.name,
         description: updated.description,
@@ -143,14 +135,12 @@ export default function ListSettingsModal({
       onClose();
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to update list");
+      setError(errorMessage(err, "Failed to update list"));
     },
-    onSettled: () => setIsLoading(false),
   });
 
   const handleSave = async () => {
     if (!validateForm()) return;
-    setIsLoading(true);
     setError("");
     try {
       await updateListMutation.mutateAsync(formData);
@@ -171,7 +161,6 @@ export default function ListSettingsModal({
       syncWatchStatus: formData.isArchived ? formData.syncWatchStatus : false,
     };
 
-    setIsLoading(true);
     setError("");
     setFormData(next);
 
@@ -186,56 +175,36 @@ export default function ListSettingsModal({
   };
 
   const createListMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/lists`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
+    mutationFn: () =>
+      api(listsApi.createList, {
+        body: {
           name: formData.name.trim(),
           description: (formData.description ?? "").trim() || null,
           listType: formData.listType,
           isPublic: formData.isPublic,
           syncWatchStatus: formData.syncWatchStatus,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to create list");
-      return data;
-    },
-    onSuccess: (data) => {
-      const created: ListListsResponse =
-        (data as { list: ListListsResponse }).list ??
-        (data as ListListsResponse);
+        },
+      }),
+    onSuccess: ({ list: created }) => {
       onListCreate?.(created);
       onClose();
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to create list");
+      setError(errorMessage(err, "Failed to create list"));
     },
-    onSettled: () => setIsLoading(false),
   });
 
   const deleteListMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/lists/${list?.id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to delete list");
-      return data;
-    },
+    mutationFn: () => api(listsApi.deleteList, { params: { id: list!.id } }),
     onSuccess: () => {
       onListDelete?.();
     },
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to delete list");
+      setError(errorMessage(err, "Failed to delete list"));
     },
-    onSettled: () => setIsDeleting(false),
   });
 
   const handleDelete = async () => {
-    setIsDeleting(true);
     setError("");
     try {
       await deleteListMutation.mutateAsync();
@@ -243,6 +212,9 @@ export default function ListSettingsModal({
       // Error state is handled in onError; swallow to avoid unhandled rejection
     }
   };
+
+  const isLoading = updateListMutation.isPending || createListMutation.isPending;
+  const isDeleting = deleteListMutation.isPending;
 
   const handleClose = () => {
     if (isLoading || isDeleting) return;
@@ -399,7 +371,6 @@ export default function ListSettingsModal({
                 <Button
                   onClick={async () => {
                     if (!validateForm()) return;
-                    setIsLoading(true);
                     setError("");
                     try {
                       await createListMutation.mutateAsync();

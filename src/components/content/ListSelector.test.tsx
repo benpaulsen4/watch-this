@@ -92,8 +92,6 @@ describe("ListSelector", () => {
       <ListSelector
         contentType="tv"
         contentId={contentId}
-        title="Test Show"
-        posterPath={null}
         currentListId="list2"
       />,
     );
@@ -195,8 +193,6 @@ describe("ListSelector", () => {
       <ListSelector
         contentType="tv"
         contentId={contentId}
-        title="Test Show"
-        posterPath={null}
       />,
       client,
     );
@@ -255,8 +251,6 @@ describe("ListSelector", () => {
       <ListSelector
         contentType="movie"
         contentId={contentId}
-        title="Shared Id"
-        posterPath={null}
       />,
       client,
     );
@@ -269,8 +263,6 @@ describe("ListSelector", () => {
       <ListSelector
         contentType="tv"
         contentId={contentId}
-        title="Shared Id"
-        posterPath={null}
       />,
       client,
     );

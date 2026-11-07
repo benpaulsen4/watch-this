@@ -70,7 +70,7 @@ describe("ListSettingsModal", () => {
       ) {
         return {
           ok: true,
-          json: async () => ({ ...baseList, name: "Updated" }),
+          json: async () => ({ list: { ...baseList, name: "Updated" } }),
         } as any;
       }
       return { ok: true, json: async () => ({}) } as any;
@@ -144,7 +144,9 @@ describe("ListSettingsModal", () => {
         const body = JSON.parse(init?.body as string);
         return {
           ok: true,
-          json: async () => ({ ...baseList, isArchived: body.isArchived }),
+          json: async () => ({
+            list: { ...baseList, isArchived: body.isArchived },
+          }),
         } as any;
       }
       return { ok: true, json: async () => ({}) } as any;

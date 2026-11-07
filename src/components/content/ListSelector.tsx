@@ -13,7 +13,8 @@ import {
 import { useMemo, useState } from "react";
 
 import ListSettingsModal from "@/components/lists/ListSettingsModal";
-import type { ListListsResponse } from "@/lib/lists/types";
+import { api } from "@/lib/api/client";
+import * as listsApi from "@/lib/lists/contract";
 import { cn } from "@/lib/utils";
 
 import { Badge } from "../ui/Badge";
@@ -23,8 +24,6 @@ import { LoadingSpinner } from "../ui/LoadingSpinner";
 export interface ListSelectorProps {
   contentType: "movie" | "tv";
   contentId: number;
-  title: string;
-  posterPath?: string | null;
   currentListId?: string;
   onInclusionChange?: () => void;
   className?: string;
@@ -33,8 +32,6 @@ export interface ListSelectorProps {
 export function ListSelector({
   contentType,
   contentId,
-  title,
-  posterPath,
   currentListId,
   onInclusionChange,
   className,
@@ -45,35 +42,25 @@ export function ListSelector({
     data: listsData,
     isLoading,
     error,
-  } = useQuery<{ lists: ListListsResponse[] }>({
+  } = useQuery({
     queryKey: ["lists"],
-    queryFn: async () => {
-      const response = await fetch("/api/lists");
-      if (!response.ok) throw new Error("Failed to fetch lists");
-      return response.json();
-    },
+    queryFn: ({ signal }) => api(listsApi.listLists, {}, { signal }),
   });
 
   // The content type belongs in both the key and the request: a TMDB id is only
   // unique within a type, so a movie and a show can share one, and without it
   // the two collide in the cache and in the query behind it.
-  const { data: listsWithContentData } = useQuery<
-    {
-      listId: string;
-      itemId: string;
-    }[]
-  >({
+  const { data: listsWithContentData } = useQuery({
     queryKey: ["content", contentId, contentType, "lists"],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/content/${contentId}/lists?contentType=${contentType}`,
-      );
-      if (!response.ok) throw new Error("Failed to fetch lists for content");
-      return response.json();
-    },
+    queryFn: ({ signal }) =>
+      api(
+        listsApi.listContentLists,
+        { params: { id: contentId }, query: { contentType } },
+        { signal },
+      ),
   });
 
-  const lists = (listsData?.lists || []) as ListListsResponse[];
+  const lists = listsData?.lists ?? [];
   const listsWithContent = useMemo(() => {
     const data = listsWithContentData || [];
     return data.reduce(
@@ -95,20 +82,10 @@ export function ListSelector({
 
   const addToListMutation = useMutation({
     mutationFn: async (listId: string) => {
-      const response = await fetch(`/api/lists/${listId}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tmdbId: contentId,
-          contentType,
-          title,
-          posterPath,
-        }),
+      await api(listsApi.createListItem, {
+        params: { id: listId },
+        body: { tmdbId: contentId, contentType },
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to add content to list");
-      }
       return { listId };
     },
     onSuccess: async ({ listId }) => {
@@ -131,13 +108,7 @@ export function ListSelector({
       listId: string;
       itemId: string;
     }) => {
-      const response = await fetch(`/api/lists/${listId}/items/${itemId}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to remove content from list");
-      }
+      await api(listsApi.deleteListItem, { params: { id: listId, itemId } });
       return { listId, itemId };
     },
     onSuccess: async ({ listId }) => {

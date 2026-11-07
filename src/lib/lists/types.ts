@@ -36,8 +36,8 @@ export interface ListListsResponse {
   isArchived: boolean;
   syncWatchStatus: boolean;
   ownerId: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   itemCount: number;
   collaborators: number;
   posterPaths: string[];
@@ -75,6 +75,11 @@ export interface ListItemRow {
   tmdbId: number;
   contentType: ContentTypeEnum;
   createdAt: string;
+}
+
+export interface ContentListEntry {
+  listId: string;
+  itemId: string;
 }
 
 export interface Collaborator {

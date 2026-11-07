@@ -566,8 +566,6 @@ export function ContentDetailsModal({
                     <ListSelector
                       contentType={content.contentType}
                       contentId={content.tmdbId}
-                      title={content.title}
-                      posterPath={content.posterPath}
                       currentListId={currentListId}
                       onInclusionChange={onInclusionChange}
                     />

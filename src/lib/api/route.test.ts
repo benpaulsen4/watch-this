@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { routeContext } from "@/test/route-context";
+
 import { defineContract, schemas, type } from "./contract";
 import { q } from "./query";
 
@@ -42,7 +44,7 @@ function makeRequest({
   });
 }
 
-const ctx = (id = "abc") => ({ params: Promise.resolve({ id }) });
+const ctx = (id = "abc") => routeContext({ id });
 
 describe("authedRoute", () => {
   beforeEach(() => {

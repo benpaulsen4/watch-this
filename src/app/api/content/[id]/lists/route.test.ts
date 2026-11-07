@@ -1,5 +1,8 @@
 // @vitest-environment node
+import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { routeContext } from "@/test/route-context";
 
 // Records the conditions the handler builds so we can assert that content type
 // is part of the filter, without standing up a real database.
@@ -19,6 +22,10 @@ vi.mock("@/lib/db", () => {
 });
 
 vi.mock("@/lib/db/schema", () => ({
+  ContentType: { MOVIE: "movie", TV: "tv" },
+  ListType: { MOVIE: "movies", TV: "tv", MIXED: "mixed" },
+  PermissionLevel: { COLLABORATOR: "collaborator", VIEWER: "viewer" },
+  WatchStatus: { PLANNING: "planning" },
   listCollaborators: { listId: "lc.listId", userId: "lc.userId" },
   listItems: {
     id: "li.id",
@@ -35,15 +42,17 @@ vi.mock("drizzle-orm", () => ({
   or: (...parts: unknown[]) => ({ op: "or", parts }),
 }));
 
-// withAuth is exercised by its own middleware; here we only need the handler.
-vi.mock("@/lib/auth/api-middleware", () => ({
-  withAuth: (handler: unknown) => handler,
+vi.mock("@/lib/auth/webauthn", () => ({
+  getCurrentUser: vi.fn(async () => ({ id: "user-1" })),
 }));
 
 const { GET } = await import("./route");
 
-function request(url: string) {
-  return { url, user: { id: "user-1" } } as never;
+function get(id: string, url: string) {
+  return GET(
+    new NextRequest(url, { headers: { cookie: "session=valid" } }),
+    routeContext({ id }),
+  );
 }
 
 function flatten(condition: unknown): unknown[] {
@@ -63,14 +72,26 @@ describe("GET /api/content/[id]/lists", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  it("rejects a non-numeric content id", async () => {
-    const response = await GET(
-      request("http://localhost/api/content/abc/lists?contentType=movie"),
+  it("rejects a content id with trailing characters", async () => {
+    const response = await get(
+      "550abc",
+      "http://localhost/api/content/550abc/lists?contentType=movie",
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
+    expect(recorded.conditions).toHaveLength(0);
+  });
+
+  it("rejects a non-numeric content id", async () => {
+    const response = await get(
+      "abc",
+      "http://localhost/api/content/abc/lists?contentType=movie",
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
       error: "Invalid content ID",
+      code: "validation",
     });
   });
 
@@ -79,20 +100,23 @@ describe("GET /api/content/[id]/lists", () => {
   // badge for a list the title was never in, and a Remove that deleted the
   // unrelated row.
   it("requires a content type", async () => {
-    const response = await GET(
-      request("http://localhost/api/content/550/lists"),
+    const response = await get(
+      "550",
+      "http://localhost/api/content/550/lists",
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       error: "Invalid content type",
+      code: "validation",
     });
     expect(recorded.conditions).toHaveLength(0);
   });
 
   it("rejects a content type that is not movie or tv", async () => {
-    const response = await GET(
-      request("http://localhost/api/content/550/lists?contentType=book"),
+    const response = await get(
+      "550",
+      "http://localhost/api/content/550/lists?contentType=book",
     );
 
     expect(response.status).toBe(400);
@@ -100,8 +124,9 @@ describe("GET /api/content/[id]/lists", () => {
   });
 
   it("filters on both tmdb id and content type", async () => {
-    const response = await GET(
-      request("http://localhost/api/content/550/lists?contentType=tv"),
+    const response = await get(
+      "550",
+      "http://localhost/api/content/550/lists?contentType=tv",
     );
 
     expect(response.status).toBe(200);
