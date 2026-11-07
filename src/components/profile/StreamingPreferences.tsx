@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
 import { api } from "@/lib/api/client";
+import * as streamingApi from "@/lib/profile/streaming/contract";
 import type { StreamingPreferences as StreamingPreferencesType } from "@/lib/profile/streaming/types";
 import { getImageUrl } from "@/lib/tmdb/client";
 import * as tmdbApi from "@/lib/tmdb/contract";
@@ -157,15 +158,7 @@ export function StreamingPreferences() {
           })),
       };
 
-      const res = await fetch("/api/profile/streaming", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err?.error || "Failed to save preferences");
-      }
+      await api(streamingApi.updateStreamingPreferences, { body: payload });
     },
     onSuccess: async () => {
       // Sync auth context (server data)

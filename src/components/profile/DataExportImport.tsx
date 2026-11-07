@@ -15,7 +15,9 @@ import { useRef,useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import type { ExportResponse, ImportResult } from "@/lib/profile/data/types";
+import { api } from "@/lib/api/client";
+import * as dataApi from "@/lib/profile/data/contract";
+import type { ImportResult } from "@/lib/profile/data/types";
 
 type ExportFormat = "json" | "csv";
 type ImportStatus = "idle" | "uploading" | "success" | "error";
@@ -28,13 +30,8 @@ export function DataExportImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const exportMutation = useMutation({
-    mutationFn: async (format: ExportFormat) => {
-      const response = await fetch(`/api/profile/export?format=${format}`);
-      const responseData = await response.json();
-      if (!response.ok)
-        throw new Error(responseData.error || "Failed to export data");
-      return responseData as ExportResponse;
-    },
+    mutationFn: (format: ExportFormat) =>
+      api(dataApi.exportUserData, { query: { format } }),
     onSuccess: ({ data, filename, mimetype }) => {
       let blob: Blob;
 

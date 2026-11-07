@@ -11,7 +11,9 @@ import React, {
   useState,
 } from "react";
 
+import { api, ApiError, errorMessage } from "@/lib/api/client";
 import { getCurrentSession, User } from "@/lib/auth/client";
+import * as streamingApi from "@/lib/profile/streaming/contract";
 import { StreamingPreferences } from "@/lib/profile/streaming/types";
 
 interface AuthState {
@@ -90,25 +92,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         streamingLoading: true,
         streamingError: null,
       }));
-      const response = await fetch("/api/profile/streaming");
-      if (response.ok) {
-        const data = await response.json();
-        setState((prev) => ({
-          ...prev,
-          streamingPreferences: data,
-          streamingLoading: false,
-          streamingLoaded: true,
-          streamingError: null,
-        }));
-      } else {
-        setState((prev) => ({
-          ...prev,
-          streamingPreferences: null,
-          streamingLoading: false,
-          streamingLoaded: true,
-          streamingError: `Failed to load streaming preferences (${response.status})`,
-        }));
-      }
+      const data = await api(streamingApi.getStreamingPreferences);
+      setState((prev) => ({
+        ...prev,
+        streamingPreferences: data,
+        streamingLoading: false,
+        streamingLoaded: true,
+        streamingError: null,
+      }));
     } catch (error) {
       console.error("Failed to refresh streaming preferences:", error);
       setState((prev) => ({
@@ -116,10 +107,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         streamingPreferences: null,
         streamingLoading: false,
         streamingLoaded: true,
+        // A server answer keeps its status in the message; a failed request
+        // has none.
         streamingError:
-          error instanceof Error
-            ? error.message
-            : "Failed to load streaming preferences",
+          error instanceof ApiError && error.status > 0
+            ? `Failed to load streaming preferences (${error.status})`
+            : errorMessage(error, "Failed to load streaming preferences"),
       }));
     }
   }, []);

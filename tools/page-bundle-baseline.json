@@ -1,0 +1,18 @@
+{
+  "/(authenticated)/activity": 208084,
+  "/(authenticated)/dashboard": 299787,
+  "/(authenticated)/lists/[id]": 290302,
+  "/(authenticated)/lists/archived": 262039,
+  "/(authenticated)/lists": 262039,
+  "/(authenticated)/profile": 287726,
+  "/(authenticated)/search": 279654,
+  "/(authenticated)/series-finale/[period]": 214299,
+  "/(authenticated)/series-finale/[period]/story": 215823,
+  "/(public)/auth/claim": 182795,
+  "/(public)/auth": 190254,
+  "/(public)/help/[...slug]": 188730,
+  "/(public)/help": 188730,
+  "/(public)": 187136,
+  "/_global-error": 136463,
+  "/_not-found": 178202
+}

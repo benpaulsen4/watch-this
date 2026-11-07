@@ -5,10 +5,9 @@ import { useCallback, useMemo } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
-import type {
-  ActivityItem,
-  ActivityTimelineResponse,
-} from "@/lib/activity/types";
+import * as activityApi from "@/lib/activity/contract";
+import type { ActivityItem } from "@/lib/activity/types";
+import { api } from "@/lib/api/client";
 import { refetchOnResume } from "@/lib/refetch-on-resume";
 
 import { useUser } from "../providers/AuthProvider";
@@ -27,24 +26,21 @@ export function ActivityTimelineClient() {
     hasNextPage,
   } = useInfiniteQuery({
     queryKey: ["activity", "timeline"],
-    queryFn: async ({ pageParam }) => {
-      const params = new URLSearchParams();
-      params.set("limit", "20");
-      if (pageParam) params.set("cursor", pageParam as string);
-      const response = await fetch(`/api/activity?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch activities");
-      return response.json();
-    },
-    initialPageParam: undefined,
-    getNextPageParam: (lastPage: ActivityTimelineResponse) =>
-      lastPage.nextCursor || undefined,
+    queryFn: ({ pageParam, signal }) =>
+      api(
+        activityApi.listActivityTimeline,
+        { query: { limit: 20, cursor: pageParam } },
+        { signal },
+      ),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
     refetchOnWindowFocus: refetchOnResume,
   });
 
-  const activities = useMemo(() => {
-    const pages = (data?.pages || []) as ActivityTimelineResponse[];
-    return pages.flatMap((p) => p.activities || []);
-  }, [data?.pages]);
+  const activities = useMemo(
+    () => (data?.pages ?? []).flatMap((p) => p.activities || []),
+    [data?.pages],
+  );
 
   const loadMore = useCallback(() => {
     if (hasNextPage) {

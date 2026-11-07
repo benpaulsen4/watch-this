@@ -1,28 +1,14 @@
-import { NextResponse } from "next/server";
-
-import { AuthenticatedRequest,withAuth } from "@/lib/auth/api-middleware";
+import { authedRoute } from "@/lib/api/route";
+import * as devicesApi from "@/lib/profile/devices/contract";
+import { deletePasskeySchemas } from "@/lib/profile/devices/schemas";
 import { deletePasskey } from "@/lib/profile/devices/service";
 
-export const DELETE = withAuth(async (request: AuthenticatedRequest) => {
-  try {
-    const userId = request.user.id;
-    const credentialId = request.url.split("/").pop()!;
-    const res = await deletePasskey(userId, credentialId);
-    if (res === "minimum") {
-      return NextResponse.json(
-        { error: "At least one passkey is required" },
-        { status: 400 },
-      );
-    }
-    if (res === "notFound") {
-      return NextResponse.json({ error: "Passkey not found" }, { status: 404 });
-    }
-    return NextResponse.json(res);
-  } catch (error) {
-    console.error("Delete passkey error:", error);
-    return NextResponse.json(
-      { error: "Failed to delete passkey" },
-      { status: 500 },
-    );
-  }
-});
+// DELETE /api/profile/devices/[id] - Remove one of the user's passkeys
+export const DELETE = authedRoute(
+  devicesApi.deletePasskey,
+  deletePasskeySchemas,
+  async ({ user, params }) => {
+    const result = await deletePasskey(user.id, params.id);
+    return result === "success" ? { success: true as const } : result;
+  },
+);

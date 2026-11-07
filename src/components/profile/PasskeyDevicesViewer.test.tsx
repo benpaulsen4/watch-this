@@ -8,6 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach,beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/api/client";
 import { initiatePasskeyClaim } from "@/lib/auth/client";
 
 import { PasskeyDevicesViewer } from "./PasskeyDevicesViewer";
@@ -224,7 +225,9 @@ describe("PasskeyDevicesViewer", () => {
     );
     (
       initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
-    ).mockRejectedValueOnce(new Error("Rate limit exceeded"));
+    ).mockRejectedValueOnce(
+      new ApiError("rateLimit", 429, "Rate limit exceeded. Try later."),
+    );
 
     window.addEventListener("unhandledrejection", (e) => e.preventDefault());
 
@@ -236,6 +239,30 @@ describe("PasskeyDevicesViewer", () => {
     expect(
       await screen.findByText(/too many add passkey attempts/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows the server's message for other claim failures", async () => {
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      { ok: true, json: async () => ({ devices: [] }) },
+    );
+    (
+      initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(
+      new ApiError("maxDevices", 400, "Maximum devices reached"),
+    );
+
+    window.addEventListener("unhandledrejection", (e) => e.preventDefault());
+
+    renderWithProviders(<PasskeyDevicesViewer />);
+    await screen.findByText(/passkey devices/i);
+    await userEvent.click(screen.getByRole("button", { name: /add passkey/i }));
+
+    expect(
+      await screen.findByText("Maximum devices reached"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/too many add passkey attempts/i),
+    ).not.toBeInTheDocument();
   });
 
   it("shows polling indicator when claim modal is open", async () => {
@@ -304,5 +331,83 @@ describe("PasskeyDevicesViewer", () => {
         ),
       ).toBe(true);
     });
+  });
+
+  it("closes the claim modal when the server rejects the cancel", async () => {
+    (
+      initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce({
+      claimId: "c-4",
+      claimCode: "CODE00000004",
+      token: "tkn4",
+      magicLink: "https://site/auth/claim?token=tkn4",
+      qrPayload: "https://site/auth/claim?token=tkn4",
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async (url: any) => {
+        const u = String(url);
+        if (u.includes("/api/profile/devices/claims/")) {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ error: "Cancel claim failed", code: "internal" }),
+          } as any;
+        }
+        return { ok: true, json: async () => ({ devices: [] }) } as any;
+      },
+    );
+
+    renderWithProviders(<PasskeyDevicesViewer />);
+    await screen.findByText(/passkey devices/i);
+    await userEvent.click(screen.getByRole("button", { name: /add passkey/i }));
+    await screen.findByText(/claim code/i);
+
+    await userEvent.click(screen.getByRole("button", { name: /cancel claim/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/claim code/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it("keeps the claim modal open when the cancel request fails on the network", async () => {
+    (
+      initiatePasskeyClaim as unknown as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce({
+      claimId: "c-5",
+      claimCode: "CODE00000005",
+      token: "tkn5",
+      magicLink: "https://site/auth/claim?token=tkn5",
+      qrPayload: "https://site/auth/claim?token=tkn5",
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async (url: any) => {
+        const u = String(url);
+        if (u.includes("/api/profile/devices/claims/")) {
+          throw new TypeError("Failed to fetch");
+        }
+        return { ok: true, json: async () => ({ devices: [] }) } as any;
+      },
+    );
+
+    renderWithProviders(<PasskeyDevicesViewer />);
+    await screen.findByText(/passkey devices/i);
+    await userEvent.click(screen.getByRole("button", { name: /add passkey/i }));
+    await screen.findByText(/claim code/i);
+
+    await userEvent.click(screen.getByRole("button", { name: /cancel claim/i }));
+
+    await waitFor(() => {
+      expect(
+        (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.some(
+          (c: unknown[]) =>
+            String(c[0]).includes("/api/profile/devices/claims/"),
+        ),
+      ).toBe(true);
+    });
+    expect(screen.getByText(/claim code/i)).toBeInTheDocument();
   });
 });

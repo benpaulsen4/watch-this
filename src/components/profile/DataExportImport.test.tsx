@@ -87,6 +87,7 @@ describe("DataExportImport", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/profile/export?format=json",
+        expect.objectContaining({ method: "GET" }),
       );
       expect(window.URL.createObjectURL).toHaveBeenCalled();
     });
@@ -114,6 +115,7 @@ describe("DataExportImport", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/profile/export?format=csv",
+        expect.objectContaining({ method: "GET" }),
       );
       expect(window.URL.createObjectURL).toHaveBeenCalled();
     });

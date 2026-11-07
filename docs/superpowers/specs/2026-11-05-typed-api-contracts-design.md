@@ -52,7 +52,10 @@ Record of what was chosen and why, so implementation does not relitigate them.
 ## Non-goals
 
 - Generating `docs/api/openapi.yaml`. It stays manually maintained.
-- Changing URLs, HTTP methods, or success response shapes.
+- Changing URLs, HTTP methods, or success response shapes. One exception is allowed and was
+  taken: a route that returned a bare JSON string such as `"success"` now returns
+  `{ success: true }`, because a returned string reads as an error code in the contract
+  system (layer 5: passkey delete and claim cancel).
 - Changing how server components call services.
 - Moving `AuthProvider`, `ProfileClient` sign-out, or the passkey flows onto React
   Query hooks. They call `api()` directly instead.
@@ -128,7 +131,8 @@ export const addCollaborator = defineContract({
 
 Params that hold a `uuid` primary key, such as list IDs, use `z.uuid()`. A malformed ID
 then returns 400 instead of reaching Postgres. Not every `[id]` is one: TMDB IDs are
-integers, and `profile/devices/[id]` holds a credential ID. Each migration PR checks the
+integers, and both `profile/devices/[id]` and `profile/devices/claims/[id]` hold `uuid`
+primary keys (`passkey_credentials.id`, `passkey_claims.id`). Each migration PR checks the
 column behind each param before choosing its schema.
 
 ### Query helpers
@@ -401,10 +405,18 @@ Old and new routes coexist throughout. Each PR is independently shippable.
 
 - **Next's route types.** Next generates checks on route export signatures. A temporary
   dynamic route using both wrappers passed `pnpm build`.
-- **Client bundle.** Next 16's build no longer prints First Load JS, so this is measured
-  as the gzipped total of `.next/static/chunks/*.js`. Baseline: 507,379 bytes. With
-  schemas server-only: 508,085 bytes (+706), and no Zod in any client chunk. Each PR
-  keeps the total growth under 10 kB gzipped.
+- **Client bundle.** Next 16's build no longer prints First Load JS, so
+  `tools/page-bundle-sizes.mjs` rebuilds it from a finished build: for each page, the
+  gzipped shared root chunks plus every synchronous client chunk in the page's client
+  manifest. `tools/page-bundle-baseline.json` holds the pre-stack numbers, from commit
+  `85487e3`. Each PR keeps every page's growth against that baseline under 10 kB gzipped,
+  checked with `node tools/page-bundle-sizes.mjs --compare tools/page-bundle-baseline.json`,
+  and keeps Zod out of every client chunk.
+
+  Until layer 4 this was the gzipped total of `.next/static/chunks/*.js` (baseline
+  507,379 bytes). That total counts each page chunk's copy of shared code separately,
+  and by layer 4 it had reached +6,223 bytes while the largest real page growth was
+  +3,002 bytes (`/lists/[id]`). Changed on 2026-11-06 to measure what a page loads.
 
 PR 1 also adds the contract and schema lint rules, because contract files start there.
 PR 8 adds the `fetch` rule.
