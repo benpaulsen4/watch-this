@@ -99,7 +99,7 @@ export function proxy(request: NextRequest) {
 
   if (!result.allowed) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: "Too many requests", code: "rateLimited" },
       {
         status: 429,
         headers: { "Retry-After": String(result.retryAfter) },

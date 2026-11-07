@@ -4,12 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock,Plus, X } from "lucide-react";
 import { useMemo,useState } from "react";
 
+import { api, errorMessage } from "@/lib/api/client";
 import { WatchStatusEnum } from "@/lib/db/schema";
 import {
-  GetSchedulesResponse,
-  ScheduleItem,
-  SchedulesByDay,
-} from "@/lib/schedules/types";
+  addSchedule,
+  getSchedules,
+  removeSchedules,
+} from "@/lib/schedules/contract";
+import { GetSchedulesResponse, SchedulesByDay } from "@/lib/schedules/types";
 import { cn } from "@/lib/utils";
 
 import { Button } from "../ui/Button";
@@ -36,12 +38,7 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
 
   const schedulesQuery = useQuery<GetSchedulesResponse>({
     queryKey: ["schedules"],
-    queryFn: async () => {
-      const response = await fetch(`/api/schedules`);
-      if (!response.ok) throw new Error("Failed to fetch schedules");
-      const data = (await response.json()) as GetSchedulesResponse;
-      return data;
-    },
+    queryFn: ({ signal }) => api(getSchedules, {}, { signal }),
   });
 
   function computeOtherShowsByDay(
@@ -70,26 +67,12 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
   // React Query handles loading/fetching; derived values computed via useMemo
 
   const addToScheduleMutation = useMutation({
-    mutationFn: async (dayOfWeek: number) => {
-      const response = await fetch("/api/schedules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tmdbId, dayOfWeek }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to add to schedule");
-      }
-      const data = (await response.json()) as ScheduleItem;
-      return data;
-    },
+    mutationFn: (dayOfWeek: number) =>
+      api(addSchedule, { body: { tmdbId, dayOfWeek } }),
     onSuccess: (newItem, dayOfWeek) => {
       queryClient.setQueryData<GetSchedulesResponse>(["schedules"], (prev) => {
         const current = prev?.schedules || ({} as SchedulesByDay);
-        const updatedDay = [
-          ...(current[dayOfWeek] || []),
-          newItem as ScheduleItem,
-        ];
+        const updatedDay = [...(current[dayOfWeek] || []), newItem];
         return {
           schedules: { ...current, [dayOfWeek]: updatedDay },
           totalShows: (prev?.totalShows ?? 0) + 1,
@@ -97,43 +80,30 @@ export function ScheduleManager({ tmdbId, watchStatus }: ScheduleManagerProps) {
       });
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof Error ? err.message : "Failed to add to schedule",
-      );
+      setError(errorMessage(err, "Failed to add to schedule"));
     },
   });
 
   const removeFromScheduleMutation = useMutation({
-    mutationFn: async (dayOfWeek: number) => {
-      const response = await fetch(
-        `/api/schedules?tmdbId=${tmdbId}&dayOfWeek=${dayOfWeek}`,
-        { method: "DELETE" },
-      );
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to remove from schedule");
-      }
-      return response.json();
-    },
+    mutationFn: (dayOfWeek: number) =>
+      api(removeSchedules, { query: { tmdbId, dayOfWeek } }),
     onSuccess: (result, dayOfWeek) => {
       queryClient.setQueryData<GetSchedulesResponse>(["schedules"], (prev) => {
         const current = prev?.schedules || ({} as SchedulesByDay);
         const updatedDay = (current[dayOfWeek] || []).filter(
           (s) => s.tmdbId !== tmdbId,
         );
-        const deletedCount = Array.isArray(result?.deletedSchedules)
-          ? result.deletedSchedules.length
-          : 1;
         return {
           schedules: { ...current, [dayOfWeek]: updatedDay },
-          totalShows: Math.max((prev?.totalShows ?? 0) - deletedCount, 0),
+          totalShows: Math.max(
+            (prev?.totalShows ?? 0) - result.deletedSchedules.length,
+            0,
+          ),
         };
       });
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof Error ? err.message : "Failed to remove from schedule",
-      );
+      setError(errorMessage(err, "Failed to remove from schedule"));
     },
   });
 
