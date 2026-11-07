@@ -186,7 +186,7 @@ These distinctions are covered by `episodeUtils.test.ts` (“downgrades a comple
 
 ## HTTP API
 
-The episodes domain is exposed via authenticated API routes (all handlers use `withAuth`).
+The episodes domain is exposed via authenticated API routes (all handlers use `authedRoute`).
 
 ### GET /api/status/episodes
 

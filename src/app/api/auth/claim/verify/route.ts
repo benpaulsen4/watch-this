@@ -2,6 +2,7 @@ import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 
 import { publicRoute } from "@/lib/api/route";
 import * as authApi from "@/lib/auth/contract";
+import { PasskeyError } from "@/lib/auth/passkey-error";
 import { claimVerifySchemas } from "@/lib/auth/schemas";
 import {
   verifyAdditionalPasskeyRegistration,
@@ -63,9 +64,9 @@ export const POST = publicRoute(
       });
     } catch (error) {
       if (error instanceof ClaimUnavailableError) return "notActive";
-      // Thrown by the WebAuthn helper when the account is already at the cap.
-      if (error instanceof Error && error.message === "Maximum devices reached") {
-        return "maxDevices";
+      // The account reached the device cap after the claim was issued.
+      if (error instanceof PasskeyError && error.code === "maxDevices") {
+        return error.code;
       }
       throw error;
     }

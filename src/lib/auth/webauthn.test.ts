@@ -148,7 +148,11 @@ describe("verifyAdditionalPasskeyRegistration device cap (DATA-08a)", () => {
         "iPhone",
         executor,
       ),
-    ).rejects.toThrow(/Maximum devices reached/);
+    ).rejects.toMatchObject({
+      name: "PasskeyError",
+      code: "maxDevices",
+      message: "Maximum devices reached",
+    });
   });
 
   it("aggregates in the database rather than materialising credential rows", async () => {

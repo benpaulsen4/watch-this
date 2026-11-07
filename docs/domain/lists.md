@@ -55,7 +55,7 @@ List UI and API responses are hydrated from the TMDB cache (`tmdb_cache`) and en
 
 Lists have two distinct concerns:
 
-1. **API auth**: all `/api/lists/*` routes are protected by `withAuth`, so requests require an authenticated session.
+1. **API auth**: all `/api/lists/*` routes are protected by `authedRoute`, so requests require an authenticated session.
 2. **List authorization**: within services, reads and writes are constrained by list membership.
 
 Authorization rules (as implemented today):
@@ -73,7 +73,7 @@ Authorization rules (as implemented today):
 
 ## API Surface
 
-All endpoints below require authentication (`withAuth`).
+All endpoints below require authentication (`authedRoute`).
 
 | Endpoint                               | Method   | Purpose                                      |
 | -------------------------------------- | -------- | -------------------------------------------- |

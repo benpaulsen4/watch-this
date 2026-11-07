@@ -275,7 +275,7 @@ All user-facing strings derived from the payload (hero sentence, streak label, p
 
 ## API
 
-All routes require a session (`withAuth`). Every response, including 401s and errors, carries `Cache-Control: private, no-store`, because each URL is shared by every user while the body is per-user.
+All routes require a session: the JSON routes use `authedRoute`, and the PNG card route uses `withAuth` directly. Every response, including 401s and errors, carries `Cache-Control: private, no-store`, because each URL is shared by every user while the body is per-user.
 
 | Method and path | Purpose | Responses |
 | --- | --- | --- |

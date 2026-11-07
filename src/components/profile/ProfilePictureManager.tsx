@@ -22,7 +22,6 @@ export function ProfilePictureManager({
 }: ProfilePictureManagerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [newUrl, setNewUrl] = useState(user.profilePictureUrl || "");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
 
@@ -58,15 +57,14 @@ export function ProfilePictureManager({
     onError: (err: unknown) => {
       setError(errorMessage(err, "Failed to update profile picture"));
     },
-    onSettled: () => setLoading(false),
   });
+  const loading = updatePictureMutation.isPending;
 
   const handleSave = async () => {
     if (!validateUrl(newUrl)) {
       setError("Please enter a valid HTTP or HTTPS URL");
       return;
     }
-    setLoading(true);
     setError(null);
     try {
       await updatePictureMutation.mutateAsync();

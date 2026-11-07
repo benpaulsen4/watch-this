@@ -3,9 +3,10 @@
 ## “401 Authentication required” on API routes
 
 - Confirm you have a valid `session` cookie set in the browser.
-- Check the route uses `withAuth` and that you are calling it from the same site/origin that can send cookies.
+- Check the response's `code`: `unauthenticated` means no cookie was sent, `invalidSession` means the cookie was rejected (and has been cleared).
+- Check you are calling the route from the same site/origin that can send cookies.
 
-Reference: [withAuth](../../src/lib/auth/api-middleware.ts#L20-L58)
+Reference: [authedRoute](../../src/lib/api/route.ts) and [withAuth](../../src/lib/auth/api-middleware.ts)
 
 ## WebAuthn errors during registration/authentication
 

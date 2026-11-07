@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { invalidInput } from "@/lib/api/route";
 import {
   AuthenticatedRequest,
   handleApiError,
@@ -77,19 +78,7 @@ const handler = withAuth(async (request: AuthenticatedRequest, context) => {
       await context.params,
     );
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: parsed.error.issues[0]?.message ?? "Invalid period",
-          code: "validation",
-          issues: parsed.error.issues.map((issue) => ({
-            path: issue.path.map(String).join("."),
-            message: issue.message,
-          })),
-        },
-        { status: 400 },
-      );
-    }
+    if (!parsed.success) return invalidInput(parsed.error);
     const { period } = parsed.data;
 
     const full = await getOrGenerateSnapshot(request.user.id, period);

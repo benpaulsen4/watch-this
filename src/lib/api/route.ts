@@ -49,7 +49,8 @@ type RouteHandler = (
 
 const NO_PARAMS: RouteContext = { params: Promise.resolve({}) };
 
-function validationFailure(issues: ApiErrorIssue[]): NextResponse {
+/** A 400 `validation` body, for routes that check a field themselves. */
+export function validationFailure(issues: ApiErrorIssue[]): NextResponse {
   const body: ApiErrorBody = {
     error: issues[0]?.message ?? "Invalid request",
     code: "validation",

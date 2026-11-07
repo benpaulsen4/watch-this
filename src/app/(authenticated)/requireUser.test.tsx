@@ -110,6 +110,10 @@ describe("toClientUser", () => {
     updatedAt: new Date("2024-01-01T00:00:00.000Z"),
   };
 
+  it("keeps a missing profile picture null, as the session route does", () => {
+    expect(toClientUser(dbUser).profilePictureUrl).toBeNull();
+  });
+
   it("mirrors shareStatsWithCollaborators", () => {
     expect(toClientUser(dbUser).shareStatsWithCollaborators).toBe(false);
     expect(

@@ -139,32 +139,34 @@ Challenge token helpers:
 
 ## Protecting API Routes
 
-Authenticated API routes must wrap their handlers using `withAuth`. This wrapper:
+Authenticated API routes use `authedRoute`, which authenticates through `withAuth` before it validates any input. `withAuth`:
 
 - reads the `session` cookie
 - verifies and resolves the current user (DB lookup)
-- injects `request.user`
-- returns `401` when unauthenticated and clears invalid session cookies
+- passes the user to the handler
+- returns `401` (`unauthenticated` or `invalidSession`) and clears invalid session cookies
 
-Implementation: [withAuth](../../src/lib/auth/api-middleware.ts#L20-L58)
+Implementation: [authedRoute](../../src/lib/api/route.ts) and [withAuth](../../src/lib/auth/api-middleware.ts)
 
 Example usage:
 
 ```ts
-import { NextResponse } from "next/server";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/api-middleware";
+import { authedRoute } from "@/lib/api/route";
+import * as authApi from "@/lib/auth/contract";
 
-async function handler(request: AuthenticatedRequest) {
-  return NextResponse.json({ userId: request.user.id });
-}
-
-export const GET = withAuth(handler);
+export const GET = authedRoute(authApi.getSession, {}, ({ user }) => ({
+  user: sessionUser(user),
+}));
 ```
+
+The two routes that cannot use a contract, the share card's PNG and the multipart import, use `withAuth` directly. See [conventions.md](../api/conventions.md).
+
+When a request made from the browser fails with `unauthenticated` or `invalidSession` while a user is signed in, `AuthProvider` re-checks the session and, if the server confirms it is gone, signs the user out and refreshes the page so `requireUser` redirects to `/auth`.
 
 ## Authenticated Pages and Client Session Hydration
 
-- Client session hydration uses `/api/auth/session` via [AuthProvider](../../src/components/providers/AuthProvider.tsx#L30-L123) and [getCurrentSession](../../src/lib/auth/client.ts#L188-L197).
-- Passkey ceremonies are initiated from the browser via [registerPasskey](../../src/lib/auth/client.ts#L19-L69) and [authenticatePasskey](../../src/lib/auth/client.ts#L72-L110).
+- Client session hydration uses `/api/auth/session` via [AuthProvider](../../src/components/providers/AuthProvider.tsx) and [getCurrentSession](../../src/lib/auth/client.ts).
+- Passkey ceremonies are initiated from the browser via [registerPasskey](../../src/lib/auth/client.ts) and [authenticatePasskey](../../src/lib/auth/client.ts), which call the auth routes through `api()` with the contracts in [contract.ts](../../src/lib/auth/contract.ts).
 
 ## Data Model (Drizzle)
 
@@ -183,4 +185,4 @@ Auth-related tables live in [schema.ts](../../src/lib/db/schema.ts):
 - **Challenge integrity**: the server does not trust a raw client-provided challenge; it only trusts a signed challenge token with a short expiration.
 - **Replay protection**: assertion counters are checked/updated during authentication.
 - **Cookie scope**: challenge cookies are scoped to their respective endpoint paths and use `sameSite: "strict"`.
-- **Session invalidation**: invalid/expired session cookies are proactively deleted by both `withAuth` and `/api/auth/session`.
+- **Session invalidation**: invalid/expired session cookies are proactively deleted by `withAuth`, which every authenticated route, `/api/auth/session` included, runs first.

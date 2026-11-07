@@ -15,7 +15,7 @@ import { useRef,useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { api } from "@/lib/api/client";
+import { api, ApiError, errorMessage } from "@/lib/api/client";
 import * as dataApi from "@/lib/profile/data/contract";
 import type { ImportResult } from "@/lib/profile/data/types";
 
@@ -59,7 +59,7 @@ export function DataExportImport() {
     },
     onError: (error: unknown) => {
       console.error("Export failed:", error);
-      alert(error instanceof Error ? error.message : "Failed to export data");
+      alert(errorMessage(error, "Failed to export data"));
     },
     onSettled: () => setExportLoading(false),
   });
@@ -94,13 +94,20 @@ export function DataExportImport() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("format", "json");
+      // A multipart upload, which api() does not send.
+      // eslint-disable-next-line no-restricted-globals
       const response = await fetch("/api/profile/import", {
         method: "POST",
         body: formData,
       });
       const result = await response.json();
+      // An ApiError, so a 401 here also reaches AuthProvider's session check.
       if (!response.ok)
-        throw new Error(result.error || "Failed to import data");
+        throw new ApiError(
+          result.code ?? "invalidResponse",
+          response.status,
+          result.error || "Failed to import data",
+        );
       return result as ImportResult;
     },
     onSuccess: (result) => {
@@ -121,7 +128,7 @@ export function DataExportImport() {
           tvShowSchedules: 0,
         },
         errors: [
-          error instanceof Error ? error.message : "Failed to import data",
+          errorMessage(error, "Failed to import data"),
         ],
       });
       setImportStatus("error");

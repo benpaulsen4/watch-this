@@ -22,6 +22,8 @@ function errorName(error: unknown): string | undefined {
 }
 
 async function fetchCardFile(period: string): Promise<File> {
+  // A PNG, which api() does not read.
+  // eslint-disable-next-line no-restricted-globals
   const response = await fetch(`/api/series-finale/${period}/card`);
   if (!response.ok) throw new Error(`Card failed: ${response.status}`);
 

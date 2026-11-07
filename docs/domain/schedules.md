@@ -57,7 +57,7 @@ Each `ScheduleItem` includes:
 
 ## API
 
-All routes are authenticated using `withAuth` ([route.ts](../../src/app/api/schedules/route.ts)).
+All routes are authenticated using `authedRoute` ([route.ts](../../src/app/api/schedules/route.ts)).
 
 ### GET `/api/schedules`
 

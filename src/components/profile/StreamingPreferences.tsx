@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
-import { api } from "@/lib/api/client";
+import { api, errorMessage } from "@/lib/api/client";
 import * as streamingApi from "@/lib/profile/streaming/contract";
 import type { StreamingPreferences as StreamingPreferencesType } from "@/lib/profile/streaming/types";
 import { getImageUrl } from "@/lib/tmdb/client";
@@ -169,7 +169,7 @@ export function StreamingPreferences() {
       });
     },
     onError: (e: unknown) => {
-      setError(e instanceof Error ? e.message : "Failed to save");
+      setError(errorMessage(e, "Failed to save"));
     },
   });
 

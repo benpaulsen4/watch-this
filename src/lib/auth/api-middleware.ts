@@ -104,28 +104,3 @@ export function handleApiError(error: unknown, context: string): NextResponse {
     { status: 500 },
   );
 }
-
-/**
- * Utility function to validate pagination parameters
- * @param page - Page number from query params
- * @param maxPage - Maximum allowed page number (default: 1000)
- * @returns Validation result with page number or error response
- */
-export function validatePagination(
-  page: string | null,
-  maxPage: number = 1000,
-): { page: number; error?: NextResponse } {
-  const pageNum = parseInt(page || "1");
-
-  if (isNaN(pageNum) || pageNum < 1 || pageNum > maxPage) {
-    return {
-      page: 1,
-      error: NextResponse.json(
-        { error: `Page must be between 1 and ${maxPage}` },
-        { status: 400 },
-      ),
-    };
-  }
-
-  return { page: pageNum };
-}
