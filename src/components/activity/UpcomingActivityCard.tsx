@@ -8,7 +8,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import type { UpcomingActivity } from "@/lib/activity/types";
-import type { MarkNextEpisodeResult } from "@/lib/episodes/types";
+import { api, errorMessage } from "@/lib/api/client";
+import * as episodesApi from "@/lib/episodes/contract";
 import { getImageUrl } from "@/lib/tmdb/client";
 
 import { ContentDetailsModal } from "../content/ContentDetailsModal";
@@ -23,36 +24,24 @@ export function UpcomingActivityCard({
   upcoming,
   onEpisodeWatched,
 }: UpcomingActivityCardProps) {
-  const [isWatching, setIsWatching] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState("");
 
   const markWatchedMutation = useMutation({
-    mutationFn: async (): Promise<MarkNextEpisodeResult> => {
-      const response = await fetch("/api/status/episodes/next", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tmdbId: upcoming.tmdbId }),
-      });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "Failed to mark episode as watched");
-      return data;
-    },
+    mutationFn: () =>
+      api(episodesApi.markNextEpisodeWatched, {
+        body: { tmdbId: upcoming.tmdbId },
+      }),
     onSuccess: () => {
       setError("");
       onEpisodeWatched?.();
     },
     onError: (err: unknown) => {
-      setError(
-        err instanceof Error ? err.message : "Failed to mark episode as watched",
-      );
+      setError(errorMessage(err, "Failed to mark episode as watched"));
     },
-    onSettled: () => setIsWatching(false),
   });
 
   const handleMarkWatched = async () => {
-    setIsWatching(true);
     setError("");
     try {
       await markWatchedMutation.mutateAsync();
@@ -102,7 +91,10 @@ export function UpcomingActivityCard({
                 {upcoming.title}
               </h3>
               <div>
-                <Button onClick={handleMarkWatched} loading={isWatching}>
+                <Button
+                  onClick={handleMarkWatched}
+                  loading={markWatchedMutation.isPending}
+                >
                   <>
                     <Play className="h-5 w-5 mr-2" />
                     <span>Episode Watched</span>

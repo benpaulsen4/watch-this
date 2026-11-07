@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tmdbError } from "@/test/tmdb-error";
+
 vi.mock("@/lib/db", () => {
   const resultsQueue: any[] = [];
   const setResults = (arr: any[]) => {
@@ -99,8 +101,10 @@ vi.mock("@/lib/activity/activityUtils", () => {
   };
 });
 
-vi.mock("@/lib/tmdb/client", () => {
+vi.mock("@/lib/tmdb/client", async (importOriginal) => {
   return {
+    isTMDBHttpError: (await importOriginal<typeof import("@/lib/tmdb/client")>())
+      .isTMDBHttpError,
     tmdbClient: {
       getMovieDetails: vi.fn(async (id: number) => ({
         id,
@@ -197,13 +201,41 @@ describe("content-status service", () => {
   });
 
   it("createOrUpdate returns notFound for missing TMDB", async () => {
-    (tmdbClient.getMovieDetails as any).mockRejectedValueOnce(new Error("404"));
+    (tmdbClient.getMovieDetails as any).mockRejectedValueOnce(
+      tmdbError(404),
+    );
     const result = await createOrUpdateContentStatus(userId, {
       tmdbId: 11,
       contentType: "movie",
       status: "completed",
     } as any);
     expect(result).toBe("notFound");
+  });
+
+  // A 404 is read from the TMDB error's status, not from message text, so an
+  // unrelated failure that happens to mention 404 is not reported as missing.
+  it("createOrUpdate rethrows a non-TMDB error that mentions 404", async () => {
+    const unrelated = new Error("relation lookup 404 failed");
+    (tmdbClient.getMovieDetails as any).mockRejectedValueOnce(unrelated);
+    await expect(
+      createOrUpdateContentStatus(userId, {
+        tmdbId: 11,
+        contentType: "movie",
+        status: "completed",
+      } as any),
+    ).rejects.toBe(unrelated);
+  });
+
+  it("createOrUpdate rethrows a TMDB failure that is not a 404", async () => {
+    const failure = tmdbError(500);
+    (tmdbClient.getMovieDetails as any).mockRejectedValueOnce(failure);
+    await expect(
+      createOrUpdateContentStatus(userId, {
+        tmdbId: 11,
+        contentType: "movie",
+        status: "completed",
+      } as any),
+    ).rejects.toBe(failure);
   });
 
   it("getContentStatus returns mapped row", async () => {

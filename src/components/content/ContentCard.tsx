@@ -5,7 +5,10 @@ import { Play, Star } from "lucide-react";
 import Image from "next/image";
 import { forwardRef, useEffect, useRef, useState } from "react";
 
+import { api } from "@/lib/api/client";
+import * as contentStatusApi from "@/lib/content-status/contract";
 import type { WatchStatusEnum } from "@/lib/db/schema";
+import * as episodesApi from "@/lib/episodes/contract";
 import { getImageUrl } from "@/lib/tmdb/client";
 import { cn, formatVoteAverage } from "@/lib/utils";
 
@@ -57,21 +60,14 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
     const clickCountRef = useRef(0);
 
     const completeMovieMutation = useMutation({
-      mutationFn: async (): Promise<CreateOrUpdateContentStatusResult> => {
-        const response = await fetch("/api/status/content", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+      mutationFn: () =>
+        api(contentStatusApi.createOrUpdateContentStatus, {
+          body: {
             tmdbId: content.tmdbId,
             contentType: "movie",
             status: "completed",
-          }),
-        });
-        const data = await response.json();
-        if (!response.ok)
-          throw new Error(data.error || "Failed to update movie status");
-        return data;
-      },
+          },
+        }),
       onSuccess: () => {
         setWatchStatus("completed" as WatchStatusEnum);
         setQuickCompleteMessage("Movie marked as watched!");
@@ -79,19 +75,10 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
     });
 
     const completeNextEpisodeMutation = useMutation({
-      mutationFn: async (): Promise<MarkNextEpisodeResult> => {
-        const response = await fetch("/api/status/episodes/next", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tmdbId: content.tmdbId }),
-        });
-        const data = await response.json();
-        if (!response.ok)
-          throw new Error(
-            data.error || "Failed to mark next episode as watched",
-          );
-        return data;
-      },
+      mutationFn: () =>
+        api(episodesApi.markNextEpisodeWatched, {
+          body: { tmdbId: content.tmdbId },
+        }),
       onSuccess: (result) => {
         if (result.newStatus)
           setWatchStatus(result.newStatus as WatchStatusEnum);
@@ -305,8 +292,4 @@ const ContentCard = forwardRef<HTMLDivElement, ContentCardProps>(
 ContentCard.displayName = "ContentCard";
 
 export { ContentCard };
-import type {
-  CreateOrUpdateContentStatusResult,
-  TMDBContent,
-} from "@/lib/content-status/types";
-import type { MarkNextEpisodeResult } from "@/lib/episodes/types";
+import type { TMDBContent } from "@/lib/content-status/types";

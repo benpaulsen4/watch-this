@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { episodeWatchStatus } from "@/lib/db/schema";
-import { tmdbClient } from "@/lib/tmdb/client";
+import { isTMDBHttpError, tmdbClient } from "@/lib/tmdb/client";
 
 import {
   batchUpdateEpisodes as batchUpdate,
@@ -118,7 +118,7 @@ export async function markNextEpisodeWatched(
   try {
     showDetails = await tmdbClient.getTVShowDetails(tmdbId);
   } catch (error) {
-    if (error instanceof Error && error.message.includes("404"))
+    if (isTMDBHttpError(error) && error.status === 404)
       return "notFound";
     throw error;
   }
@@ -180,7 +180,7 @@ export async function markNextEpisodeWatched(
       nextEpisodeNumber,
     );
   } catch (error) {
-    if (error instanceof Error && error.message.includes("404"))
+    if (isTMDBHttpError(error) && error.status === 404)
       return "noNextEpisode";
     throw error;
   }

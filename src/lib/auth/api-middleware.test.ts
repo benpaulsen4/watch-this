@@ -2,8 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TMDBHttpError } from "@/lib/tmdb/client";
 import { routeContext } from "@/test/route-context";
+import { tmdbError } from "@/test/tmdb-error";
 
 vi.mock("@/lib/auth/webauthn", () => ({
   getCurrentUser: vi.fn(async (token?: string) => {
@@ -13,12 +13,6 @@ vi.mock("@/lib/auth/webauthn", () => ({
 }));
 
 const { handleApiError, withAuth } = await import("./api-middleware");
-
-function tmdbError(status: number): TMDBHttpError {
-  const error = new Error(`TMDB API error: ${status} Nope`) as TMDBHttpError;
-  error.status = status;
-  return error;
-}
 
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);

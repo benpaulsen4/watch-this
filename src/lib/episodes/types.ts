@@ -52,3 +52,8 @@ export interface MarkNextEpisodeResult {
 }
 
 export type MarkNextEpisodeError = "notFound" | "noNextEpisode" | "notAired";
+
+export interface DeleteEpisodeStatusesResponse {
+  message: string;
+  deletedCount: number;
+}

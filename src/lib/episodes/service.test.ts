@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { tmdbError } from "@/test/tmdb-error";
+
 vi.mock("../db", () => {
   const resultsQueue: any[] = [];
   const setResults = (arr: any[]) => {
@@ -91,8 +93,10 @@ vi.mock("./episodeUtils", async (importOriginal) => {
   };
 });
 
-vi.mock("../tmdb/client", () => {
+vi.mock("../tmdb/client", async (importOriginal) => {
   return {
+    isTMDBHttpError: (await importOriginal<typeof import("../tmdb/client")>())
+      .isTMDBHttpError,
     tmdbClient: {
       getTVShowDetails: vi.fn(async (id: number) => ({ id, name: "S" })),
       getTVSeasonDetails: vi.fn(async (_id: number, season: number) => ({
@@ -235,10 +239,22 @@ describe("episodes service", () => {
 
   it("markNextEpisodeWatched returns notFound when show missing", async () => {
     (tmdbClient.getTVShowDetails as any).mockRejectedValueOnce(
-      new Error("404"),
+      tmdbError(404),
     );
     const result = await markNextEpisodeWatched(userId, 50);
     expect(result).toBe("notFound");
+  });
+
+  it("markNextEpisodeWatched rethrows a show lookup failure that is not a 404", async () => {
+    const failure = tmdbError(503);
+    (tmdbClient.getTVShowDetails as any).mockRejectedValueOnce(failure);
+    await expect(markNextEpisodeWatched(userId, 51)).rejects.toBe(failure);
+  });
+
+  it("markNextEpisodeWatched rethrows a non-TMDB error that mentions 404", async () => {
+    const unrelated = new Error("socket 404 closed");
+    (tmdbClient.getTVShowDetails as any).mockRejectedValueOnce(unrelated);
+    await expect(markNextEpisodeWatched(userId, 52)).rejects.toBe(unrelated);
   });
 
   it("markNextEpisodeWatched returns notAired when episode is in future", async () => {
@@ -254,7 +270,7 @@ describe("episodes service", () => {
   it("markNextEpisodeWatched returns noNextEpisode when episode details missing", async () => {
     (db as any).__setMockResults([[]]);
     (tmdbClient.getTVEpisodeDetails as any).mockRejectedValueOnce(
-      new Error("404"),
+      tmdbError(404),
     );
     const result = await markNextEpisodeWatched(userId, 7);
     expect(result).toBe("noNextEpisode");

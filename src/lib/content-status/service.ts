@@ -17,6 +17,7 @@ import {
   WatchStatusEnum,
 } from "@/lib/db/schema";
 import {
+  isTMDBHttpError,
   tmdbClient,
   TMDBMovie,
   TMDBSearchItem,
@@ -177,7 +178,7 @@ export async function createOrUpdateContentStatus(
     } catch {}
     return { status: mapRow(result) };
   } catch (error) {
-    if (error instanceof Error && error.message.includes("404"))
+    if (isTMDBHttpError(error) && error.status === 404)
       return "notFound";
     throw error;
   }
