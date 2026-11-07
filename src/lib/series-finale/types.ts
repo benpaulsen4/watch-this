@@ -313,3 +313,12 @@ export interface SeriesFinalePayload {
 export function titleKey(tmdbId: number, contentType: "movie" | "tv"): string {
   return `${contentType}:${tmdbId}`;
 }
+
+/** One period in the dashboard and profile listing, read from the row. */
+export interface SeriesFinaleSnapshotSummary {
+  label: string;
+  generatedAt: Date;
+  dismissedAt: Date | null;
+  storyCompletedAt: Date | null;
+  headline: SeriesFinalePayload["headline"];
+}

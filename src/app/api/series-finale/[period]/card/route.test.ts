@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { shareQrDataUrl } from "@/lib/series-finale/share";
 import type { SeriesFinalePayload } from "@/lib/series-finale/types";
+import { routeContext } from "@/test/route-context";
 
 const mockUser = { id: "user-1", username: "benjamin" };
 vi.mock("@/lib/auth/webauthn", () => ({
@@ -54,6 +55,19 @@ vi.mock("next/og", () => ({
 }));
 
 const { GET } = await import("./route");
+
+// Next passes the `[period]` segment as route context; tests take it from the
+// URL they built.
+function send(
+  handler: (
+    request: NextRequest,
+    context: ReturnType<typeof routeContext>,
+  ) => Promise<Response>,
+  request: NextRequest,
+) {
+  const period = new URL(request.url).pathname.split("/")[3] ?? "";
+  return handler(request, routeContext({ period }));
+}
 
 function authedRequest(url: string) {
   return new NextRequest(url, { headers: { cookie: "session=valid" } });
@@ -193,7 +207,7 @@ describe("GET /api/series-finale/[period]/card", () => {
   });
 
   it("requires a session, and still forbids caching the refusal", async () => {
-    const response = await GET(new NextRequest(CARD_URL));
+    const response = await send(GET, new NextRequest(CARD_URL));
 
     expect(response.status).toBe(401);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -201,13 +215,16 @@ describe("GET /api/series-finale/[period]/card", () => {
   });
 
   it("rejects a label that is not a plausible year", async () => {
-    const response = await GET(
+    const response = await send(
+      GET,
       authedRequest("http://localhost/api/series-finale/abcd/card"),
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       error: "Invalid period",
+      code: "validation",
+      issues: [{ path: "period", message: "Invalid period" }],
     });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(getOrGenerateSnapshot).not.toHaveBeenCalled();
@@ -216,7 +233,7 @@ describe("GET /api/series-finale/[period]/card", () => {
   it("maps a null payload to 404", async () => {
     getOrGenerateSnapshot.mockResolvedValue(null);
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(404);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -226,7 +243,7 @@ describe("GET /api/series-finale/[period]/card", () => {
   it("refuses a thin year rather than drawing a card for it", async () => {
     getOrGenerateSnapshot.mockResolvedValue({ ...payload(), thin: true });
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(404);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -236,7 +253,7 @@ describe("GET /api/series-finale/[period]/card", () => {
   it("renders the requested period's card as a private 1080x1350 PNG", async () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
@@ -255,10 +272,25 @@ describe("GET /api/series-finale/[period]/card", () => {
     expect(text).toContain("The Sunday Marathoner");
   });
 
+  it("reads the period from the route context, not the URL", async () => {
+    getOrGenerateSnapshot.mockResolvedValue(payload());
+
+    const response = await GET(
+      authedRequest("http://localhost/api/series-finale/abcd/card"),
+      routeContext({ period: "2025" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(getOrGenerateSnapshot).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ label: "2025" }),
+    );
+  });
+
   it("draws nobody else's name, only the viewer's", async () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
 
-    await GET(authedRequest(CARD_URL));
+    await send(GET, authedRequest(CARD_URL));
 
     const text = textOf(lastTree()).join("\n");
     expect(text).not.toContain("crewmate-quentin");
@@ -273,7 +305,7 @@ describe("GET /api/series-finale/[period]/card", () => {
   it("inlines the top show's w342 poster, fetched with a timeout", async () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
 
-    await GET(authedRequest(CARD_URL));
+    await send(GET, authedRequest(CARD_URL));
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://image.tmdb.org/t/p/w342/bear-poster.jpg",
@@ -285,7 +317,7 @@ describe("GET /api/series-finale/[period]/card", () => {
   it("refuses to follow a redirect off the TMDB image host", async () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
 
-    await GET(authedRequest(CARD_URL));
+    await send(GET, authedRequest(CARD_URL));
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.any(String),
@@ -301,7 +333,7 @@ describe("GET /api/series-finale/[period]/card", () => {
       }),
     );
 
-    await GET(authedRequest(CARD_URL));
+    await send(GET, authedRequest(CARD_URL));
 
     expect(imageSources(lastTree())).toContain(POSTER_DATA_URL);
   });
@@ -312,7 +344,7 @@ describe("GET /api/series-finale/[period]/card", () => {
       new Response(POSTER_BYTES, { headers: { "content-type": "image/png" } }),
     );
 
-    await GET(authedRequest(CARD_URL));
+    await send(GET, authedRequest(CARD_URL));
 
     expect(imageSources(lastTree())).toContain(
       `data:image/png;base64,${Buffer.from(POSTER_BYTES).toString("base64")}`,
@@ -325,7 +357,7 @@ describe("GET /api/series-finale/[period]/card", () => {
       new Response(POSTER_BYTES, { headers: { "content-type": "image/webp" } }),
     );
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(200);
     expect(
@@ -346,7 +378,7 @@ describe("GET /api/series-finale/[period]/card", () => {
       }),
     );
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(200);
     expect(imageSources(lastTree())).not.toContain(POSTER_DATA_URL);
@@ -356,7 +388,7 @@ describe("GET /api/series-finale/[period]/card", () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
     fetchMock.mockRejectedValue(new Error("network down"));
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(200);
     expect(
@@ -371,7 +403,7 @@ describe("GET /api/series-finale/[period]/card", () => {
     if (withoutPoster.topShow) withoutPoster.topShow.posterPath = null;
     getOrGenerateSnapshot.mockResolvedValue(withoutPoster);
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(200);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -385,7 +417,7 @@ describe("GET /api/series-finale/[period]/card", () => {
       new Response(oversized, { headers: { "content-type": "image/jpeg" } }),
     );
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(200);
     expect(
@@ -398,7 +430,7 @@ describe("GET /api/series-finale/[period]/card", () => {
   it("points the QR at the site's front page, not at anything of the user's", async () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
 
-    await GET(authedRequest(CARD_URL));
+    await send(GET, authedRequest(CARD_URL));
 
     expect(getSiteUrl).toHaveBeenCalledWith("/");
     const expected = await shareQrDataUrl(SITE_SENTINEL);
@@ -409,7 +441,7 @@ describe("GET /api/series-finale/[period]/card", () => {
   it("carries the QR and the TMDB attribution as inline images", async () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
 
-    await GET(authedRequest(CARD_URL));
+    await send(GET, authedRequest(CARD_URL));
 
     const sources = imageSources(lastTree());
     expect(sources.some((src) => src.startsWith("data:image/png"))).toBe(true);
@@ -422,7 +454,7 @@ describe("GET /api/series-finale/[period]/card", () => {
     getOrGenerateSnapshot.mockResolvedValue(payload());
     renderFailure.error = new Error("Expected <div> to have explicit display");
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(500);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -435,7 +467,7 @@ describe("GET /api/series-finale/[period]/card", () => {
     renderFailure.error = new Error("Unsupported image type");
     renderFailure.times = 1;
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(200);
     expect(rendered).toHaveLength(2);
@@ -450,7 +482,7 @@ describe("GET /api/series-finale/[period]/card", () => {
     getOrGenerateSnapshot.mockResolvedValue(withoutPoster);
     renderFailure.error = new Error("Expected <div> to have explicit display");
 
-    const response = await GET(authedRequest(CARD_URL));
+    const response = await send(GET, authedRequest(CARD_URL));
 
     expect(response.status).toBe(500);
     expect(rendered).toHaveLength(1);

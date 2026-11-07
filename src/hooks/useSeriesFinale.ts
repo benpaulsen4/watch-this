@@ -7,15 +7,15 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-import type { SeriesFinalePayload } from "@/lib/series-finale/types";
+import { api, isApiError } from "@/lib/api/client";
+import type { Jsonify } from "@/lib/api/contract";
+import * as seriesFinaleApi from "@/lib/series-finale/contract";
+import type {
+  SeriesFinalePayload,
+  SeriesFinaleSnapshotSummary,
+} from "@/lib/series-finale/types";
 
-export interface SeriesFinaleListItem {
-  label: string;
-  generatedAt: string;
-  dismissedAt: string | null;
-  storyCompletedAt: string | null;
-  headline: SeriesFinalePayload["headline"];
-}
+export type SeriesFinaleListItem = Jsonify<SeriesFinaleSnapshotSummary>;
 
 /**
  * A 404 from `GET /api/series-finale/[period]` means the period is not
@@ -29,29 +29,18 @@ export class SeriesFinaleUnavailableError extends Error {
   }
 }
 
-async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new SeriesFinaleUnavailableError();
-    }
-    throw new Error(`Request failed: ${response.status}`);
-  }
-  return (await response.json()) as T;
-}
-
 /**
- * POST to `url`, resolving once the response has been read to its end, and
- * throwing `failure` on a non-2xx. Nothing uses the body (`{ success: true }`),
- * but it is read anyway: an unread fetch body leaves the request open in the
- * browser, so a page that has posted never goes network-idle -- and the recap
- * posts a dismissal whenever its foot is reached. A body that is not JSON (a
- * proxy's error page) is read all the same and ignored.
+ * Run a dismissal or completion POST, failing with `failure`. The client reads
+ * the response body to its end even when unused: an unread body leaves the
+ * request open in the browser, so a page that has posted never goes
+ * network-idle -- and the recap posts a dismissal whenever its foot is reached.
  */
-async function post(url: string, failure: string): Promise<void> {
-  const response = await fetch(url, { method: "POST" });
-  await response.json().catch(() => undefined);
-  if (!response.ok) throw new Error(failure);
+async function post(request: Promise<unknown>, failure: string): Promise<void> {
+  try {
+    await request;
+  } catch (error) {
+    throw new Error(failure, { cause: error });
+  }
 }
 
 const LIST_KEY = ["series-finale", "list"] as const;
@@ -59,9 +48,11 @@ const LIST_KEY = ["series-finale", "list"] as const;
 export function useSeriesFinaleList() {
   return useQuery({
     queryKey: LIST_KEY,
-    queryFn: async () => {
-      const data = await getJson<{ periods: SeriesFinaleListItem[] }>(
-        "/api/series-finale",
+    queryFn: async ({ signal }) => {
+      const data = await api(
+        seriesFinaleApi.listAvailableSnapshots,
+        {},
+        { signal },
       );
       return data.periods;
     },
@@ -83,8 +74,25 @@ const periodQueryKey = (period: string) => ["series-finale", period] as const;
 function periodQueryOptions(period: string) {
   return queryOptions({
     queryKey: periodQueryKey(period),
-    queryFn: () =>
-      getJson<SeriesFinalePeriodResponse>(`/api/series-finale/${period}`),
+    queryFn: async ({ signal }) => {
+      try {
+        return await api(
+          seriesFinaleApi.getOrGenerateSnapshot,
+          { params: { period } },
+          { signal },
+        );
+      } catch (error) {
+        // Any 404 means "not available", as before -- a body without the
+        // contract's code (a proxy's page) included.
+        if (
+          isApiError(error, seriesFinaleApi.getOrGenerateSnapshot) &&
+          error.status === 404
+        ) {
+          throw new SeriesFinaleUnavailableError();
+        }
+        throw error;
+      }
+    },
     // A snapshot is frozen, so there is nothing to refetch for.
     staleTime: Infinity,
     // A 404 means "not available", not "try again" -- and the first
@@ -127,7 +135,10 @@ export function useDismissSeriesFinale() {
 
   return useMutation({
     mutationFn: (period: string) =>
-      post(`/api/series-finale/${period}/dismiss`, "Dismiss failed"),
+      post(
+        api(seriesFinaleApi.dismissSeriesFinale, { params: { period } }),
+        "Dismiss failed",
+      ),
     onMutate: async (period: string) => {
       // An in-flight list fetch would land after this and overwrite it.
       await queryClient.cancelQueries({ queryKey: LIST_KEY });
@@ -171,7 +182,7 @@ export function useCompleteStory() {
   return useMutation({
     mutationFn: (period: string) =>
       post(
-        `/api/series-finale/${period}/story-complete`,
+        api(seriesFinaleApi.completeStory, { params: { period } }),
         "Story completion failed",
       ),
     onMutate: async (period: string) => {

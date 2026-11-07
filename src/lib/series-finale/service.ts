@@ -44,6 +44,7 @@ import {
   type CrewMemberTotals,
   SERIES_FINALE_SCHEMA_VERSION,
   type SeriesFinalePayload,
+  type SeriesFinaleSnapshotSummary,
   titleKey,
   type TitleMeta,
   type WatchedEpisodeRow,
@@ -1206,15 +1207,9 @@ async function generateAndList(
  * every dashboard load, and the rest of the jsonb (crew, timelines, shame
  * lists) is never shown here.
  */
-export async function listSnapshots(userId: string): Promise<
-  {
-    label: string;
-    generatedAt: Date;
-    dismissedAt: Date | null;
-    storyCompletedAt: Date | null;
-    headline: SeriesFinalePayload["headline"];
-  }[]
-> {
+export async function listSnapshots(
+  userId: string,
+): Promise<SeriesFinaleSnapshotSummary[]> {
   const rows = await db
     .select({
       periodLabel: seriesFinale.periodLabel,

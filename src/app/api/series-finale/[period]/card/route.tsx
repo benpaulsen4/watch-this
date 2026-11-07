@@ -4,10 +4,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import {
   AuthenticatedRequest,
   handleApiError,
+  type RouteContext,
   withAuth,
 } from "@/lib/auth/api-middleware";
 import { getSiteUrl } from "@/lib/seo/site";
-import { parsePeriodLabel } from "@/lib/series-finale/periods";
+import { getOrGenerateSnapshotSchemas } from "@/lib/series-finale/schemas";
 import { getOrGenerateSnapshot } from "@/lib/series-finale/service";
 import { shareQrDataUrl, stripCrossUserData } from "@/lib/series-finale/share";
 import {
@@ -68,17 +69,28 @@ async function posterDataUrl(
 }
 
 // GET /api/series-finale/[period]/card - the viewer's 1080x1350 share image.
-// The period is the segment before "card", parsed from `request.url` for the
-// same reason as the payload route beside this one: `withAuth` wraps a
-// single-argument handler.
-const handler = withAuth(async (request: AuthenticatedRequest) => {
+// A PNG, not JSON, so this route uses `withAuth` directly rather than a
+// contract; its error bodies follow the contract shape all the same.
+const handler = withAuth(async (request: AuthenticatedRequest, context) => {
   try {
-    const label = new URL(request.url).pathname.split("/").at(-2) ?? "";
-    const period = parsePeriodLabel(label);
+    const parsed = getOrGenerateSnapshotSchemas.params.safeParse(
+      await context.params,
+    );
 
-    if (!period) {
-      return NextResponse.json({ error: "Invalid period" }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: parsed.error.issues[0]?.message ?? "Invalid period",
+          code: "validation",
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.map(String).join("."),
+            message: issue.message,
+          })),
+        },
+        { status: 400 },
+      );
     }
+    const { period } = parsed.data;
 
     const full = await getOrGenerateSnapshot(request.user.id, period);
 
@@ -86,7 +98,7 @@ const handler = withAuth(async (request: AuthenticatedRequest) => {
     // card announcing "3 hours" is exactly what the thin rule exists to avoid.
     if (!full || full.thin) {
       return NextResponse.json(
-        { error: "Period not available" },
+        { error: "Period not available", code: "notFound" },
         { status: 404 },
       );
     }
@@ -137,8 +149,11 @@ const handler = withAuth(async (request: AuthenticatedRequest) => {
 
 // The image is one user's recap at a URL that is the same for every user, so
 // no shared cache may keep it -- 401s and errors included.
-export async function GET(request: NextRequest): Promise<NextResponse> {
-  const response = await handler(request);
+export async function GET(
+  request: NextRequest,
+  context: RouteContext,
+): Promise<NextResponse> {
+  const response = await handler(request, context);
   response.headers.set("Cache-Control", "private, no-store");
   return response;
 }
