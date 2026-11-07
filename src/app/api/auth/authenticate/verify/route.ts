@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { publicRoute } from "@/lib/api/route";
 import * as authApi from "@/lib/auth/contract";
+import { PasskeyError } from "@/lib/auth/passkey-error";
 import { authenticateVerifySchemas } from "@/lib/auth/schemas";
 import type { AuthenticateVerifyResponse } from "@/lib/auth/types";
 import {
@@ -33,11 +34,12 @@ export const POST = publicRoute(
         challengePayload.challenge,
       );
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === "Credential not found") return "credentialNotFound";
-        if (error.message === "Authentication verification failed") {
-          return "verificationFailed";
-        }
+      if (
+        error instanceof PasskeyError &&
+        (error.code === "credentialNotFound" ||
+          error.code === "verificationFailed")
+      ) {
+        return error.code;
       }
       throw error;
     }

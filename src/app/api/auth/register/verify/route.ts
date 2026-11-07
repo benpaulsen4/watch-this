@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { publicRoute } from "@/lib/api/route";
 import * as authApi from "@/lib/auth/contract";
+import { PasskeyError } from "@/lib/auth/passkey-error";
 import { registerVerifySchemas } from "@/lib/auth/schemas";
 import type { RegisterVerifyResponse } from "@/lib/auth/types";
 import {
@@ -37,11 +38,11 @@ export const POST = publicRoute(
         timezone,
       );
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message === "Username already exists") return "usernameTaken";
-        if (error.message === "Registration verification failed") {
-          return "verificationFailed";
-        }
+      if (
+        error instanceof PasskeyError &&
+        (error.code === "usernameTaken" || error.code === "verificationFailed")
+      ) {
+        return error.code;
       }
       throw error;
     }

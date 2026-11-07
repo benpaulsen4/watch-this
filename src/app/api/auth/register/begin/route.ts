@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { publicRoute } from "@/lib/api/route";
 import * as authApi from "@/lib/auth/contract";
+import { PasskeyError } from "@/lib/auth/passkey-error";
 import { registerBeginSchemas } from "@/lib/auth/schemas";
 import type { RegisterBeginResponse } from "@/lib/auth/types";
 import {
@@ -18,8 +19,8 @@ export const POST = publicRoute(
     try {
       options = await generatePasskeyRegistrationOptions(username);
     } catch (error) {
-      if (error instanceof Error && error.message === "Username already exists") {
-        return "usernameTaken";
+      if (error instanceof PasskeyError && error.code === "usernameTaken") {
+        return error.code;
       }
       throw error;
     }

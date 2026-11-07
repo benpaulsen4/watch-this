@@ -2,6 +2,8 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PasskeyError } from "@/lib/auth/passkey-error";
+
 const webauthn = {
   createChallengeToken: vi.fn(async () => "challenge-token"),
   createSessionToken: vi.fn(async () => "session-token"),
@@ -80,7 +82,7 @@ describe("POST /api/auth/register/begin", () => {
 
   it("maps a taken username to 409 usernameTaken", async () => {
     webauthn.generatePasskeyRegistrationOptions.mockRejectedValue(
-      new Error("Username already exists"),
+      new PasskeyError("usernameTaken", "Username already exists"),
     );
     const response = await registerBegin.POST(
       post("/register/begin", { username: "sam" }),
@@ -145,9 +147,11 @@ describe("POST /api/auth/register/verify", () => {
   it.each([
     ["Username already exists", 409, "usernameTaken"],
     ["Registration verification failed", 400, "verificationFailed"],
-  ])("maps %s to %i", async (message, status, code) => {
+  ] as const)("maps %s to %i", async (message, status, code) => {
     webauthn.verifyChallengeToken.mockResolvedValue({ challenge: "abc" });
-    webauthn.verifyPasskeyRegistration.mockRejectedValue(new Error(message));
+    webauthn.verifyPasskeyRegistration.mockRejectedValue(
+      new PasskeyError(code, message),
+    );
     const response = await registerVerify.POST(
       post("/register/verify", body, "registration-challenge=challenge-token"),
     );
@@ -163,6 +167,19 @@ describe("POST /api/auth/register/verify", () => {
     );
     expect(response.status).toBe(500);
     expect((await response.json()).error).toBe("Registration failed");
+  });
+
+  // Only the code matters: an unrelated error that happens to share the text
+  // is unexpected, so it is a 500 rather than a 409.
+  it("ignores a plain error that only shares the message", async () => {
+    webauthn.verifyChallengeToken.mockResolvedValue({ challenge: "abc" });
+    webauthn.verifyPasskeyRegistration.mockRejectedValue(
+      new Error("Username already exists"),
+    );
+    const response = await registerVerify.POST(
+      post("/register/verify", body, "registration-challenge=challenge-token"),
+    );
+    expect(response.status).toBe(500);
   });
 });
 
@@ -202,9 +219,11 @@ describe("authenticate", () => {
   it.each([
     ["Credential not found", 404, "credentialNotFound"],
     ["Authentication verification failed", 400, "verificationFailed"],
-  ])("verify maps %s to %i", async (message, status, code) => {
+  ] as const)("verify maps %s to %i", async (message, status, code) => {
     webauthn.verifyChallengeToken.mockResolvedValue({ challenge: "xyz" });
-    webauthn.verifyPasskeyAuthentication.mockRejectedValue(new Error(message));
+    webauthn.verifyPasskeyAuthentication.mockRejectedValue(
+      new PasskeyError(code, message),
+    );
     const response = await authenticateVerify.POST(
       post(
         "/authenticate/verify",

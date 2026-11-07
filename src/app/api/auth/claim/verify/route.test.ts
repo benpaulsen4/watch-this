@@ -96,6 +96,7 @@ vi.mock("@/lib/auth/webauthn", () => ({
   ),
 }));
 
+import { PasskeyError } from "@/lib/auth/passkey-error";
 import { verifyAdditionalPasskeyRegistration } from "@/lib/auth/webauthn";
 import { db as mockDb } from "@/lib/db";
 
@@ -158,7 +159,7 @@ describe("claim verify route atomicity (AUTH-03)", () => {
 
   it("answers maxDevices and keeps the claim when the account is at the cap", async () => {
     vi.mocked(verifyAdditionalPasskeyRegistration).mockRejectedValueOnce(
-      new Error("Maximum devices reached"),
+      new PasskeyError("maxDevices", "Maximum devices reached"),
     );
 
     const res = await POST(makeRequest());

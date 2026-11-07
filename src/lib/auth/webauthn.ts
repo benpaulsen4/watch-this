@@ -15,6 +15,7 @@ import { jwtVerify, SignJWT } from "jose";
 import { passkeyCredentials, type User, users } from "../db";
 import { expectRow } from "../db/expectRow";
 import { db } from "../db/index";
+import { PasskeyError } from "./passkey-error";
 
 const RP_NAME = process.env.WEBAUTHN_RP_NAME || "WatchThis";
 
@@ -144,7 +145,7 @@ export async function generatePasskeyRegistrationOptions(username: string) {
     .limit(1);
 
   if (existingUser.length > 0) {
-    throw new Error("Username already exists");
+    throw new PasskeyError("usernameTaken", "Username already exists");
   }
 
   const options: GenerateRegistrationOptionsOpts = {
@@ -182,7 +183,7 @@ export async function verifyPasskeyRegistration(
   const verificationResult = await verifyRegistrationResponse(verification);
 
   if (!verificationResult.verified || !verificationResult.registrationInfo) {
-    throw new Error("Registration verification failed");
+    throw new PasskeyError("verificationFailed", "Registration verification failed");
   }
 
   const { credential } = verificationResult.registrationInfo;
@@ -281,7 +282,7 @@ export async function verifyAdditionalPasskeyRegistration(
   const verificationResult = await verifyRegistrationResponse(verification);
 
   if (!verificationResult.verified || !verificationResult.registrationInfo) {
-    throw new Error("Registration verification failed");
+    throw new PasskeyError("verificationFailed", "Registration verification failed");
   }
 
   const { credential } = verificationResult.registrationInfo;
@@ -301,7 +302,7 @@ export async function verifyAdditionalPasskeyRegistration(
     );
 
   if ((activeDevices?.value ?? 0) >= 10) {
-    throw new Error("Maximum devices reached");
+    throw new PasskeyError("maxDevices", "Maximum devices reached");
   }
 
   const [newCredential] = await executor
@@ -382,7 +383,7 @@ export async function verifyPasskeyAuthentication(
 
   const credentialRow = credentialData[0];
   if (!credentialRow) {
-    throw new Error("Credential not found");
+    throw new PasskeyError("credentialNotFound", "Credential not found");
   }
 
   const { credential, user } = credentialRow;
@@ -403,7 +404,7 @@ export async function verifyPasskeyAuthentication(
   const verificationResult = await verifyAuthenticationResponse(verification);
 
   if (!verificationResult.verified) {
-    throw new Error("Authentication verification failed");
+    throw new PasskeyError("verificationFailed", "Authentication verification failed");
   }
 
   // Update counter and last used
