@@ -41,14 +41,14 @@ export function PasskeyDevicesViewer() {
     null
   );
   const [isInitiating, setIsInitiating] = useState(false);
-  const [isPolling, setIsPolling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  // The modal polls for the newly claimed device for as long as it is open.
+  const isPolling = isClaimModalOpen;
 
   useEffect(() => {
     if (!isClaimModalOpen) return;
-    setIsPolling(true);
     const ids = (devicesData?.devices || []).map((d) => d.id);
     const timer = setInterval(() => {
       refetch().then(({ data }) => {
@@ -57,15 +57,11 @@ export function PasskeyDevicesViewer() {
         if (added) {
           setIsClaimModalOpen(false);
           setClaimInfo(null);
-          setIsPolling(false);
           queryClient.invalidateQueries({ queryKey: ["profile", "devices"] });
         }
       });
     }, 4000);
-    return () => {
-      clearInterval(timer);
-      setIsPolling(false);
-    };
+    return () => clearInterval(timer);
   }, [isClaimModalOpen, refetch, queryClient, devicesData?.devices]);
 
   const initiateClaimMutation = useMutation({

@@ -73,35 +73,38 @@ allowBuilds:
 # drizzle-kit 1.0 is stable; the 1.0.0-rc line no longer depends on
 # @esbuild-kit at all.
 #
-# GHSA-g7r4-m6w7-qqqr (low, 0.27.3 - 0.28.0) is held closed on vite's path
-# by the LOCKFILE only, not by anything declared here. vite declares
-# ^0.27.0 and every 0.27.x above 0.27.2 is inside the advisory. The lockfile
-# resolves vite onto esbuild 0.27.2 and `pnpm install --frozen-lockfile`
-# reproduces it, but an unconstrained `pnpm update` can refloat vite to
-# 0.27.7 and silently reopen it. A scoped override was tried under npm and
-# reverted: npm leaked `"vite": { "esbuild": ... }` onto tsx as well, which
-# pulled tsx's esbuild to 0.27.2 against its declared ~0.28.0. pnpm's
-# `vite>esbuild` selector does not have that bug, so the override is worth
-# revisiting now. Until then, re-check this path after any dependency update;
-# it is the one advisory in the tree that nothing here is holding shut.
+# GHSA-g7r4-m6w7-qqqr (low, esbuild 0.27.3 - 0.28.0) no longer touches
+# vite's path. vite 7.3.7 widened its range to ^0.27.0 || ^0.28.0, so it
+# now dedupes onto tsx's esbuild 0.28.1, past the advisory, and the old
+# 0.27.2 copy is gone. pnpm picks the highest match, so an update can no
+# longer refloat vite into 0.27.3+ the way it could under ^0.27.0 alone.
 #
-# GHSA-vfj7-8cjw-p6xm (high, braces <=3.0.3) is OPEN and cannot be closed
-# here. It has no patched release -- 3.0.3 is the latest braces -- so no
-# version bump or override reaches a fix. Its one remaining path is
-# @next/eslint-plugin-next, which pins fast-glob to exactly 3.3.1 in every
-# 16.x release including canary; every fast-glob depends on micromatch ^4,
-# which depends on braces ^3. npm's `audit fix --force` offered
-# eslint-config-next 14.2.35, a two-major downgrade that does not pair with
-# next 16, and was not taken. Exposure is nil in practice: the plugin only
-# globs `settings.next.rootDir` from eslint.config.mjs (unset here), in a
-# dev-only lint run that ships nothing. The other path, typescript-eslint
-# 8.46, was closed by moving it to 8.71, which replaced fast-glob with
-# tinyglobby -- but eslint-config-next declares ^8.46.0, so like vite's
-# esbuild that fix is held by the LOCKFILE only. Revisit when braces ships
-# a fix or @next/eslint-plugin-next drops fast-glob. It is the one finding
-# `pnpm audit` should report; anything else is new.
+# GHSA-vfj7-8cjw-p6xm (high, braces <=3.0.3) was WITHDRAWN on 2026-10-23,
+# so its one remaining path -- @next/eslint-plugin-next, which pins
+# fast-glob to exactly 3.3.1 -- no longer needs a note. The other path,
+# typescript-eslint 8.46, was closed by moving it to 8.71, which replaced
+# fast-glob with tinyglobby; eslint-config-next declares ^8.46.0, so that
+# is held by the LOCKFILE only.
+#
+# minimatch ^11.0.1 under @typescript-eslint/typescript-estree only --
+# load-bearing. GHSA-g3hv-75wg-m249 (moderate, >=7.0.0 <11.0.1, globparts
+# amplification) has no 10.x backport, and typescript-estree declares
+# ^10.2.2 through 8.72 at least. 11.0 kept the exports and API and only
+# dropped Node 18 (the tree already needs 20+). eslint's own minimatch@3 is
+# outside the range and stays unpinned -- see SUPPLY-13 above for why a
+# global minimatch/brace-expansion pin breaks it. Drop this once
+# typescript-estree declares ^11.
+#
+# next ^16.4.1, zod ^4.6.6 and vitest ^4.1.12 are raised in package.json
+# rather than overridden: they close GHSA advisories in next (critical,
+# <=16.4.0), zod (high, <4.6.6) and @vitest/mocker (<4.1.12). vitest 4.1.12
+# also lets vite float to 7.3.7, past the vite advisories (<=7.3.6) -- held
+# by the LOCKFILE only, as vitest declares vite ^7 loosely enough to allow
+# the vulnerable range. `pnpm audit` should report nothing; anything it
+# does report is new.
 overrides:
   "@types/react": 19.2.2
   "@types/react-dom": 19.2.2
   "@esbuild-kit/core-utils>esbuild": ^0.25.12
   postcss: ^8.5.18
+  "@typescript-eslint/typescript-estree>minimatch": ^11.0.1
