@@ -25,7 +25,7 @@ allowBuilds:
 #
 # SUPPLY-13: brace-expansion is still NOT overridden, and no longer needs
 # to be. The versions this tree resolves -- 1.1.21 under eslint's
-# minimatch@3 and 5.0.12 under typescript-eslint's minimatch@10 -- are both
+# minimatch@3 and 5.0.12 under typescript-estree's minimatch@11 -- are both
 # past the fixes for GHSA-mh99-v99m-4gvg and GHSA-rgw5-rvv9-x895, so
 # `pnpm audit` is clean on it without one. An override would still be wrong:
 # the 5.x line changed its export from `module.exports = expand` to
@@ -41,7 +41,7 @@ allowBuilds:
 # next is sharp's only consumer here, and 0.35.4 is also the floor for
 # GHSA-rgj7-g3m4-5g8c (high, <0.35.4, bundled libheif) -- so the override no
 # longer changes the resolution and cannot earn its place. It has to come
-# back if next's ^16.3.6 floor is ever lowered below 16.3. GHSA-wq5f-xc86-pv6w
+# back if next's ^16.4.1 floor is ever lowered below 16.3. GHSA-wq5f-xc86-pv6w
 # (high, <0.35.5, bundled librsvg) has since raised the bar past next's own
 # floor: sharp 0.35.5 is inside next's ^0.35.4, so it needs no override, but
 # it is held by the LOCKFILE only. source-map-js 1.2.2, which closes
@@ -52,10 +52,11 @@ allowBuilds:
 # already the patched version, since the advisories are ranged <2.3.2. It
 # bought nothing and violated a declared range.
 #
-# SUPPLY-05: esbuild is still NOT overridden globally. Four consumers declare
-# mutually disjoint ranges (vite ^0.27.0, tsx ~0.28.0, drizzle-kit ^0.25.4,
-# @esbuild-kit/core-utils ~0.18.20), so no single version satisfies them and
-# any blanket pin violates three of the four. The old ^0.28.1 pin was for
+# SUPPLY-05: esbuild is still NOT overridden globally. Its consumers declare
+# ranges with no common version (vite ^0.27.0 || ^0.28.0 and tsx ~0.28.0
+# overlap, but drizzle-kit ^0.25.4 and @esbuild-kit/core-utils ~0.18.20 are
+# disjoint from them and each other), so any blanket pin violates at least
+# two of them. The old ^0.28.1 pin was for
 # GHSA-gv7w-rqvm-qjhr, which was WITHDRAWN on 2026-06-17.
 #
 # What IS pinned is one scoped override: esbuild ^0.25.12 under
@@ -76,8 +77,10 @@ allowBuilds:
 # GHSA-g7r4-m6w7-qqqr (low, esbuild 0.27.3 - 0.28.0) no longer touches
 # vite's path. vite 7.3.7 widened its range to ^0.27.0 || ^0.28.0, so it
 # now dedupes onto tsx's esbuild 0.28.1, past the advisory, and the old
-# 0.27.2 copy is gone. pnpm picks the highest match, so an update can no
-# longer refloat vite into 0.27.3+ the way it could under ^0.27.0 alone.
+# 0.27.2 copy is gone. vite's declared range still admits 0.27.3 - 0.28.0,
+# so this is held by RESOLUTION only: pnpm's default highest-match picks
+# 0.28.1+. A lowest/time-based resolution-mode, or a dedupe toward some
+# other 0.27.x copy, could reopen it.
 #
 # GHSA-vfj7-8cjw-p6xm (high, braces <=3.0.3) was WITHDRAWN on 2026-10-23,
 # so its one remaining path -- @next/eslint-plugin-next, which pins
@@ -97,10 +100,9 @@ allowBuilds:
 #
 # next ^16.4.1, zod ^4.6.6 and vitest ^4.1.12 are raised in package.json
 # rather than overridden: they close GHSA advisories in next (critical,
-# <=16.4.0), zod (high, <4.6.6) and @vitest/mocker (<4.1.12). vitest 4.1.12
-# also lets vite float to 7.3.7, past the vite advisories (<=7.3.6) -- held
-# by the LOCKFILE only, as vitest declares vite ^7 loosely enough to allow
-# the vulnerable range. `pnpm audit` should report nothing; anything it
+# <=16.4.0), zod (high, <4.6.6) and @vitest/mocker (<4.1.12). vite 7.3.7,
+# past the vite advisories (<=7.3.6), is held by the LOCKFILE only: vitest
+# declares vite ^6 || ^7 || ^8, which still admits the vulnerable range. `pnpm audit` should report nothing; anything it
 # does report is new.
 overrides:
   "@types/react": 19.2.2
