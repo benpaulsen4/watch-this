@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircle, Check, Edit3,Globe, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import Dropdown from "@/components/ui/Dropdown";
@@ -14,47 +14,49 @@ type Props = {
   onUserUpdate: () => Promise<void> | void;
 };
 
+function supportedTimezones(): string[] {
+  try {
+    // Type-safe check for supportedValuesOf method
+    const intlWithSupported = Intl as typeof Intl & {
+      supportedValuesOf?: (type: string) => string[];
+    };
+
+    const supported = intlWithSupported.supportedValuesOf
+      ? intlWithSupported.supportedValuesOf("timeZone")
+      : [];
+    if (supported && Array.isArray(supported) && supported.length > 0) {
+      if (!supported.includes("UTC")) supported.push("UTC"); // UTC not included in chrome supported list
+      return supported;
+    }
+    // Fallback small list
+    return [
+      "UTC",
+      "America/Los_Angeles",
+      "America/New_York",
+      "Europe/London",
+      "Europe/Paris",
+      "Asia/Tokyo",
+      "Asia/Singapore",
+      "Australia/Sydney",
+    ];
+  } catch {
+    return ["UTC"];
+  }
+}
+
 export function TimezoneSelector({ user, onUserUpdate }: Props) {
-  const [timezones, setTimezones] = useState<string[]>([]);
+  const timezones = useMemo(() => supportedTimezones(), []);
   const [timezone, setTimezone] = useState<string>(user.timezone || "UTC");
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Populate supported timezones (browser only)
-    try {
-      // Type-safe check for supportedValuesOf method
-      const intlWithSupported = Intl as typeof Intl & {
-        supportedValuesOf?: (type: string) => string[];
-      };
-
-      const supported = intlWithSupported.supportedValuesOf
-        ? intlWithSupported.supportedValuesOf("timeZone")
-        : [];
-      if (supported && Array.isArray(supported) && supported.length > 0) {
-        if (!supported.includes("UTC")) supported.push("UTC"); // UTC not included in chrome supported list
-        setTimezones(supported);
-      } else {
-        // Fallback small list
-        setTimezones([
-          "UTC",
-          "America/Los_Angeles",
-          "America/New_York",
-          "Europe/London",
-          "Europe/Paris",
-          "Asia/Tokyo",
-          "Asia/Singapore",
-          "Australia/Sydney",
-        ]);
-      }
-    } catch {
-      setTimezones(["UTC"]);
-    }
-  }, []);
-
-  useEffect(() => {
+  // Re-sync the selection when the saved timezone changes (adjusting state
+  // during render rather than in an effect, per the React docs).
+  const [syncedTimezone, setSyncedTimezone] = useState(user.timezone);
+  if (user.timezone !== syncedTimezone) {
+    setSyncedTimezone(user.timezone);
     setTimezone(user.timezone || "UTC");
-  }, [user.timezone]);
+  }
 
   const handleSave = async () => {
     setError(null);
